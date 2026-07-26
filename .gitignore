@@ -47,3 +47,8 @@ net/
 game_output.log
 TEMPLATE_LICENSE.txt
 *.log
+*.zip
+CLAUDE.md
+tools/
+docs/渲染体系.md
+docs/重构方案-双FBO解耦.md

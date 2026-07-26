@@ -58,7 +58,7 @@ public abstract class FrozenEntityRenderMixin {
             model.renderToBuffer(poseStack, stunConsumer, packedLight, OverlayTexture.NO_OVERLAY);
         }
 
-        if (isInvincible) {
+        if (isInvincible && !isStunned) {
             VertexConsumer invConsumer = bufferSource.getBuffer(com.plumejade.lensouls.boss.InvincibleGlintRenderTypes.bodyGlint());
             model.renderToBuffer(poseStack, invConsumer, packedLight, OverlayTexture.NO_OVERLAY);
         }

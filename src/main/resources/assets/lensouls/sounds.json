@@ -54,5 +54,17 @@
         "stream": false
       }
     ]
+  },
+  "boss.toughness_fail": {
+    "sounds": [
+      {
+        "name": "lensouls:boss/toughness_fail1",
+        "stream": false
+      },
+      {
+        "name": "lensouls:boss/toughness_fail2",
+        "stream": false
+      }
+    ]
   }
 }

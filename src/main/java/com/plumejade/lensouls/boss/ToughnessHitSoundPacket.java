@@ -3,11 +3,11 @@ package com.plumejade.lensouls.boss;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.sound.ModSounds;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.Holder;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -18,10 +18,11 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Random;
 
 /**
- * S2C：BOSS 韧性被削减时播放松弛音效。
+ * S2C：BOSS 韧性相关音效。
  * <p>
- * 由服务端 {@link BossToughnessManager#hit(LivingEntity)} 发出，
- * 客户端收到后随机播放 4 个韧性变化音效之一，并浮动音量和音调。
+ * {@code fail=false} 播放削韧成功音效（toughness_change），
+ * {@code fail=true} 播放无敌阻挡音效（toughness_fail）。
+ * 音量和音调均有随机浮动。
  */
 public class ToughnessHitSoundPacket implements CustomPacketPayload {
 
@@ -33,17 +34,21 @@ public class ToughnessHitSoundPacket implements CustomPacketPayload {
             StreamCodec.ofMember(ToughnessHitSoundPacket::encode, ToughnessHitSoundPacket::new);
 
     private final int entityId;
+    private final boolean fail;  // true = 无敌阻挡音效，false = 削韧成功音效
 
-    public ToughnessHitSoundPacket(int entityId) {
+    public ToughnessHitSoundPacket(int entityId, boolean fail) {
         this.entityId = entityId;
+        this.fail = fail;
     }
 
     private ToughnessHitSoundPacket(RegistryFriendlyByteBuf buf) {
         this.entityId = buf.readInt();
+        this.fail = buf.readBoolean();
     }
 
     private void encode(RegistryFriendlyByteBuf buf) {
         buf.writeInt(entityId);
+        buf.writeBoolean(fail);
     }
 
     @Override
@@ -61,14 +66,14 @@ public class ToughnessHitSoundPacket implements CustomPacketPayload {
             Entity entity = level.getEntity(packet.entityId);
             if (!(entity instanceof LivingEntity le) || !le.isAlive()) return;
 
-            // 随机浮动音量 [0.7 ~ 1.2] + 音调 [0.8 ~ 1.2]
+            SoundEvent sound = packet.fail ? ModSounds.TOUGHNESS_FAIL.get() : ModSounds.TOUGHNESS_CHANGE.get();
             Random rng = new Random();
             float volume = 0.7f + rng.nextFloat() * 0.5f;
             float pitch  = 0.8f + rng.nextFloat() * 0.4f;
 
             level.playLocalSound(
                     le.getX(), le.getY() + le.getBbHeight() * 0.5, le.getZ(),
-                    ModSounds.TOUGHNESS_CHANGE.get(),
+                    sound,
                     SoundSource.PLAYERS,
                     volume, pitch,
                     false

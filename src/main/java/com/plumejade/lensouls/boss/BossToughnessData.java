@@ -65,11 +65,14 @@ public class BossToughnessData {
 
     // ========== 削韧 ==========
 
-    /** 拍照成功时调用，削 1 次韧性 */
-    public void hit() {
-        if (broken || requiredHits <= 0) return;
-        // 无敌窗口内不能削韧
-        if (invincibleTicks > 0) return;
+    /**
+     * 削韧一击。
+     * @return true = 成功削韧；false = 被无敌或破刹状态阻挡
+     */
+    public boolean hit() {
+        if (broken) return false;
+        if (requiredHits <= 0) return false;
+        if (invincibleTicks > 0) return false;
 
         currentHits = Math.min(currentHits + 1, requiredHits);
         invincibleTicks = 60;  // 3 秒无敌窗口
@@ -82,6 +85,7 @@ public class BossToughnessData {
             broken = true;
             stunRemainingTicks = -1;  // 由调用方设置具体时长
         }
+        return true;
     }
 
     /** 调用方在确认破防后设置定身持续时间 */
@@ -108,12 +112,13 @@ public class BossToughnessData {
         }
     }
 
-    /** 重置韧性 */
+    /** 重置韧性（同时清除无敌窗口） */
     public void reset() {
         this.currentHits = 0;
         this.broken = false;
         this.stunRemainingTicks = 0;
         this.recoveryTicks = 0;
+        this.invincibleTicks = 0;
     }
 
     /** 破防结束时调用（由调用方决定何时结束） */

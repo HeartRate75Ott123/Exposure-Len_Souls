@@ -74,16 +74,22 @@ public class BossToughnessManager {
         // 破刹期间不接受外来削韧（防止反复触发定身重置、音效、广播）
         if (data.isBroken()) return data;
 
-        data.hit();
+        boolean wasInvincible = data.isInvincible();
+        boolean actuallyHit = data.hit();
         boolean isBroken = data.isBroken();
 
         // 广播削韧粒子和音效给追踪者
         if (!entity.level().isClientSide) {
-            // 破防时不发削韧橙粒子，由 onToughnessBroken 发破韧粒子（十字+冲击波）
-            if (!isBroken) {
-                PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessParticlePacket(entity.getId(), false));
+            if (actuallyHit) {
+                // 成功削韧：发橙色削韧粒子（破防时由 onToughnessBroken 发破韧粒子）
+                if (!isBroken) {
+                    PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessParticlePacket(entity.getId(), false));
+                }
+                PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessHitSoundPacket(entity.getId(), false));
+            } else if (wasInvincible) {
+                // 无敌窗口阻挡：发失败音效
+                PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessHitSoundPacket(entity.getId(), true));
             }
-            PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessHitSoundPacket(entity.getId()));
         }
 
         if (isBroken) {
@@ -130,7 +136,7 @@ public class BossToughnessManager {
 
         // 播放韧性重置音效
         PacketDistributor.sendToPlayersTrackingEntity(entity,
-                new ToughnessHitSoundPacket(entity.getId()));
+                new ToughnessHitSoundPacket(entity.getId(), false));
 
 
         // 广播恢复后的状态
@@ -192,7 +198,7 @@ public class BossToughnessManager {
                         Entity entity = sl.getEntity(uuid);
                         if (entity instanceof LivingEntity le && le.isAlive()) {
                             PacketDistributor.sendToPlayersTrackingEntity(le,
-                                    new ToughnessHitSoundPacket(le.getId()));
+                                    new ToughnessHitSoundPacket(le.getId(), false));
                             break;
                         }
                     }

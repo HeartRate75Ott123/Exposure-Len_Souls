@@ -89,9 +89,11 @@ public class GravityGunItem extends Item {
             }
         }
 
-        // 音效
+        // 音效（音量和音调大范围浮动）
+        float vol = 0.6f + player.getRandom().nextFloat() * 0.8f;
+        float pit = 0.6f + player.getRandom().nextFloat() * 0.8f;
         level.playSound(null, player.getX(), player.getY(), player.getZ(),
-                ModSounds.GRAVITY_SHOOT.get(), SoundSource.PLAYERS, 1.0f, 1.0f);
+                ModSounds.GRAVITY_SHOOT.get(), SoundSource.PLAYERS, vol, pit);
     }
 
     @Override

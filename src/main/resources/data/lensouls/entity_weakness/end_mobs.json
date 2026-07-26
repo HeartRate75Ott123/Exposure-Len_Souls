@@ -1,0 +1,15 @@
+{
+  "minecraft:enderman": { "ender": 2.0 },
+  "minecraft:endermite": { "ender": 2.0 },
+  "minecraft:shulker": { "ender": 1.5 },
+  "minecraft:ender_dragon": { "ender": 1.5 },
+
+  "cataclysm:ender_guardian": { "ender": 1.5 },
+  "cataclysm:ender_golem": { "ender": 1.5 },
+  "cataclysm:endermaptera": { "ender": 2.0 },
+
+  "legendary_monsters:endersent": { "ender": 2.0 },
+  "legendary_monsters:chorusling": { "ender": 2.0 },
+  "legendary_monsters:shulker_mimic": { "ender": 1.5 },
+  "legendary_monsters:the_obliterator": { "ender": 2.0 }
+}

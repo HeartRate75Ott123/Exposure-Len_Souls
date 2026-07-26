@@ -1,0 +1,20 @@
+{
+    "vertex": "lensouls:soul_glow_composite",
+    "fragment": "lensouls:soul_glow_composite",
+    "samplers": [
+        { "name": "DiffuseSampler" }
+    ],
+    "attributes": [ "Position", "UV0" ],
+    "uniforms": [
+        { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "ScreenSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
+        { "name": "Color1", "type": "float", "count": 4, "values": [ 1.0, 0.4, 0.0, 1.0 ] },
+        { "name": "Color2", "type": "float", "count": 4, "values": [ 1.0, 0.8, 0.0, 1.0 ] },
+        { "name": "Color3", "type": "float", "count": 4, "values": [ 1.0, 0.2, 0.0, 1.0 ] },
+        { "name": "Color4", "type": "float", "count": 4, "values": [ 0.8, 0.0, 0.0, 1.0 ] },
+        { "name": "GlowStrength", "type": "float", "count": 1, "values": [ 1.0 ] },
+        { "name": "OutlineWidth", "type": "float", "count": 1, "values": [ 2.0 ] },
+        { "name": "GameTime", "type": "float", "count": 1, "values": [ 0.0 ] }
+    ]
+}

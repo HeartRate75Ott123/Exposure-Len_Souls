@@ -1,0 +1,19 @@
+{
+  "vertex": "lensouls:soul_outline",
+  "fragment": "lensouls:soul_outline",
+  "samplers": [
+    { "name": "DiffuseSampler" }
+  ],
+  "attributes": [ "Position", "UV0" ],
+  "uniforms": [
+    { "name": "ScreenSize",      "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
+    { "name": "PaletteColor0",   "type": "float", "count": 3, "values": [ 1.0, 0.271, 0.0 ] },
+    { "name": "PaletteColor1",   "type": "float", "count": 3, "values": [ 1.0, 0.843, 0.0 ] },
+    { "name": "PaletteColor2",   "type": "float", "count": 3, "values": [ 0.898, 0.165, 0.0 ] },
+    { "name": "PaletteColor3",   "type": "float", "count": 3, "values": [ 0.545, 0.0, 0.0 ] },
+    { "name": "PaletteSize",     "type": "float", "count": 1, "values": [ 4.0 ] },
+    { "name": "GlowStrength",    "type": "float", "count": 1, "values": [ 0.7 ] },
+    { "name": "Time",            "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "DebugMode",       "type": "float", "count": 1, "values": [ 0.0 ] }
+  ]
+}

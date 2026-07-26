@@ -1,0 +1,92 @@
+#version 150
+
+uniform sampler2D DiffuseSampler;
+uniform vec2 ScreenSize;
+uniform float Time;
+
+uniform vec4 BossColor1;
+uniform vec4 BossColor2;
+uniform vec4 BossColor3;
+uniform vec4 BossColor4;
+uniform float BossGlowStrength;
+uniform float BossOutlineWidth;
+
+in vec2 texCoord0;
+
+out vec4 fragColor;
+
+void main() {
+    vec2 s = 3.0 / ScreenSize;
+
+    float tl = texture(DiffuseSampler, texCoord0 + vec2(-s.x,  s.y)).a;
+    float tc = texture(DiffuseSampler, texCoord0 + vec2( 0.0,  s.y)).a;
+    float tr = texture(DiffuseSampler, texCoord0 + vec2( s.x,  s.y)).a;
+    float ml = texture(DiffuseSampler, texCoord0 + vec2(-s.x,  0.0)).a;
+    float mr = texture(DiffuseSampler, texCoord0 + vec2( s.x,  0.0)).a;
+    float bl = texture(DiffuseSampler, texCoord0 + vec2(-s.x, -s.y)).a;
+    float bc = texture(DiffuseSampler, texCoord0 + vec2( 0.0, -s.y)).a;
+    float br = texture(DiffuseSampler, texCoord0 + vec2( s.x, -s.y)).a;
+
+    float gx = -tl - 2.0*tc - tr + bl + 2.0*bc + br;
+    float gy = -tl - 2.0*ml - bl + tr + 2.0*mr + br;
+    float edge = sqrt(gx*gx + gy*gy);
+
+    if (edge < 0.04) discard;
+
+    float flow = texCoord0.x * 4.0 + texCoord0.y * 2.5 + Time * 6.0;
+    float phase = sin(flow) * 0.5 + 0.5;
+
+    vec3 color;
+    float bossAlpha;
+
+    if (BossGlowStrength > 0.0) {
+        float c3on = dot(BossColor3.rgb, vec3(1.0)) > 0.001 ? 1.0 : 0.0;
+        float c4on = dot(BossColor4.rgb, vec3(1.0)) > 0.001 ? 1.0 : 0.0;
+        // cos² 平滑权重混合：无 floor/fract/mod，完全无缝
+        float activeCount = 2.0 + c3on + c4on;
+        float flow = texCoord0.x * 3.2 + texCoord0.y * 1.1 + Time * 1.2;
+        float angle = flow * 6.2832;
+        float step = 6.2832 / activeCount;
+
+        vec3 accum = vec3(0.0);
+        float total = 0.0;
+
+        float w = 0.5 + 0.5 * cos(angle);
+        w *= w;  accum += w * BossColor1.rgb;  total += w;
+
+        w = 0.5 + 0.5 * cos(angle - step);
+        w *= w;  accum += w * BossColor2.rgb;  total += w;
+
+        if (c3on > 0.5) {
+            w = 0.5 + 0.5 * cos(angle - step * 2.0);
+            w *= w;  accum += w * BossColor3.rgb;  total += w;
+        }
+
+        if (c4on > 0.5) {
+            w = 0.5 + 0.5 * cos(angle - step * 3.0);
+            w *= w;  accum += w * BossColor4.rgb;  total += w;
+        }
+
+        color = accum / max(total, 0.001);
+        bossAlpha = BossGlowStrength;
+    } else {
+        vec3 deepIce  = vec3(0.133, 0.333, 0.8);
+        vec3 midIce   = vec3(0.333, 0.667, 1.0);
+        vec3 brightIce = vec3(0.667, 0.933, 1.0);
+
+        if (phase < 0.5) {
+            color = mix(deepIce, midIce, phase * 2.0);
+        } else {
+            color = mix(midIce, brightIce, (phase - 0.5) * 2.0);
+        }
+        bossAlpha = 1.0;
+    }
+
+    float core = smoothstep(0.04, 0.40, edge);
+
+    float intensity = core;
+    vec3 finalColor = color;
+    float alpha = clamp(intensity * 1.5 * bossAlpha, 0.2, 0.95);
+
+    fragColor = vec4(finalColor, alpha);
+}

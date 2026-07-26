@@ -1,0 +1,17 @@
+{
+  "required": false,
+  "package": "com.plumejade.lensouls.mixin.compat",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "lensouls.compat.mixins.refmap.json",
+  "mixins": [
+    "PolaroidFixMixin",
+    "BetterCombatRangeMixin",
+    "IrisBufferSourceGetBufferMixin",
+    "StackedPhotoStackingMixin",
+    "LightroomInjectMixin",
+    "PolaroidPrintMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

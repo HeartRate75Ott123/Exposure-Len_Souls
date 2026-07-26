@@ -1,0 +1,29 @@
+{
+  "required": true,
+  "package": "com.plumejade.lensouls.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "lensouls.mixins.refmap.json",
+  "mixins": [
+    "SoulOutlineMixinTrigger",
+    "ability.PlayerInteractionMixin",
+    "BossDetectionMixin"
+  ],
+  "client": [
+    "client.FrozenEntityRenderMixin",
+    "client.BufferSourceGetBufferMixin",
+    "client.BossEntityRenderMixin",
+    "client.GameRendererMixin",
+    "client.GunBowAnimationMixin",
+    "client.ItemInHandRendererMixin",
+    "client.ItemRendererMixin",
+    "client.ItemRendererAccessor",
+    "client.ItemInHandLayerMixin",
+    "client.PlayerClientMixin",
+    "client.MultiPlayerGameModeMixin",
+    "client.GameRendererFrameEndMixin",
+    "client.LivingEntityPhantomMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

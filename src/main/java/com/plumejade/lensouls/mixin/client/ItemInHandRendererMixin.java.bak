@@ -1,0 +1,57 @@
+package com.plumejade.lensouls.mixin.client;
+
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.plumejade.lensouls.ability.client.BossOutlineManager;
+import com.plumejade.lensouls.ability.client.ItemRenderTracker;
+import com.plumejade.lensouls.client.outline.BossOutlineColors;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.ItemInHandRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+/**
+ * 第一人称手部渲染 BOSS mask 捕获。
+ * <p>
+ * tryStartCapture 做帧级去重：PA 已通过实体渲染捕获则跳过；
+ * 无 PA 时直接捕获手持物品。
+ */
+@Mixin(value = ItemInHandRenderer.class, priority = 900)
+public abstract class ItemInHandRendererMixin {
+
+    @Inject(method = "renderHandsWithItems", at = @At("HEAD"), require = 1)
+    private void lensouls$beforeRenderHands(float partialTick, PoseStack poseStack,
+                                             MultiBufferSource.BufferSource bufferSource,
+                                             LocalPlayer player, int packedLight,
+                                             CallbackInfo ci) {
+        // 空手时不对手臂描边
+        if (player.getMainHandItem().isEmpty() && player.getOffhandItem().isEmpty()) {
+            return;
+        }
+
+        BossOutlineColors colors = BossOutlineColors.fromEntity(player);
+        if (colors == null) return;
+
+        // tryStartCapture 做帧级去重：PA 已通过实体渲染捕获则跳过
+        if (!BossOutlineManager.tryStartCapture(player.getId())) return;
+
+        ItemRenderTracker.beginItemRender();
+        BossOutlineManager.setColors(colors);
+    }
+
+    @Inject(method = "renderHandsWithItems", at = @At("RETURN"), require = 1)
+    private void lensouls$afterRenderHands(float partialTick, PoseStack poseStack,
+                                            MultiBufferSource.BufferSource bufferSource,
+                                            LocalPlayer player, int packedLight,
+                                            CallbackInfo ci) {
+        if (!BossOutlineManager.isCapturing()) {
+            ItemRenderTracker.endItemRender();
+            return;
+        }
+        BossOutlineManager.flushMask();
+        BossOutlineManager.endCapture();
+        ItemRenderTracker.endItemRender();
+    }
+}

@@ -1,0 +1,58 @@
+{
+  "gun.shoot": {
+    "sounds": [
+      {
+        "name": "lensouls:gun/shoot",
+        "stream": false
+      }
+    ]
+  },
+  "gun.mode_change": {
+    "sounds": [
+      {
+        "name": "lensouls:gun/modechange1",
+        "stream": false
+      },
+      {
+        "name": "lensouls:gun/modechange2",
+        "stream": false
+      }
+    ]
+  },
+  "gun.bullet_change": {
+    "sounds": [
+      {
+        "name": "lensouls:gun/bullet_change",
+        "stream": false
+      }
+    ]
+  },
+  "gravity.shoot": {
+    "sounds": [
+      {
+        "name": "lensouls:gun/dragshoot",
+        "stream": false
+      }
+    ]
+  },
+  "boss.toughness_change": {
+    "sounds": [
+      {
+        "name": "lensouls:boss/toughness_change1",
+        "stream": false
+      },
+      {
+        "name": "lensouls:boss/toughness_change2",
+        "stream": false
+      },
+      {
+        "name": "lensouls:boss/toughness_change3",
+        "stream": false
+      },
+      {
+        "name": "lensouls:boss/toughness_change4",
+        "stream": false
+      }
+    ]
+  }
+}

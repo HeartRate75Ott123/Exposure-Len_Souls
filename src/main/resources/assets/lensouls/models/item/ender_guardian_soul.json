@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "lensouls:item/len_souls/cataclysim/ender_guardian_soul"
+  }
+}

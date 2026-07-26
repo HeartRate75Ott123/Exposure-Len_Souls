@@ -1,0 +1,22 @@
+{
+    "vertex": "lensouls:rendertype_soul_item_glow",
+    "fragment": "lensouls:rendertype_soul_item_glow",
+    "samplers": [
+        { "name": "Sampler0" }
+    ],
+    "attributes": [ "Position", "Color", "UV0", "UV1", "UV2", "Normal" ],
+    "uniforms": [
+        { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "ColorModulator", "type": "float", "count": 4, "values": [ 1.0, 1.0, 1.0, 1.0 ] },
+        { "name": "GameTime", "type": "float", "count": 1, "values": [ 0.0 ] },
+        { "name": "BossColor1", "type": "float", "count": 3, "values": [ 1.0, 0.8, 0.0 ] },
+        { "name": "BossColor2", "type": "float", "count": 3, "values": [ 1.0, 0.5, 0.0 ] },
+        { "name": "BossColor3", "type": "float", "count": 3, "values": [ 0.8, 0.2, 0.2 ] },
+        { "name": "BossColor4", "type": "float", "count": 3, "values": [ 0.5, 0.0, 0.2 ] },
+        { "name": "GlowIntensity", "type": "float", "count": 1, "values": [ 1.0 ] },
+        { "name": "UseTextureAlpha", "type": "float", "count": 1, "values": [ 1.0 ] },
+        { "name": "OutlineWidth", "type": "float", "count": 1, "values": [ 0.02 ] },
+        { "name": "UseGlowExpansion", "type": "float", "count": 1, "values": [ 0.0 ] }
+    ]
+}

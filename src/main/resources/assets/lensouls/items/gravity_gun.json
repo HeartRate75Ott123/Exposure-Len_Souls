@@ -1,0 +1,9 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "lensouls:item/gravity_gun"
+  },
+  "properties": {
+    "hand_animation_on_swap": false
+  }
+}

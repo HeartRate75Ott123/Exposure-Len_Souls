@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "IPI",
+    "OCO",
+    "IOI"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "P": { "item": "minecraft:ender_pearl" },
+    "C": { "item": "minecraft:chest" },
+    "O": { "item": "minecraft:obsidian" }
+  },
+  "result": {
+    "id": "lensouls:converter"
+  }
+}

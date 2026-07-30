@@ -301,11 +301,10 @@ public class BossToughnessManager {
         ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
         String idStr = id.toString();
 
-        // 遍历覆盖配置：格式 "modid:entityid:count"
+        // 1. 配置文件覆盖：格式 "modid:entityid:count"
         for (String entry : Config.TOUGHNESS_HITS_OVERRIDES.get()) {
             String[] parts = entry.split(":");
             if (parts.length >= 3) {
-                // 取前两段作为实体 ID（entity ID 内部也可能含 :，所以 join 前 n-1 段）
                 String entryId = parts[0] + ":" + parts[1];
                 if (entryId.equals(idStr)) {
                     try {
@@ -315,6 +314,13 @@ public class BossToughnessManager {
             }
         }
 
+        // 2. BossToughnessAttributes 硬编码覆盖
+        int attrHits = BossToughnessAttributes.getRequiredHits(entity);
+        if (attrHits != Config.TOUGHNESS_DEFAULT_HITS.get()) {
+            return attrHits;
+        }
+
+        // 3. 默认值
         return Config.TOUGHNESS_DEFAULT_HITS.get();
     }
 

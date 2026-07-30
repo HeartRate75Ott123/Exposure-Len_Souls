@@ -132,7 +132,34 @@ public class Config {
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> TOUGHNESS_HITS_OVERRIDES = BUILDER
             .comment("Per-entity override: \"modid:entityid:count\"",
                     "Example: \"cataclysm:ignis:8\" (Ignis needs 8 hits); \"legendary_monsters:cloud_golem:3\" (Cloud Golem needs 3 hits)")
-            .defineListAllowEmpty("toughnessHitsOverrides", java.util.List.of(), () -> "", o -> o instanceof String);
+            .defineListAllowEmpty("toughnessHitsOverrides", java.util.List.of(
+                    "legendary_monsters:overgrown_colossus:8",
+                    "legendary_monsters:dune_sentinel:8",
+                    "legendary_monsters:skeletosaurus:8",
+                    "legendary_monsters:lava_eater:8",
+                    "legendary_monsters:frostbitten_golem:8",
+                    "legendary_monsters:ancient_guardian:8",
+                    "block_factorys_bosses:yeti:8",
+                    "legendary_monsters:withered_abomination:8",
+                    "cataclysm:maledictus:9",
+                    "cataclysm:netherite_monstrosity:9",
+                    "cataclysm:scylla:9",
+                    "cataclysm:ancient_remnant:9",
+                    "cataclysm:the_harbinger:9",
+                    "legendary_monsters:shulker_mimic:10",
+                    "legendary_monsters:endersent:10",
+                    "legendary_monsters:annihilation_pursuer:10",
+                    "legendary_monsters:posessed_paladin:10",
+                    "legendary_monsters:cloud_golem:10",
+                    "minecraft:wither:10",
+                    "minecraft:warden:10",
+                    "cataclysm:the_leviathan:12",
+                    "cataclysm:ender_guardian:12",
+                    "minecraft:ender_dragon:12",
+                    "cataclysm:ignis:20",
+                    "block_factorys_bosses:underworld_knight:20",
+                    "legendary_monsters:the_obliterator:20"
+            ), () -> "", o -> o instanceof String);
 
     static { BUILDER.pop(); }
 

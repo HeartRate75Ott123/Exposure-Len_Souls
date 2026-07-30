@@ -13,6 +13,7 @@ import com.plumejade.lensouls.boss.ToughnessParticlePacket;
 import com.plumejade.lensouls.boss.ToughnessSyncPacket;
 import com.plumejade.lensouls.client.render.BossPhantomRenderer;
 import com.plumejade.lensouls.entity.ModEntities;
+import com.plumejade.lensouls.effect.ElementInfusionEffect;
 import com.plumejade.lensouls.effect.ModEffects;
 import com.plumejade.lensouls.entity.BossPhantomType;
 import com.plumejade.lensouls.gui.ConverterScreen;
@@ -27,12 +28,14 @@ import com.plumejade.lensouls.network.PhantomTickPacket;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceProvider;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.GatherEffectScreenTooltipsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
@@ -76,6 +79,8 @@ public class LenSoulsClient {
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onClientLogout);
         // 客户端元素螺旋粒子 Tick 驱动
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.particle.ClientElementSpiralHandler::onClientTick);
+        // 药水效果 tooltip 追加描述行
+        NeoForge.EVENT_BUS.addListener(LenSoulsClient::onGatherEffectTooltips);
     }
 
     /** 注册菜单界面到 RegisterMenuScreensEvent */
@@ -348,5 +353,17 @@ public class LenSoulsClient {
                 com.plumejade.lensouls.network.ElementSpiralPacket.STREAM_CODEC,
                 com.plumejade.lensouls.network.ElementSpiralPacket::handle
         );
+    }
+
+    private static void onGatherEffectTooltips(GatherEffectScreenTooltipsEvent event) {
+        MobEffectInstance inst = event.getEffectInstance();
+        if (!(inst.getEffect().value() instanceof ElementInfusionEffect)) return;
+        Component desc = Component.translatable(inst.getDescriptionId() + ".description");
+        String raw = desc.getString();
+        if (raw.isEmpty() || raw.equals(inst.getDescriptionId() + ".description")) return;
+        String[] lines = raw.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            event.getTooltip().add(1 + i, Component.literal(lines[i]));
+        }
     }
 }

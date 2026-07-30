@@ -36,8 +36,7 @@ public class AbilityManager {
     // ========== 公开 API ==========
 
     public AbilityType getEnabled(Player player) {
-        AbilityType t = get(player).getEnabled();
-        return t;
+        return get(player).getEnabled();
     }
 
     /**
@@ -51,17 +50,17 @@ public class AbilityManager {
         save(player, data);
         syncToClient(player);
         if (next != null) {
-            // 聊天栏绿色播报
             player.sendSystemMessage(
                     Component.translatable("ability.lensouls." + next.getId() + ".name")
                             .copy().withStyle(net.minecraft.ChatFormatting.GREEN));
             return true;
         } else {
-            // 孤例播报：仅一个能力时也播报当前能力名（绿色）
             AbilityType current = data.getEnabled();
-            player.sendSystemMessage(
-                    Component.translatable("ability.lensouls." + current.getId() + ".name")
-                            .copy().withStyle(net.minecraft.ChatFormatting.GREEN));
+            if (current != null) {
+                player.sendSystemMessage(
+                        Component.translatable("ability.lensouls." + current.getId() + ".name")
+                                .copy().withStyle(net.minecraft.ChatFormatting.GREEN));
+            }
             return false;
         }
     }
@@ -176,7 +175,8 @@ public class AbilityManager {
             wDim = data.getWarpDimension();
         }
         PacketDistributor.sendToPlayer(player,
-                new AbilitySyncPacket(enabled.ordinal(), swActive, wx, wy, wz, wDim));
+                new AbilitySyncPacket(enabled != null ? enabled.ordinal() : -1,
+                        swActive, wx, wy, wz, wDim));
     }
 
     // ========== 持久化 ==========

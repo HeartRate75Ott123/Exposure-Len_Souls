@@ -34,7 +34,7 @@ public class AcquisitionHandler {
             boolean isInstant = event.getEntity().getRandom().nextBoolean();
             String filmId;
             if (isInstant) {
-                filmId = isColor ? "exposure_polaroid:instant_color_film" : "exposure_polaroid:instant_black_and_white_film";
+                filmId = isColor ? "exposure_polaroid:instant_color_slide" : "exposure_polaroid:instant_black_and_white_slide";
             } else {
                 filmId = isColor ? "exposure:color_film" : "exposure:black_and_white_film";
             }

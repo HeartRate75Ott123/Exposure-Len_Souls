@@ -14,7 +14,7 @@ import net.minecraft.world.phys.Vec3;
  */
 public class ClientAbilityCache {
 
-    private static AbilityType currentEnabled = AbilityType.WEAKNESS_LENS;
+    private static AbilityType currentEnabled;
     private static boolean spatialWarpActive = false;
     private static Vec3 warpCenter = Vec3.ZERO;
     private static String warpDimension = "";

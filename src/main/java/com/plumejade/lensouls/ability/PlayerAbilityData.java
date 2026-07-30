@@ -38,18 +38,16 @@ public class PlayerAbilityData {
     }
 
     public AbilityType getEnabled() {
-        AbilityType t = AbilityType.values()[currentOrdinal];
-        if (!unlocked[t.ordinal()]) {
-            // 兜底：当前能力被锁定 → 寻找第一个已解锁的能力
-            for (int i = 0; i < COUNT; i++) {
-                if (unlocked[i]) {
-                    currentOrdinal = i;
-                    return AbilityType.values()[i];
-                }
-            }
-            // 没有任何已解锁的能力，返回当前（安全默认）
+        if (unlocked[currentOrdinal]) {
+            return AbilityType.values()[currentOrdinal];
         }
-        return AbilityType.values()[currentOrdinal];
+        for (int i = 0; i < COUNT; i++) {
+            if (unlocked[i]) {
+                currentOrdinal = i;
+                return AbilityType.values()[i];
+            }
+        }
+        return null;
     }
 
     /** 空间扭曲是否激活（有坐标圈） */

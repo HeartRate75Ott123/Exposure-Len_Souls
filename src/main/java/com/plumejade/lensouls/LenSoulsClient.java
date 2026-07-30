@@ -376,20 +376,24 @@ public class LenSoulsClient {
         try {
             Class<?> eventClass = Class.forName(
                     "fuzs.stylisheffects.neoforge.api.v1.client.NeoForgeMobEffectWidgetEvent$EffectTooltip");
-            var addListener = IEventBus.class.getMethod("addListener", Class.class, Consumer.class);
+            java.lang.reflect.Method addListenerMethod =
+                    IEventBus.class.getMethod("addListener", Class.class, Consumer.class);
+            java.lang.reflect.Method getContext = eventClass.getMethod("getContext");
+            Class<?> contextClass = getContext.getReturnType();
+            java.lang.reflect.Method getEffectInstance = contextClass.getMethod("getEffectInstance");
+            Class<?> effectInstClass = getEffectInstance.getReturnType();
+            java.lang.reflect.Method getEffect = effectInstClass.getMethod("getEffect");
+            Class<?> holderClass = getEffect.getReturnType();
+            java.lang.reflect.Method holderValue = holderClass.getMethod("value");
+            java.lang.reflect.Method getTooltipLines = eventClass.getMethod("getTooltipLines");
+            java.lang.reflect.Method getDescriptionId = effectInstClass.getMethod("getDescriptionId");
             Consumer handler = event -> {
                 try {
-                    var getContext = eventClass.getMethod("getContext");
-                    Object context = getContext.invoke(event);
-                    var getEffect = context.getClass().getMethod("getEffectInstance");
-                    Object mobEffectInst = getEffect.invoke(context);
-                    var effectValue = mobEffectInst.getClass().getMethod("getEffect").invoke(mobEffectInst);
-                    Object effect = effectValue.getClass().getMethod("value").invoke(effectValue);
+                    Object mobEffectInst = getEffectInstance.invoke(getContext.invoke(event));
+                    Object effect = holderValue.invoke(getEffect.invoke(mobEffectInst));
                     if (!(effect instanceof ElementInfusionEffect)) return;
-                    var getTooltipLines = eventClass.getMethod("getTooltipLines");
                     List<Component> tooltip = (List<Component>) getTooltipLines.invoke(event);
-                    String descKey = (String) mobEffectInst.getClass()
-                            .getMethod("getDescriptionId").invoke(mobEffectInst);
+                    String descKey = (String) getDescriptionId.invoke(mobEffectInst);
                     Component desc = Component.translatable(descKey + ".description");
                     String raw = desc.getString();
                     if (raw.isEmpty() || raw.equals(descKey + ".description")) return;
@@ -400,7 +404,7 @@ public class LenSoulsClient {
                 } catch (Exception ignored) {
                 }
             };
-            addListener.invoke(NeoForge.EVENT_BUS, eventClass, handler);
+            addListenerMethod.invoke(NeoForge.EVENT_BUS, eventClass, handler);
         } catch (Exception ignored) {
         }
     }

@@ -10,6 +10,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import top.theillusivec4.curios.api.CuriosApi;
+
+import java.util.Random;
 
 import java.util.Random;
 
@@ -53,45 +56,28 @@ public class TrophyModifierHandler {
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        try {
-            // 遍历所有 Curios 槽位而非仅 head
-            Class<?> curiosApi = Class.forName("top.theillusivec4.curios.api.CuriosApi");
-            var getCurios = curiosApi.getMethod("getCuriosInventory", LivingEntity.class);
-            Object optional = getCurios.invoke(null, player);
-            if (!(boolean) optional.getClass().getMethod("isPresent").invoke(optional)) return;
-            Object handler = optional.getClass().getMethod("get").invoke(optional);
-            // 获取所有槽位类型
-            Object curios = handler.getClass().getMethod("getCurios").invoke(handler);
-            if (curios instanceof java.util.Map<?, ?> map) {
-                for (var entry : map.entrySet()) {
-                    Object stacks = entry.getValue().getClass().getMethod("getStacks").invoke(entry.getValue());
-                    int slots = (int) stacks.getClass().getMethod("getSlots").invoke(stacks);
-                    for (int i = 0; i < slots; i++) {
-                        ItemStack stack = (ItemStack) stacks.getClass().getMethod("getStackInSlot", int.class).invoke(stacks, i);
-                        if (stack.isEmpty()) continue;
-                        // 只处理 TF 奖杯物品
-                        String regName = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-                        if (!regName.contains("twilightforest") || !regName.contains("trophy")) continue;
-                        LenSouls.LOGGER.info("[Trophy] 发现奖杯: {}", regName);
-                        if (getModifier(stack) != null) continue;
-                        TrophyMod mod = rollModifier();
-                        CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-                        CompoundTag mt = new CompoundTag();
-                        mt.putString("type", mod.type);
-                        mt.putFloat("value", mod.value);
-                        tag.put(TAG, mt);
-                        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-                        // 写回槽位触发同步
-                        try {
-                            stacks.getClass().getMethod("setStackInSlot", int.class, ItemStack.class).invoke(stacks, i, stack);
-                        } catch (Exception ignored) {}
-                        LenSouls.LOGGER.info("[Trophy] 生成修饰符 {} x{} 于 {}", mod.type(), mod.value(), stack.getHoverName().getString());
-                    }
+        CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
+            for (var stacksHandler : handler.getCurios().values()) {
+                var stackHandler = stacksHandler.getStacks();
+                for (int i = 0; i < stackHandler.getSlots(); i++) {
+                    ItemStack stack = stackHandler.getStackInSlot(i);
+                    if (stack.isEmpty()) continue;
+                    String regName = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                    if (!regName.contains("twilightforest") || !regName.contains("trophy")) continue;
+                    LenSouls.LOGGER.info("[Trophy] 发现奖杯: {}", regName);
+                    if (getModifier(stack) != null) continue;
+                    TrophyMod mod = rollModifier();
+                    CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+                    CompoundTag mt = new CompoundTag();
+                    mt.putString("type", mod.type);
+                    mt.putFloat("value", mod.value);
+                    tag.put(TAG, mt);
+                    stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+                    try { stacksHandler.getStacks().setStackInSlot(i, stack); } catch (Exception ignored) {}
+                    LenSouls.LOGGER.info("[Trophy] 生成修饰符 {} x{} 于 {}", mod.type(), mod.value(), stack.getHoverName().getString());
                 }
             }
-        } catch (Exception e) {
-            LenSouls.LOGGER.error("[Trophy] tick 失败", e);
-        }
+        });
     }
 
     private static java.util.List<?> findCurios(ServerPlayer player, String slot) {

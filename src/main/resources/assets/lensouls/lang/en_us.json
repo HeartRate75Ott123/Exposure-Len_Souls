@@ -33,7 +33,6 @@
   "item.lensouls.lens_tier_4": "§7Lens §8(Tier IV)",
   "message.lensouls.lens_tier_insufficient": "§cInsufficient tier! Cannot deal toughness damage. Install Soul Upgrade %s",
   "lensouls.photograph.entity_name": "§7Entity: %s",
-  "jei.lensouls.photograph_curio": "Ability-steal photo — requires Soul Photography enchantment. Equippable in Photograph slot. Entity: %s",
 
   "item.lensouls.converter": "Element Converter",
   "item.lensouls.converter.tooltip": "Right-click: Open GUI, press §e%s§7: Activate soul",
@@ -266,4 +265,6 @@
   "jei.lensouls.lens_tier_2": "Tier 2 lens — required to damage up to Tier 2 bosses' toughness",
   "jei.lensouls.lens_tier_3": "Tier 3 lens — required to damage up to Tier 3 bosses' toughness",
   "jei.lensouls.lens_tier_4": "Tier 4 lens — required to damage up to Tier 4 bosses' toughness"
+,
+  "jei.lensouls.photograph_curio": "Ability-steal photo — requires Soul Photography enchantment. Equippable in Photograph slot. Entity: %s"
 }

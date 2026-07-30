@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.integration;
 
+import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.damage.ElementDamage;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.Holder;
@@ -9,8 +10,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attribute;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
@@ -66,7 +65,6 @@ public class PhotographEffectRegistry {
         dmg("legendary_monsters:annihilation_pursuer", "物理伤害 -20%%", "minecraft:generic");
         potion("block_factorys_bosses:yeti", "冰冻免疫 + 力量 I", "minecraft:strength", 0);
         potion("block_factorys_bosses:underworld_knight", "火焰免疫 + 凋零免疫", "minecraft:fire_resistance", 0);
-        // 特殊效果
         spec("cataclysm:ignis",        "攻击时 20%% 概率施加炽焰烙印（防具 -20%%）");
         spec("cataclysm:the_leviathan", "获得海豚恩惠（水中加速）");
         spec("twilightforest:ur_ghast", "创造飞行（伤害 -90%%）");
@@ -100,12 +98,9 @@ public class PhotographEffectRegistry {
         DESCRIPTIONS.merge(entityId, desc, (old, add) -> old + "\n" + add);
     }
 
-    /** 每 tick 应用效果 */
     public static void applyEffects(LivingEntity player, String entityId) {
-        // 硬编码效果（药水/特殊）
         List<EffectEntry> list = EFFECTS.get(entityId);
         if (list != null) applyList(player, list);
-        // 同时应用 attacker_element 配置 → 元素活性 I
         var id = ResourceLocation.parse(entityId);
         if (com.plumejade.lensouls.config.AttackerElementLoader.hasMapping(id)) {
             ElementDamage elem = com.plumejade.lensouls.config.AttackerElementLoader.getElement(id);
@@ -173,13 +168,11 @@ public class PhotographEffectRegistry {
         event.getToolTip().add(Component.translatable("lensouls.photograph.entity_name",
                 Component.translatable(entityIdToTranslationKey(entityId))));
 
-        // 硬编码效果描述
         String desc = DESCRIPTIONS.get(entityId);
         if (desc != null) {
             for (String line : desc.split("\n"))
                 event.getToolTip().add(Component.literal("§7" + line));
         } else {
-            // attacker_element fallback → 元素活性 I
             var id = ResourceLocation.parse(entityId);
             if (com.plumejade.lensouls.config.AttackerElementLoader.hasMapping(id)) {
                 ElementDamage elem = com.plumejade.lensouls.config.AttackerElementLoader.getElement(id);

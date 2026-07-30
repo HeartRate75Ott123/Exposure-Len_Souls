@@ -13,6 +13,8 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import top.theillusivec4.curios.api.CuriosApi;
+import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 import java.util.*;
 
@@ -67,7 +69,6 @@ public class PhotoSpecialEffects {
         boolean hasFlightPhoto = hasEntityInGear(player, FLYING_ENTITIES::contains);
         if (hasFlightPhoto) {
             player.getAbilities().mayfly = true;
-            player.getAbilities().flying = player.getAbilities().flying || player.getAbilities().mayfly;
             player.onUpdateAbilities();
             player.getPersistentData().putBoolean(FLIGHT_TAG, true);
         } else if (player.getPersistentData().getBoolean(FLIGHT_TAG)) {
@@ -81,18 +82,18 @@ public class PhotoSpecialEffects {
 
         applyAttributes(player);
 
-        // 应用所有已装备照片的硬编码效果 + 元素活性
-        for (String slot : new String[]{"head", "photograph"}) {
-            try {
-                java.util.List<?> results = findCurios(player, slot);
-                if (results == null) continue;
-                for (Object r : results) {
-                    ItemStack stack = (ItemStack) r.getClass().getMethod("stack").invoke(r);
+        // 遍历所有 Curios 槽位应用照片效果
+        CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
+            for (var stacksHandler : handler.getCurios().values()) {
+                IDynamicStackHandler stackHandler = stacksHandler.getStacks();
+                for (int i = 0; i < stackHandler.getSlots(); i++) {
+                    ItemStack stack = stackHandler.getStackInSlot(i);
+                    if (stack.isEmpty()) continue;
                     String stolen = PhotographEffectRegistry.getStolenEntity(stack);
                     if (stolen != null) PhotographEffectRegistry.applyEffects(player, stolen);
                 }
-            } catch (Exception ignored) {}
-        }
+            }
+        });
     }
 
     @SubscribeEvent
@@ -162,37 +163,19 @@ public class PhotoSpecialEffects {
         player.getPersistentData().putString(ATTR_TAG, String.join(",", active));
     }
 
-    private static java.util.List<?> findCurios(ServerPlayer player, String slot) {
-        try {
-            Class<?> curiosApi = Class.forName("top.theillusivec4.curios.api.CuriosApi");
-            var getCurios = curiosApi.getMethod("getCuriosInventory", LivingEntity.class);
-            Object optional = getCurios.invoke(null, player);
-            if (!(boolean) optional.getClass().getMethod("isPresent").invoke(optional)) return null;
-            Object handler = optional.getClass().getMethod("get").invoke(optional);
-            return (java.util.List<?>) handler.getClass().getMethod("findCurios", String.class).invoke(handler, slot);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     public static boolean hasEntityInGear(ServerPlayer player, java.util.function.Predicate<String> predicate) {
-        try {
-            Class<?> curiosApi = Class.forName("top.theillusivec4.curios.api.CuriosApi");
-            var getCurios = curiosApi.getMethod("getCuriosInventory", LivingEntity.class);
-            Object optional = getCurios.invoke(null, player);
-            if (!(boolean) optional.getClass().getMethod("isPresent").invoke(optional)) return false;
-            Object handler = optional.getClass().getMethod("get").invoke(optional);
-            for (String slot : new String[]{"head", "photograph"}) {
-                try {
-                    var results = (java.util.List<?>) handler.getClass().getMethod("findCurios", String.class).invoke(handler, slot);
-                    if (results != null) for (Object r : results) {
-                        ItemStack stack = (ItemStack) r.getClass().getMethod("stack").invoke(r);
-                        String entity = PhotographEffectRegistry.getStolenEntity(stack);
-                        if (entity != null && predicate.test(entity)) return true;
-                    }
-                } catch (Exception ignored) {}
+        var opt = CuriosApi.getCuriosInventory(player);
+        if (opt.isEmpty()) return false;
+        var handler = opt.get();
+        for (var stacksHandler : handler.getCurios().values()) {
+            IDynamicStackHandler stackHandler = stacksHandler.getStacks();
+            for (int i = 0; i < stackHandler.getSlots(); i++) {
+                ItemStack stack = stackHandler.getStackInSlot(i);
+                if (stack.isEmpty()) continue;
+                String entity = PhotographEffectRegistry.getStolenEntity(stack);
+                if (entity != null && predicate.test(entity)) return true;
             }
-        } catch (Exception ignored) {}
+        }
         return false;
     }
 }

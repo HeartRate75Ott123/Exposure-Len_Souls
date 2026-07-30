@@ -26,6 +26,14 @@
   "element.lensouls.ender.short": "Ender",
   "element.lensouls.projectile.short": "Projectile",
   "item.lensouls.soul.boss_hint": "Also activates a special effect",
+  "lensouls.photograph.slot_hint": "§eCan be equipped in the Photograph slot",
+  "item.lensouls.lens_tier_1": "§7Lens §8(Tier I)",
+  "item.lensouls.lens_tier_2": "§7Lens §8(Tier II)",
+  "item.lensouls.lens_tier_3": "§7Lens §8(Tier III)",
+  "item.lensouls.lens_tier_4": "§7Lens §8(Tier IV)",
+  "message.lensouls.lens_tier_insufficient": "§cInsufficient lens tier! Required tier: %s",
+  "lensouls.photograph.entity_name": "§7Entity: %s",
+  "jei.lensouls.photograph_curio": "Stolen entity photo — can be equipped in the Photograph slot. Entity: %s. Right-click the photo to use.",
 
   "item.lensouls.converter": "Element Converter",
   "item.lensouls.converter.tooltip": "Right-click: Open GUI, press §e%s§7: Activate soul",
@@ -157,6 +165,12 @@
   "ability.lensouls.temporal_recall.description": "§aInjects a health and position snapshot into the photo. A lethal hit automatically consumes one recall photo to save you. Can also be triggered manually by left-clicking air with the photo.",
   "ability.lensouls.time_stop.description": "§aRight-click with a Soul Photography enchanted camera to freeze all visible entities for 5 seconds. You are unaffected.",
   "ability.lensouls.vital_strike.description": "§aRight-click with the camera without consuming film or producing a photo. Deals 1 toughness damage to the targeted boss. Requires Soul Photography enchantment.",
+  "ability.lensouls.soul_sever.name": "Soul Sever",
+  "ability.lensouls.soul_sever.description": "§aRight-click with viewfinder open: 30%% chance to deal 10-20%% current HP damage (bypasses all restrictions). Shockwave FX on success, fail sound on miss. Cooldown: 10s (success) / 0.5s (failure). No film consumed.",
+  "ability.lensouls.ability_steal.name": "Ability Steal",
+  "ability.lensouls.ability_steal.description": "§aTake a photo to capture entity data. The resulting photo can be equipped in the Photograph curio slot for element infusion or special effects. See JEI for details per entity.",
+  "item.lensouls.soul_sever_ball": "§aSkill Ball (Soul Sever)",
+  "item.lensouls.ability_steal_ball": "§aSkill Ball (Ability Steal)",
 
   "ability.lensouls.spatial_warp.enabled": "§aSpatial Warp: ON",
   "ability.lensouls.spatial_warp.disabled": "§aSpatial Warp: OFF",
@@ -204,6 +218,13 @@
   "entity.lensouls.boss_phantom.ender_guardian": "Ender Guardian Phantom",
   "entity.lensouls.boss_phantom.obliterator": "The Obliterator Phantom",
   "entity.lensouls.boss_phantom.netherite_monstrosity": "Netherite Monstrosity Phantom",
+  "entity.lensouls.boss_phantom.hydra": "Hydra Phantom",
+  "entity.lensouls.boss_phantom.knight_phantom": "Knight Phantom",
+  "entity.lensouls.boss_phantom.alpha_yeti": "Alpha Yeti Phantom",
+  "entity.lensouls.boss_phantom.naga": "Naga Phantom",
+  "entity.lensouls.boss_phantom.lava_eater": "Lava Eater Phantom",
+  "entity.lensouls.boss_phantom.the_leviathan": "The Leviathan Phantom",
+  "entity.lensouls.boss_phantom.scylla": "Scylla Phantom",
 
   "command.lensouls.skill.set": "Set §b%s §fto §e%s",
   "command.lensouls.skill.invalid": "Invalid ability: %s",
@@ -221,4 +242,23 @@
   "jade.lensouls.activity": "Element: ",
   "config.jade.plugin_lensouls.entity_weakness": "Element Weakness"
 
+,
+  "item.lensouls.hydra_soul": "Hydra Soul",
+  "item.lensouls.knight_phantom_soul": "Knight Phantom Soul",
+  "item.lensouls.alpha_yeti_soul": "Alpha Yeti Soul",
+  "item.lensouls.naga_soul": "Naga Soul",
+  "item.lensouls.lava_eater_soul": "Lava Eater Soul",
+  "item.lensouls.the_leviathan_soul": "The Leviathan Soul",
+  "item.lensouls.scylla_soul": "Scylla Soul",
+  "item.lensouls.drag_bullet": "Drag Bullet",
+  "curios.identifier.photograph": "Photograph"
+,
+  "command.lensouls.toughness.get": "Get boss toughness attributes",
+  "command.lensouls.toughness.set": "Set boss toughness attributes"
+,
+  "command.lensouls.toughness.get": "Get boss toughness attributes",
+  "command.lensouls.toughness.set": "Set boss toughness attributes",
+  "trophy.lensouls.toughness_bonus": "§6Toughness Damage x%s",
+  "trophy.lensouls.stun_extend": "§6Stun Duration +%s",
+  "trophy.lensouls.invincible_shorten": "§6Invincible Window -%s"
 }

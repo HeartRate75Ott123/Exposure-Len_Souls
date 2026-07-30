@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "lensouls:item/uplen/lens_tier_2"
+  }
+}

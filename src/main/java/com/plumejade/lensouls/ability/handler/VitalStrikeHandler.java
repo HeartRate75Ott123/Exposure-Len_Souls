@@ -3,8 +3,13 @@ package com.plumejade.lensouls.ability.handler;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.boss.BossTierLoader;
+import com.plumejade.lensouls.boss.BossToughnessAttributes;
 import com.plumejade.lensouls.boss.BossToughnessManager;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
+import com.plumejade.lensouls.item.LensItem;
+import io.github.mortuusars.exposure.Exposure;
+import io.github.mortuusars.exposure.world.item.component.StoredItemStack;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -55,12 +60,27 @@ public class VitalStrikeHandler {
         LivingEntity boss = findBossInSight(player);
         if (boss == null) return;
 
+        // ── 镜头等级检测 ──
+        int bossTier = BossTierLoader.getTier(boss);
+        if (bossTier > 0) {
+            int lensTier = getLensTier(stack);
+            if (lensTier < bossTier) {
+                player.displayClientMessage(
+                        net.minecraft.network.chat.Component.translatable("message.lensouls.lens_tier_insufficient", bossTier),
+                        true);
+                return;
+            }
+        }
+
         // ── 削韧 ──
         BossToughnessManager manager = BossToughnessManager.getInstance();
         if (!manager.has(boss)) manager.register(boss);
-        // 要害打击白霸体 15 tick（0.75s）
-        var data = manager.hit(boss);
-        if (data != null) data.setInvincibleTicks(15);
+        var data = manager.hit(boss, player);
+        if (data != null) {
+            int interval = BossToughnessAttributes.getInvincibleTicks(boss);
+            int playerInterval = com.plumejade.lensouls.integration.TrophyModifierHandler.applyInvincibleModifier(player, interval);
+            data.setInvincibleTicks(Math.max(1, playerInterval / 2));
+        }
     }
 
     // ========== 工具方法 ==========
@@ -107,5 +127,13 @@ public class VitalStrikeHandler {
             }
         }
         return closest;
+    }
+
+    private static int getLensTier(ItemStack camera) {
+        var stored = camera.get(io.github.mortuusars.exposure.Exposure.DataComponents.LENS);
+        if (stored instanceof StoredItemStack s && s.getForReading().getItem() instanceof LensItem lens) {
+            return lens.getTier();
+        }
+        return 0;
     }
 }

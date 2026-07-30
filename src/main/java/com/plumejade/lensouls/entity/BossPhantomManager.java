@@ -309,29 +309,33 @@ public class BossPhantomManager {
         }
     }
 
-    /** 幻影骑士：每 tick 维持攻击态（visible + 攻击加成），防止 AI 切回 HOVER 隐身 */
+    /** 幻影骑士：维持可见+攻击力加成，阻止 HOVER 回退，自动选敌 */
     private static void forceKnightPhantomAttackMode(Entity entity) {
         try {
             Class<?> clazz = Class.forName("twilightforest.entity.boss.KnightPhantom");
-            // FLAG_CHARGING = true → visibleSize + 攻击力+7
+            // FLAG_CHARGING = true → visibleSize + 攻击力+7（安全兜底）
             var dataAccessorField = clazz.getDeclaredField("FLAG_CHARGING");
             dataAccessorField.setAccessible(true);
             var dataAccessor = (net.minecraft.network.syncher.EntityDataAccessor<Boolean>) dataAccessorField.get(null);
             if (!entity.getEntityData().get(dataAccessor)) {
                 entity.getEntityData().set(dataAccessor, true);
             }
-            // 确保 currentFormation 不是 HOVER（AI 可能在某些 tick 切回 HOVER）
+            // formation 被 AI 切回 HOVER 时调用 switchToFormation 重新进入攻击态（正确处理 updateMyNumber + setChargingAtPlayer）
             java.lang.reflect.Field formationField = clazz.getDeclaredField("currentFormation");
             formationField.setAccessible(true);
-            Object current = formationField.get(entity);
             Class<?> formationEnum = Class.forName("twilightforest.entity.boss.KnightPhantom$Formation");
+            Object current = formationField.get(entity);
             Object hover = Enum.valueOf((Class<Enum>) formationEnum, "HOVER");
             if (current == hover) {
-                Object attack = Enum.valueOf((Class<Enum>) formationEnum, "ATTACK_PLAYER_ATTACK");
-                formationField.set(entity, attack);
-                java.lang.reflect.Field ticksField = clazz.getDeclaredField("ticksProgress");
-                ticksField.setAccessible(true);
-                ticksField.setInt(entity, 0);
+                Object attackStart = Enum.valueOf((Class<Enum>) formationEnum, "ATTACK_PLAYER_START");
+                clazz.getMethod("switchToFormation", formationEnum).invoke(entity, attackStart);
+            }
+            // 无目标时自动选敌（仅非玩家实体）
+            if (entity instanceof net.minecraft.world.entity.Mob mob && mob.getTarget() == null) {
+                net.minecraft.world.entity.LivingEntity t = findNearestEnemy(
+                        (net.minecraft.server.level.ServerLevel) entity.level(),
+                        entity.getX(), entity.getY(), entity.getZ());
+                if (t != null) mob.setTarget(t);
             }
         } catch (Exception e) {
             // 静默：TF 未加载时不会到这里

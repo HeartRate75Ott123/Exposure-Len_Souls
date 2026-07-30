@@ -80,36 +80,40 @@ public class BossToughnessManager {
 
     // ========== 削韧 ==========
 
-    /** 拍照成功时调用，削 1 次韧性，返回削韧后的数据 */
+    /** 拍照/要害打击时调用，削 1 次韧性，返回削韧后的数据 */
     public BossToughnessData hit(LivingEntity entity) {
+        return hit(entity, null);
+    }
+
+    public BossToughnessData hit(LivingEntity entity, @javax.annotation.Nullable net.minecraft.server.level.ServerPlayer player) {
         BossToughnessData data = dataMap.get(entity.getUUID());
         if (data == null) return null;
 
-        // 破刹期间不接受外来削韧（防止反复触发定身重置、音效、广播）
         if (data.isBroken()) return data;
 
         boolean wasInvincible = data.isInvincible();
-        boolean actuallyHit = data.hit();
+        int invTicks = BossToughnessAttributes.getInvincibleTicks(entity);
+        // 应用玩家头颅修饰符
+        if (player != null) {
+            invTicks = com.plumejade.lensouls.integration.TrophyModifierHandler.applyInvincibleModifier(player, invTicks);
+        }
+        boolean actuallyHit = data.hit(invTicks);
         boolean isBroken = data.isBroken();
 
-        // 广播削韧粒子和音效给追踪者
         if (!entity.level().isClientSide) {
             if (actuallyHit) {
-                // 成功削韧：发橙色削韧粒子（破防时由 onToughnessBroken 发破韧粒子）
                 if (!isBroken) {
                     PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessParticlePacket(entity.getId(), false));
                 }
                 PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessHitSoundPacket(entity.getId(), false));
             } else if (wasInvincible) {
-                // 无敌窗口阻挡：发失败音效
                 PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessHitSoundPacket(entity.getId(), true));
             }
         }
 
         if (isBroken) {
-            onToughnessBroken(entity, data);
+            onToughnessBroken(entity, data, player);
         }
-        // 广播变化到客户端
         broadcastToughness(entity);
         return data;
     }
@@ -117,12 +121,16 @@ public class BossToughnessManager {
     // ========== 破防处理 ==========
 
     private void onToughnessBroken(LivingEntity entity, BossToughnessData data) {
+        onToughnessBroken(entity, data, null);
+    }
+
+    private void onToughnessBroken(LivingEntity entity, BossToughnessData data, @javax.annotation.Nullable net.minecraft.server.level.ServerPlayer player) {
         // 发射破韧粒子（十字 + 冲击波环）
         if (!entity.level().isClientSide) {
             PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessParticlePacket(entity.getId(), true));
         }
 
-        int stunTicks = Config.TOUGH_STUN_DURATION_TICKS.get();
+        int stunTicks = BossToughnessAttributes.getStunDurationTicks(entity);
         data.setStunTicks(stunTicks);
 
         // 应用定身效果（参考 FreezeTracker 的冻结逻辑）

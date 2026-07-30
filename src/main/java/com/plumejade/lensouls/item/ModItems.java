@@ -100,6 +100,14 @@ public class ModItems {
     public static final DeferredItem<Item> VITAL_STRIKE_BALL = ITEMS.register("vital_strike_ball",
             () -> new SkillBallItem(AbilityType.VITAL_STRIKE, new Item.Properties().stacksTo(64)));
 
+    /** 夺魂索命能力球 */
+    public static final DeferredItem<Item> SOUL_SEVER_BALL = ITEMS.register("soul_sever_ball",
+            () -> new SkillBallItem(AbilityType.SOUL_SEVER, new Item.Properties().stacksTo(64)));
+
+    /** 能力窃取能力球 */
+    public static final DeferredItem<Item> ABILITY_STEAL_BALL = ITEMS.register("ability_steal_ball",
+            () -> new SkillBallItem(AbilityType.ABILITY_STEAL, new Item.Properties().stacksTo(64)));
+
     // ---- 次元枪 ----
     public static final DeferredItem<Item> DIMENSIONAL_GUN = ITEMS.register("dimensional_gun",
             () -> new DimensionalGunItem(new Item.Properties().stacksTo(1).fireResistant()));
@@ -107,6 +115,20 @@ public class ModItems {
     // ---- 引力枪 ----
     public static final DeferredItem<Item> GRAVITY_GUN = ITEMS.register("gravity_gun",
             () -> new GravityGunItem(new Item.Properties().stacksTo(1)));
+
+    // ---- 相机镜头配件 ----
+    public static final DeferredItem<LensItem> LENS_TIER_1 = ITEMS.register("lens_tier_1",
+            () -> new LensItem(1, new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<LensItem> LENS_TIER_2 = ITEMS.register("lens_tier_2",
+            () -> new LensItem(2, new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<LensItem> LENS_TIER_3 = ITEMS.register("lens_tier_3",
+            () -> new LensItem(3, new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<LensItem> LENS_TIER_4 = ITEMS.register("lens_tier_4",
+            () -> new LensItem(4, new Item.Properties().stacksTo(1)));
+
+    // ---- 实体照片饰品 ----
+    public static final DeferredItem<EntityPhotographItem> ENTITY_PHOTOGRAPH =
+            ITEMS.register("entity_photograph", () -> new EntityPhotographItem(new Item.Properties().stacksTo(1)));
 
     // ---- 子弹物品（仅用于渲染弹射物模型） ----
     public static final DeferredItem<Item> OVERWORLD_BULLET = ITEMS.register("overworld_bullet",

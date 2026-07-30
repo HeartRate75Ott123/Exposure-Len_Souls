@@ -31,8 +31,10 @@ public class LivingEntityPhantomMixin {
         if (!ClientPhantomHandler.isPhantomEntity(e.getId())) return false;
         BossPhantomType type = BossPhantomType.getTypeForClass(e.getClass().getName());
         if (type == null) return false;
-        // 娜迦/九头蛇/斯库拉：直接不透明渲染，跳过半透明拦截
+        // 旧路径实体（className为空）不走半透明
         if (type.getClassName().isEmpty()) return false;
+        // 娜迦/九头蛇/斯库拉：跳过半透明混入（多部件实体或蛇形模型不适配 PhantomVertexConsumer）
+        if (type == BossPhantomType.NAGA || type == BossPhantomType.HYDRA || type == BossPhantomType.SCYLLA) return false;
         return true;
     }
 

@@ -7,6 +7,8 @@ import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.boss.BossToughnessAttributes;
+import com.plumejade.lensouls.boss.BossToughnessData;
 import com.plumejade.lensouls.boss.BossToughnessManager;
 import com.plumejade.lensouls.item.DimensionalGunItem;
 import com.plumejade.lensouls.item.ModItems;
@@ -111,10 +113,77 @@ public class LensoulsCommand {
                                             if (target instanceof LivingEntity le) {
                                                 BossToughnessManager.getInstance().remove(le);
                                                 ctx.getSource().sendSuccess(
-                                                        () -> Component.literal("韧性数据已删除"), true);
+                                                        () -> Component.literal("§a韧性数据已删除"), true);
                                             }
                                             return 1;
                                         })
+                                )
+                        )
+                        .then(Commands.literal("get")
+                                .then(Commands.argument("target", EntityArgument.entity())
+                                        .executes(ctx -> {
+                                            Entity target = EntityArgument.getEntity(ctx, "target");
+                                            if (!(target instanceof LivingEntity le)) {
+                                                ctx.getSource().sendFailure(Component.literal("目标不是生物实体"));
+                                                return 0;
+                                            }
+                                            String id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(le.getType()).toString();
+                                            int hits = BossToughnessAttributes.getRequiredHits(le);
+                                            int stun = BossToughnessAttributes.getStunDurationTicks(le);
+                                            int inv = BossToughnessAttributes.getInvincibleTicks(le);
+                                            BossToughnessData data = BossToughnessManager.getInstance().get(le);
+                                            if (data != null) {
+                                                ctx.getSource().sendSuccess(() -> Component.literal(
+                                                        "§6" + id + " §7削韧次数: §e" + hits + "§7 定身: §e" + stun + "§7tick 间隔: §e" + inv + "§7tick 当前: §e" + data.getCurrentHits() + "/" + data.getRequiredHits()), false);
+                                            } else {
+                                                ctx.getSource().sendSuccess(() -> Component.literal(
+                                                        "§6" + id + " §7削韧次数: §e" + hits + "§7 定身: §e" + stun + "§7tick 间隔: §e" + inv + "§7tick (未注册)"), false);
+                                            }
+                                            return 1;
+                                        })
+                                )
+                        )
+                        .then(Commands.literal("set")
+                                .then(Commands.argument("target", EntityArgument.entity())
+                                        .then(Commands.argument("hits", IntegerArgumentType.integer(1, 100))
+                                                .then(Commands.argument("stun", IntegerArgumentType.integer(0, 6000))
+                                                        .then(Commands.argument("interval", IntegerArgumentType.integer(1, 600))
+                                                                .executes(ctx -> {
+                                                                    Entity target = EntityArgument.getEntity(ctx, "target");
+                                                                    if (!(target instanceof LivingEntity le)) {
+                                                                        ctx.getSource().sendFailure(Component.literal("目标不是生物实体"));
+                                                                        return 0;
+                                                                    }
+                                                                    int h = IntegerArgumentType.getInteger(ctx, "hits");
+                                                                    int s = IntegerArgumentType.getInteger(ctx, "stun");
+                                                                    int i = IntegerArgumentType.getInteger(ctx, "interval");
+                                                                    String id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(le.getType()).toString();
+                                                                    BossToughnessAttributes.put(id, new BossToughnessAttributes.ToughnessConfig(h, s, i));
+                                                                    // 如果有活跃韧性数据，更新 requiredHits
+                                                                    BossToughnessData data = BossToughnessManager.getInstance().get(le);
+                                                                    if (data != null) {
+                                                                        // 通过反射更新私有字段
+                                                                        try {
+                                                                            var reqField = BossToughnessData.class.getDeclaredField("requiredHits");
+                                                                            reqField.setAccessible(true);
+                                                                            reqField.setInt(data, h);
+                                                                            var stunField = BossToughnessData.class.getDeclaredField("stunRemainingTicks");
+                                                                            stunField.setAccessible(true);
+                                                                            int currentStun = stunField.getInt(data);
+                                                                            if (s > currentStun) stunField.setInt(data, s);
+                                                                            var invField = BossToughnessData.class.getDeclaredField("invincibleTicks");
+                                                                            invField.setAccessible(true);
+                                                                            invField.setInt(data, 0);
+                                                                        } catch (Exception ignored) {}
+                                                                        com.plumejade.lensouls.boss.BossToughnessManager.getInstance().broadcastToughness(le);
+                                                                    }
+                                                                    ctx.getSource().sendSuccess(() -> Component.literal(
+                                                                            "§a设置成功 §7削韧:§e" + h + "§7 定身:§e" + s + "§7tick 间隔:§e" + i + "§7tick"), true);
+                                                                    return 1;
+                                                                })
+                                                        )
+                                                )
+                                        )
                                 )
                         )
                 )

@@ -6,6 +6,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 
 /**
  * 时空回溯处理器。
@@ -52,7 +53,64 @@ public class TemporalRecallHandler {
             player.displayClientMessage(
                     net.minecraft.network.chat.Component.translatable("ability.lensouls.temporal_recall.triggered")
                             .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
+            // 回溯后易伤叠加（每5次+1级，持续20s，窗口5min）
+            applyRecallVulnerability(player);
         }
+    }
+
+    /** 时空回溯易伤：每5次回溯叠1层，持续20s，窗口5min */
+    private static final String TAG_COUNT = "lensouls:recall_count";
+    private static final String TAG_VULN = "lensouls:recall_vuln_amp";
+    private static final String TAG_WINDOW = "lensouls:recall_window_end";
+    private static final String TAG_VULN_END = "lensouls:recall_vuln_end";
+
+    private static void applyRecallVulnerability(ServerPlayer player) {
+        var tag = player.getPersistentData();
+        long now = player.level().getGameTime();
+        int count = tag.getInt(TAG_COUNT) + 1;
+        tag.putInt(TAG_COUNT, count);
+
+        // 窗口结束时间（5min = 6000 tick）
+        long windowEnd = now + 6000;
+        tag.putLong(TAG_WINDOW, windowEnd);
+
+        // 每5次叠1层
+        int amp = count / 5;
+        tag.putInt(TAG_VULN, amp);
+        tag.putLong(TAG_VULN_END, now + 400); // 20s
+
+        // 给玩家一个视觉提示（虚弱效果）
+        if (amp > 0) {
+            player.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                    net.minecraft.world.effect.MobEffects.WEAKNESS, 400, amp - 1, false, true, true));
+        }
+    }
+
+    /** 真正死亡时重置回溯数据 */
+    @SubscribeEvent
+    public static void onDeath(LivingDeathEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            player.getPersistentData().remove(TAG_COUNT);
+            player.getPersistentData().remove(TAG_VULN);
+            player.getPersistentData().remove(TAG_WINDOW);
+            player.getPersistentData().remove(TAG_VULN_END);
+        }
+    }
+
+    /** 易伤增伤：在窗口内且易伤未过期时增伤 */
+    @SubscribeEvent
+    public static void onVulnerabilityDamage(LivingDamageEvent.Pre event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (player.level().isClientSide) return;
+        var tag = player.getPersistentData();
+        long now = player.level().getGameTime();
+        long windowEnd = tag.getLong(TAG_WINDOW);
+        long vulnEnd = tag.getLong(TAG_VULN_END);
+        if (now > windowEnd || now > vulnEnd) return;
+        int amp = tag.getInt(TAG_VULN);
+        if (amp <= 0) return;
+        float multiplier = 1.0f + 0.2f * amp;
+        event.setNewDamage(event.getNewDamage() * multiplier);
     }
 
     /** 公开消费入口——供主动触发包和被动保命共用 */

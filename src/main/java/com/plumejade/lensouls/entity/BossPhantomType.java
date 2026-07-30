@@ -55,22 +55,22 @@ public enum BossPhantomType {
 
     // ========== 新 BOSS 镜魂（Twilight Forest — 借体驱动） ==========
 
-    HYDRA("twilightforest", "hydra", ElementDamage.FIRE, 1.0f, false, 0x498cff, 30,
+    HYDRA("twilightforest", "hydra", ElementDamage.FIRE, 1.0f, false, 0xFF4500, 30,
             12.0, 14.0, 6.0f, 5.0f,
             "twilightforest.entity.boss.Hydra",
             "twilightforest.init.TFEntities", "HYDRA",
             "twilightforest:textures/entity/hydra4.png"),
-    KNIGHT_PHANTOM("twilightforest", "knight_phantom", ElementDamage.ENDER, 1.0f, false, 0x56ff91, 30,
+    KNIGHT_PHANTOM("twilightforest", "knight_phantom", ElementDamage.ENDER, 1.0f, false, 0x888888, 30,
             7.5, 8.5, 6.0f, 5.0f,
             "twilightforest.entity.boss.KnightPhantom",
             "twilightforest.init.TFEntities", "KNIGHT_PHANTOM",
-            "twilightforest:textures/entity/knightphantom.png"),
-    ALPHA_YETI("twilightforest", "alpha_yeti", ElementDamage.WATER, 1.0f, false, 0x56ff91, 30,
+            "twilightforest:textures/entity/phantomskeleton.png"),
+    ALPHA_YETI("twilightforest", "alpha_yeti", ElementDamage.WATER, 1.0f, false, 0x4fc3f7, 30,
             7.5, 8.5, 6.0f, 5.0f,
             "twilightforest.entity.boss.AlphaYeti",
             "twilightforest.init.TFEntities", "ALPHA_YETI",
             "twilightforest:textures/entity/yetialpha.png"),
-    NAGA("twilightforest", "naga", ElementDamage.EARTH, 1.0f, false, 0x56ff91, 30,
+    NAGA("twilightforest", "naga", ElementDamage.EARTH, 1.0f, false, 0xCC6600, 30,
             7.5, 8.5, 6.0f, 5.0f,
             "twilightforest.entity.boss.Naga",
             "twilightforest.init.TFEntities", "NAGA",
@@ -78,7 +78,7 @@ public enum BossPhantomType {
 
     // ========== 新 BOSS 镜魂（Legendary Monsters — 借体驱动） ==========
 
-    LAVA_EATER("legendary_monsters", "lava_eater", ElementDamage.FIRE, 1.2f, false, 0x56ff91, 28,
+    LAVA_EATER("legendary_monsters", "lava_eater", ElementDamage.FIRE, 1.2f, false, 0xFF4500, 28,
             7.5, 8.5, 8.0f, 5.0f,
             "net.miauczel.legendary_monsters.entity.AnimatedMonster.Mobs.Lava_eaterEntity",
             "net.miauczel.legendary_monsters.entity.ModEntities", "Lava_eater",
@@ -86,12 +86,12 @@ public enum BossPhantomType {
 
     // ========== 新 BOSS 镜魂（Cataclysm — 借体驱动） ==========
 
-    THE_LEVIATHAN("cataclysm", "the_leviathan", ElementDamage.ENDER, 2.5f, false, 0x56ff91, 35,
+    THE_LEVIATHAN("cataclysm", "the_leviathan", ElementDamage.ENDER, 2.5f, false, 0x660099, 35,
             12.0, 14.0, 15.0f, 8.0f,
             "com.github.L_Ender.cataclysm.entity.AnimationMonster.BossMonsters.The_Leviathan.The_Leviathan_Entity",
             "com.github.L_Ender.cataclysm.init.ModEntities", "THE_LEVIATHAN",
             "cataclysm:textures/entity/leviathan/the_leviathan.png"),
-    SCYLLA("cataclysm", "scylla", ElementDamage.WATER, 1.8f, false, 0x90c8f3, 32,
+    SCYLLA("cataclysm", "scylla", ElementDamage.WATER, 1.8f, false, 0x4fc3f7, 32,
             7.5, 8.5, 10.0f, 6.0f,
             "com.github.L_Ender.cataclysm.entity.InternalAnimationMonster.IABossMonsters.Scylla.Scylla_Entity",
             "com.github.L_Ender.cataclysm.init.ModEntities", "SCYLLA",
@@ -275,28 +275,21 @@ public enum BossPhantomType {
     private static void initKnightPhantom(Entity entity) {
         try {
             Class<?> clazz = Class.forName("twilightforest.entity.boss.KnightPhantom");
-            // 装备剑
+            // 装备全套盔甲（不覆写 mainhand，由 switchToFormation 中的 updateMyNumber→setNumber 设剑/斧/镐）
             if (entity instanceof net.minecraft.world.entity.LivingEntity le) {
-                le.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
+                le.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD,
                         new net.minecraft.world.item.ItemStack(
                                 net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
-                                        net.minecraft.resources.ResourceLocation.parse("twilightforest:knightmetal_sword"))));
+                                        net.minecraft.resources.ResourceLocation.parse("twilightforest:phantom_helmet"))));
+                le.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST,
+                        new net.minecraft.world.item.ItemStack(
+                                net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                                        net.minecraft.resources.ResourceLocation.parse("twilightforest:phantom_chestplate"))));
             }
-            // 设置 currentFormation = ATTACK_PLAYER_ATTACK（ordinal=11）
-            java.lang.reflect.Field formationField = clazz.getDeclaredField("currentFormation");
-            formationField.setAccessible(true);
+            // 使用 switchToFormation 正确初始化：setChargingAtPlayer(FLAG_CHARGING+属性修正器) + updateMyNumber(设number=0→剑) + ticksProgress=0
             Class<?> formationEnum = Class.forName("twilightforest.entity.boss.KnightPhantom$Formation");
-            Object attackFormation = Enum.valueOf((Class<Enum>) formationEnum, "ATTACK_PLAYER_ATTACK");
-            formationField.set(entity, attackFormation);
-            // 重置 ticksProgress
-            java.lang.reflect.Field ticksField = clazz.getDeclaredField("ticksProgress");
-            ticksField.setAccessible(true);
-            ticksField.setInt(entity, 0);
-            // 设置 FLAG_CHARGING = true（SynchedEntityData，控制渲染尺寸+攻击力加成）
-            var dataAccessorField = clazz.getDeclaredField("FLAG_CHARGING");
-            dataAccessorField.setAccessible(true);
-            var dataAccessor = (net.minecraft.network.syncher.EntityDataAccessor<Boolean>) dataAccessorField.get(null);
-            entity.getEntityData().set(dataAccessor, true);
+            Object attackStart = Enum.valueOf((Class<Enum>) formationEnum, "ATTACK_PLAYER_START");
+            clazz.getMethod("switchToFormation", formationEnum).invoke(entity, attackStart);
         } catch (Exception e) {
             com.plumejade.lensouls.LenSouls.LOGGER.error("[幻灵] KnightPhantom init 失败", e);
         }

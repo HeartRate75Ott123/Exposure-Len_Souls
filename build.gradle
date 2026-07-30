@@ -147,6 +147,8 @@ dependencies {
     // ---- 前置模组 ----
     implementation files("run/mods/[玩法][拾光定影] exposure-neoforge-1.21.1-1.9.18.jar")
     implementation files("run/mods/exposure_polaroid-neoforge-1.21.1-1.1.5.jar")
+    // ---- Curios 饰品 API ----
+    implementation files("run/mods/curios-neoforge-9.5.1+1.21.1.jar")
     compileOnly "lensouls:legendary_monsters:2.1.20"
     compileOnly "lensouls:cataclysm:3.32"
     compileOnly "lensouls:lionfishapi:3.1"

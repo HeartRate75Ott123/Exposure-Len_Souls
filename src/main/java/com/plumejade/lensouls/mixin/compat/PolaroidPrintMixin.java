@@ -2,6 +2,7 @@ package com.plumejade.lensouls.mixin.compat;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.util.TemporalSnapshot;
+import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import io.github.mortuusars.exposure.Exposure;
 import io.github.mortuusars.exposure.world.camera.frame.Frame;
 import io.github.mortuusars.exposure.world.entity.CameraHolder;
@@ -51,7 +52,7 @@ public class PolaroidPrintMixin {
         ExposureIdentifier targetId = frame.identifier();
         if (targetId == null || targetId.isEmpty()) return;
 
-        if (findAndMarkInInventory(player, targetId, abilityId)) {
+        if (findAndMarkInInventory(player, targetId, abilityId, cameraTag)) {
             cleanupCamera(cameraStack, cameraTag);
         }
     }
@@ -59,7 +60,7 @@ public class PolaroidPrintMixin {
     // ========== 背包扫描 ==========
 
     /** 用 ExposureIdentifier 精确匹配玩家背包中的照片 */
-    private static boolean findAndMarkInInventory(Player player, ExposureIdentifier targetId, String abilityId) {
+    private static boolean findAndMarkInInventory(Player player, ExposureIdentifier targetId, String abilityId, CompoundTag cameraTag) {
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             ItemStack stack = player.getInventory().getItem(i);
             if (stack.isEmpty()) continue;
@@ -68,7 +69,7 @@ public class PolaroidPrintMixin {
             if (stack.getItem() instanceof io.github.mortuusars.exposure.world.item.PhotographItem) {
                 Frame stackFrame = stack.get(Exposure.DataComponents.PHOTOGRAPH_FRAME);
                 if (stackFrame != null && targetId.equals(stackFrame.identifier())) {
-                    inject(stack, abilityId, player);
+                    inject(stack, abilityId, player, cameraTag);
                     return true;
                 }
             }
@@ -81,7 +82,7 @@ public class PolaroidPrintMixin {
                     ItemStack inner = photos.getItemUnsafe(j);
                     Frame innerFrame = inner.get(Exposure.DataComponents.PHOTOGRAPH_FRAME);
                     if (innerFrame != null && targetId.equals(innerFrame.identifier())) {
-                        inject(inner, abilityId, player);
+                        inject(inner, abilityId, player, cameraTag);
                         changed = true;
                         break;
                     }
@@ -98,7 +99,7 @@ public class PolaroidPrintMixin {
     // ========== 注入与清理 ==========
 
     /** 往照片 ItemStack 写入能力标记、额外数据、改名、强制单张 */
-    private static void inject(ItemStack photo, String abilityId, Player player) {
+    private static void inject(ItemStack photo, String abilityId, Player player, CompoundTag cameraTag) {
         CompoundTag tag = photo.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         if (tag.getBoolean("lensouls:injected")) return;
 
@@ -120,25 +121,45 @@ public class PolaroidPrintMixin {
                     tag.put("lensouls:snapshot", snapshot.toTag());
                 }
             }
+            case "ability_steal" -> {
+                String entityId = cameraTag.getString("lensouls:stolen_entity");
+                if (!entityId.isEmpty()) {
+                    tag.putBoolean("lensouls:ability_steal", true);
+                    tag.putString("lensouls:stolen_entity", entityId);
+                }
+            }
+        }
+
+        // 所有能力通用：注入被窃取实体 ID（照片饰品系统使用）
+        if (!tag.contains("lensouls:stolen_entity")) {
+            String entityId = cameraTag.getString("lensouls:stolen_entity");
+            if (!entityId.isEmpty()) {
+                tag.putString("lensouls:stolen_entity", entityId);
+            }
         }
 
         photo.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
         photo.setCount(1); // 强制单张，不与普通照片堆叠
 
-        // 改名 "照片(能力名)"
-        String transKey = "ability.lensouls." + abilityId + ".name";
-        MutableComponent name = Component.literal("")
-                .append(Component.literal("照片("))
-                .append(Component.translatable(transKey))
-                .append(Component.literal(")"))
-                .withStyle(ChatFormatting.GREEN)
-                .withStyle(s -> s.withItalic(false).withBold(false));
-        photo.set(DataComponents.CUSTOM_NAME, name);
+        // 有注册效果的实体 → 标记为照片饰品 + 绿色名；否则保持普通照片
+        String entityId = tag.getString("lensouls:stolen_entity");
+        if (!entityId.isEmpty() && PhotographEffectRegistry.hasEffect(entityId)) {
+            tag.putBoolean("lensouls:photograph_curio", true);
+            String transKey = "ability.lensouls." + abilityId + ".name";
+            MutableComponent name = Component.literal("")
+                    .append(Component.literal("照片("))
+                    .append(Component.translatable(transKey))
+                    .append(Component.literal(")"))
+                    .withStyle(ChatFormatting.GREEN)
+                    .withStyle(s -> s.withItalic(false).withBold(false));
+            photo.set(DataComponents.CUSTOM_NAME, name);
+        }
     }
 
     private static void cleanupCamera(ItemStack cameraStack, CompoundTag cameraTag) {
         CompoundTag clean = cameraTag.copy();
         clean.remove("lensouls:capture_ability");
+        clean.remove("lensouls:stolen_entity");
         cameraStack.set(DataComponents.CUSTOM_DATA,
                 clean.isEmpty() ? CustomData.EMPTY : CustomData.of(clean));
     }

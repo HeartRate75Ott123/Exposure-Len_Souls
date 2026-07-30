@@ -82,7 +82,7 @@ public record BossOutlineColors(
             1.2f, 3.0f
     );
 
-    /** 幻影骑士 — 灰魄 */
+    /** 幻影骑士 — 灰蓝 */
     public static final BossOutlineColors KNIGHT_PHANTOM_COLOR = new BossOutlineColors(
             hex(0x8a8ea8),
             hex(0x6b6e8a),

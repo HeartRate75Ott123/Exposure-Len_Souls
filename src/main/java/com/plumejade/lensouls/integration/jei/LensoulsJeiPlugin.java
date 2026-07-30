@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.integration.jei;
 
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import com.plumejade.lensouls.item.ModItems;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -89,10 +90,33 @@ public class LensoulsJeiPlugin implements IModPlugin {
                 Component.translatable("jei.lensouls.skill_ball.creative"));
         addSingleInfo(registration, ModItems.VITAL_STRIKE_BALL.get().getDefaultInstance(),
                 Component.translatable("jei.lensouls.skill_ball.creative"));
+        addSingleInfo(registration, ModItems.SOUL_SEVER_BALL.get().getDefaultInstance(),
+                Component.translatable("jei.lensouls.skill_ball.creative"));
+        addSingleInfo(registration, ModItems.ABILITY_STEAL_BALL.get().getDefaultInstance(),
+                Component.translatable("jei.lensouls.skill_ball.creative"));
+
+        // ---- 相机镜头 ----
+        addSingleInfo(registration, ModItems.LENS_TIER_1.get().getDefaultInstance(),
+                Component.literal("§7Tier 1 lens — required to damage Tier 1 bosses' toughness"));
+        addSingleInfo(registration, ModItems.LENS_TIER_2.get().getDefaultInstance(),
+                Component.literal("§7Tier 2 lens — required to damage up to Tier 2 bosses' toughness"));
+        addSingleInfo(registration, ModItems.LENS_TIER_3.get().getDefaultInstance(),
+                Component.literal("§7Tier 3 lens — required to damage up to Tier 3 bosses' toughness"));
+        addSingleInfo(registration, ModItems.LENS_TIER_4.get().getDefaultInstance(),
+                Component.literal("§7Tier 4 lens — required to damage up to Tier 4 bosses' toughness"));
 
         // ---- 转换器 ----
         addSingleInfo(registration, ModItems.CONVERTER.get().getDefaultInstance(),
                 Component.translatable("jei.lensouls.converter"));
+
+        // ---- 能力窃取实体照片（可搜索，不加入创造选项卡） ----
+        for (String entityId : PhotographEffectRegistry.getAllEntityIds()) {
+            ItemStack photo = com.plumejade.lensouls.item.EntityPhotographItem.create(entityId);
+            Component entityName = Component.translatable(
+                    PhotographEffectRegistry.entityIdToTranslationKey(entityId));
+            registration.addIngredientInfo(photo, VanillaTypes.ITEM_STACK,
+                    Component.translatable("jei.lensouls.photograph_curio", entityName));
+        }
     }
 
     /** 为物品添加一条信息提示（varargs 支持多行） */

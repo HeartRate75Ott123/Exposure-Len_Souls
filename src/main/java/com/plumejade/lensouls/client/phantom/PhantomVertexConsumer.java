@@ -1,9 +1,6 @@
 package com.plumejade.lensouls.client.phantom;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import org.joml.Matrix4f;
-import org.joml.Vector3f;
 
 /**
  * 幻灵 VertexConsumer 包装器。
@@ -11,8 +8,8 @@ import org.joml.Vector3f;
  * 拦截模型对 VertexConsumer.setColor() 的调用，
  * 将所有顶点颜色替换为元素色 × 幻灵透明度（alpha）。
  * <p>
- * 解决 Cloud_GolemModel / TheObliteratorModel 等模型在 renderToBuffer() 中
- * 调用 root.render(PoseStack, VertexConsumer, int, int) 丢弃颜色参数的问题。
+ * 模型调用 addVertex(pose, x, y, z).setColor(r,g,b,a).setUv().setNormal() 链式调用，
+ * 颜色通过 setColor() 拦截替换。
  * <p>
  * 适配 1.21.1 VertexConsumer API（addVertex/setColor 命名风格）。
  */
@@ -101,44 +98,6 @@ public record PhantomVertexConsumer(
     @Override
     public VertexConsumer setOverlay(int packedOverlay) {
         delegate.setOverlay(packedOverlay);
-        return this;
-    }
-
-    @Override
-    public void addVertex(float x, float y, float z, int color, float u, float v,
-                          int packedNormal, int packedLight, float nx, float ny, float nz) {
-        // color 是 ARGB 打包，替换为元素色 + 幻灵 alpha
-        int replaced = (alpha << 24) | (elementR << 16) | (elementG << 8) | elementB;
-        delegate.addVertex(x, y, z, replaced, u, v, packedNormal, packedLight, nx, ny, nz);
-    }
-
-    @Override
-    public VertexConsumer addVertex(Vector3f pos) {
-        delegate.addVertex(pos);
-        return this;
-    }
-
-    @Override
-    public VertexConsumer addVertex(PoseStack.Pose pose, Vector3f pos) {
-        delegate.addVertex(pose, pos);
-        return this;
-    }
-
-    @Override
-    public VertexConsumer addVertex(PoseStack.Pose pose, float x, float y, float z) {
-        delegate.addVertex(pose, x, y, z);
-        return this;
-    }
-
-    @Override
-    public VertexConsumer addVertex(Matrix4f matrix, float x, float y, float z) {
-        delegate.addVertex(matrix, x, y, z);
-        return this;
-    }
-
-    @Override
-    public VertexConsumer setNormal(PoseStack.Pose pose, float x, float y, float z) {
-        delegate.setNormal(pose, x, y, z);
         return this;
     }
 }

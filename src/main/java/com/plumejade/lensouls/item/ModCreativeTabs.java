@@ -44,6 +44,19 @@ public class ModCreativeTabs {
                         output.accept(ModItems.TEMPORAL_RECALL_BALL.get());
                         output.accept(ModItems.TIME_STOP_BALL.get());
                         output.accept(ModItems.VITAL_STRIKE_BALL.get());
+                        output.accept(ModItems.SOUL_SEVER_BALL.get());
+                        output.accept(ModItems.ABILITY_STEAL_BALL.get());
+
+                        output.accept(ModItems.LENS_TIER_1.get());
+                        output.accept(ModItems.LENS_TIER_2.get());
+                        output.accept(ModItems.LENS_TIER_3.get());
+                        output.accept(ModItems.LENS_TIER_4.get());
+
+                        // ---- 相机镜头配件 ----
+                        output.accept(ModItems.LENS_TIER_1.get());
+                        output.accept(ModItems.LENS_TIER_2.get());
+                        output.accept(ModItems.LENS_TIER_3.get());
+                        output.accept(ModItems.LENS_TIER_4.get());
 
                         // BOSS 专属镜魂
                         output.accept(ModItems.IGNIS_SOUL.get());

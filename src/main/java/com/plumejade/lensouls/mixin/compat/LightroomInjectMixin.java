@@ -3,6 +3,7 @@ package com.plumejade.lensouls.mixin.compat;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.ability.handler.PhotoInjectionHandler;
+import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import io.github.mortuusars.exposure.Exposure;
 import io.github.mortuusars.exposure.world.camera.frame.Frame;
 import io.github.mortuusars.exposure.world.camera.frame.Photographer;
@@ -45,6 +46,27 @@ public class LightroomInjectMixin {
 
         tag.putBoolean("lensouls:injected", true);
         tag.putString("lensouls:ability_type", ability.getId());
+
+        // ABILITY_STEAL：从缓存读取被窃取实体 ID
+        if (ability == AbilityType.ABILITY_STEAL) {
+            String entityId = PhotoInjectionHandler.pollStolenEntity(frame.identifier().toString());
+            if (entityId != null && !entityId.isEmpty()) {
+                tag.putBoolean("lensouls:ability_steal", true);
+                tag.putString("lensouls:stolen_entity", entityId);
+                if (PhotographEffectRegistry.hasEffect(entityId)) {
+                    tag.putBoolean("lensouls:photograph_curio", true);
+                }
+            }
+        } else {
+            String entityId = PhotoInjectionHandler.pollStolenEntity(frame.identifier().toString());
+            if (entityId != null && !entityId.isEmpty()) {
+                tag.putString("lensouls:stolen_entity", entityId);
+                if (PhotographEffectRegistry.hasEffect(entityId)) {
+                    tag.putBoolean("lensouls:photograph_curio", true);
+                }
+            }
+        }
+
         result.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 
     }

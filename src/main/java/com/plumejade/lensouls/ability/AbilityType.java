@@ -11,7 +11,9 @@ public enum AbilityType {
     SPATIAL_WARP("spatial_warp"),
     TEMPORAL_RECALL("temporal_recall"),
     TIME_STOP("time_stop"),
-    VITAL_STRIKE("vital_strike");
+    VITAL_STRIKE("vital_strike"),
+    SOUL_SEVER("soul_sever"),
+    ABILITY_STEAL("ability_steal");
 
     private final String id;
 
@@ -45,6 +47,6 @@ public enum AbilityType {
      * 该能力是否需要在拍照时向照片注入额外数据。
      */
     public boolean injectsPhotoData() {
-        return this == SPATIAL_WARP || this == TEMPORAL_RECALL;
+        return this == SPATIAL_WARP || this == TEMPORAL_RECALL || this == ABILITY_STEAL;
     }
 }

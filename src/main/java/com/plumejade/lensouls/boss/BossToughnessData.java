@@ -68,25 +68,29 @@ public class BossToughnessData {
 
     /**
      * 削韧一击。
+     * @param invincibleTicks 本次削韧后的无敌窗口（由调用方根据 BOSS 属性传入）
      * @return true = 成功削韧；false = 被无敌或破刹状态阻挡
      */
-    public boolean hit() {
+    public boolean hit(int invincibleTicks) {
         if (broken) return false;
         if (requiredHits <= 0) return false;
-        if (invincibleTicks > 0) return false;
+        if (this.invincibleTicks > 0) return false;
 
         currentHits = Math.min(currentHits + 1, requiredHits);
-        invincibleTicks = 60;  // 3 秒无敌窗口
+        this.invincibleTicks = Math.max(1, invincibleTicks);
 
-        // 触发恢复倒计时
         recoveryTicks = maxRecoveryTicks;
 
-        // 达到破防阈值
         if (currentHits >= requiredHits) {
             broken = true;
-            stunRemainingTicks = -1;  // 由调用方设置具体时长
+            stunRemainingTicks = -1;
         }
         return true;
+    }
+
+    /** 兼容旧调用（默认 60 tick） */
+    public boolean hit() {
+        return hit(60);
     }
 
     /** 调用方在确认破防后设置定身持续时间 */

@@ -13,6 +13,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.bus.api.EventPriority;
@@ -46,6 +47,7 @@ public class PhotoInjectionHandler {
         try {
             Class<?> eventClass = Class.forName("io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent");
             Method getCameraHolderEntity = eventClass.getMethod("getCameraHolderEntity");
+            Method getEntitiesInFrame = eventClass.getMethod("getEntitiesInFrame");
 
             Method addListener = NeoForge.EVENT_BUS.getClass()
                     .getMethod("addListener", EventPriority.class, boolean.class, Class.class, Consumer.class);
@@ -60,31 +62,38 @@ public class PhotoInjectionHandler {
                             AbilityManager am = AbilityManager.getInstance();
                             AbilityType ability = am.getEnabled(player);
                             if (ability == null) return;
-                            if (ability == AbilityType.TIME_STOP) {
-                                // TIME_STOP 由 TimeFreezeHandler 处理
-                                return;
-                            }
-                            if (ability == AbilityType.VITAL_STRIKE) {
-                                // VITAL_STRIKE 不产生照片，由 VitalStrikeHandler 处理
-                                return;
-                            }
+                            if (ability == AbilityType.TIME_STOP) return;
+                            if (ability == AbilityType.VITAL_STRIKE) return;
+                            if (ability == AbilityType.SOUL_SEVER) return;
 
                             // 所有相机能力都需要摄魂术附魔
                             ItemStack hand = player.getMainHandItem();
-                            if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), hand) <= 0) {
-                                return;
-                            }
+                            if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), hand) <= 0) return;
 
-                            // WEAKNESS_LENS / SPATIAL_WARP / TEMPORAL_RECALL
-                            // 首次解锁时 setUnlocked 已发送描述
-
-                            // 将能力写入相机物品，供拍立得 mixin 在出片时直接读取
+                            // 将能力写入相机物品
                             CompoundTag cameraTag = hand.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
                             cameraTag.putString("lensouls:capture_ability", ability.getId());
+
+                            // 捕获画面中第一个实体 ID（所有能力通用，供照片饰品系统使用）
+                            //noinspection unchecked
+                            List<LivingEntity> frameEntities = (List<LivingEntity>) getEntitiesInFrame.invoke(event);
+                            if (frameEntities != null && !frameEntities.isEmpty()) {
+                                LivingEntity first = frameEntities.get(0);
+                                String stolenId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(first.getType()).toString();
+                                cameraTag.putString("lensouls:stolen_entity", stolenId);
+                                // 缓存到内存（供 Lightroom 路径读取）
+                                try {
+                                    Method getFrame = eventClass.getMethod("getFrame");
+                                    Object frame = getFrame.invoke(event);
+                                    Class<?> frameClass = Class.forName("io.github.mortuusars.exposure.world.camera.frame.Frame");
+                                    Method identifier = frameClass.getMethod("identifier");
+                                    Object expId = identifier.invoke(frame);
+                                    if (expId != null) cacheStolenEntity(expId.toString(), stolenId);
+                                } catch (Exception ignored) {}
+                            }
+
                             hand.set(DataComponents.CUSTOM_DATA, CustomData.of(cameraTag));
 
-                            // 拍立得走 capture_ability 路径，不入 pendingQueue
-                            // 只有走 Lightroom 冲洗的常规相机才需要队列——入队等待照片出现
                             ResourceLocation camId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(hand.getItem());
                             if (!"exposure_polaroid:instant_camera".equals(camId.toString())) {
                                 enqueue(player.getUUID(), ability);
@@ -107,6 +116,16 @@ public class PhotoInjectionHandler {
      * 用队列而非计数器，因为照片冲印是异步的，冲出来时能力可能已切换。
      */
     private static final Map<UUID, LinkedList<AbilityType>> pendingQueue = new HashMap<>();
+    /** ABILITY_STEAL: 曝光 ID → 被窃取实体 ID（供 Lightroom 暗房冲洗时读取） */
+    private static final Map<String, String> stolenEntityCache = new HashMap<>();
+
+    public static void cacheStolenEntity(String exposureId, String entityId) {
+        if (exposureId != null && !exposureId.isEmpty()) stolenEntityCache.put(exposureId, entityId);
+    }
+
+    public static String pollStolenEntity(String exposureId) {
+        return exposureId != null ? stolenEntityCache.remove(exposureId) : null;
+    }
 
     /** FrameAddedEvent 回调中调用：记录按下快门时的能力 */
     public static void enqueue(UUID playerUuid, AbilityType ability) {

@@ -1,6 +1,7 @@
 {
   "values": [
     "exposure:photograph",
-    "exposure_polaroid:instant_photograph"
+    "exposure_polaroid:instant_photograph",
+    "lensouls:entity_photograph"
   ]
 }

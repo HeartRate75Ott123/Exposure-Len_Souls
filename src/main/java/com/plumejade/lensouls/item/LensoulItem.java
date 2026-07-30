@@ -42,30 +42,34 @@ public class LensoulItem extends Item {
     private final float damageMultiplier;    // 物品自带倍率（BOSS镜魂 > 1.0）
     private final boolean applySlowness;     // 云筑魔像专属：攻击附带减速
     private final int cooldownSeconds;       // 冷却秒数（0 表示用配置默认值）
+    private final boolean isBossSoul;        // 是否为 BOSS 镜魂（用于描边等标识）
 
     public LensoulItem(ElementDamage element, Properties properties) {
-        this(element, 1.0f, false, 0, properties);
+        this(element, 1.0f, false, 0, false, properties);
     }
 
-    /** BOSS 镜魂专用构造器 */
     public LensoulItem(ElementDamage element, float damageMultiplier, boolean applySlowness, Properties properties) {
-        this(element, damageMultiplier, applySlowness, 0, properties);
+        this(element, damageMultiplier, applySlowness, 0, true, properties);
     }
 
-    /** BOSS 镜魂专用构造器（含自定义冷却时长） */
     public LensoulItem(ElementDamage element, float damageMultiplier, boolean applySlowness, int cooldownSeconds, Properties properties) {
+        this(element, damageMultiplier, applySlowness, cooldownSeconds, true, properties);
+    }
+
+    public LensoulItem(ElementDamage element, float damageMultiplier, boolean applySlowness, int cooldownSeconds, boolean isBossSoul, Properties properties) {
         super(properties);
         this.element = element;
         this.damageMultiplier = damageMultiplier;
         this.applySlowness = applySlowness;
         this.cooldownSeconds = cooldownSeconds;
+        this.isBossSoul = isBossSoul;
     }
 
     @Override
     public ItemStack getDefaultInstance() {
         ItemStack stack = super.getDefaultInstance();
         // BOSS 镜魂初次设置显示名：末影守卫镜魂（末影）
-        if (this.damageMultiplier > 1.0f || this.applySlowness) {
+        if (this.isBossSoul) {
             String elementShort = "element.lensouls." + element.getSerializedName() + ".short";
             stack.set(DataComponents.CUSTOM_NAME,
                     Component.translatable(this.getDescriptionId())
@@ -294,7 +298,7 @@ public class LensoulItem extends Item {
         ));
 
         // 始终设置自定义名称（即使效果未变更），确保后续覆盖正确
-        String descId = this.damageMultiplier > 1.0f || this.applySlowness ? stack.getDescriptionId() : null;
+        String descId = this.isBossSoul ? stack.getDescriptionId() : null;
         ElementInfusionEffect.setPlayerData(player, this.element, this.applySlowness, descId);
 
         Component soulDisplay = this.damageMultiplier > 1.0f || this.applySlowness

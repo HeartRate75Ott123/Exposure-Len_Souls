@@ -36,6 +36,8 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
+import net.neoforged.neoforge.registries.RegisterEvent;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(LenSouls.MODID)
@@ -56,6 +58,8 @@ public class LenSouls {
         com.plumejade.lensouls.particle.ModParticleTypes.register(modEventBus);
         com.plumejade.lensouls.sound.ModSounds.register(modEventBus);
         PacketHandler.register(modEventBus);
+
+        modEventBus.addListener(this::registerConditions);
 
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(DamageHandler.class);
@@ -105,6 +109,12 @@ public class LenSouls {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
+    }
+
+    private void registerConditions(RegisterEvent event) {
+        event.register(NeoForgeRegistries.Keys.CONDITION_CODECS,
+                com.plumejade.lensouls.config.ConfigRecipeCondition.ID,
+                () -> com.plumejade.lensouls.config.ConfigRecipeCondition.CODEC);
     }
 
     // You can use SubscribeEvent and let the Event Bus discover methods to call

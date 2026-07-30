@@ -47,6 +47,8 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import java.util.List;
+import java.util.function.Consumer;
 
 // This class will not load on dedicated servers. Accessing client side code from here is safe.
 @Mod(value = LenSouls.MODID, dist = Dist.CLIENT)
@@ -81,6 +83,8 @@ public class LenSoulsClient {
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.particle.ClientElementSpiralHandler::onClientTick);
         // 药水效果 tooltip 追加描述行
         NeoForge.EVENT_BUS.addListener(LenSoulsClient::onGatherEffectTooltips);
+        // 兼容 Stylish Effects 的 tooltip 事件
+        tryRegisterStylishEffectsListener();
     }
 
     /** 注册菜单界面到 RegisterMenuScreensEvent */
@@ -364,6 +368,40 @@ public class LenSoulsClient {
         String[] lines = raw.split("\n", -1);
         for (int i = 0; i < lines.length; i++) {
             event.getTooltip().add(1 + i, Component.literal(lines[i]));
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void tryRegisterStylishEffectsListener() {
+        try {
+            Class<?> eventClass = Class.forName(
+                    "fuzs.stylisheffects.neoforge.api.v1.client.NeoForgeMobEffectWidgetEvent$EffectTooltip");
+            var addListener = IEventBus.class.getMethod("addListener", Class.class, Consumer.class);
+            Consumer handler = event -> {
+                try {
+                    var getContext = eventClass.getMethod("getContext");
+                    Object context = getContext.invoke(event);
+                    var getEffect = context.getClass().getMethod("getEffectInstance");
+                    Object mobEffectInst = getEffect.invoke(context);
+                    var effectValue = mobEffectInst.getClass().getMethod("getEffect").invoke(mobEffectInst);
+                    Object effect = effectValue.getClass().getMethod("value").invoke(effectValue);
+                    if (!(effect instanceof ElementInfusionEffect)) return;
+                    var getTooltipLines = eventClass.getMethod("getTooltipLines");
+                    List<Component> tooltip = (List<Component>) getTooltipLines.invoke(event);
+                    String descKey = (String) mobEffectInst.getClass()
+                            .getMethod("getDescriptionId").invoke(mobEffectInst);
+                    Component desc = Component.translatable(descKey + ".description");
+                    String raw = desc.getString();
+                    if (raw.isEmpty() || raw.equals(descKey + ".description")) return;
+                    String[] lines = raw.split("\n", -1);
+                    for (int i = 0; i < lines.length; i++) {
+                        tooltip.add(1 + i, Component.literal(lines[i]));
+                    }
+                } catch (Exception ignored) {
+                }
+            };
+            addListener.invoke(NeoForge.EVENT_BUS, eventClass, handler);
+        } catch (Exception ignored) {
         }
     }
 }

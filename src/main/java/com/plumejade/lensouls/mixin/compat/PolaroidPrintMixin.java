@@ -138,9 +138,6 @@ public class PolaroidPrintMixin {
             }
         }
 
-        photo.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-        photo.setCount(1); // 强制单张，不与普通照片堆叠
-
         // 有注册效果的实体 → 标记为照片饰品 + 绿色名；否则保持普通照片
         String entityId = tag.getString("lensouls:stolen_entity");
         if (!entityId.isEmpty() && PhotographEffectRegistry.hasEffect(entityId)) {
@@ -154,6 +151,8 @@ public class PolaroidPrintMixin {
                     .withStyle(s -> s.withItalic(false).withBold(false));
             photo.set(DataComponents.CUSTOM_NAME, name);
         }
+
+        photo.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
     }
 
     private static void cleanupCamera(ItemStack cameraStack, CompoundTag cameraTag) {

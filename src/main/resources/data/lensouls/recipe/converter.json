@@ -1,5 +1,11 @@
 {
   "type": "minecraft:crafting_shaped",
+  "neoforge:conditions": [
+    {
+      "type": "lensouls:config",
+      "config": "enableConverterRecipe"
+    }
+  ],
   "pattern": [
     "IPI",
     "OCO",

@@ -25,6 +25,9 @@ public class EntityPhotographItem extends Item {
         ItemStack stack = new ItemStack(ModItems.ENTITY_PHOTOGRAPH.get());
         CompoundTag tag = new CompoundTag();
         tag.putString("lensouls:stolen_entity", entityId);
+        if (com.plumejade.lensouls.integration.PhotographEffectRegistry.hasEffect(entityId)) {
+            tag.putBoolean("lensouls:photograph_curio", true);
+        }
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
         // 用实体名作为物品名，JEI 可搜索
         int colon = entityId.indexOf(':');

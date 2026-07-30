@@ -191,7 +191,6 @@ public record BossOutlineColors(
             if (inst.getEffect().value() instanceof ElementInfusionEffect effect) {
                 ElementDamage element = effect.getElement();
 
-                // 优先：通过 descriptionId 精确匹配（如 item.lensouls.ignis_soul）
                 String descId = ElementInfusionEffect.getPlayerCustomName(
                         (entity instanceof Player p) ? p : null, element);
                 if (descId != null && !descId.isEmpty()) {
@@ -201,21 +200,6 @@ public record BossOutlineColors(
                         if (dur > bestDuration) {
                             bestDuration = dur;
                             bestType = matched;
-                        }
-                        continue;
-                    }
-                }
-
-                // 降级：element+multiplier 近似匹配（基础镜魂无 descriptionId 时）
-                int amp = inst.getAmplifier();
-                float mult = effect.getDamageMultiplier(amp);
-                for (BossPhantomType type : BossPhantomType.values()) {
-                    if (type.getElement() == element
-                            && Math.abs(type.getDamageMultiplier() - mult) < 0.01f) {
-                        int dur = inst.getDuration();
-                        if (dur > bestDuration) {
-                            bestDuration = dur;
-                            bestType = type;
                         }
                     }
                 }

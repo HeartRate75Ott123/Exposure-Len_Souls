@@ -53,19 +53,28 @@ public enum BossPhantomType {
             "com.github.L_Ender.cataclysm.init.ModEntities", "NETHERITE_MONSTROSITY",
             "cataclysm:textures/entity/monstrosity/netherite_monstrosity.png"),
 
-    // ========== 新 BOSS 镜魂（Twilight Forest — 降级 BossPhantomEntity） ==========
+    // ========== 新 BOSS 镜魂（Twilight Forest — 借体驱动） ==========
 
     HYDRA("twilightforest", "hydra", ElementDamage.FIRE, 1.0f, false, 0x498cff, 30,
-            7.5, 8.5, 6.0f, 5.0f, "", "", "", ""),
+            12.0, 14.0, 6.0f, 5.0f,
+            "twilightforest.entity.boss.Hydra",
+            "twilightforest.init.TFEntities", "HYDRA",
+            "twilightforest:textures/entity/hydra4.png"),
     KNIGHT_PHANTOM("twilightforest", "knight_phantom", ElementDamage.ENDER, 1.0f, false, 0x56ff91, 30,
             7.5, 8.5, 6.0f, 5.0f,
             "twilightforest.entity.boss.KnightPhantom",
             "twilightforest.init.TFEntities", "KNIGHT_PHANTOM",
             "twilightforest:textures/entity/knightphantom.png"),
     ALPHA_YETI("twilightforest", "alpha_yeti", ElementDamage.WATER, 1.0f, false, 0x56ff91, 30,
-            7.5, 8.5, 6.0f, 5.0f, "", "", "", ""),
+            7.5, 8.5, 6.0f, 5.0f,
+            "twilightforest.entity.boss.AlphaYeti",
+            "twilightforest.init.TFEntities", "ALPHA_YETI",
+            "twilightforest:textures/entity/yetialpha.png"),
     NAGA("twilightforest", "naga", ElementDamage.EARTH, 1.0f, false, 0x56ff91, 30,
-            7.5, 8.5, 6.0f, 5.0f, "", "", "", ""),
+            7.5, 8.5, 6.0f, 5.0f,
+            "twilightforest.entity.boss.Naga",
+            "twilightforest.init.TFEntities", "NAGA",
+            "twilightforest:textures/entity/nagahead.png"),
 
     // ========== 新 BOSS 镜魂（Legendary Monsters — 借体驱动） ==========
 

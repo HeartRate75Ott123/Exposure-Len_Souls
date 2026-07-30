@@ -75,7 +75,6 @@ public class BossPhantomManager {
                 Component.translatable(descId)));
 
         // 旁观者模式（不移动玩家位置，不施加效果）
-        // 持久化保存原始模式到 NBT（所有路径通用，对抗断线丢失）
         originalGameTypes.put(player.getUUID(), player.gameMode.getGameModeForPlayer());
         player.getPersistentData().putInt("lensouls:originalGameType",
                 player.gameMode.getGameModeForPlayer().getId());
@@ -88,7 +87,7 @@ public class BossPhantomManager {
         }
 
         // 降级：BossPhantomEntity 旧路径（模组未加载时备用）
-        applyStunEffects(player, PHANTOM_TOTAL_TICKS + 1);
+        // 无需施加迟缓/抗性，旁观者模式已防止被攻击
 
         // 生成幻灵
         BossPhantomEntity phantom = new BossPhantomEntity(
@@ -169,8 +168,21 @@ public class BossPhantomManager {
             player.getPersistentData().putInt("lensouls:originalGameType",
                     player.gameMode.getGameModeForPlayer().getId());
 
-            // 4. 类型特定初始化（Ignis: blockingProgress, 等）
+            // 4. 类型特定初始化（Ignis: blockingProgress, KnightPhantom: 攻击态, Naga: 家园限制）
             type.initEntity(entity, level);
+
+            // Naga 有严格家园限制，需将 restrictionPoint 设到召唤位，否则不会攻击玩家
+            if (type == BossPhantomType.NAGA) {
+                try {
+                    Class<?> nagaClass = Class.forName("twilightforest.entity.boss.Naga");
+                    var rpMethod = nagaClass.getMethod("setRestrictionPoint", net.minecraft.core.GlobalPos.class);
+                    var globalPos = net.minecraft.core.GlobalPos.of(level.dimension(),
+                            net.minecraft.core.BlockPos.containing(ox, oy, oz));
+                    rpMethod.invoke(entity, globalPos);
+                } catch (Exception e) {
+                    LenSouls.LOGGER.warn("[幻灵] Naga setRestrictionPoint 失败", e);
+                }
+            }
 
             // 5. 找最近敌对生物作为 target
             LivingEntity target = findNearestEnemy(level, ox, py, oz);

@@ -97,17 +97,15 @@ public class PhotographEffectRegistry {
 
     private static void add(String entityId, String desc, EffectEntry entry) {
         EFFECTS.computeIfAbsent(entityId, k -> new ArrayList<>()).add(entry);
-        DESCRIPTIONS.put(entityId, desc);
+        DESCRIPTIONS.merge(entityId, desc, (old, add) -> old + "\n" + add);
     }
 
     /** 每 tick 应用效果 */
     public static void applyEffects(LivingEntity player, String entityId) {
+        // 硬编码效果（药水/特殊）
         List<EffectEntry> list = EFFECTS.get(entityId);
-        if (list != null) {
-            applyList(player, list);
-            return;
-        }
-        // fallback: attacker_element 配置 → 动态生成元素活性效果
+        if (list != null) applyList(player, list);
+        // 同时应用 attacker_element 配置 → 元素活性 I
         var id = ResourceLocation.parse(entityId);
         if (com.plumejade.lensouls.config.AttackerElementLoader.hasMapping(id)) {
             ElementDamage elem = com.plumejade.lensouls.config.AttackerElementLoader.getElement(id);
@@ -178,18 +176,19 @@ public class PhotographEffectRegistry {
         // 硬编码效果描述
         String desc = DESCRIPTIONS.get(entityId);
         if (desc != null) {
-            event.getToolTip().add(Component.literal("§7" + desc));
-            return;
-        }
-        // attacker_element fallback → 元素活性 I
-        var id = ResourceLocation.parse(entityId);
-        if (com.plumejade.lensouls.config.AttackerElementLoader.hasMapping(id)) {
-            ElementDamage elem = com.plumejade.lensouls.config.AttackerElementLoader.getElement(id);
-            if (elem != null)
-                event.getToolTip().add(Component.literal("")
-                        .append(Component.translatable("element.lensouls." + elem.getSerializedName() + ".short"))
-                        .append(Component.literal(" 活性 I"))
-                        .withStyle(ChatFormatting.GREEN));
+            for (String line : desc.split("\n"))
+                event.getToolTip().add(Component.literal("§7" + line));
+        } else {
+            // attacker_element fallback → 元素活性 I
+            var id = ResourceLocation.parse(entityId);
+            if (com.plumejade.lensouls.config.AttackerElementLoader.hasMapping(id)) {
+                ElementDamage elem = com.plumejade.lensouls.config.AttackerElementLoader.getElement(id);
+                if (elem != null)
+                    event.getToolTip().add(Component.literal("")
+                            .append(Component.translatable("element.lensouls." + elem.getSerializedName() + ".short"))
+                            .append(Component.literal(" 活性 I"))
+                            .withStyle(ChatFormatting.GREEN));
+            }
         }
     }
 }

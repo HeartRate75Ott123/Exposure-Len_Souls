@@ -18,8 +18,32 @@ public class BossToughnessAttributes {
     private static final Map<String, ToughnessConfig> OVERRIDES = new HashMap<>();
 
     static {
-        // 可在此添加特定实体的覆盖配置
-        // put("cataclysm:ignis", new ToughnessConfig(8, 300, 40));
+        put("legendary_monsters:overgrown_colossus", new ToughnessConfig(8, 200, 60));
+        put("legendary_monsters:dune_sentinel", new ToughnessConfig(8, 200, 60));
+        put("legendary_monsters:skeletosaurus", new ToughnessConfig(8, 200, 60));
+        put("legendary_monsters:lava_eater", new ToughnessConfig(8, 200, 60));
+        put("legendary_monsters:frostbitten_golem", new ToughnessConfig(8, 200, 60));
+        put("legendary_monsters:ancient_guardian", new ToughnessConfig(8, 200, 60));
+        put("block_factorys_bosses:yeti", new ToughnessConfig(8, 200, 60));
+        put("legendary_monsters:withered_abomination", new ToughnessConfig(8, 200, 60));
+        put("cataclysm:maledictus", new ToughnessConfig(9, 200, 60));
+        put("cataclysm:netherite_monstrosity", new ToughnessConfig(9, 200, 60));
+        put("cataclysm:scylla", new ToughnessConfig(9, 200, 60));
+        put("cataclysm:ancient_remnant", new ToughnessConfig(9, 200, 60));
+        put("cataclysm:the_harbinger", new ToughnessConfig(9, 200, 60));
+        put("legendary_monsters:shulker_mimic", new ToughnessConfig(10, 200, 60));
+        put("legendary_monsters:endersent", new ToughnessConfig(10, 200, 60));
+        put("legendary_monsters:annihilation_pursuer", new ToughnessConfig(10, 200, 60));
+        put("legendary_monsters:posessed_paladin", new ToughnessConfig(10, 200, 60));
+        put("legendary_monsters:cloud_golem", new ToughnessConfig(10, 200, 60));
+        put("minecraft:wither", new ToughnessConfig(10, 200, 60));
+        put("minecraft:warden", new ToughnessConfig(10, 200, 60));
+        put("cataclysm:the_leviathan", new ToughnessConfig(12, 200, 60));
+        put("cataclysm:ender_guardian", new ToughnessConfig(12, 200, 60));
+        put("minecraft:ender_dragon", new ToughnessConfig(12, 200, 60));
+        put("cataclysm:ignis", new ToughnessConfig(20, 200, 60));
+        put("block_factorys_bosses:underworld_knight", new ToughnessConfig(20, 200, 60));
+        put("legendary_monsters:the_obliterator", new ToughnessConfig(20, 200, 60));
     }
 
     public static void put(String entityId, ToughnessConfig config) {

@@ -42,35 +42,6 @@ public class CuriosIntegration {
                 }
             });
 
-            // ── PlayerTickEvent.Post → 应用照片效果 ──
-            registerListener(PlayerTickEvent.Post.class, EventPriority.NORMAL, (Consumer<Object>) event -> {
-                try {
-                    if (!(((net.neoforged.neoforge.event.tick.PlayerTickEvent) event).getEntity() instanceof net.minecraft.server.level.ServerPlayer player)) return;
-
-                    Class<?> curiosApi = Class.forName("top.theillusivec4.curios.api.CuriosApi");
-                    Method getCurios = curiosApi.getMethod("getCuriosInventory", net.minecraft.world.entity.LivingEntity.class);
-                    Object optional = getCurios.invoke(null, player);
-                    if (!(boolean) optional.getClass().getMethod("isPresent").invoke(optional)) return;
-                    Object handler = optional.getClass().getMethod("get").invoke(optional);
-
-                    List<?> results = null;
-                    try {
-                        results = (List<?>) handler.getClass().getMethod("findCurios", String.class).invoke(handler, "photograph");
-                    } catch (Exception ignored) {}
-                    if (results == null || results.isEmpty()) return;
-
-                    for (Object result : results) {
-                        net.minecraft.world.item.ItemStack stack = (net.minecraft.world.item.ItemStack)
-                                result.getClass().getMethod("stack").invoke(result);
-                        if (stack.isEmpty()) continue;
-                        String stolen = PhotographEffectRegistry.getStolenEntity(stack);
-                        if (stolen != null) PhotographEffectRegistry.applyEffects(player, stolen);
-                    }
-                } catch (Exception e) {
-                    com.plumejade.lensouls.LenSouls.LOGGER.error("[Curios] tick 失败", e);
-                }
-            });
-
             com.plumejade.lensouls.LenSouls.LOGGER.info("[Curios] 照片饰品槽已注册");
         } catch (Exception e) {
             com.plumejade.lensouls.LenSouls.LOGGER.info("[Curios] Curios 未安装");

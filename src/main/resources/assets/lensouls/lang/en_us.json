@@ -31,7 +31,7 @@
   "item.lensouls.lens_tier_2": "§7Lens §8(Tier II)",
   "item.lensouls.lens_tier_3": "§7Lens §8(Tier III)",
   "item.lensouls.lens_tier_4": "§7Lens §8(Tier IV)",
-  "message.lensouls.lens_tier_insufficient": "§cInsufficient lens tier! Required tier: %s",
+  "message.lensouls.lens_tier_insufficient": "§cInsufficient tier! Cannot deal toughness damage. Install Soul Upgrade %s",
   "lensouls.photograph.entity_name": "§7Entity: %s",
   "jei.lensouls.photograph_curio": "Stolen entity photo — can be equipped in the Photograph slot. Entity: %s. Right-click the photo to use.",
 

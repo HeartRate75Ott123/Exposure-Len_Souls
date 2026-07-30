@@ -5,6 +5,7 @@ import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import com.plumejade.lensouls.item.ModItems;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
+import mezz.jei.api.registration.ISubtypeRegistration;
 import mezz.jei.api.registration.IRecipeRegistration;
 import mezz.jei.api.constants.VanillaTypes;
 import net.minecraft.ChatFormatting;
@@ -27,6 +28,14 @@ public class LensoulsJeiPlugin implements IModPlugin {
     @Override
     public ResourceLocation getPluginUid() {
         return PLUGIN_UID;
+    }
+
+    @Override
+    public void registerItemSubtypes(ISubtypeRegistration registration) {
+        registration.registerSubtypeInterpreter(ModItems.ENTITY_PHOTOGRAPH.get(), (stack, ctx) -> {
+            String entity = PhotographEffectRegistry.getStolenEntity(stack);
+            return entity != null ? entity : "none";
+        });
     }
 
     /** 铁砧升级提示（绿色） */

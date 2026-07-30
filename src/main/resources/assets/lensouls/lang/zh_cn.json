@@ -233,7 +233,7 @@
   "item.lensouls.lens_tier_2": "§d摄魂升级 II",
   "item.lensouls.lens_tier_3": "§d摄魂升级 III",
   "item.lensouls.lens_tier_4": "§d摄魂升级 IV",
-  "message.lensouls.lens_tier_insufficient": "§c等级不足！请确认你安装了粉红 %s",
+  "message.lensouls.lens_tier_insufficient": "§c等级不足，无法造成韧性伤害！确认你安装了摄魂升级%s",
   "entity.lensouls.boss_phantom.hydra": "九头蛇幻灵",
   "entity.lensouls.boss_phantom.knight_phantom": "幻影骑士幻灵",
   "entity.lensouls.boss_phantom.alpha_yeti": "雪怪首领幻灵",

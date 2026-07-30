@@ -98,6 +98,11 @@ public class ModCreativeTabs {
                         ItemStack book = new ItemStack(Items.ENCHANTED_BOOK);
                         book.enchant(holder, 1);
                         output.accept(book);
+
+                        // 实体照片（供 JEI 搜索）
+                        for (String eid : com.plumejade.lensouls.integration.PhotographEffectRegistry.getAllEntityIds()) {
+                            output.accept(com.plumejade.lensouls.item.EntityPhotographItem.create(eid));
+                        }
                     })
                     .build());
 

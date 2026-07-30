@@ -31,7 +31,7 @@ public class EntityPhotographItem extends Item {
         String transKey = "entity." + entityId.substring(0, colon) + "." + entityId.substring(colon + 1);
         stack.set(DataComponents.CUSTOM_NAME,
                 Component.literal("照片(").append(Component.translatable(transKey)).append(Component.literal(")"))
-                        .withStyle(ChatFormatting.GREEN));
+                        .withStyle(ChatFormatting.GREEN).withStyle(s -> s.withItalic(false)));
         return stack;
     }
 }

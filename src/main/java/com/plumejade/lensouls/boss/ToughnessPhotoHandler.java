@@ -2,96 +2,63 @@ package com.plumejade.lensouls.boss;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.item.LensItem;
+import io.github.mortuusars.exposure.Exposure;
+import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
+import io.github.mortuusars.exposure.world.item.component.StoredItemStack;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.network.PacketDistributor;
-
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.function.Consumer;
+import net.neoforged.bus.api.SubscribeEvent;
 
 public class ToughnessPhotoHandler {
 
-    private static boolean registered = false;
-
-    public static void register() {
-        if (registered) return;
-        registered = true;
-
+    @SubscribeEvent
+    public static void onFrameAdded(FrameAddedEvent event) {
         try {
-            Class<?> eventClass = Class.forName("io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent");
-            Method getEntitiesInFrame = eventClass.getMethod("getEntitiesInFrame");
-            Method getCamera = eventClass.getMethod("getCamera");
-            Method getCameraHolderEntity = eventClass.getMethod("getCameraHolderEntity");
+            ItemStack camera = event.getCamera();
+            int lensTier = 0;
+            StoredItemStack stored = camera.get(Exposure.DataComponents.LENS);
+            if (stored != null && stored.getForReading().getItem() instanceof LensItem lens) {
+                lensTier = lens.getTier();
+            }
 
-            Class<?> dataComponentsClass = Class.forName("io.github.mortuusars.exposure.Exposure$DataComponents");
-            java.lang.reflect.Field lensField = dataComponentsClass.getField("LENS");
-            net.minecraft.core.component.DataComponentType<?> lensType =
-                    (net.minecraft.core.component.DataComponentType<?>) lensField.get(null);
-            Method itemStackGet = ItemStack.class.getMethod("get", net.minecraft.core.component.DataComponentType.class);
+            var entities = event.getEntitiesInFrame();
+            if (entities == null || entities.isEmpty()) return;
 
-            Method addListener = NeoForge.EVENT_BUS.getClass()
-                    .getMethod("addListener", EventPriority.class, boolean.class, Class.class, Consumer.class);
+            Entity holder = event.getCameraHolderEntity();
+            net.minecraft.server.level.ServerPlayer hitter = holder instanceof net.minecraft.server.level.ServerPlayer p ? p : null;
+            BossToughnessManager manager = BossToughnessManager.getInstance();
+            boolean playedSound = false;
 
-            addListener.invoke(NeoForge.EVENT_BUS, EventPriority.NORMAL, false, eventClass,
-                    (Consumer<Object>) event -> {
-                        try {
-                            ItemStack camera = (ItemStack) getCamera.invoke(event);
-                            int lensTier = 0;
-                            Object stored = itemStackGet.invoke(camera, lensType);
-                            if (stored != null) {
-                                Object innerStack = stored.getClass().getMethod("getForReading").invoke(stored);
-                                if (innerStack instanceof ItemStack lensStack
-                                        && lensStack.getItem() instanceof LensItem lens) {
-                                    lensTier = lens.getTier();
-                                }
-                            }
+            for (LivingEntity entity : entities) {
+                boolean hasTier = BossTierLoader.getTier(entity) > 0;
+                boolean inManager = manager.has(entity);
 
-                            @SuppressWarnings("unchecked")
-                            List<LivingEntity> entities = (List<LivingEntity>) getEntitiesInFrame.invoke(event);
-                            if (entities == null || entities.isEmpty()) return;
+                if (hasTier && lensTier < 1) {
+                    if (!playedSound) failSound(entity, holder);
+                    playedSound = true;
+                    continue;
+                }
 
-                            Entity holder = (Entity) getCameraHolderEntity.invoke(event);
-                            net.minecraft.server.level.ServerPlayer hitter = holder instanceof net.minecraft.server.level.ServerPlayer p ? p : null;
-                            BossToughnessManager manager = BossToughnessManager.getInstance();
-                            boolean playedSound = false;
+                if (hasTier && !inManager) {
+                    manager.register(entity);
+                    inManager = true;
+                }
+                if (!inManager) continue;
 
-                            for (LivingEntity entity : entities) {
-                                boolean hasTier = BossTierLoader.getTier(entity) > 0;
-                                boolean inManager = manager.has(entity);
-
-                                if (hasTier && lensTier < 1) {
-                                    if (!playedSound) failSound(entity, holder);
-                                    playedSound = true;
-                                    continue;
-                                }
-
-                                if (hasTier && !inManager) {
-                                    manager.register(entity);
-                                    inManager = true;
-                                }
-                                if (!inManager) continue;
-
-                                int bossTier = BossTierLoader.getTier(entity);
-                                if (bossTier < 1) { manager.hit(entity, hitter); break; }
-                                if (lensTier >= bossTier) { manager.hit(entity, hitter); break; }
-                                if (!playedSound) failSound(entity, holder);
-                                playedSound = true;
-                            }
-                        } catch (Exception e) {
-                            LenSouls.LOGGER.error("[ToughnessPhoto] fail", e);
-                        }
-                    });
+                int bossTier = BossTierLoader.getTier(entity);
+                if (bossTier < 1) { manager.hit(entity, hitter); break; }
+                if (lensTier >= bossTier) { manager.hit(entity, hitter); break; }
+                if (!playedSound) failSound(entity, holder);
+                playedSound = true;
+            }
         } catch (Exception e) {
-            LenSouls.LOGGER.error("[ToughnessPhoto] 注册失败", e);
+            LenSouls.LOGGER.error("[ToughnessPhoto] fail", e);
         }
     }
 
     private static void failSound(LivingEntity entity, Entity holder) {
-        PacketDistributor.sendToPlayersTrackingEntity(entity,
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntity(entity,
                 new ToughnessHitSoundPacket(entity.getId(), true));
         if (holder instanceof net.minecraft.server.level.ServerPlayer player) {
             player.displayClientMessage(

@@ -81,14 +81,12 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotoSpecialEffects.class);
 
         // Curios 照片饰品槽（运行时检测）
-        com.plumejade.lensouls.integration.CuriosIntegration.register();
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.CuriosIntegration.class);
 
-
-        // 注册反射版 FrameAddedEvent 监听（所有能力注入 + TIME_STOP）
-        com.plumejade.lensouls.ability.handler.PhotoInjectionHandler.register();
-        com.plumejade.lensouls.ability.handler.TimeFreezeHandler.register();
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.ability.handler.TimeFreezeHandler.class);
 
         // BOSS 韧性系统（注册实例，所有 @SubscribeEvent 用非静态方法）
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.ToughnessPhotoHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.BossToughnessManager.getInstance());
 
         // ---- 元素系统 ----
@@ -102,9 +100,6 @@ public class LenSouls {
 
         // BOSS 韧性 — 伤害减免 + 自动注册事件处理器
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.ToughnessDamageHandler.class);
-
-        // BOSS 韧性 — 拍照削韧（反射监听 Exposure FrameAddedEvent）
-        com.plumejade.lensouls.boss.ToughnessPhotoHandler.register();
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }

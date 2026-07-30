@@ -79,69 +79,42 @@ public class TrophyModifierHandler {
 
     public record TrophyMod(String type, float value) {}
 
-    /** 应用修饰符到韧性数据 */
-    public static float applyHitsModifier(ServerPlayer player, float baseHits) {
-        float total = baseHits;
-        try {
-            Class<?> curiosApi = Class.forName("top.theillusivec4.curios.api.CuriosApi");
-            var getCurios = curiosApi.getMethod("getCuriosInventory", LivingEntity.class);
-            Object optional = getCurios.invoke(null, player);
-            if (!(boolean) optional.getClass().getMethod("isPresent").invoke(optional)) return total;
-            Object handler = optional.getClass().getMethod("get").invoke(optional);
-            var results = (java.util.List<?>) handler.getClass()
-                    .getMethod("findCurios", String.class).invoke(handler, "head");
-            if (results == null) return total;
-            for (Object r : results) {
-                ItemStack stack = (ItemStack) r.getClass().getMethod("stack").invoke(r);
-                TrophyMod m = getModifier(stack);
-                if (m == null) continue;
-                switch (m.type) {
-                    case "toughness_bonus" -> total *= m.value;
-                    case "stun_extend" -> {} // handled in stun
-                    case "invincible_shorten" -> {} // handled in invincible
+    private static java.util.List<ItemStack> getTrophyStacks(ServerPlayer player) {
+        java.util.List<ItemStack> list = new java.util.ArrayList<>();
+        CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
+            for (var sh : handler.getCurios().values()) {
+                var stacks = sh.getStacks();
+                for (int i = 0; i < stacks.getSlots(); i++) {
+                    ItemStack stack = stacks.getStackInSlot(i);
+                    if (!stack.isEmpty() && getModifier(stack) != null) list.add(stack);
                 }
             }
-        } catch (Exception ignored) {}
+        });
+        return list;
+    }
+
+    public static float applyHitsModifier(ServerPlayer player, float baseHits) {
+        float total = baseHits;
+        for (ItemStack stack : getTrophyStacks(player)) {
+            TrophyMod m = getModifier(stack);
+            if (m != null && "toughness_bonus".equals(m.type)) total *= m.value;
+        }
         return total;
     }
 
     public static int applyStunModifier(ServerPlayer player, int baseStun) {
-        try {
-            Class<?> curiosApi = Class.forName("top.theillusivec4.curios.api.CuriosApi");
-            var getCurios = curiosApi.getMethod("getCuriosInventory", LivingEntity.class);
-            Object optional = getCurios.invoke(null, player);
-            if (!(boolean) optional.getClass().getMethod("isPresent").invoke(optional)) return baseStun;
-            Object handler = optional.getClass().getMethod("get").invoke(optional);
-            var results = (java.util.List<?>) handler.getClass()
-                    .getMethod("findCurios", String.class).invoke(handler, "head");
-            if (results == null) return baseStun;
-            for (Object r : results) {
-                ItemStack stack = (ItemStack) r.getClass().getMethod("stack").invoke(r);
-                TrophyMod m = getModifier(stack);
-                if (m == null) continue;
-                if ("stun_extend".equals(m.type)) return (int) (baseStun * m.value);
-            }
-        } catch (Exception ignored) {}
+        for (ItemStack stack : getTrophyStacks(player)) {
+            TrophyMod m = getModifier(stack);
+            if (m != null && "stun_extend".equals(m.type)) return (int) (baseStun * m.value);
+        }
         return baseStun;
     }
 
     public static int applyInvincibleModifier(ServerPlayer player, int baseInvincible) {
-        try {
-            Class<?> curiosApi = Class.forName("top.theillusivec4.curios.api.CuriosApi");
-            var getCurios = curiosApi.getMethod("getCuriosInventory", LivingEntity.class);
-            Object optional = getCurios.invoke(null, player);
-            if (!(boolean) optional.getClass().getMethod("isPresent").invoke(optional)) return baseInvincible;
-            Object handler = optional.getClass().getMethod("get").invoke(optional);
-            var results = (java.util.List<?>) handler.getClass()
-                    .getMethod("findCurios", String.class).invoke(handler, "head");
-            if (results == null) return baseInvincible;
-            for (Object r : results) {
-                ItemStack stack = (ItemStack) r.getClass().getMethod("stack").invoke(r);
-                TrophyMod m = getModifier(stack);
-                if (m == null) continue;
-                if ("invincible_shorten".equals(m.type)) return Math.max(1, (int) (baseInvincible * m.value));
-            }
-        } catch (Exception ignored) {}
+        for (ItemStack stack : getTrophyStacks(player)) {
+            TrophyMod m = getModifier(stack);
+            if (m != null && "invincible_shorten".equals(m.type)) return Math.max(1, (int) (baseInvincible * m.value));
+        }
         return baseInvincible;
     }
 

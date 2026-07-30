@@ -108,8 +108,6 @@
   "enchantment.lensouls.soul_photography.desc": "将实体照片存入剑槽，攻击时获得额外伤害",
   "container.lensouls.photo_gui": "摄魂照片",
   "key.lensouls.photo_gui": "打开照片 GUI (X)",
-  "key.lensouls.gold_glint": "调试：切换金色光效 (K)",
-  "key.lensouls.debug_mask": "调试：显示 mask 深度热力图 (F10)",
   "lensouls.configuration.souls": "镜魂",
   "lensouls.configuration.photos": "照片",
   "lensouls.configuration.dimensionalGun": "次元枪",

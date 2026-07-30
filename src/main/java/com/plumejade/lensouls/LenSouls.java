@@ -83,14 +83,6 @@ public class LenSouls {
         // Curios 照片饰品槽（运行时检测）
         com.plumejade.lensouls.integration.CuriosIntegration.register();
 
-        // ---- Curios 集成（运行时检测） ----
-//        try {
-//            Class.forName("top.theillusivec4.curios.api.CuriosApi");
-//            NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.CuriosIntegration.class);
-//            LenSouls.LOGGER.info("[Curios] Curios API 已加载，照片饰品槽已注册");
-//        } catch (ClassNotFoundException e) {
-//            LenSouls.LOGGER.info("[Curios] Curios 未安装，跳过照片饰品槽");
-//        }
 
         // 注册反射版 FrameAddedEvent 监听（所有能力注入 + TIME_STOP）
         com.plumejade.lensouls.ability.handler.PhotoInjectionHandler.register();

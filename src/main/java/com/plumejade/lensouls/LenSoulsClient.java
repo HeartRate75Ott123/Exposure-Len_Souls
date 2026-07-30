@@ -120,7 +120,6 @@ public class LenSoulsClient {
         for (var skin : net.minecraft.client.resources.PlayerSkin.Model.values()) {
             var renderer = event.getSkin(skin);
             if (renderer instanceof net.minecraft.client.renderer.entity.player.PlayerRenderer pr) {
-                pr.addLayer(new com.plumejade.lensouls.ability.client.GoldenPlayerGlintLayer(pr));
                 // 镜魂实体发光层（第三人称，Iris/PA/BC 兼容）
                 pr.addLayer(new com.plumejade.lensouls.ability.client.SoulGlowLayer<>(pr));
             }

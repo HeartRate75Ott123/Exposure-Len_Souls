@@ -1,6 +1,5 @@
 package com.plumejade.lensouls.integration;
 
-import com.plumejade.lensouls.LenSouls;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -64,7 +63,6 @@ public class TrophyModifierHandler {
                     if (stack.isEmpty()) continue;
                     String regName = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
                     if (!regName.contains("twilightforest") || !regName.contains("trophy")) continue;
-                    LenSouls.LOGGER.info("[Trophy] 发现奖杯: {}", regName);
                     if (getModifier(stack) != null) continue;
                     TrophyMod mod = rollModifier();
                     CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
@@ -74,29 +72,9 @@ public class TrophyModifierHandler {
                     tag.put(TAG, mt);
                     stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
                     try { stacksHandler.getStacks().setStackInSlot(i, stack); } catch (Exception ignored) {}
-                    LenSouls.LOGGER.info("[Trophy] 生成修饰符 {} x{} 于 {}", mod.type(), mod.value(), stack.getHoverName().getString());
                 }
             }
         });
-    }
-
-    private static java.util.List<?> findCurios(ServerPlayer player, String slot) {
-        try {
-            Class<?> curiosApi = Class.forName("top.theillusivec4.curios.api.CuriosApi");
-            var getCurios = curiosApi.getMethod("getCuriosInventory", LivingEntity.class);
-            Object optional = getCurios.invoke(null, player);
-            if (!(boolean) optional.getClass().getMethod("isPresent").invoke(optional)) {
-                LenSouls.LOGGER.warn("[Trophy] Curios 库存未找到");
-                return null;
-            }
-            Object handler = optional.getClass().getMethod("get").invoke(optional);
-            var result = (java.util.List<?>) handler.getClass().getMethod("findCurios", String.class).invoke(handler, slot);
-            LenSouls.LOGGER.info("[Trophy] findCurios({}) 返回: {}", slot, result == null ? "null" : result.size() + "个");
-            return result;
-        } catch (Exception e) {
-            LenSouls.LOGGER.error("[Trophy] findCurios 失败", e);
-            return null;
-        }
     }
 
     public record TrophyMod(String type, float value) {}

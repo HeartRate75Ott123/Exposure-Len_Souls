@@ -80,8 +80,6 @@
   "enchantment.lensouls.soul_photography.desc": "Store entity photos in the sword slot for bonus damage on attacks",
   "container.lensouls.photo_gui": "Soul Photograph",
   "key.lensouls.photo_gui": "Open Photo GUI (X)",
-  "key.lensouls.gold_glint": "Debug: Toggle Gold Glint (K)",
-  "key.lensouls.debug_mask": "Debug: Show Mask Depth Heatmap (F10)",
   "lensouls.configuration.souls": "Souls",
   "lensouls.configuration.photos": "Photos",
   "lensouls.configuration.dimensionalGun": "Dimensional Gun",

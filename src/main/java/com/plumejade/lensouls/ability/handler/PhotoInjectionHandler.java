@@ -39,31 +39,26 @@ public class PhotoInjectionHandler {
             if (!(event.getCameraHolderEntity() instanceof ServerPlayer player)) return;
             AbilityManager am = AbilityManager.getInstance();
             AbilityType ability = am.getEnabled(player);
-            if (ability == null || ability == AbilityType.TIME_STOP || ability == AbilityType.VITAL_STRIKE || ability == AbilityType.SOUL_SEVER) return;
+            if (ability == null) return;
+            if (ability == AbilityType.TIME_STOP || ability == AbilityType.VITAL_STRIKE || ability == AbilityType.SOUL_SEVER) return;
 
             ItemStack hand = player.getMainHandItem();
             if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), hand) <= 0) return;
 
-            CompoundTag cameraTag = hand.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-            cameraTag.putString("lensouls:capture_ability", ability.getId());
+            enqueue(player.getUUID(), ability);
 
-            var frameEntities = event.getEntitiesInFrame();
-            if (frameEntities != null && !frameEntities.isEmpty()) {
-                LivingEntity first = frameEntities.get(0);
-                String stolenId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(first.getType()).toString();
-                cameraTag.putString("lensouls:stolen_entity", stolenId);
-                var frame = event.getFrame();
-                if (frame != null) {
-                    var expId = frame.identifier();
-                    if (expId != null) cacheStolenEntity(expId.toString(), stolenId);
+            // 仅能力窃取才偷实体 ID
+            if (ability == AbilityType.ABILITY_STEAL) {
+                var frameEntities = event.getEntitiesInFrame();
+                if (frameEntities != null && !frameEntities.isEmpty()) {
+                    LivingEntity first = frameEntities.get(0);
+                    String stolenId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(first.getType()).toString();
+                    var frame = event.getFrame();
+                    if (frame != null) {
+                        var expId = frame.identifier();
+                        if (expId != null) cacheStolenEntity(expId.toString(), stolenId);
+                    }
                 }
-            }
-
-            hand.set(DataComponents.CUSTOM_DATA, CustomData.of(cameraTag));
-
-            ResourceLocation camId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(hand.getItem());
-            if (!"exposure_polaroid:instant_camera".equals(camId.toString())) {
-                enqueue(player.getUUID(), ability);
             }
         } catch (Exception e) {
             LenSouls.LOGGER.error("[PhotoInject] fail", e);

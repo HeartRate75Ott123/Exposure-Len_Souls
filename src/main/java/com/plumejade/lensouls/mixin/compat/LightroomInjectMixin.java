@@ -3,14 +3,17 @@ package com.plumejade.lensouls.mixin.compat;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.ability.handler.PhotoInjectionHandler;
+import com.plumejade.lensouls.ability.util.TemporalSnapshot;
 import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import io.github.mortuusars.exposure.Exposure;
 import io.github.mortuusars.exposure.world.camera.frame.Frame;
 import io.github.mortuusars.exposure.world.camera.frame.Photographer;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -47,22 +50,35 @@ public class LightroomInjectMixin {
         tag.putBoolean("lensouls:injected", true);
         tag.putString("lensouls:ability_type", ability.getId());
 
-        // ABILITY_STEAL：从缓存读取被窃取实体 ID
-        if (ability == AbilityType.ABILITY_STEAL) {
-            String entityId = PhotoInjectionHandler.pollStolenEntity(frame.identifier().toString());
-            if (entityId != null && !entityId.isEmpty()) {
-                tag.putBoolean("lensouls:ability_steal", true);
-                tag.putString("lensouls:stolen_entity", entityId);
-                if (PhotographEffectRegistry.hasEffect(entityId)) {
-                    tag.putBoolean("lensouls:photograph_curio", true);
+        switch (ability) {
+            case SPATIAL_WARP -> {
+                Vec3 pos = frame.extraData().get(Frame.POSITION).orElse(null);
+                if (pos != null) {
+                    CompoundTag posTag = new CompoundTag();
+                    posTag.putDouble("x", pos.x);
+                    posTag.putDouble("y", pos.y);
+                    posTag.putDouble("z", pos.z);
+                    tag.put("lensouls:spatial_warp_pos", posTag);
                 }
             }
-        } else {
-            String entityId = PhotoInjectionHandler.pollStolenEntity(frame.identifier().toString());
-            if (entityId != null && !entityId.isEmpty()) {
-                tag.putString("lensouls:stolen_entity", entityId);
-                if (PhotographEffectRegistry.hasEffect(entityId)) {
-                    tag.putBoolean("lensouls:photograph_curio", true);
+            case TEMPORAL_RECALL -> {
+                if (playerUuid != null) {
+                    ServerPlayer sp = net.neoforged.neoforge.server.ServerLifecycleHooks
+                            .getCurrentServer().getPlayerList().getPlayer(playerUuid);
+                    if (sp != null) {
+                        TemporalSnapshot snapshot = TemporalSnapshot.capture(sp);
+                        tag.put("lensouls:snapshot", snapshot.toTag());
+                    }
+                }
+            }
+            case ABILITY_STEAL -> {
+                String entityId = PhotoInjectionHandler.pollStolenEntity(frame.identifier().toString());
+                if (entityId != null && !entityId.isEmpty()) {
+                    tag.putBoolean("lensouls:ability_steal", true);
+                    tag.putString("lensouls:stolen_entity", entityId);
+                    if (PhotographEffectRegistry.hasEffect(entityId)) {
+                        tag.putBoolean("lensouls:photograph_curio", true);
+                    }
                 }
             }
         }

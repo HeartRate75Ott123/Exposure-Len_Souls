@@ -26,7 +26,6 @@ public class ToughnessBarRenderer {
     private static final ResourceLocation NO_PROTECTION =
             ResourceLocation.fromNamespaceAndPath("lensouls", "textures/entity/toughness_bar/no_protection.png");
 
-    // POSITION_TEX_COLOR + TRANSLUCENT：无 UV1/UV2/Normal，无光照，无发黑
     private static RenderType rtP = null, rtN = null;
     private static RenderType make(ResourceLocation tex, String name) {
         return RenderType.create(name, DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS, 256, false, false,
@@ -42,20 +41,17 @@ public class ToughnessBarRenderer {
     private static RenderType getP() { if (rtP == null) rtP = make(PROTECTED, "lensouls_bar_p"); return rtP; }
     private static RenderType getN() { if (rtN == null) rtN = make(NO_PROTECTION, "lensouls_bar_n"); return rtN; }
 
-    private static final float POS_DELAY = 0.08f, POS_SMOOTH = 0.20f;
-    private static final float PROGRESS_SPEED = 0.12f;
+    private static final float POS_SMOOTH = 0.06f;
     private static float debugProgress = 0.3f;
     private static boolean useDebug = false;
-    private static final Map<UUID, Vec3> delayPos = new ConcurrentHashMap<>();
     private static final Map<UUID, Vec3> smoothPos = new ConcurrentHashMap<>();
-    private static final Map<UUID, Float> smoothProgress = new ConcurrentHashMap<>();
 
     public static void setDebugProgress(float p) { debugProgress = Math.max(0, Math.min(1, p)); }
     public static void setUseDebug(boolean u) { useDebug = u; }
     public static float getDebugProgress() { return debugProgress; }
 
     @SubscribeEvent public static void onLevelLoad(LevelEvent.Load e) {
-        if (e.getLevel().isClientSide()) { delayPos.clear(); smoothPos.clear(); }
+        if (e.getLevel().isClientSide()) smoothPos.clear();
     }
 
     @SubscribeEvent
@@ -64,69 +60,53 @@ public class ToughnessBarRenderer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.options.hideGui) return;
         Camera cam = mc.gameRenderer.getMainCamera();
+        var src = mc.renderBuffers().bufferSource();
+        VertexConsumer vc = src.getBuffer(getP());
+        VertexConsumer nc = src.getBuffer(getN());
 
-        // 调试模式：只渲染玩家头顶
         if (useDebug) {
-            renderBar(event, mc, cam, mc.player, debugProgress);
-            return;
+            renderBar(event, mc, cam, mc.player, debugProgress, vc, nc);
+        } else {
+            for (var entry : BossToughnessClientCache.getEntries()) {
+                if (!(mc.level.getEntity(entry.entityId()) instanceof LivingEntity le) || !le.isAlive()) continue;
+                renderBar(event, mc, cam, le, entry.progress(), vc, nc);
+            }
         }
 
-        // 遍历所有 BOSS 实体，每个渲染独立的韧性条
-        for (var entry : BossToughnessClientCache.getEntries()) {
-            if (!(mc.level.getEntity(entry.entityId()) instanceof LivingEntity le) || !le.isAlive()) continue;
-            renderBar(event, mc, cam, le, entry.progress());
-        }
+        src.endBatch(getP());
+        src.endBatch(getN());
     }
 
-    /** 在单个实体头顶渲染韧性条 */
-    private static void renderBar(RenderLevelStageEvent event, Minecraft mc, Camera cam, LivingEntity target, float progress) {
+    private static void renderBar(RenderLevelStageEvent event, Minecraft mc, Camera cam, LivingEntity target, float progress, VertexConsumer vc, VertexConsumer nc) {
         Vec3 raw = target.position().add(0, target.getBbHeight() + Config.TOUGH_BAR_VERTICAL_OFFSET.get(), 0);
         UUID uid = target.getUUID();
-        Vec3 d = delayPos.get(uid);
-        if (d == null) d = raw;
-        else d = new Vec3(d.x + (raw.x - d.x) * POS_DELAY, d.y + (raw.y - d.y) * POS_DELAY, d.z + (raw.z - d.z) * POS_DELAY);
-        delayPos.put(uid, d);
-        Vec3 s = smoothPos.get(uid);
-        if (s == null) s = d;
-        else s = new Vec3(s.x + (d.x - s.x) * POS_SMOOTH, d.y + (d.y - s.y) * POS_SMOOTH, d.z + (d.z - s.z) * POS_SMOOTH);
-        smoothPos.put(uid, s);
-
-        float sp = smoothProgress.getOrDefault(uid, progress);
-        sp += (progress - sp) * PROGRESS_SPEED;
-        if (Math.abs(sp - progress) < 0.002f) sp = progress;
-        smoothProgress.put(uid, sp);
-        progress = sp;
-
-        if (delayPos.size() > 200) { delayPos.clear(); smoothPos.clear(); smoothProgress.clear(); }
+        float speed = target.hurtTime > 0 ? POS_SMOOTH * 0.5f : POS_SMOOTH;
+        Vec3 pos = smoothPos.compute(uid, (k, v) -> {
+            if (v == null) return raw;
+            return new Vec3(v.x + (raw.x - v.x) * speed, v.y + (raw.y - v.y) * speed, v.z + (raw.z - v.z) * speed);
+        });
 
         int w = Config.TOUGH_BAR_WIDTH.get(), h = Config.TOUGH_BAR_HEIGHT.get();
         var ps = event.getPoseStack();
-        MultiBufferSource.BufferSource src = mc.renderBuffers().bufferSource();
 
         ps.pushPose();
-        ps.translate(s.x - cam.getPosition().x, s.y - cam.getPosition().y, s.z - cam.getPosition().z);
+        ps.translate(pos.x - cam.getPosition().x, pos.y - cam.getPosition().y, pos.z - cam.getPosition().z);
         ps.mulPose(cam.rotation());
         ps.scale(-0.025f * w / 32f, -0.025f * h / 32f, 0.025f);
         Matrix4f mat = ps.last().pose();
         float hw = w / 2f, hh = h / 2f;
-        float split = h * (1f - progress); // 分界线（不重叠，无混合闪烁）
+        float split = h * (1f - progress);
 
-        // 底层 protected（下部）
-        VertexConsumer vc = src.getBuffer(getP());
         vc.addVertex(mat, -hw, -hh + split, 0).setUv(0, 1f - progress).setColor(255, 255, 255, 255);
         vc.addVertex(mat, hw, -hh + split, 0).setUv(1, 1f - progress).setColor(255, 255, 255, 255);
         vc.addVertex(mat, hw, -hh, 0).setUv(1, 0).setColor(255, 255, 255, 255);
         vc.addVertex(mat, -hw, -hh, 0).setUv(0, 0).setColor(255, 255, 255, 255);
-        src.endBatch(getP());
 
         if (progress > 0.001f) {
-            // 顶层 no_protection（上部）
-            VertexConsumer nc = src.getBuffer(getN());
             nc.addVertex(mat, -hw, hh, 0).setUv(0, 1).setColor(255, 255, 255, 255);
             nc.addVertex(mat, hw, hh, 0).setUv(1, 1).setColor(255, 255, 255, 255);
             nc.addVertex(mat, hw, -hh + split, 0).setUv(1, 1f - progress).setColor(255, 255, 255, 255);
             nc.addVertex(mat, -hw, -hh + split, 0).setUv(0, 1f - progress).setColor(255, 255, 255, 255);
-            src.endBatch(getN());
         }
 
         ps.popPose();

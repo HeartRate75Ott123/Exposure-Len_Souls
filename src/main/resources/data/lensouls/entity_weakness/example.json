@@ -1,32 +1,31 @@
 {
   "minecraft:zombie": {
-    "fire": 1.5,
+    "fire": 0.5,
     "water": 0.5,
-    "earth": 1.0,
-    "projectile": 1.0
+    "earth": 0.5,
+    "projectile": 0.5
   },
   "minecraft:skeleton": {
-    "water": 2.0,
-    "projectile": 1.0
+    "water": 0.5,
+    "projectile": 0.5
   },
   "minecraft:creeper": {
     "projectile": 0.5,
-    "earth": 2.0
+    "earth": 0.5
   },
   "minecraft:blaze": {
-    "fire": 0.0,
-    "water": 3.0
+    "water": 0.5
   },
   "minecraft:spider": {
-    "fire": 1.25,
-    "earth": 1.5
+    "fire": 0.5,
+    "earth": 0.5
   },
   "minecraft:slime": {
-    "fire": 1.25,
-    "earth": 1.5
+    "fire": 0.5,
+    "earth": 0.5
   },
   "minecraft:iron_golem": {
-    "earth": 1.1,
-    "projectile": 1.5
+    "earth": 0.5,
+    "projectile": 0.5
   }
 }

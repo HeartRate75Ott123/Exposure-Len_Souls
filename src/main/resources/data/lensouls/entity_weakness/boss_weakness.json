@@ -1,8 +1,0 @@
-{
-  "cataclysm:ignis": { "water": 2.0 },
-  "cataclysm:ender_guardian": { "ender": 1.5, "projectile": 1.5 },
-  "cataclysm:netherite_monstrosity": { "earth": 2.0, "water": 2.0 },
-  "legendary_monsters:cloud_golem": { "projectile": 1.5, "earth": 1.5 },
-  "legendary_monsters:posessed_paladin": { "projectile": 1.5 },
-  "legendary_monsters:the_obliterator": { "ender": 2.0 }
-}

@@ -1,0 +1,5 @@
+{
+  "cataclysm:ignis": { "element": "fire", "activity": 1.0 },
+  "block_factorys_bosses:underworld_knight": { "element": "earth", "activity": 1.0 },
+  "legendary_monsters:the_obliterator": { "element": "ender", "activity": 1.0 }
+}

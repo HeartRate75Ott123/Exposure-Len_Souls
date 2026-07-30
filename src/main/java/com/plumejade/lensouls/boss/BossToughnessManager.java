@@ -2,6 +2,8 @@ package com.plumejade.lensouls.boss;
 
 import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -62,6 +64,18 @@ public class BossToughnessManager {
         BossToughnessData removed = dataMap.remove(entity.getUUID());
         if (removed != null) {
         }
+    }
+
+    /** 查询实体是否处于无敌期 */
+    public boolean isInvincible(LivingEntity entity) {
+        BossToughnessData data = dataMap.get(entity.getUUID());
+        return data != null && data.isInvincible();
+    }
+
+    /** 设置实体的无敌剩余 tick */
+    public void setInvincibleTicks(LivingEntity entity, int ticks) {
+        BossToughnessData data = dataMap.get(entity.getUUID());
+        if (data != null) data.setInvincibleTicks(ticks);
     }
 
     // ========== 削韧 ==========
@@ -268,9 +282,26 @@ public class BossToughnessManager {
 
     // ========== 计算所需削韧次数 ==========
 
-    /** 所有 BOSS 固定需要 5 次削韧才能破防 */
+    /** 计算击破韧性需要的削韧次数，优先查 per-entity 覆盖配置，否则返回默认值。 */
     public static int computeRequiredHits(LivingEntity entity) {
-        return 5;
+        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        String idStr = id.toString();
+
+        // 遍历覆盖配置：格式 "modid:entityid:count"
+        for (String entry : Config.TOUGHNESS_HITS_OVERRIDES.get()) {
+            String[] parts = entry.split(":");
+            if (parts.length >= 3) {
+                // 取前两段作为实体 ID（entity ID 内部也可能含 :，所以 join 前 n-1 段）
+                String entryId = parts[0] + ":" + parts[1];
+                if (entryId.equals(idStr)) {
+                    try {
+                        return Integer.parseInt(parts[2]);
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+
+        return Config.TOUGHNESS_DEFAULT_HITS.get();
     }
 
     // ========== 事件 ==========

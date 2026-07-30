@@ -55,6 +55,7 @@ public class BossPhantomModelIntegration {
                         com.github.L_Ender.cataclysm.client.animation.Netherite_Monstrosity_Animation.SMASH);
             });
             case IGNIS, ENDER_GUARDIAN -> null;
+            default -> null;
         };
     }
 

@@ -1,0 +1,5 @@
+{
+  "cataclysm:the_leviathan": { "element": "water", "activity": 1.0 },
+  "cataclysm:ender_guardian": { "element": "ender", "activity": 1.0 },
+  "minecraft:ender_dragon": { "element": "ender", "activity": 1.0 }
+}

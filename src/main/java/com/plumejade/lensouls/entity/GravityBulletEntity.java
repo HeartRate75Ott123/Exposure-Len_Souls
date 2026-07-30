@@ -24,6 +24,9 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.entity.PartEntity;
+
+import javax.annotation.Nullable;
 
 public class GravityBulletEntity extends ThrowableItemProjectile {
     private static final int COLLISION_SEGMENTS = 5;
@@ -109,26 +112,20 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
                     return;
                 }
 
-                // 多段实体碰撞
-                AABB baseBox = getBoundingBox().move(oldPos.subtract(newPos));
-                Vec3 step = vel.scale(1.0 / COLLISION_SEGMENTS);
+                // 全轨迹射线检测（PartEntity 优先）
+                double margin = Math.max(1.0, vel.length());
+                AABB searchBox = getBoundingBox().move(oldPos.subtract(newPos)).expandTowards(vel).inflate(margin);
+                double bestDist = Double.MAX_VALUE;
+                EntityHitResult bestHit = null;
 
-                for (int seg = 0; seg < COLLISION_SEGMENTS; seg++) {
-                    Vec3 segStart = oldPos.add(step.scale(seg));
-                    Vec3 segEnd = segStart.add(step);
-                    AABB searchBox = baseBox.move(step.scale(seg)).expandTowards(step).inflate(1.0);
-
-                    for (Entity target : level().getEntities(this, searchBox, this::canHitEntity)) {
-                        AABB targetBox = target.getBoundingBox();
-                        double minDim = Math.min(Math.min(targetBox.getXsize(), targetBox.getYsize()), targetBox.getZsize());
-                        if (minDim < 0.6) targetBox = targetBox.inflate(0.4);
-
-                        if (targetBox.clip(segStart, segEnd).isPresent()) {
-                            onHit(new EntityHitResult(target, segStart));
-                            return;
-                        }
+                for (Entity target : level().getEntities(this, searchBox, this::canHitEntity)) {
+                    EntityHitResult hit = findClosestHit(target, oldPos, vel);
+                    if (hit != null) {
+                        double d = hit.getLocation().distanceToSqr(oldPos);
+                        if (d < bestDist) { bestDist = d; bestHit = hit; }
                     }
                 }
+                if (bestHit != null) { onHit(bestHit); return; }
 
                 // 超时
                 if (tickCount > TIMEOUT_TICKS) { discard(); }
@@ -216,6 +213,37 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
     protected void onHitEntity(EntityHitResult result) {
         Entity target = result.getEntity();
         if (target.equals(getOwner()) || level().isClientSide) return;
+
+        // PartEntity 命中 - 委托到父实体
+        if (target instanceof PartEntity<?> part) {
+            Entity parent = part.getParent();
+            if (parent instanceof LivingEntity living) {
+                parent.invulnerableTime = 0;
+                part.invulnerableTime = 0;
+                hasHit = true;
+                entityData.set(DATA_HAS_HIT, true);
+                entityData.set(DATA_HIT_TARGET_ID, living.getId());
+                hitTarget = living;
+                hitTick = tickCount;
+                pullPhase = 1;
+                // 写 ActiveBulletId 到引力枪物品
+                if (getOwner() instanceof ServerPlayer sp) {
+                    for (ItemStack s : sp.getInventory().items) {
+                        if (s.getItem() instanceof com.plumejade.lensouls.item.GravityGunItem) {
+                            net.minecraft.nbt.CompoundTag st = s.getOrDefault(DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.EMPTY).copyTag();
+                            if (gunUuid.equals(st.getString("GravityGunItemId"))) {
+                                st.putInt("ActiveBulletId", getId());
+                                s.set(DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(st));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            discard();
+            return;
+        }
+
         if (!(target instanceof LivingEntity living)) { discard(); return; }
 
         Entity owner = getOwner();
@@ -268,5 +296,33 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
     @Override public boolean isNoGravity() { return true; }
     @Override public boolean shouldRender(double x, double y, double z) { return !entityData.get(DATA_HAS_HIT) && super.shouldRender(x, y, z); }
     @Override protected boolean canHitEntity(Entity target) { return target instanceof LivingEntity && !target.equals(getOwner()); }
+    /** PartEntity 优先检测，有 Parts 绝不回退父 AABB */
+    @Nullable
+    private EntityHitResult findClosestHit(Entity target, Vec3 origin, Vec3 vel) {
+        Vec3 end = origin.add(vel);
+        PartEntity<?>[] parts = target.getParts();
+        if (parts != null) {
+            EntityHitResult best = null;
+            double bestD = Double.MAX_VALUE;
+            for (PartEntity<?> part : parts) {
+                if (part == null || !part.isAlive()) continue;
+                var clip = part.getBoundingBox().clip(origin, end);
+                if (clip.isPresent()) {
+                    double d = clip.get().distanceToSqr(origin);
+                    if (d < bestD) { bestD = d; best = new EntityHitResult(part, clip.get()); }
+                }
+                if (part.getBoundingBox().contains(origin)) return new EntityHitResult(part, origin);
+            }
+            return best;
+        }
+        AABB box = target.getBoundingBox();
+        double minDim = Math.min(Math.min(box.getXsize(), box.getYsize()), box.getZsize());
+        if (minDim < 0.6) box = box.inflate(0.4);
+        var clip = box.clip(origin, end);
+        if (clip.isPresent()) return new EntityHitResult(target, clip.get());
+        if (box.contains(origin)) return new EntityHitResult(target, origin);
+        return null;
+    }
+
     @Override public boolean shouldRenderAtSqrDistance(double d) { return d < 4096; }
 }

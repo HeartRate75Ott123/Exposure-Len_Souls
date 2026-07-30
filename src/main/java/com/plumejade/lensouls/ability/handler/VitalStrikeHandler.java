@@ -58,10 +58,9 @@ public class VitalStrikeHandler {
         // ── 削韧 ──
         BossToughnessManager manager = BossToughnessManager.getInstance();
         if (!manager.has(boss)) manager.register(boss);
-        manager.hit(boss);
-
-        // ── 冷却 ──
-        player.getCooldowns().addCooldown(stack.getItem(), 20);
+        // 要害打击白霸体 15 tick（0.75s）
+        var data = manager.hit(boss);
+        if (data != null) data.setInvincibleTicks(15);
     }
 
     // ========== 工具方法 ==========

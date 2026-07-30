@@ -6,11 +6,11 @@
   "mixins": [
     "SoulOutlineMixinTrigger",
     "ability.PlayerInteractionMixin",
-    "BossDetectionMixin"
+    "BossDetectionMixin",
+    "compat.VitalStrikeNoFilmConsumeMixin"
   ],
   "client": [
     "client.FrozenEntityRenderMixin",
-    "client.BufferSourceGetBufferMixin",
     "client.BossEntityRenderMixin",
     "client.GameRendererMixin",
     "client.GunBowAnimationMixin",

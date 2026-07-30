@@ -6,6 +6,7 @@ import com.plumejade.lensouls.effect.ElementInfusionEffect;
 import com.plumejade.lensouls.entity.BossPhantomManager;
 import com.plumejade.lensouls.entity.BossPhantomType;
 import com.plumejade.lensouls.gui.ModMenus;
+import com.plumejade.lensouls.handler.AnvilUpgradeHandler;
 import com.plumejade.lensouls.item.LensoulItem;
 import com.plumejade.lensouls.timer.TimerService;
 import net.minecraft.core.component.DataComponents;
@@ -123,11 +124,9 @@ public class ConverterTriggerPacket implements CustomPacketPayload {
                 if (onCooldown) continue;
 
                 // ---- BOSS 镜魂：已有活跃幻灵时跳过，不进冷却 ----
-                float dmgMult = soulItem.getDamageMultiplier();
-                boolean slowness = soulItem.shouldApplySlowness();
                 var element = soulItem.getElement();
                 String descId = soulStack.getDescriptionId();
-                BossPhantomType phantomType = BossPhantomType.fromSoulItem(dmgMult, slowness, element);
+                BossPhantomType phantomType = BossPhantomType.fromDescriptionId(descId);
                 if (phantomType != null && phantomType.isModLoaded() && player instanceof ServerPlayer serverPlayer
                         && BossPhantomManager.getInstance().hasActivePhantom(serverPlayer.getUUID())) {
                     phantomActiveSkipped = true;
@@ -145,9 +144,10 @@ public class ConverterTriggerPacket implements CustomPacketPayload {
                 tag.put("SoulCooldowns", cooldowns);
                 converter.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 
-                // ---- BOSS 镜魂：走虚影幻灵序列 ----
+                // ---- BOSS 镜魂：走虚影幻灵序列（使用物品实际等级） ----
                 if (phantomType != null && phantomType.isModLoaded() && player instanceof ServerPlayer serverPlayer) {
-                    BossPhantomManager.getInstance().startPhantom(serverPlayer, phantomType, descId);
+                    int amp = AnvilUpgradeHandler.getAmplifier(soulStack);
+                    BossPhantomManager.getInstance().startPhantom(serverPlayer, phantomType, descId, amp);
 
                     // 反馈：虚影已降临
                     Component soulDisplay = Component.translatable(descId);
@@ -163,10 +163,10 @@ public class ConverterTriggerPacket implements CustomPacketPayload {
                     ));
                     // 始终设置自定义名称（即使效果未变更），确保后续覆盖正确
                     ElementInfusionEffect.setPlayerData(player, soulItem.getElement(), soulItem.shouldApplySlowness(),
-                            dmgMult > 1.0f || slowness ? descId : null);
+                            soulItem.getDamageMultiplier() > 1.0f || soulItem.shouldApplySlowness() ? descId : null);
 
                     String soulId = soulItem.getElement().getSerializedName();
-                    Component soulDisplay = dmgMult > 1.0f || slowness
+                    Component soulDisplay = soulItem.getDamageMultiplier() > 1.0f || soulItem.shouldApplySlowness()
                             ? Component.translatable(descId)
                             : Component.translatable("element.lensouls." + soulId);
                     player.sendSystemMessage(

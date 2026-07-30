@@ -1,0 +1,10 @@
+{
+  "legendary_monsters:overgrown_colossus": { "element": "earth", "activity": 1.0 },
+  "legendary_monsters:dune_sentinel": { "element": "earth", "activity": 1.0 },
+  "legendary_monsters:skeletosaurus": { "element": "earth", "activity": 1.0 },
+  "legendary_monsters:lava_eater": { "element": "fire", "activity": 1.0 },
+  "legendary_monsters:frostbitten_golem": { "element": "water", "activity": 1.0 },
+  "legendary_monsters:ancient_guardian": { "element": "earth", "activity": 1.0 },
+  "block_factorys_bosses:yeti": { "element": "water", "activity": 1.0 },
+  "legendary_monsters:withered_abomination": { "element": "fire", "activity": 1.0 }
+}

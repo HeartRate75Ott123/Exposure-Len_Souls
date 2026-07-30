@@ -1,12 +1,15 @@
 package com.plumejade.lensouls.ability.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.boss.BossToughnessManager;
+import com.plumejade.lensouls.item.DimensionalGunItem;
+import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -15,6 +18,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
@@ -112,6 +116,25 @@ public class LensoulsCommand {
                                             return 1;
                                         })
                                 )
+                        )
+                )
+                .then(Commands.literal("dimension_gun")
+                        .then(Commands.argument("kills", IntegerArgumentType.integer(0, 10000))
+                                .executes(ctx -> {
+                                    int kills = IntegerArgumentType.getInteger(ctx, "kills");
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    ItemStack held = player.getMainHandItem();
+                                    if (!held.is(ModItems.DIMENSIONAL_GUN.get())) {
+                                        ctx.getSource().sendFailure(
+                                                Component.literal("主手未持有次元枪"));
+                                        return 0;
+                                    }
+                                    DimensionalGunItem gun = (DimensionalGunItem) held.getItem();
+                                    gun.setKills(held, kills);
+                                    ctx.getSource().sendSuccess(
+                                            () -> Component.literal("次元枪击杀数已设为 " + kills), true);
+                                    return 1;
+                                })
                         )
                 )
         );

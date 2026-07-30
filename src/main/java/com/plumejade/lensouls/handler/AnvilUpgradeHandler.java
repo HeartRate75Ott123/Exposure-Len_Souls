@@ -56,11 +56,8 @@ public class AnvilUpgradeHandler {
         tag.remove("SoulCooldownDur");
         output.set(DataComponents.CUSTOM_DATA, tag.isEmpty() ? CustomData.EMPTY : CustomData.of(tag));
 
-        // 更新显示名
-        int finalLevel = nextLevel;
-        output.set(DataComponents.CUSTOM_NAME,
-                Component.translatable(leftSoul.getDescriptionId())
-                        .append(Component.literal(" §7[" + toRoman(finalLevel) + "]")));
+        // 等级信息改为 tooltip（LensoulItem.appendHoverText 处理）
+        // 不再修改物品名称，避免斜体
 
         event.setOutput(output);
         event.setCost(xpCost);
@@ -77,8 +74,9 @@ public class AnvilUpgradeHandler {
                 return tag.getInt("SoulLevel");
             }
         }
-        // 根据 damageMultiplier 推算初始等级
+        // 根据 damageMultiplier 推算初始等级（对齐星级）
         float mult = soul.getDamageMultiplier();
+        if (mult >= 2.5f) return 5;
         if (mult >= 2.0f) return 4;
         if (mult >= 1.5f) return 3;
         if (mult >= 1.2f) return 2;

@@ -17,12 +17,16 @@ import java.util.Map;
 /**
  * 物品元素活性数据包加载器。
  * <p>
- * 路径: {@code data/lensouls/item_element_activity/&lt;物品注册名&gt;.json}
+ * 路径: {@code data/lensouls/item_element_activity/&lt;任意文件名&gt;.json}
+ * <p>
+ * 格式（仿 entity_weakness，从文件内容中读取物品 ID）：
  * <pre>
  * {
- *   "values": {
- *     "lensouls:fire": 2,
- *     "lensouls:water": 1
+ *   "minecraft:diamond_sword": {
+ *     "values": { "lensouls:fire": 2, "lensouls:water": 1 }
+ *   },
+ *   "twilightforest:fiery_sword": {
+ *     "values": { "lensouls:fire": 3 }
  *   }
  * }
  * </pre>
@@ -43,30 +47,42 @@ public class ItemElementActivityLoader extends SimpleJsonResourceReloadListener 
         Map<ResourceLocation, Map<ElementDamage, Integer>> newMap = new HashMap<>();
 
         for (Map.Entry<ResourceLocation, JsonElement> entry : entries.entrySet()) {
-            ResourceLocation fileId = entry.getKey(); // lensouls:items/diamond_sword → 实际是文件名
-            JsonObject root = entry.getValue().getAsJsonObject();
-            if (!root.has("values")) continue;
+            JsonElement json = entry.getValue();
+            if (!json.isJsonObject()) continue;
 
-            // 文件名即为物品注册名（去掉目录前缀）
-            // SimpleJsonResourceReloadListener 的 key 是 data/目录 到 .json 的相对路径
-            // 比如 "items/diamond_sword" → minecraft:diamond_sword
-            ResourceLocation itemId = fileId;
+            JsonObject root = json.getAsJsonObject();
+            for (String itemKey : root.keySet()) {
+                ResourceLocation itemId;
+                try {
+                    itemId = ResourceLocation.parse(itemKey);
+                } catch (Exception e) {
+                    LenSouls.LOGGER.warn("[ItemElementActivity] 无效物品 ID '{}' (文件: {}): {}", itemKey, entry.getKey(), e.getMessage());
+                    continue;
+                }
 
-            JsonObject values = root.getAsJsonObject("values");
-            Map<ElementDamage, Integer> elementLevels = new HashMap<>();
+                JsonElement valElem = root.get(itemKey);
+                if (!(valElem instanceof JsonObject valObj) || !valObj.has("values")) continue;
 
-            for (String key : values.keySet()) {
-                ElementDamage element = ElementDamage.byName(key.replace("lensouls:", ""));
-                if (element != null) {
-                    int level = values.get(key).getAsInt();
-                    if (level >= 1 && level <= 5) {
-                        elementLevels.put(element, level);
+                JsonObject values = valObj.getAsJsonObject("values");
+                Map<ElementDamage, Integer> elementLevels = new HashMap<>();
+
+                for (String key : values.keySet()) {
+                    ElementDamage element = ElementDamage.byName(key.replace("lensouls:", ""));
+                    if (element != null) {
+                        int level = values.get(key).getAsInt();
+                        if (level >= 1 && level <= 5) {
+                            elementLevels.put(element, level);
+                        }
                     }
                 }
-            }
 
-            if (!elementLevels.isEmpty()) {
-                newMap.put(itemId, elementLevels);
+                if (!elementLevels.isEmpty()) {
+                    newMap.merge(itemId, elementLevels, (a, b) -> {
+                        Map<ElementDamage, Integer> m = new HashMap<>(a);
+                        m.putAll(b);
+                        return m;
+                    });
+                }
             }
         }
 
@@ -91,6 +107,11 @@ public class ItemElementActivityLoader extends SimpleJsonResourceReloadListener 
     public static float getActivity(ItemStack stack, ElementDamage element) {
         ResourceLocation itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
         return getActivity(itemId, element);
+    }
+
+    /** 获取物品的所有元素等级映射（可能为 null） */
+    public static Map<ElementDamage, Integer> getLevels(ResourceLocation itemId) {
+        return activityMap.get(itemId);
     }
 
     public static void clear() {

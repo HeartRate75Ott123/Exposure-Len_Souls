@@ -12,6 +12,7 @@ public record BossPhantomData(
         int remainingTicks,
         String descId,
         int phantomEntityId,
+        int amplifier,
         double originX, double originY, double originZ,
         float originYRot, float originXRot,
         double watchX, double watchY, double watchZ
@@ -27,7 +28,7 @@ public record BossPhantomData(
 
     public BossPhantomData tick() {
         return new BossPhantomData(type, playerId, totalTicks, remainingTicks - 1,
-                descId, phantomEntityId, originX, originY, originZ, originYRot, originXRot,
+                descId, phantomEntityId, amplifier, originX, originY, originZ, originYRot, originXRot,
                 watchX, watchY, watchZ);
     }
 }

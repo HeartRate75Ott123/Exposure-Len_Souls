@@ -58,6 +58,24 @@ public class LensoulsJeiPlugin implements IModPlugin {
         addSoulInfo(registration, ModItems.NETHERITE_MONSTROSITY_SOUL.get().getDefaultInstance(),
                 bossSoulInfo("entity.cataclysm.netherite_monstrosity"));
 
+        // ---- 暮色 BOSS 镜魂 ----
+        addSoulInfo(registration, ModItems.HYDRA_SOUL.get().getDefaultInstance(),
+                bossSoulInfo("entity.twilightforest.hydra"));
+        addSoulInfo(registration, ModItems.KNIGHT_PHANTOM_SOUL.get().getDefaultInstance(),
+                bossSoulInfo("entity.twilightforest.knight_phantom"));
+        addSoulInfo(registration, ModItems.ALPHA_YETI_SOUL.get().getDefaultInstance(),
+                bossSoulInfo("entity.twilightforest.alpha_yeti"));
+        addSoulInfo(registration, ModItems.NAGA_SOUL.get().getDefaultInstance(),
+                bossSoulInfo("entity.twilightforest.naga"));
+        // ---- 传奇怪物 ----
+        addSoulInfo(registration, ModItems.LAVA_EATER_SOUL.get().getDefaultInstance(),
+                bossSoulInfo("entity.legendary_monsters.lava_eater"));
+        // ---- 灾变 ----
+        addSoulInfo(registration, ModItems.THE_LEVIATHAN_SOUL.get().getDefaultInstance(),
+                bossSoulInfo("entity.cataclysm.the_leviathan"));
+        addSoulInfo(registration, ModItems.SCYLLA_SOUL.get().getDefaultInstance(),
+                bossSoulInfo("entity.cataclysm.scylla"));
+
         // ---- 能力球 ----
         addSingleInfo(registration, ModItems.SKILL_BALL.get().getDefaultInstance(),
                 Component.translatable("jei.lensouls.skill_ball"));

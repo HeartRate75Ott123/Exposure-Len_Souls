@@ -61,6 +61,21 @@ public class LensoulItem extends Item {
         this.cooldownSeconds = cooldownSeconds;
     }
 
+    @Override
+    public ItemStack getDefaultInstance() {
+        ItemStack stack = super.getDefaultInstance();
+        // BOSS 镜魂初次设置显示名：末影守卫镜魂（末影）
+        if (this.damageMultiplier > 1.0f || this.applySlowness) {
+            String elementShort = "element.lensouls." + element.getSerializedName() + ".short";
+            stack.set(DataComponents.CUSTOM_NAME,
+                    Component.translatable(this.getDescriptionId())
+                            .append(Component.literal("（"))
+                            .append(Component.translatable(elementShort))
+                            .append(Component.literal("）")));
+        }
+        return stack;
+    }
+
     /** 获取冷却刻数：BOSS 走 bossCooldown 配置，基础走 defaultCooldown 配置 */
     public int getCooldownTicks() {
         return (cooldownSeconds > 0 ? Config.BOSS_COOLDOWN.get() : Config.DEFAULT_COOLDOWN.get()) * 20;
@@ -128,7 +143,7 @@ public class LensoulItem extends Item {
 
         // ---- 启动冷却（独立于效果，低级启用后也进入冷却） ----
         // BOSS 镜魂：已有活跃幻灵时直接跳过，不进冷却
-        BossPhantomType checkType = BossPhantomType.fromSoulItem(damageMultiplier, applySlowness, element);
+        BossPhantomType checkType = BossPhantomType.fromDescriptionId(stack.getDescriptionId());
         if (checkType != null && checkType.isModLoaded() && player instanceof ServerPlayer sp
                 && BossPhantomManager.getInstance().hasActivePhantom(sp.getUUID())) {
             return InteractionResultHolder.pass(stack);
@@ -146,10 +161,11 @@ public class LensoulItem extends Item {
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(cdTag));
 
         // ---- BOSS 镜魂：走虚影幻灵序列（3 秒后自动施加效果） ----
-        BossPhantomType phantomType = BossPhantomType.fromSoulItem(damageMultiplier, applySlowness, element);
+        BossPhantomType phantomType = BossPhantomType.fromDescriptionId(stack.getDescriptionId());
         if (phantomType != null && phantomType.isModLoaded() && player instanceof ServerPlayer serverPlayer) {
             String descId = stack.getDescriptionId();
-            BossPhantomManager.getInstance().startPhantom(serverPlayer, phantomType, descId);
+            int amplifier = getAmplifier(stack);
+            BossPhantomManager.getInstance().startPhantom(serverPlayer, phantomType, descId, amplifier);
 
             // 反馈：虚影已降临
             Component soulDisplay = Component.translatable(descId);
@@ -201,6 +217,13 @@ public class LensoulItem extends Item {
     public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context,
             @NotNull List<Component> tooltipComponents, @NotNull TooltipFlag flag) {
         super.appendHoverText(stack, context, tooltipComponents, flag);
+
+        // ---- 元素活性等级（绿字） ----
+        int soulLevel = com.plumejade.lensouls.handler.AnvilUpgradeHandler.getSoulLevel(stack);
+        String elementKey = "element.lensouls." + this.element.getSerializedName() + ".short";
+        tooltipComponents.add(Component.translatable(elementKey)
+                .append(Component.literal(" " + toRoman(soulLevel)))
+                .copy().withStyle(net.minecraft.ChatFormatting.GREEN));
 
         // ---- 使用提示（始终显示） ----
         tooltipComponents.add(Component.translatable("item.lensouls.soul.use_hint"));
@@ -279,5 +302,17 @@ public class LensoulItem extends Item {
                 : Component.translatable("element.lensouls." + element.getSerializedName());
         player.sendSystemMessage(
                 Component.translatable("message.lensouls.soul_activated", soulDisplay));
+    }
+
+    /** 1→I, 2→II, ..., 5→V */
+    private static String toRoman(int n) {
+        return switch (n) {
+            case 1 -> "I";
+            case 2 -> "II";
+            case 3 -> "III";
+            case 4 -> "IV";
+            case 5 -> "V";
+            default -> String.valueOf(n);
+        };
     }
 }

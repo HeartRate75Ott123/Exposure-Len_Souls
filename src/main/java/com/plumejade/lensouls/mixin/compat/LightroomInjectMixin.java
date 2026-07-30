@@ -25,7 +25,8 @@ import java.util.UUID;
 public class LightroomInjectMixin {
 
     @Inject(method = "createPrintResult", at = @At("RETURN"), require = 0)
-    private void lensouls$injectAtCreation(Frame frame, Object process,
+    private void lensouls$injectAtCreation(Frame frame,
+                                            io.github.mortuusars.exposure.world.lightroom.PrintingProcess process,
                                             CallbackInfoReturnable<ItemStack> cir) {
         ItemStack result = cir.getReturnValue();
         if (result == null || result.isEmpty()) return;

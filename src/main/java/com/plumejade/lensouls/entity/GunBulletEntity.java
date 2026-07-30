@@ -2,6 +2,7 @@ package com.plumejade.lensouls.entity;
 
 import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -22,8 +23,15 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.entity.PartEntity;
+
+import javax.annotation.Nullable;
+import java.util.Optional;
 
 public class GunBulletEntity extends ThrowableItemProjectile {
+    /** PartEntity 碰撞检测结果 */
+    record PartHitResult(EntityHitResult hit, boolean isPart, PartEntity<?> part) {}
+
     private static final EntityDataAccessor<Byte> DATA_BULLET_TYPE =
             SynchedEntityData.defineId(GunBulletEntity.class, EntityDataSerializers.BYTE);
 
@@ -68,50 +76,97 @@ public class GunBulletEntity extends ThrowableItemProjectile {
         Vec3 oldPos = position();
         Vec3 vel = getDeltaMovement();
 
-        // [DEBUG] 首个 tick 日志
-        if (tickCount == 0) {
-        }
-
         setPos(getX() + vel.x, getY() + vel.y, getZ() + vel.z);
 
         if (!level().isClientSide) {
-            // 将 AABB 偏移回 oldPos 作为基准，避免 getBoundingBox() 在 setPos 后已指向 newPos
-            AABB baseBox = getBoundingBox().move(oldPos.subtract(position()));
-            Vec3 step = vel.scale(1.0 / COLLISION_SEGMENTS);
+            Vec3 newPos = position();
 
-            for (int seg = 0; seg < COLLISION_SEGMENTS; seg++) {
-                Vec3 segStart = oldPos.add(step.scale(seg));
-                Vec3 segEnd = segStart.add(step);
-                AABB searchBox = baseBox.move(step.scale(seg)).expandTowards(step).inflate(1.0);
+            // ========== 碰撞检测：整条弹道搜索，PartEntity 优先，有部件不查主 AABB ==========
+            Vec3 end = oldPos.add(vel);
+            double margin = Math.max(1.0, vel.length());
+            AABB fullPathBox = getBoundingBox().move(oldPos.subtract(newPos))
+                    .expandTowards(vel).inflate(margin);
 
-                int candidates = 0;
-                for (Entity target : level().getEntities(this, searchBox, this::canHitEntity)) {
-                    candidates++;
-                    AABB targetBox = target.getBoundingBox();
-                    double minDim = Math.min(Math.min(targetBox.getXsize(), targetBox.getYsize()), targetBox.getZsize());
-                    if (minDim < 0.6) targetBox = targetBox.inflate(0.3);
+            PartHitResult best = null;
+            double bestDist = Double.MAX_VALUE;
 
-                    var clipResult = targetBox.clip(segStart, segEnd);
-                    if (clipResult.isPresent()) {
-                        onHit(new EntityHitResult(target, clipResult.get()));
-                        return;
-                    }
-                }
-                if (candidates > 0 && seg == 0) {
+            for (Entity target : level().getEntities(this, fullPathBox, this::canHitEntity)) {
+                PartHitResult r = checkEntity(target, oldPos, end);
+                if (r != null) {
+                    double d = r.hit().getLocation().distanceToSqr(oldPos);
+                    if (d < bestDist) { bestDist = d; best = r; }
                 }
             }
-            if (tickCount % 20 == 0) {
+
+            if (best != null) {
+                if (best.isPart() && best.part() != null) {
+                    handlePartEntityHit(best.part());
+                } else {
+                    onHit(best.hit());
+                }
+                return;
             }
+
             if (tickCount > 200) discard();
         }
+    }
+
+    /**
+     * 检测一个实体的碰撞。
+     * 核心原则：有 PartEntity 的实体永不回退查主实体 AABB。
+     */
+    @Nullable
+    private PartHitResult checkEntity(Entity target, Vec3 origin, Vec3 end) {
+        PartEntity<?>[] parts = target.getParts();
+        boolean hasParts = parts != null && parts.length > 0;
+
+        // 1) 先查 PartEntity
+        if (hasParts) {
+            for (PartEntity<?> part : parts) {
+                if (part == null || !part.isAlive()) continue;
+                AABB box = part.getBoundingBox();
+                double minDim = Math.min(Math.min(box.getXsize(), box.getYsize()), box.getZsize());
+                if (minDim < 0.6) box = box.inflate(0.3);
+                Optional<Vec3> clip = box.clip(origin, end);
+                if (clip.isPresent()) {
+                    return new PartHitResult(new EntityHitResult(target, clip.get()), true, part);
+                }
+                if (box.contains(origin)) {
+                    return new PartHitResult(new EntityHitResult(target, origin), true, part);
+                }
+            }
+            // 关键：有 PartEntity 但没命中任何部件 → 返回 null，让子弹继续飞
+            // 永不回退查主实体 AABB（避免命中九头蛇大框后被 hurtServer 吞伤害）
+            return null;
+        }
+
+        // 2) 无 PartEntity → 直接查主实体碰撞箱
+        AABB box = target.getBoundingBox();
+        double minDim = Math.min(Math.min(box.getXsize(), box.getYsize()), box.getZsize());
+        if (minDim < 0.6) box = box.inflate(0.3);
+        Optional<Vec3> clip = box.clip(origin, end);
+        if (clip.isPresent()) {
+            return new PartHitResult(new EntityHitResult(target, clip.get()), false, null);
+        }
+        if (box.contains(origin)) {
+            return new PartHitResult(new EntityHitResult(target, origin), false, null);
+        }
+        return null;
     }
 
     @Override
     protected void onHitEntity(EntityHitResult result) {
         Entity target = result.getEntity();
         if (target.equals(getOwner())) { discard(); return; }
-        if (!(target instanceof LivingEntity living)) { discard(); return; }
         if (level().isClientSide) { discard(); return; }
+
+        // PartEntity 分支：多部件 BOSS（九头蛇、末影龙等）的子碰撞体
+        if (target instanceof PartEntity<?> part) {
+            handlePartEntityHit(part);
+            return;
+        }
+
+        if (!(target instanceof LivingEntity living)) { discard(); return; }
 
         float finalDamage = (float) damage;
         Entity owner = getOwner();
@@ -139,20 +194,55 @@ public class GunBulletEntity extends ThrowableItemProjectile {
             }
         }
 
-        // 命中粒子效果（按弹药类型：主世界→亮绿，地狱→橙，末地→紫）
-        if (level() instanceof ServerLevel sl) {
-            var pType = switch (type) {
-                case 0 -> com.plumejade.lensouls.particle.ModParticleTypes.HIT_SPARK.get();      // 亮绿
-                case 2 -> com.plumejade.lensouls.particle.ModParticleTypes.HIT_SPARK_PURPLE.get(); // 紫
-                default -> com.plumejade.lensouls.particle.ModParticleTypes.HIT_SPARK_ORANGE.get(); // 橙
-            };
-            sl.sendParticles(pType, living.getX(), living.getY() + living.getBbHeight() * 0.5, living.getZ(),
-                    9, 0.5, 0.3, 0.5, 0.15);
-        }
-
+        playHitParticles(target);
         discard();
     }
 
+    /**
+     * 命中 PartEntity（多部件 BOSS 的子体）时的处理。
+     * 不执行 LivingEntity 专属效果（治疗/点燃/牵引），仅应用伤害 + 粒子。
+     */
+    private void handlePartEntityHit(PartEntity<?> part) {
+        if (level().isClientSide) { discard(); return; }
+
+        float finalDamage = (float) damage;
+        DamageSource gunSource = gunBulletDamage(null);
+
+        // 重置部件和父实体无敌时间（PartEntity 委托到父实体 hurtServer）
+        part.invulnerableTime = 0;
+        Entity parent = part.getParent();
+        if (parent != null) parent.invulnerableTime = 0;
+
+        part.hurt(gunSource, finalDamage);
+
+        playHitParticles(part);
+        discard();
+    }
+
+    /** 发射命中粒子（按弹药类型：主世界→亮绿，地狱→橙，末地→紫） */
+    private void playHitParticles(Entity target) {
+        if (!(level() instanceof ServerLevel sl)) return;
+        byte type = entityData.get(DATA_BULLET_TYPE);
+        var pType = switch (type) {
+            case 0 -> com.plumejade.lensouls.particle.ModParticleTypes.HIT_SPARK.get();      // 亮绿
+            case 2 -> com.plumejade.lensouls.particle.ModParticleTypes.HIT_SPARK_PURPLE.get(); // 紫
+            default -> com.plumejade.lensouls.particle.ModParticleTypes.HIT_SPARK_ORANGE.get(); // 橙
+        };
+        sl.sendParticles(pType, target.getX(), target.getY() + target.getBbHeight() * 0.5, target.getZ(),
+                9, 0.5, 0.3, 0.5, 0.15);
+    }
+
+    public byte getBulletType() { return entityData.get(DATA_BULLET_TYPE); }
+
+    /** 弹药类型→元素映射（0=土, 1=火, 2=末影） */
+    public static ElementDamage getBulletElement(byte bulletType) {
+        return switch (bulletType) {
+            case 0 -> ElementDamage.EARTH;
+            case 1 -> ElementDamage.FIRE;
+            case 2 -> ElementDamage.ENDER;
+            default -> null;
+        };
+    }
     @Override public boolean isNoGravity() { return true; }
     @Override protected boolean canHitEntity(Entity target) { return target instanceof LivingEntity && !target.equals(getOwner()); }
     @Override public void readAdditionalSaveData(CompoundTag tag) { super.readAdditionalSaveData(tag); damage = tag.getDouble("Damage"); armorPen = tag.getDouble("ArmorPen"); }

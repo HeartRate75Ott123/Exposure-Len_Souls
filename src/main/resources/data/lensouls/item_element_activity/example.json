@@ -1,0 +1,12 @@
+{
+  "minecraft:diamond_sword": {
+    "values": {
+      "lensouls:earth": 1
+    }
+  },
+  "minecraft:netherite_sword": {
+    "values": {
+      "lensouls:earth": 2
+    }
+  }
+}

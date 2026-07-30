@@ -9,7 +9,9 @@
     "IrisBufferSourceGetBufferMixin",
     "StackedPhotoStackingMixin",
     "LightroomInjectMixin",
-    "PolaroidPrintMixin"
+    "PolaroidPrintMixin",
+    "CataclysmDamageBucketMixin",
+    "LegendaryMonstersCapMixin"
   ],
   "injectors": {
     "defaultRequire": 0

@@ -52,6 +52,14 @@ public class ModCreativeTabs {
                         output.accept(ModItems.OBLITERATOR_SOUL.get());
                         output.accept(ModItems.ENDER_GUARDIAN_SOUL.get());
                         output.accept(ModItems.NETHERITE_MONSTROSITY_SOUL.get());
+                        output.accept(ModItems.HYDRA_SOUL.get());
+                        output.accept(ModItems.KNIGHT_PHANTOM_SOUL.get());
+                        output.accept(ModItems.ALPHA_YETI_SOUL.get());
+                        output.accept(ModItems.NAGA_SOUL.get());
+                        output.accept(ModItems.LAVA_EATER_SOUL.get());
+                        output.accept(ModItems.THE_LEVIATHAN_SOUL.get());
+                        output.accept(ModItems.SCYLLA_SOUL.get());
+
 
                         // ---- 枪械 ----
                         output.accept(ModItems.DIMENSIONAL_GUN.get());

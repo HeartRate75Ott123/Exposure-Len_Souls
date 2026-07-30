@@ -1,0 +1,10 @@
+{
+  "irons_spellbooks:fire_spell": {
+    "element": "fire",
+    "activity": 2.5
+  },
+  "irons_spellbooks:ice_spell": {
+    "element": "water",
+    "activity": 2.0
+  }
+}

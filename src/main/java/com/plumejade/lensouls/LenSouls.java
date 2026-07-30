@@ -89,6 +89,9 @@ public class LenSouls {
         // ---- 物品获取方式（掉落+配方监听） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.AcquisitionHandler.class);
 
+        // ---- 元素活性 tooltip（客户端物品 hover 提示） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.ElementActivityTooltipHandler.class);
+
         // BOSS 韧性 — 伤害减免 + 自动注册事件处理器
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.ToughnessDamageHandler.class);
 
@@ -113,6 +116,8 @@ public class LenSouls {
     public void onAddReloadListeners(AddReloadListenerEvent event) {
         event.addListener(new DataPackLoader());
         event.addListener(new com.plumejade.lensouls.config.ItemElementActivityLoader());
+        event.addListener(new com.plumejade.lensouls.config.DamageTypeElementLoader());
+        event.addListener(new com.plumejade.lensouls.config.AttackerElementLoader());
     }
 
     /**

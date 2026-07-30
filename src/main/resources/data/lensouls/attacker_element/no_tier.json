@@ -1,0 +1,17 @@
+{
+  "block_factorys_bosses:infernal_dragon": { "element": "fire", "activity": 1.0 },
+  "block_factorys_bosses:sandworm": { "element": "earth", "activity": 1.0 },
+  "block_factorys_bosses:kraken": { "element": "water", "activity": 1.0 },
+  "twilightforest:naga": { "element": "earth", "activity": 1.0 },
+  "twilightforest:lich": { "element": "ender", "activity": 1.0 },
+  "twilightforest:minoshroom": { "element": "earth", "activity": 1.0 },
+  "twilightforest:hydra": { "element": "fire", "activity": 1.0 },
+  "twilightforest:knight_phantom": { "element": "water", "activity": 1.0 },
+  "twilightforest:ur_ghast": { "element": "fire", "activity": 1.0 },
+  "twilightforest:alpha_yeti": { "element": "water", "activity": 1.0 },
+  "twilightforest:snow_queen": { "element": "water", "activity": 1.0 },
+  "twilightforest:armored_giant": { "element": "earth", "activity": 1.0 },
+  "twilightforest:giant_miner": { "element": "earth", "activity": 1.0 },
+  "eternal_starlight:starlight_golem": { "element": "earth", "activity": 1.0 },
+  "eternal_starlight:lunar_monstrosity": { "element": "ender", "activity": 1.0 }
+}

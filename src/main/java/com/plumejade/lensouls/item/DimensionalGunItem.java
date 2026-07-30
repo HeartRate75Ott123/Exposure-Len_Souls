@@ -186,7 +186,7 @@ public class DimensionalGunItem extends Item {
     // ======================== Scaling ========================
 
     private int getScaledMaxAmmo(ItemStack stack) {
-        float progress = getKillProgress(stack);
+        float progress = getFastSlowProgress(stack);
         int base = Config.DG_BASE_MAX_AMMO.get();
         int max = Config.DG_MAX_AMMO.get();
         return base + (int) ((max - base) * progress);
@@ -194,9 +194,14 @@ public class DimensionalGunItem extends Item {
 
     private double getScaledDamage(ItemStack stack) {
         float progress = getKillProgress(stack);
+        int kills = getKills(stack);
+        int target = Config.DG_KILL_TARGET.get();
         double base = Config.DG_BASE_DAMAGE.get();
-        double max = Config.DG_MAX_DAMAGE.get();
-        return base + (max - base) * progress;
+        double dmg = base + 15.0 * progress;
+        if (kills >= target) {
+            dmg += 20.0;
+        }
+        return dmg;
     }
 
     private double getScaledArmorPen(ItemStack stack) {
@@ -207,14 +212,14 @@ public class DimensionalGunItem extends Item {
     }
 
     public int getChargeTicks(ItemStack stack) {
-        float progress = getKillProgress(stack);
+        float progress = getFastSlowProgress(stack);
         int base = Config.DG_BASE_CHARGE_TIME.get();
         int min = Config.DG_MIN_CHARGE_TIME.get();
         return (int) (base - (base - min) * progress);
     }
 
     private long getRegenIntervalTicks(ItemStack stack) {
-        float progress = getKillProgress(stack);
+        float progress = getFastSlowProgress(stack);
         int baseTime = Config.DG_BASE_REGEN_TIME.get();
         int minTime = Config.DG_MIN_REGEN_TIME.get();
         int totalSeconds = (int) (baseTime - (baseTime - minTime) * progress);
@@ -225,7 +230,17 @@ public class DimensionalGunItem extends Item {
     private float getKillProgress(ItemStack stack) {
         int kills = getKills(stack);
         int target = Config.DG_KILL_TARGET.get();
-        return Math.min(1.0f, (float) kills / target);
+        float t = Math.min(1.0f, (float) kills / target);
+        // 三次 Hermite S 曲线：前半段快、后半段慢
+        return t < 0.5f ? 4.0f * t * t * t : 1.0f - 4.0f * (1.0f - t) * (1.0f - t) * (1.0f - t);
+    }
+
+    /** 平方根曲线（弹药上限、蓄力时间、恢复间隔用）：前期快、后期慢 */
+    private float getFastSlowProgress(ItemStack stack) {
+        int kills = getKills(stack);
+        int target = Config.DG_KILL_TARGET.get();
+        float t = Math.min(1.0f, (float) kills / target);
+        return (float) Math.sqrt(t);
     }
 
     // ======================== Public API (called from packets/handlers) ========================
@@ -303,7 +318,7 @@ public class DimensionalGunItem extends Item {
     private int getAmmo(ItemStack stack) { return stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag().getInt(KEY_AMMO); }
     private void setAmmo(ItemStack stack, int val) { write(stack, KEY_AMMO, val); }
     private int getKills(ItemStack stack) { return stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag().getInt(KEY_KILLS); }
-    private void setKills(ItemStack stack, int val) { write(stack, KEY_KILLS, val); }
+    public void setKills(ItemStack stack, int val) { write(stack, KEY_KILLS, val); }
     private int getSelectedAmmo(ItemStack stack) {
         var tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag();
         if (!tag.contains(KEY_SELECTED)) return 0;
@@ -363,7 +378,12 @@ public class DimensionalGunItem extends Item {
         tooltip.add(Component.translatable("message.lensouls.dimensional_gun.ammo", ammo, maxAmmo).withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("message.lensouls.dimensional_gun.ammo_type", Component.translatable(ammoName)).withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("message.lensouls.dimensional_gun.fire_mode", Component.translatable(fireMode)).withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("message.lensouls.dimensional_gun.kills", kills, target).withStyle(ChatFormatting.GRAY));
+        float progress = getKillProgress(stack);
+        boolean maxed = kills >= target;
+        tooltip.add(Component.translatable("message.lensouls.dimensional_gun.kills", kills, target, Math.round(progress * 100.0f)).withStyle(ChatFormatting.GRAY));
+        if (maxed) {
+            tooltip.add(Component.translatable("message.lensouls.dimensional_gun.max_level_unlocked").withStyle(ChatFormatting.GOLD));
+        }
         double rawDmg = getScaledDamage(stack);
         double rawPen = getScaledArmorPen(stack);
         double rawCharge = getChargeTicks(stack) / 20.0f;

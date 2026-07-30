@@ -42,7 +42,7 @@ public class DataPackLoader extends SimpleJsonResourceReloadListener {
     private static final String FOLDER = "entity_weakness";
     private static final Gson GSON = new GsonBuilder().setLenient().create();
 
-    /** 未在数据包中显式配置的元素弱点默认值（PROJECTILE 除外） */
+    /** 未在数据包中显式配置的元素弱点默认值（PROJECTILE 除外 = 0） */
     private static final float DEFAULT_WEAKNESS = 0.1f;
 
     /** 实体 ID → (元素 → 倍率) */
@@ -58,7 +58,10 @@ public class DataPackLoader extends SimpleJsonResourceReloadListener {
      * 获取某实体对指定元素的弱点倍率。
      * <p>
      * 若数据包已定义该实体的该元素值，则使用数据包值；
-     * 否则 FIRE/WATER/EARTH/ENDER 默认 0.1，PROJECTILE 默认 0。
+     * 否则 FIRE/WATER/EARTH/ENDER 默认 0.1（基础增伤），PROJECTILE 默认 0。
+     * <p>
+     * 粒子发射受 {@link #getAllWeaknesses} 显式配置控制：
+     * 显式配置的弱点才发射 UP 螺旋粒子，默认 0.1 不发射粒子但产生伤害。
      *
      * @param entityId 实体注册名（如 {@code minecraft:zombie}）
      * @param element  元素类型
@@ -67,7 +70,7 @@ public class DataPackLoader extends SimpleJsonResourceReloadListener {
     public static float getWeakness(ResourceLocation entityId, ElementDamage element) {
         Map<ElementDamage, Float> weaknesses = weaknessCache.get(entityId);
         if (weaknesses != null && weaknesses.containsKey(element)) return weaknesses.get(element);
-        // 未显式配置：PROJECTILE 默认 0，其余默认 0.1
+        // 未显式配置：PROJECTILE 默认 0，其余默认 0.1（基础增伤，不发射粒子）
         return element == ElementDamage.PROJECTILE ? 0f : DEFAULT_WEAKNESS;
     }
 

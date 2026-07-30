@@ -1,7 +1,10 @@
 package com.plumejade.lensouls.boss;
 
+import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.boss.BossBarCache;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.AbstractGolem;
@@ -66,22 +69,36 @@ public class ToughnessDamageHandler {
      * <p>
      * 检测层级：
      * <ol>
+     *   <li>配置黑名单（toughnessBlacklist）—— 永不触发韧性</li>
+     *   <li>配置白名单（toughnessWhitelist）—— 始终触发韧性</li>
+     *   <li>硬编码排除类（铁傀儡、雪傀儡等）</li>
      *   <li>ServerBossEvent 字段检测（Mixin，实体类含有 boss bar 字段）</li>
-     *   <li>通用血量阈值（maxHealth ≥ {@link #GENERIC_BOSS_HP_THRESHOLD}），排除 {@link #BOSS_EXCLUDED_CLASSES}</li>
+     *   <li>通用血量阈值（maxHealth ≥ {@link #GENERIC_BOSS_HP_THRESHOLD}）</li>
      * </ol>
      */
     public static boolean isBoss(LivingEntity entity) {
-        // 0. 白名单排除：高血量的非 BOSS（铁傀儡、雪傀儡等）
+        // 0. 配置黑名单：永不触发韧性
+        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        if (Config.TOUGHNESS_BLACKLIST.get().contains(id.toString())) {
+            return false;
+        }
+
+        // 1. 配置白名单：始终触发韧性
+        if (Config.TOUGHNESS_WHITELIST.get().contains(id.toString())) {
+            return true;
+        }
+
+        // 2. 硬编码排除：高血量的非 BOSS（铁傀儡、雪傀儡等）
         if (BOSS_EXCLUDED_CLASSES.stream().anyMatch(clazz -> clazz.isInstance(entity))) {
             return false;
         }
 
-        // 1. ServerBossEvent 字段检测（覆盖绝大多数 modded BOSS）
+        // 3. ServerBossEvent 字段检测（覆盖绝大多数 modded BOSS）
         if (entity instanceof Mob && BossBarCache.hasBossBar(entity.getClass())) {
             return true;
         }
 
-        // 2. 通用 BOSS 判定：高血量
+        // 4. 通用 BOSS 判定：高血量
         if (entity.getMaxHealth() >= GENERIC_BOSS_HP_THRESHOLD) {
             return true;
         }

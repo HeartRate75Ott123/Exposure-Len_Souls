@@ -1,0 +1,17 @@
+{
+  "cataclysm:maledictus": {
+    "water": 0.8
+  },
+  "cataclysm:netherite_monstrosity": {
+    "water": 0.8
+  },
+  "cataclysm:scylla": {
+    "earth": 0.8
+  },
+  "cataclysm:ancient_remnant": {
+    "water": 0.8
+  },
+  "cataclysm:the_harbinger": {
+    "earth": 0.8
+  }
+}

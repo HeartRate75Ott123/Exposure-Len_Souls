@@ -12,7 +12,9 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public class Config {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
-    // ---- 镜魂配置 ----
+    // ==================== 镜魂 ====================
+    static { BUILDER.push("souls"); }
+
     public static final ModConfigSpec.IntValue DEFAULT_DURATION = BUILDER
             .comment("Mirror soul infusion duration (seconds)")
             .defineInRange("defaultDuration", 30, 1, 3600);
@@ -25,12 +27,20 @@ public class Config {
             .comment("Boss soul cooldown (seconds)")
             .defineInRange("bossCooldown", 120, 1, 3600);
 
-    // ---- 照片配置 ----
+    static { BUILDER.pop(); }
+
+    // ==================== 照片 ====================
+    static { BUILDER.push("photos"); }
+
     public static final ModConfigSpec.DoubleValue PHOTO_BONUS = BUILDER
             .comment("Photo damage bonus multiplier (e.g. 1.2 = +120% damage)")
             .defineInRange("photoBonus", 1.2, 0.0, 10.0);
 
-    // ---- 次元枪 (Dimensional Gun) ----
+    static { BUILDER.pop(); }
+
+    // ==================== 次元枪 ====================
+    static { BUILDER.push("dimensionalGun"); }
+
     public static final ModConfigSpec.IntValue DG_BASE_MAX_AMMO = BUILDER
             .comment("Dimensional Gun: Base max ammo")
             .defineInRange("dgBaseMaxAmmo", 10, 1, 100);
@@ -45,7 +55,7 @@ public class Config {
             .defineInRange("dgBaseArmorPen", 0.0, 0.0, 100.0);
     public static final ModConfigSpec.IntValue DG_KILL_TARGET = BUILDER
             .comment("Dimensional Gun: Kills required for max level")
-            .defineInRange("dgKillTarget", 200, 1, 10000);
+            .defineInRange("dgKillTarget", 400, 1, 10000);
     public static final ModConfigSpec.DoubleValue DG_MAX_DAMAGE = BUILDER
             .comment("Dimensional Gun: Max damage at max kills")
             .defineInRange("dgMaxDamage", 40.0, 1.0, 500.0);
@@ -86,27 +96,22 @@ public class Config {
             .comment("Dimensional Gun: Element damage multiplier (stacks with soul)")
             .defineInRange("dgElementMultiplier", 1.0, 0.0, 10.0);
 
-    // ---- 引力枪 (Gravity Gun) ----
+    static { BUILDER.pop(); }
+
+    // ==================== 引力枪 ====================
+    static { BUILDER.push("gravityGun"); }
+
     public static final ModConfigSpec.IntValue GG_COOLDOWN = BUILDER
             .comment("Gravity Gun: cooldown after each shot (ticks, 20 = 1s)")
             .defineInRange("ggCooldown", 4, 0, 100);
-
     public static final ModConfigSpec.DoubleValue GG_PULL_FORCE = BUILDER
             .comment("Gravity Gun: pull strength multiplier")
             .defineInRange("ggPullForce", 1.0, 0.1, 5.0);
 
-    // ---- BOSS 韧性条 ----
-    public static final ModConfigSpec.IntValue TOUGH_BAR_WIDTH = BUILDER
-            .comment("Boss toughness bar size (pixels, 1:1 ratio)")
-            .defineInRange("toughBarWidth", 32, 8, 200);
+    static { BUILDER.pop(); }
 
-    public static final ModConfigSpec.IntValue TOUGH_BAR_HEIGHT = BUILDER
-            .comment("Boss toughness bar height (pixels, matches width for 1:1)")
-            .defineInRange("toughBarHeight", 32, 8, 200);
-
-    public static final ModConfigSpec.DoubleValue TOUGH_BAR_VERTICAL_OFFSET = BUILDER
-            .comment("Boss toughness bar vertical offset above head (blocks)")
-            .defineInRange("toughBarVerticalOffset", 0.5, 0.0, 5.0);
+    // ==================== BOSS 韧性 ====================
+    static { BUILDER.push("toughness"); }
 
     public static final ModConfigSpec.DoubleValue TOUGH_DAMAGE_REDUCTION = BUILDER
             .comment("Boss damage reduction when fully shielded (0-1, 0.8 = 80%)")
@@ -120,38 +125,94 @@ public class Config {
             .comment("Stun duration when toughness broken (ticks, 20 = 1s)")
             .defineInRange("toughStunDurationTicks", 200, 40, 600);
 
-    public static final ModConfigSpec.DoubleValue TOUGH_PHOTOS_PER_20000HP = BUILDER
-            .comment("Photos needed to break toughness for a 20000 HP boss")
-            .defineInRange("toughPhotosPer20000HP", 10.0, 1.0, 100.0);
+    public static final ModConfigSpec.IntValue TOUGHNESS_DEFAULT_HITS = BUILDER
+            .comment("Default photos needed to break toughness")
+            .defineInRange("toughnessDefaultHits", 5, 1, 100);
 
-    // ---- 获取方式配置（默认开启，方便整合包魔改） ----
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> TOUGHNESS_HITS_OVERRIDES = BUILDER
+            .comment("Per-entity override: \"modid:entityid:count\"",
+                    "Example: \"cataclysm:ignis:8\" (Ignis needs 8 hits); \"legendary_monsters:cloud_golem:3\" (Cloud Golem needs 3 hits)")
+            .defineListAllowEmpty("toughnessHitsOverrides", java.util.List.of(), () -> "", o -> o instanceof String);
+
+    static { BUILDER.pop(); }
+
+    // ==================== 韧性条渲染 ====================
+    static { BUILDER.push("toughnessBar"); }
+
+    public static final ModConfigSpec.IntValue TOUGH_BAR_WIDTH = BUILDER
+            .comment("Boss toughness bar width (pixels)")
+            .defineInRange("toughBarWidth", 32, 8, 200);
+
+    public static final ModConfigSpec.IntValue TOUGH_BAR_HEIGHT = BUILDER
+            .comment("Boss toughness bar height (pixels)")
+            .defineInRange("toughBarHeight", 32, 8, 200);
+
+    public static final ModConfigSpec.DoubleValue TOUGH_BAR_VERTICAL_OFFSET = BUILDER
+            .comment("Boss toughness bar vertical offset above head (blocks)")
+            .defineInRange("toughBarVerticalOffset", 0.5, 0.0, 5.0);
+
+    static { BUILDER.pop(); }
+
+    // ==================== 韧性目标过滤 ====================
+    static { BUILDER.push("toughnessFilter"); }
+
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> TOUGHNESS_BLACKLIST = BUILDER
+            .comment("Entities that NEVER trigger toughness. Format: \"modid:entityid\"",
+                    "Example: \"minecraft:iron_golem\" (Iron Golem excluded); \"minecraft:snow_golem\" (Snow Golem excluded)")
+            .defineListAllowEmpty("toughnessBlacklist", java.util.List.of(
+                    "block_factorys_bosses:kraken",
+                    "block_factorys_bosses:underworld_knight",
+                    "block_factorys_bosses:sandworm",
+                    "block_factorys_bosses:infernal_dragon",
+                    "twilightforest:lich",
+                    "twilightforest:knight_phantom",
+                    "twilightforest:ur_ghast",
+                    "twilightforest:hydra",
+                    "eternal_starlight:lunar_monstrosity",
+                    "eternal_starlight:starlight_golem",
+                    "minecraft:wither",
+                    "minecraft:ender_dragon"
+            ), () -> "", o -> o instanceof String);
+
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> TOUGHNESS_WHITELIST = BUILDER
+            .comment("Entities that ALWAYS trigger toughness. Format: \"modid:entityid\"",
+                    "Example: \"cataclysm:ignis\" (Ignis always has toughness); \"legendary_monsters:the_obliterator\" (Obliterator always has toughness)")
+            .defineListAllowEmpty("toughnessWhitelist", java.util.List.of(), () -> "", o -> o instanceof String);
+
+    static { BUILDER.pop(); }
+
+    // ==================== 获取方式 ====================
+    static { BUILDER.push("acquisition"); }
+
     public static final ModConfigSpec.BooleanValue ENABLE_BASIC_SOUL_DROP = BUILDER
-            .comment("Enable basic soul drops from mobs (10% chance)")
+            .comment("Basic soul drops from mobs (10% chance)")
             .define("enableBasicSoulDrop", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_BOSS_SOUL_DROP = BUILDER
-            .comment("Enable boss soul drops from corresponding bosses (100% chance)")
+            .comment("Boss soul drops from corresponding bosses (100% chance)")
             .define("enableBossSoulDrop", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_ENCHANTMENT_LOOT = BUILDER
-            .comment("Enable Soul Photography enchantment in dungeon loot and villager trades")
+            .comment("Soul Photography enchantment in dungeon loot and villager trades")
             .define("enableEnchantmentLoot", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_DIMENSIONAL_GUN_RECIPE = BUILDER
-            .comment("Enable Dimensional Gun crafting recipe")
+            .comment("Dimensional Gun crafting recipe")
             .define("enableDimensionalGunRecipe", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_GRAVITY_GUN_RECIPE = BUILDER
-            .comment("Enable Gravity Gun crafting recipe")
+            .comment("Gravity Gun crafting recipe")
             .define("enableGravityGunRecipe", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_CONVERTER_RECIPE = BUILDER
-            .comment("Enable Converter crafting recipe")
+            .comment("Converter crafting recipe")
             .define("enableConverterRecipe", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_SKILL_BALL_BOSS_LOOT = BUILDER
-            .comment("Enable Skill Ball drops from bosses (50% chance)")
+            .comment("Skill Ball drops from bosses (50% chance)")
             .define("enableSkillBallBossLoot", true);
+
+    static { BUILDER.pop(); }
 
     static final ModConfigSpec SPEC = BUILDER.build();
 }

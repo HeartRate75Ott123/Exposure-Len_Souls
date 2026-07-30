@@ -1,0 +1,11 @@
+{
+  "cataclysm:the_leviathan": {
+    "fire": 0.8
+  },
+  "cataclysm:ender_guardian": {
+    "ender": 0.8
+  },
+  "minecraft:ender_dragon": {
+    "ender": 0.8
+  }
+}

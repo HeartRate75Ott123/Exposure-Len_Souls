@@ -1,0 +1,12 @@
+{
+  "cataclysm:ignis": {
+    "water": 0.8
+  },
+  "block_factorys_bosses:underworld_knight": {
+    "earth": 0.8
+  },
+  "legendary_monsters:the_obliterator": {
+    "ender": 0.8,
+    "fire":0.8
+  }
+}

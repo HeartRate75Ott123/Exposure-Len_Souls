@@ -54,7 +54,7 @@ public class BossPhantomManager {
 
     // ========== 启动 ==========
 
-    public void startPhantom(ServerPlayer player, BossPhantomType type, String descId) {
+    public void startPhantom(ServerPlayer player, BossPhantomType type, String descId, int amplifier) {
         UUID pid = player.getUUID();
 
         if (activePhantoms.containsKey(pid)) {
@@ -65,10 +65,10 @@ public class BossPhantomManager {
         double ox = player.getX(), oy = player.getY(), oz = player.getZ();
         float oyaw = player.getYRot(), opitch = player.getXRot();
 
-        // 立即刷新元素效果
+        // 立即刷新元素效果（使用物品实际等级，而非 type 硬编码）
         player.removeEffect(type.getEffectHolder());
         player.addEffect(new MobEffectInstance(type.getEffectHolder(),
-                Config.DEFAULT_DURATION.get() * 20, type.getAmplifier(), false, false, false));
+                Config.DEFAULT_DURATION.get() * 20, amplifier, false, false, false));
         ElementInfusionEffect.setPlayerData(player, type.getElement(), type.shouldApplySlowness(), descId);
         player.sendSystemMessage(Component.translatable("message.lensouls.soul_activated",
                 Component.translatable(descId)));
@@ -80,9 +80,9 @@ public class BossPhantomManager {
                 player.gameMode.getGameModeForPlayer().getId());
         player.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
 
-        // 借真身驱动（模组加载时借用真实 BOSS 实体）
-        if (type.isModLoaded()) {
-            startBorrowedEntity(player, type, descId, ox, oy, oz, oyaw, opitch);
+        // 借真身驱动（模组加载 + className 非空时借用真实 BOSS 实体）
+        if (!type.getClassName().isEmpty() && type.isModLoaded()) {
+            startBorrowedEntity(player, type, descId, amplifier, ox, oy, oz, oyaw, opitch);
             return;
         }
 
@@ -107,7 +107,7 @@ public class BossPhantomManager {
 
         activePhantoms.put(pid, new BossPhantomData(
                 type, pid, PHANTOM_TOTAL_TICKS, PHANTOM_TOTAL_TICKS, descId,
-                phantom.getId(), ox, oy, oz, oyaw, opitch, ox, oy, oz));
+                phantom.getId(), amplifier, ox, oy, oz, oyaw, opitch, ox, oy, oz));
 
     }
 
@@ -132,7 +132,7 @@ public class BossPhantomManager {
      * 设 target = 附近敌对生物，让 AI 自动出招。
      * 渲染层由 LivingEntityPhantomMixin 替换为半透明。
      */
-    private void startBorrowedEntity(ServerPlayer player, BossPhantomType type, String descId,
+    private void startBorrowedEntity(ServerPlayer player, BossPhantomType type, String descId, int amplifier,
                                       double ox, double oy, double oz, float oyaw, float opitch) {
         ServerLevel level = player.serverLevel();
         double py = oy + 1.5;
@@ -185,8 +185,8 @@ public class BossPhantomManager {
             // 加入后再清除 boss bar（startSeenByPlayer 新增的玩家被 removeAllPlayers 移除）
             com.plumejade.lensouls.boss.BossBarCache.clearBossBar(entity);
 
-            // 7. 召唤瞬间 AOE 伤害
-            dealSpawnAOE(level, type, ox, py, oz);
+            // 7. 召唤瞬间 AOE 伤害（排除幻灵自身）
+            dealSpawnAOE(level, type, ox, py, oz, entity);
 
             // 8. 发送开始包 + 入场粒子
             PacketDistributor.sendToPlayer(player, new PhantomStartPacket(player.getUUID(), type,
@@ -195,7 +195,7 @@ public class BossPhantomManager {
 
             activePhantoms.put(player.getUUID(), new BossPhantomData(
                     type, player.getUUID(), PHANTOM_TOTAL_TICKS, PHANTOM_TOTAL_TICKS, descId,
-                    entity.getId(), ox, oy, oz, oyaw, opitch, ox, oy, oz));
+                    entity.getId(), amplifier, ox, oy, oz, oyaw, opitch, ox, oy, oz));
 
 
         } catch (Throwable t) {
@@ -211,9 +211,9 @@ public class BossPhantomManager {
         }
     }
 
-    /** 召唤瞬间径向 AOE */
+    /** 召唤瞬间径向 AOE（排除幻灵自身） */
     private static void dealSpawnAOE(ServerLevel level, BossPhantomType type,
-                                      double cx, double cy, double cz) {
+                                      double cx, double cy, double cz, Entity self) {
         double range = type == BossPhantomType.OBLITERATOR ? 30.0 : 10.0;
         DamageSource piercing = level.damageSources().magic();
         AABB aabb = new AABB(cx - range, cy - range, cz - range,
@@ -221,6 +221,7 @@ public class BossPhantomManager {
         int count = 0;
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, aabb)) {
             if (e instanceof Player || !e.isAlive()) continue;
+            if (e == self) continue; // 不伤害幻灵自身
             if (e.distanceToSqr(cx, cy, cz) > range * range) continue;
             e.hurt(piercing, 50.0f + type.getSkillDamage());
             count++;
@@ -265,6 +266,53 @@ public class BossPhantomManager {
             if (e != null) return e;
         }
         return null;
+    }
+
+    /** 利维坦：强制水域导航 + 悬浮 */
+    private static void forceLeviathanWaterMode(Entity entity) {
+        try {
+            Class<?> clazz = Class.forName("com.github.L_Ender.cataclysm.entity.AnimationMonster.BossMonsters.The_Leviathan.The_Leviathan_Entity");
+            java.lang.reflect.Field landNav = clazz.getDeclaredField("isLandNavigator");
+            landNav.setAccessible(true);
+            landNav.set(entity, false);
+            entity.setNoGravity(true);
+        } catch (Exception e) {
+            LenSouls.LOGGER.error("[幻灵] 利维坦水域模式切换失败", e);
+        }
+    }
+
+    /** 利维坦：清零内部攻击冷却 */
+    private static void resetLeviathanCooldowns(Entity entity) {
+        try {
+            Class<?> clazz = entity.getClass();
+            for (String fn : new String[]{"hunting_cooldown", "bite_cooldown", "melee_cooldown", "makePortalCooldown"}) {
+                try {
+                    java.lang.reflect.Field f = clazz.getDeclaredField(fn);
+                    f.setAccessible(true); f.setInt(entity, 0);
+                } catch (NoSuchFieldException ignored) {}
+            }
+        } catch (Exception e) {
+            LenSouls.LOGGER.error("[幻灵] 利维坦冷却清零失败", e);
+        }
+    }
+
+    /** 幻影骑士：清零内部冷却 + 解除盾牌 */
+    private static void resetKnightPhantomCooldowns(Entity entity) {
+        try {
+            Class<?> clazz = entity.getClass();
+            for (String fn : new String[]{"attackCooldown", "attackTimer", "shieldCooldown", "nextAbility"}) {
+                try {
+                    java.lang.reflect.Field f = clazz.getDeclaredField(fn);
+                    f.setAccessible(true); f.setInt(entity, 0);
+                } catch (NoSuchFieldException ignored) {}
+            }
+            try {
+                java.lang.reflect.Field f = clazz.getDeclaredField("shieldBlocks");
+                f.setAccessible(true); f.setBoolean(entity, false);
+            } catch (NoSuchFieldException ignored) {}
+        } catch (Exception e) {
+            LenSouls.LOGGER.error("[幻灵] 幻影骑士冷却清零失败", e);
+        }
     }
 
     // ========== 下界合金巨兽冷却清零 ==========
@@ -356,6 +404,15 @@ public class BossPhantomManager {
                     // 下界合金巨兽：每 tick 清零内部冷却，防止冷却期占用演出时间
                     if (d.type() == BossPhantomType.NETHERITE_MONSTROSITY) {
                         resetNetheriteCooldowns(ie);
+                    }
+                    // 利维坦：强制水域导航 + 冷却清零
+                    if (d.type() == BossPhantomType.THE_LEVIATHAN) {
+                        forceLeviathanWaterMode(ie);
+                        resetLeviathanCooldowns(ie);
+                    }
+                    // 幻影骑士：冷却清零
+                    if (d.type() == BossPhantomType.KNIGHT_PHANTOM) {
+                        resetKnightPhantomCooldowns(ie);
                     }
                 } else if (ie == null) {
                     LenSouls.LOGGER.warn("[幻灵] 实体丢失 id={}，主动结束幻灵", d.phantomEntityId());
@@ -525,10 +582,10 @@ public class BossPhantomManager {
 
         if (apply) {
             BossPhantomType t = d.type();
-            // startPhantom 已立即应用效果，此处仅确保生效
+            // startPhantom 已立即应用效果，此处仅确保生效（使用物品实际等级）
             if (!p.hasEffect(t.getEffectHolder())) {
                 p.addEffect(new MobEffectInstance(t.getEffectHolder(),
-                        Config.DEFAULT_DURATION.get() * 20, t.getAmplifier(), false, false, false));
+                        Config.DEFAULT_DURATION.get() * 20, d.amplifier(), false, false, false));
                 ElementInfusionEffect.setPlayerData(p, t.getElement(), t.shouldApplySlowness(), d.descId());
                 p.sendSystemMessage(Component.translatable("message.lensouls.soul_activated",
                         Component.translatable(d.descId())));
@@ -741,6 +798,8 @@ public class BossPhantomManager {
             getInstance().clearPlayer(player.getUUID());
             // 清除上一会话残留的元素附魔数据（自定义名称、减速标记）
             ElementInfusionEffect.cleanupPlayer(player);
+            // 清除残留的定身效果（幻灵期间 Slowness 255 + Resistance 255）
+            removeStunEffects(player);
             // 如果玩家还残留无重力（断线时未触发 endPhantom），强制关闭
             if (player.isNoGravity()) {
                 player.setNoGravity(false);

@@ -82,6 +82,68 @@ public record BossOutlineColors(
             1.2f, 3.0f
     );
 
+    /** 幻影骑士 — 灰魄 */
+    public static final BossOutlineColors KNIGHT_PHANTOM_COLOR = new BossOutlineColors(
+            hex(0x8a8ea8),
+            hex(0x6b6e8a),
+            hex(0xbfc2d4),
+            hex(0x4d5070),
+            1.0f, 2.8f
+    );
+
+    /** 九头蛇 — 青焰 */
+    public static final BossOutlineColors HYDRA = new BossOutlineColors(
+            hex(0x00c8e0),
+            hex(0x00a0b0),
+            hex(0x006070),
+            hex(0x80e8f0),
+            1.0f, 2.8f
+    );
+
+    /** 雪怪首领 — 冰魄 */
+    public static final BossOutlineColors ALPHA_YETI = new BossOutlineColors(
+            hex(0xe8eeff),
+            hex(0xb0c8f0),
+            hex(0xffffff),
+            hex(0x80b0e0),
+            1.0f, 2.8f
+    );
+
+    /** 娜迦 — 翠蛇 */
+    public static final BossOutlineColors NAGA = new BossOutlineColors(
+            hex(0x56ff91),
+            hex(0xa0ff60),
+            hex(0x206030),
+            hex(0x88aa70),
+            1.0f, 2.8f
+    );
+
+    /** 噬焰蜥 — 炽蜥 */
+    public static final BossOutlineColors LAVA_EATER = new BossOutlineColors(
+            hex(0xff5500),
+            hex(0xff2000),
+            hex(0x800000),
+            hex(0xffaa00),
+            1.0f, 2.8f
+    );
+
+    /** 利维坦 — 深渊 */
+    public static final BossOutlineColors THE_LEVIATHAN = new BossOutlineColors(
+            hex(0x9933cc),
+            hex(0xcc44ff),
+            hex(0x440066),
+            hex(0xddaaff),
+            1.0f, 2.8f
+    );
+
+    /** 斯库拉 — 潮汐 */
+    public static final BossOutlineColors SCYLLA = new BossOutlineColors(
+            hex(0x00bbff),
+            hex(0x0077cc),
+            hex(0x003366),
+            hex(0x88ddff),
+            1.0f, 2.8f
+    );
     // ========== 工厂方法 ==========
 
     private static float[] rgb(float r, float g, float b) {
@@ -101,8 +163,8 @@ public record BossOutlineColors(
         return new float[]{0.0f, 0.0f, 0.0f};
     }
 
-    /** 6 个 BOSS 类型的配色数量（用于 {@code SoulGlowRenderTypes} 缓存） */
-    public static final int BOSS_TYPE_COUNT = 6;
+    /** 13 个 BOSS 类型的配色数量（用于 {@code SoulGlowRenderTypes} 缓存） */
+    public static final int BOSS_TYPE_COUNT = 13;
 
     /**
      * 从玩家的活跃元素附魔效果检测当前激活的 BOSS 类型并返回配色。
@@ -117,6 +179,8 @@ public record BossOutlineColors(
     /**
      * 从任意活跃实体的元素附魔效果检测 BOSS 类型并返回配色。
      * <p>
+     * 使用 descriptionId 精确匹配（如 "item.lensouls.ignis_soul"），
+     * 而非 element+multiplier 近似匹配，避免多 BOSS 共享相同元素/倍率时的歧义。
      * 适用于 {@link SoulGlowLayer} 对任意 {@link LivingEntity} 的描边检测。
      */
     public static BossOutlineColors fromEntity(LivingEntity entity) {
@@ -125,10 +189,26 @@ public record BossOutlineColors(
 
         for (MobEffectInstance inst : entity.getActiveEffects()) {
             if (inst.getEffect().value() instanceof ElementInfusionEffect effect) {
-                int amp = inst.getAmplifier();
-                float mult = effect.getDamageMultiplier(amp);
                 ElementDamage element = effect.getElement();
 
+                // 优先：通过 descriptionId 精确匹配（如 item.lensouls.ignis_soul）
+                String descId = ElementInfusionEffect.getPlayerCustomName(
+                        (entity instanceof Player p) ? p : null, element);
+                if (descId != null && !descId.isEmpty()) {
+                    BossPhantomType matched = BossPhantomType.fromDescriptionId(descId);
+                    if (matched != null) {
+                        int dur = inst.getDuration();
+                        if (dur > bestDuration) {
+                            bestDuration = dur;
+                            bestType = matched;
+                        }
+                        continue;
+                    }
+                }
+
+                // 降级：element+multiplier 近似匹配（基础镜魂无 descriptionId 时）
+                int amp = inst.getAmplifier();
+                float mult = effect.getDamageMultiplier(amp);
                 for (BossPhantomType type : BossPhantomType.values()) {
                     if (type.getElement() == element
                             && Math.abs(type.getDamageMultiplier() - mult) < 0.01f) {
@@ -156,6 +236,14 @@ public record BossOutlineColors(
             case OBLITERATOR          -> OBLITERATOR;
             case ENDER_GUARDIAN       -> ENDER_GUARDIAN;
             case NETHERITE_MONSTROSITY -> NETHERITE_MONSTROSITY;
+            case KNIGHT_PHANTOM       -> KNIGHT_PHANTOM_COLOR;
+            case HYDRA                -> HYDRA;
+            case ALPHA_YETI           -> ALPHA_YETI;
+            case NAGA                 -> NAGA;
+            case LAVA_EATER           -> LAVA_EATER;
+            case THE_LEVIATHAN        -> THE_LEVIATHAN;
+            case SCYLLA               -> SCYLLA;
+            default -> null;
         };
     }
 }

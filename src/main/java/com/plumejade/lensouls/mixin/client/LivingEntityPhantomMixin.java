@@ -28,8 +28,12 @@ public class LivingEntityPhantomMixin {
     }
 
     private static boolean isPhantom(LivingEntity e) {
-        return BossPhantomType.isPhantomClassName(e.getClass().getName())
-                && ClientPhantomHandler.isPhantomEntity(e.getId());
+        if (!ClientPhantomHandler.isPhantomEntity(e.getId())) return false;
+        BossPhantomType type = BossPhantomType.getTypeForClass(e.getClass().getName());
+        if (type == null) return false;
+        // 娜迦/九头蛇/斯库拉：直接不透明渲染，跳过半透明拦截
+        if (type.getClassName().isEmpty()) return false;
+        return true;
     }
 
     /**

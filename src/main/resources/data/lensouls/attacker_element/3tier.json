@@ -1,0 +1,9 @@
+{
+  "legendary_monsters:shulker_mimic": { "element": "ender", "activity": 1.0 },
+  "legendary_monsters:endersent": { "element": "ender", "activity": 1.0 },
+  "legendary_monsters:annihilation_pursuer": { "element": "ender", "activity": 1.0 },
+  "legendary_monsters:posessed_paladin": { "element": "earth", "activity": 1.0 },
+  "legendary_monsters:cloud_golem": { "element": "water", "activity": 1.0 },
+  "minecraft:wither": { "element": "ender", "activity": 1.0 },
+  "minecraft:warden": { "element": "ender", "activity": 1.0 }
+}

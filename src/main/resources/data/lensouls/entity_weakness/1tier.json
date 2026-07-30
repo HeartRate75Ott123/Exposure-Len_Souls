@@ -1,0 +1,26 @@
+{
+  "legendary_monsters:overgrown_colossus": {
+    "fire": 1
+  },
+  "legendary_monsters:dune_sentinel": {
+    "water": 1
+  },
+  "legendary_monsters:skeletosaurus": {
+    "earth": 1
+  },
+  "legendary_monsters:lava_eater": {
+    "water": 1
+  },
+  "legendary_monsters:frostbitten_golem": {
+    "fire": 1
+  },
+  "legendary_monsters:ancient_guardian": {
+    "water": 1
+  },
+  "block_factorys_bosses:yeti": {
+    "fire": 1
+  },
+  "legendary_monsters:withered_abomination": {
+    "water": 1
+  }
+}

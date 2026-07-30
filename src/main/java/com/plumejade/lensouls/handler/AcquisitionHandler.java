@@ -128,6 +128,13 @@ public class AcquisitionHandler {
             case OBLITERATOR -> new ItemStack(ModItems.OBLITERATOR_SOUL.get());
             case ENDER_GUARDIAN -> new ItemStack(ModItems.ENDER_GUARDIAN_SOUL.get());
             case NETHERITE_MONSTROSITY -> new ItemStack(ModItems.NETHERITE_MONSTROSITY_SOUL.get());
+            case HYDRA -> new ItemStack(ModItems.HYDRA_SOUL.get());
+            case KNIGHT_PHANTOM -> new ItemStack(ModItems.KNIGHT_PHANTOM_SOUL.get());
+            case ALPHA_YETI -> new ItemStack(ModItems.ALPHA_YETI_SOUL.get());
+            case NAGA -> new ItemStack(ModItems.NAGA_SOUL.get());
+            case LAVA_EATER -> new ItemStack(ModItems.LAVA_EATER_SOUL.get());
+            case THE_LEVIATHAN -> new ItemStack(ModItems.THE_LEVIATHAN_SOUL.get());
+            case SCYLLA -> new ItemStack(ModItems.SCYLLA_SOUL.get());
         };
     }
 }

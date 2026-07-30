@@ -1,6 +1,8 @@
 package com.plumejade.lensouls.damage;
 
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.config.AttackerElementLoader;
+import com.plumejade.lensouls.config.DamageTypeElementLoader;
 import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.config.ItemElementActivityLoader;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
@@ -39,74 +41,129 @@ public class DamageHandler {
     public static void onLivingDamagePre(LivingDamageEvent.Pre event) {
         LivingEntity target = event.getEntity();
         DamageSource source = event.getSource();
-        float originalDamage = event.getOriginalDamage();
         Level level = target.level();
-
+        float originalDamage = event.getOriginalDamage();
         if (originalDamage <= 0f) return;
 
         ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
         float totalBonusMultiplier = 0f;
+        java.util.Set<ElementDamage> activeElements = java.util.EnumSet.noneOf(ElementDamage.class);
 
-        // 1. 玩家元素附魔检测
+        // 1-2. 玩家活性：灌注 + 独立武器
         if (source.getEntity() instanceof Player player) {
             boolean slowness = ElementInfusionEffect.hasPlayerSlowness(player);
-            ItemStack weapon = player.getMainHandItem();
-            ResourceLocation weaponId = BuiltInRegistries.ITEM.getKey(weapon.getItem());
+            ResourceLocation weaponId = BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem());
 
             for (MobEffectInstance inst : player.getActiveEffects()) {
-                if (inst.getEffect().value() instanceof ElementInfusionEffect elementEffect) {
-                    ElementDamage element = elementEffect.getElement();
+                if (!(inst.getEffect().value() instanceof ElementInfusionEffect effect)) continue;
+                ElementDamage element = effect.getElement();
+                activeElements.add(element);
 
-                    // 弱点倍率（无配置默认 0.1，PROJECTILE 默认 0）
-                    float weakness = DataPackLoader.getWeakness(entityId, element);
+                float weakness = DataPackLoader.getWeakness(entityId, element);
+                float potionActivity = ElementDamage.getActivityByAmplifier(inst.getAmplifier());
+                float weaponActivity = ItemElementActivityLoader.getActivity(weaponId, element);
 
-                    // 药水活性（effect amplifier 决定）
-                    float potionActivity = ElementDamage.getActivityByAmplifier(inst.getAmplifier());
+                if (weakness > 0f && (potionActivity > 0f || weaponActivity > 0f)) {
+                    totalBonusMultiplier += (weaponActivity + potionActivity) * weakness;
+                    emitSpiralParticle(level, target, element);
+                }
 
-                    // 武器活性（数据包配置）
-                    float weaponActivity = ItemElementActivityLoader.getActivity(weaponId, element);
+                if (slowness && element == ElementDamage.WATER) {
+                    target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 1, false, false, true));
+                }
 
-                    if (weakness > 0f && (potionActivity > 0f || weaponActivity > 0f)) {
-                        totalBonusMultiplier += (weaponActivity + potionActivity) * weakness;
-                    }
+                BossPhantomType bossType = BossPhantomType.fromSoulItem(
+                        ElementDamage.getActivityByAmplifier(inst.getAmplifier()), slowness, element);
+                if (bossType != null) sendHitParticles((ServerLevel) level, target, bossType);
+            }
 
-                    // 云筑魔像镜魂：每次近战攻击附加减速 II（3 秒）
-                    if (slowness && element == ElementDamage.WATER && target != null) {
-                        target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 1, false, false, true));
-                    }
+            for (ElementDamage element : ElementDamage.values()) {
+                if (element == ElementDamage.PROJECTILE || activeElements.contains(element)) continue;
+                float wActivity = ItemElementActivityLoader.getActivity(weaponId, element);
+                if (wActivity <= 0f) continue;
+                float weakness = DataPackLoader.getWeakness(entityId, element);
+                if (weakness > 0f) {
+                    totalBonusMultiplier += wActivity * weakness;
+                    emitSpiralParticle(level, target, element);
+                }
+                activeElements.add(element);
+            }
+        }
 
-                    // 服务端：元素弱点螺旋粒子 + BOSS 命中特效
-                    if (!level.isClientSide) {
-                        if (weakness > 0f) {
-                            PacketDistributor.sendToPlayersTrackingEntity(target,
-                                    new ElementSpiralPacket(target.getId(), element.ordinal(), false));
+        // 2b. 次元枪子弹固有元素：弹药类型→元素映射（活性=2.0，对应镜魂3级）
+        if (source.getDirectEntity() instanceof com.plumejade.lensouls.entity.GunBulletEntity gunBullet) {
+            ElementDamage bulletElement = com.plumejade.lensouls.entity.GunBulletEntity.getBulletElement(gunBullet.getBulletType());
+            if (bulletElement != null) {
+                float w = DataPackLoader.getWeakness(entityId, bulletElement);
+                if (w > 0f) {
+                    totalBonusMultiplier += 2.0f * w;
+                    emitSpiralParticle(level, target, bulletElement);
+                }
+            }
+        }
+
+        // 3. 弹射物
+        if (source.is(DamageTypeTags.IS_PROJECTILE)) {
+            float projWeakness = DataPackLoader.getWeakness(entityId, ElementDamage.PROJECTILE);
+            totalBonusMultiplier += projWeakness;
+            if (projWeakness > 0f) emitSpiralParticle(level, target, ElementDamage.PROJECTILE);
+        }
+
+        // 4. 伤害类型 → 元素映射
+        ResourceLocation dtId = level.registryAccess()
+                .registryOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE)
+                .getKey(source.type());
+        if (dtId != null && DamageTypeElementLoader.hasMapping(dtId)) {
+            ElementDamage dtElement = DamageTypeElementLoader.getElement(dtId);
+            float dtActivity = DamageTypeElementLoader.getActivity(dtId, dtElement);
+            if (source.getEntity() instanceof Player && !activeElements.contains(dtElement)) dtActivity = 0f;
+            if (dtActivity > 0f) {
+                float dtWeakness = DataPackLoader.getWeakness(entityId, dtElement);
+                if (dtWeakness > 0f) {
+                    totalBonusMultiplier += dtActivity * dtWeakness;
+                    emitSpiralParticle(level, target, dtElement);
+                }
+            }
+        }
+
+        // 5. 攻击者实体 → 元素映射
+        if (source.getEntity() != null) {
+            ResourceLocation attackerId = BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType());
+            if (AttackerElementLoader.hasMapping(attackerId)) {
+                ElementDamage atkElement = AttackerElementLoader.getElement(attackerId);
+                float atkActivity = AttackerElementLoader.getActivity(attackerId, atkElement);
+                if (source.getEntity() instanceof Player && !activeElements.contains(atkElement)) atkActivity = 0f;
+                // 玩家被攻击时：若自身有对应元素灌注，免疫该元素追加伤害（灌注防护）
+                if (target instanceof Player targetPlayer) {
+                    for (var inst : targetPlayer.getActiveEffects()) {
+                        if (inst.getEffect().value() instanceof ElementInfusionEffect eif
+                                && eif.getElement() == atkElement) {
+                            atkActivity = 0f;
+                            break;
                         }
-
-                        BossPhantomType bossType = BossPhantomType.fromSoulItem(
-                                ElementDamage.getActivityByAmplifier(inst.getAmplifier()),
-                                slowness, element);
-                        if (bossType != null) {
-                            sendHitParticles((ServerLevel) level, target, bossType);
-                        }
+                    }
+                }
+                if (atkActivity > 0f) {
+                    float atkWeakness = DataPackLoader.getWeakness(entityId, atkElement);
+                    if (atkWeakness > 0f) {
+                        totalBonusMultiplier += atkActivity * atkWeakness;
+                        emitSpiralParticle(level, target, atkElement);
                     }
                 }
             }
         }
 
-        // 2. 弹射物伤害检测
-        if (source.is(DamageTypeTags.IS_PROJECTILE)) {
-            float projWeakness = DataPackLoader.getWeakness(entityId, ElementDamage.PROJECTILE);
-            if (projWeakness > 0f && !level.isClientSide) {
-                PacketDistributor.sendToPlayersTrackingEntity(target,
-                        new ElementSpiralPacket(target.getId(), ElementDamage.PROJECTILE.ordinal(), false));
-            }
-            totalBonusMultiplier += projWeakness;
-        }
-
-        // 3. 应用追加伤害（仅服务端）
         if (!level.isClientSide && totalBonusMultiplier > 0f) {
-            float bonusDamage = originalDamage * totalBonusMultiplier;
-            event.setNewDamage(originalDamage + bonusDamage);
+            event.setNewDamage(originalDamage + originalDamage * totalBonusMultiplier);
+        }
+    }
+
+    /** 发射元素弱点螺旋粒子（仅显式配置的弱点） */
+    private static void emitSpiralParticle(Level level, LivingEntity target, ElementDamage element) {
+        if (!level.isClientSide && DataPackLoader.getAllWeaknesses(
+                BuiltInRegistries.ENTITY_TYPE.getKey(target.getType())).containsKey(element)) {
+            PacketDistributor.sendToPlayersTrackingEntity(target,
+                    new ElementSpiralPacket(target.getId(), element.ordinal(), false));
         }
     }
 

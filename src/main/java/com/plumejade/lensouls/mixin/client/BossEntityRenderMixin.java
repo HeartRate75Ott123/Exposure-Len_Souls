@@ -3,6 +3,7 @@ package com.plumejade.lensouls.mixin.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.plumejade.lensouls.ability.client.BossOutlineManager;
 import com.plumejade.lensouls.client.outline.BossOutlineColors;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.LivingEntity;
@@ -20,6 +21,8 @@ public abstract class BossEntityRenderMixin {
                                             PoseStack poseStack, MultiBufferSource bufferSource,
                                             int packedLight, CallbackInfo ci) {
         if (!(entity instanceof Player)) return;
+        // 屏幕（背包、箱子等 GUI）中不捕获 mask — 防止 BufferBuilder "Not building!" 崩溃
+        if (Minecraft.getInstance().screen != null) return;
         BossOutlineColors colors = BossOutlineColors.fromEntity(entity);
         if (colors == null) return;
 

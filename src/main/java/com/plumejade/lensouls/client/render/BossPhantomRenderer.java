@@ -300,6 +300,8 @@ public class BossPhantomRenderer extends EntityRenderer<BossPhantomEntity> {
             case POSSESSED_PALADIN -> ResourceLocation.fromNamespaceAndPath("legendary_monsters", "textures/entity/posessed_paladin/new_posessed_paladin.png");
             // Obliterator 贴图在 the_warped_one 目录下
             case OBLITERATOR -> ResourceLocation.fromNamespaceAndPath("legendary_monsters", "textures/entity/the_warped_one/the_warped_one.png");
+            // 新 BOSS 使用降级模型/贴图
+            default -> ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "textures/entity/boss_phantom.png");
         };
     }
 }

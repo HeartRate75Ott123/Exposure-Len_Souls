@@ -43,9 +43,9 @@ public class TrophyModifierHandler {
         Random rnd = new Random();
         String type = MODS[rnd.nextInt(MODS.length)];
         float value = switch (type) {
-            case "toughness_bonus" -> 1.0f + rnd.nextInt(3) * 0.5f; // 1.0 / 1.5 / 2.0
-            case "stun_extend" -> 1.2f + rnd.nextFloat() * 0.4f;    // 1.2~1.6
-            case "invincible_shorten" -> 0.5f + rnd.nextFloat() * 0.3f; // 0.5~0.8
+            case "toughness_bonus" -> 1.0f + rnd.nextInt(5) * 0.5f;   // 1.0 / 1.5 / 2.0 / 2.5 / 3.0
+            case "stun_extend" -> 1.25f + rnd.nextInt(6) * 0.05f;    // +25% ~ +50% 步长5%
+            case "invincible_shorten" -> 0.50f + rnd.nextInt(6) * 0.05f; // ×50% ~ ×75% 步长5%
             default -> 1.0f;
         };
         return new TrophyMod(type, value);

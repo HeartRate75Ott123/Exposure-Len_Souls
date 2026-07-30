@@ -93,11 +93,14 @@ public class BossToughnessManager {
 
         boolean wasInvincible = data.isInvincible();
         int invTicks = BossToughnessAttributes.getInvincibleTicks(entity);
-        // 应用玩家头颅修饰符
         if (player != null) {
             invTicks = com.plumejade.lensouls.integration.TrophyModifierHandler.applyInvincibleModifier(player, invTicks);
         }
-        boolean actuallyHit = data.hit(invTicks);
+        float hitMultiplier = 1.0f;
+        if (player != null) {
+            hitMultiplier = com.plumejade.lensouls.integration.TrophyModifierHandler.applyHitsModifier(player, 1.0f);
+        }
+        boolean actuallyHit = data.hit(invTicks, hitMultiplier);
         boolean isBroken = data.isBroken();
 
         if (!entity.level().isClientSide) {
@@ -131,6 +134,9 @@ public class BossToughnessManager {
         }
 
         int stunTicks = BossToughnessAttributes.getStunDurationTicks(entity);
+        if (player != null) {
+            stunTicks = com.plumejade.lensouls.integration.TrophyModifierHandler.applyStunModifier(player, stunTicks);
+        }
         data.setStunTicks(stunTicks);
 
         // 应用定身效果（参考 FreezeTracker 的冻结逻辑）

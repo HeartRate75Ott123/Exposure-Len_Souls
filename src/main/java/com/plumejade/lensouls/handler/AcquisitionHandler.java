@@ -14,20 +14,8 @@ import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * 物品获取方式处理器。
- * <p>
- * 通过 {@link LivingDropsEvent} 实现：
- * <ul>
- *   <li>基础镜魂：击杀怪物有 10% 概率掉落一个随机元素镜魂</li>
- *   <li>BOSS 镜魂：击杀对应 BOSS 必定掉落其专属镜魂</li>
- *   <li>能力球：击杀 BOSS 有 50% 概率掉落一个随机能力球</li>
- * </ul>
- * 所有掉落均可通过配置开关独立控制。
- */
 public class AcquisitionHandler {
 
-    /** 已注册的 BOSS 实体类型 ID 集合（含模组命名空间） */
     private static final Set<String> BOSS_ENTITY_IDS = new HashSet<>();
 
     static {
@@ -36,18 +24,30 @@ public class AcquisitionHandler {
         }
     }
 
-    // ========== 基础镜魂掉落 ==========
-
     @SubscribeEvent
     public static void onLivingDrops(LivingDropsEvent event) {
         if (event.getEntity().level().isClientSide) return;
 
-        // ---- 基础镜魂：击杀怪物 10% 掉落 ----
+        // ---- 胶卷/拍立得相片掉落 13% ----
+        if (event.getEntity().getRandom().nextFloat() < 0.13f) {
+            boolean isColor = event.getEntity().getRandom().nextBoolean();
+            boolean isInstant = event.getEntity().getRandom().nextBoolean();
+            String filmId;
+            if (isInstant) {
+                filmId = isColor ? "exposure_polaroid:instant_color_film" : "exposure_polaroid:instant_black_and_white_film";
+            } else {
+                filmId = isColor ? "exposure:color_film" : "exposure:black_and_white_film";
+            }
+            var filmItem = BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse(filmId));
+            if (filmItem != null) {
+                event.getDrops().add(createItemEntity(event, new ItemStack(filmItem)));
+            }
+        }
+
         if (Config.ENABLE_BASIC_SOUL_DROP.get()) {
             handleBasicSoulDrop(event);
         }
 
-        // ---- BOSS 镜魂 + 能力球掉落 ----
         if (Config.ENABLE_BOSS_SOUL_DROP.get() || Config.ENABLE_SKILL_BALL_BOSS_LOOT.get()) {
             handleBossDrop(event);
         }

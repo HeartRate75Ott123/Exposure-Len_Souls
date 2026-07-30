@@ -72,11 +72,20 @@ public class BossToughnessData {
      * @return true = 成功削韧；false = 被无敌或破刹状态阻挡
      */
     public boolean hit(int invincibleTicks) {
+        return hit(invincibleTicks, 1.0f);
+    }
+
+    /**
+     * 削韧一击（带倍率）。
+     * @param invincibleTicks 本次削韧后的无敌窗口
+     * @param hitMultiplier 每次削韧的倍率（奖杯修饰符）
+     */
+    public boolean hit(int invincibleTicks, float hitMultiplier) {
         if (broken) return false;
         if (requiredHits <= 0) return false;
         if (this.invincibleTicks > 0) return false;
 
-        currentHits = Math.min(currentHits + 1, requiredHits);
+        currentHits = Math.min(currentHits + (int) hitMultiplier, requiredHits);
         this.invincibleTicks = Math.max(1, invincibleTicks);
 
         recoveryTicks = maxRecoveryTicks;

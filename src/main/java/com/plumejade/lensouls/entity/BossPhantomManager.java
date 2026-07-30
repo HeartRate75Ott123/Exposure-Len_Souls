@@ -297,6 +297,35 @@ public class BossPhantomManager {
         }
     }
 
+    /** 幻影骑士：每 tick 维持攻击态（visible + 攻击加成），防止 AI 切回 HOVER 隐身 */
+    private static void forceKnightPhantomAttackMode(Entity entity) {
+        try {
+            Class<?> clazz = Class.forName("twilightforest.entity.boss.KnightPhantom");
+            // FLAG_CHARGING = true → visibleSize + 攻击力+7
+            var dataAccessorField = clazz.getDeclaredField("FLAG_CHARGING");
+            dataAccessorField.setAccessible(true);
+            var dataAccessor = (net.minecraft.network.syncher.EntityDataAccessor<Boolean>) dataAccessorField.get(null);
+            if (!entity.getEntityData().get(dataAccessor)) {
+                entity.getEntityData().set(dataAccessor, true);
+            }
+            // 确保 currentFormation 不是 HOVER（AI 可能在某些 tick 切回 HOVER）
+            java.lang.reflect.Field formationField = clazz.getDeclaredField("currentFormation");
+            formationField.setAccessible(true);
+            Object current = formationField.get(entity);
+            Class<?> formationEnum = Class.forName("twilightforest.entity.boss.KnightPhantom$Formation");
+            Object hover = Enum.valueOf((Class<Enum>) formationEnum, "HOVER");
+            if (current == hover) {
+                Object attack = Enum.valueOf((Class<Enum>) formationEnum, "ATTACK_PLAYER_ATTACK");
+                formationField.set(entity, attack);
+                java.lang.reflect.Field ticksField = clazz.getDeclaredField("ticksProgress");
+                ticksField.setAccessible(true);
+                ticksField.setInt(entity, 0);
+            }
+        } catch (Exception e) {
+            // 静默：TF 未加载时不会到这里
+        }
+    }
+
     /** 幻影骑士：清零内部冷却 + 解除盾牌 */
     private static void resetKnightPhantomCooldowns(Entity entity) {
         try {
@@ -411,8 +440,9 @@ public class BossPhantomManager {
                         forceLeviathanWaterMode(ie);
                         resetLeviathanCooldowns(ie);
                     }
-                    // 幻影骑士：冷却清零
+                    // 幻影骑士：维持攻击态 + 冷却清零
                     if (d.type() == BossPhantomType.KNIGHT_PHANTOM) {
+                        forceKnightPhantomAttackMode(ie);
                         resetKnightPhantomCooldowns(ie);
                     }
                 } else if (ie == null) {

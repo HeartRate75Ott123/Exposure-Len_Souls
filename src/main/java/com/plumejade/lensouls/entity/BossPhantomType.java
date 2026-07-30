@@ -58,7 +58,10 @@ public enum BossPhantomType {
     HYDRA("twilightforest", "hydra", ElementDamage.FIRE, 1.0f, false, 0x498cff, 30,
             7.5, 8.5, 6.0f, 5.0f, "", "", "", ""),
     KNIGHT_PHANTOM("twilightforest", "knight_phantom", ElementDamage.ENDER, 1.0f, false, 0x56ff91, 30,
-            7.5, 8.5, 6.0f, 5.0f, "", "", "", ""),
+            7.5, 8.5, 6.0f, 5.0f,
+            "twilightforest.entity.boss.KnightPhantom",
+            "twilightforest.init.TFEntities", "KNIGHT_PHANTOM",
+            "twilightforest:textures/entity/knightphantom.png"),
     ALPHA_YETI("twilightforest", "alpha_yeti", ElementDamage.WATER, 1.0f, false, 0x56ff91, 30,
             7.5, 8.5, 6.0f, 5.0f, "", "", "", ""),
     NAGA("twilightforest", "naga", ElementDamage.EARTH, 1.0f, false, 0x56ff91, 30,
@@ -263,15 +266,28 @@ public enum BossPhantomType {
     private static void initKnightPhantom(Entity entity) {
         try {
             Class<?> clazz = Class.forName("twilightforest.entity.boss.KnightPhantom");
-            Class<?> formationEnum = Class.forName("twilightforest.entity.boss.KnightPhantom$Formation");
+            // 装备剑
             if (entity instanceof net.minecraft.world.entity.LivingEntity le) {
                 le.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
                         new net.minecraft.world.item.ItemStack(
                                 net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
                                         net.minecraft.resources.ResourceLocation.parse("twilightforest:knightmetal_sword"))));
             }
-            clazz.getMethod("switchToFormation", formationEnum).invoke(entity,
-                    Enum.valueOf((Class<Enum>) formationEnum, "ATTACK_PLAYER_ATTACK"));
+            // 设置 currentFormation = ATTACK_PLAYER_ATTACK（ordinal=11）
+            java.lang.reflect.Field formationField = clazz.getDeclaredField("currentFormation");
+            formationField.setAccessible(true);
+            Class<?> formationEnum = Class.forName("twilightforest.entity.boss.KnightPhantom$Formation");
+            Object attackFormation = Enum.valueOf((Class<Enum>) formationEnum, "ATTACK_PLAYER_ATTACK");
+            formationField.set(entity, attackFormation);
+            // 重置 ticksProgress
+            java.lang.reflect.Field ticksField = clazz.getDeclaredField("ticksProgress");
+            ticksField.setAccessible(true);
+            ticksField.setInt(entity, 0);
+            // 设置 FLAG_CHARGING = true（SynchedEntityData，控制渲染尺寸+攻击力加成）
+            var dataAccessorField = clazz.getDeclaredField("FLAG_CHARGING");
+            dataAccessorField.setAccessible(true);
+            var dataAccessor = (net.minecraft.network.syncher.EntityDataAccessor<Boolean>) dataAccessorField.get(null);
+            entity.getEntityData().set(dataAccessor, true);
         } catch (Exception e) {
             com.plumejade.lensouls.LenSouls.LOGGER.error("[幻灵] KnightPhantom init 失败", e);
         }

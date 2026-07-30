@@ -42,11 +42,13 @@ public class ToughnessBarRenderer {
     private static RenderType getP() { if (rtP == null) rtP = make(PROTECTED, "lensouls_bar_p"); return rtP; }
     private static RenderType getN() { if (rtN == null) rtN = make(NO_PROTECTION, "lensouls_bar_n"); return rtN; }
 
-    private static final float DELAY = 0.08f, SMOOTH = 0.20f;
+    private static final float POS_DELAY = 0.08f, POS_SMOOTH = 0.20f;
+    private static final float PROGRESS_SPEED = 0.12f;
     private static float debugProgress = 0.3f;
     private static boolean useDebug = false;
     private static final Map<UUID, Vec3> delayPos = new ConcurrentHashMap<>();
     private static final Map<UUID, Vec3> smoothPos = new ConcurrentHashMap<>();
+    private static final Map<UUID, Float> smoothProgress = new ConcurrentHashMap<>();
 
     public static void setDebugProgress(float p) { debugProgress = Math.max(0, Math.min(1, p)); }
     public static void setUseDebug(boolean u) { useDebug = u; }
@@ -82,13 +84,20 @@ public class ToughnessBarRenderer {
         UUID uid = target.getUUID();
         Vec3 d = delayPos.get(uid);
         if (d == null) d = raw;
-        else d = new Vec3(d.x + (raw.x - d.x) * DELAY, d.y + (raw.y - d.y) * DELAY, d.z + (raw.z - d.z) * DELAY);
+        else d = new Vec3(d.x + (raw.x - d.x) * POS_DELAY, d.y + (raw.y - d.y) * POS_DELAY, d.z + (raw.z - d.z) * POS_DELAY);
         delayPos.put(uid, d);
         Vec3 s = smoothPos.get(uid);
         if (s == null) s = d;
-        else s = new Vec3(s.x + (d.x - s.x) * SMOOTH, d.y + (d.y - s.y) * SMOOTH, d.z + (d.z - s.z) * SMOOTH);
+        else s = new Vec3(s.x + (d.x - s.x) * POS_SMOOTH, d.y + (d.y - s.y) * POS_SMOOTH, d.z + (d.z - s.z) * POS_SMOOTH);
         smoothPos.put(uid, s);
-        if (delayPos.size() > 200) { delayPos.clear(); smoothPos.clear(); }
+
+        float sp = smoothProgress.getOrDefault(uid, progress);
+        sp += (progress - sp) * PROGRESS_SPEED;
+        if (Math.abs(sp - progress) < 0.002f) sp = progress;
+        smoothProgress.put(uid, sp);
+        progress = sp;
+
+        if (delayPos.size() > 200) { delayPos.clear(); smoothPos.clear(); smoothProgress.clear(); }
 
         int w = Config.TOUGH_BAR_WIDTH.get(), h = Config.TOUGH_BAR_HEIGHT.get();
         var ps = event.getPoseStack();

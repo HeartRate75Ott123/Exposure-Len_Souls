@@ -122,6 +122,7 @@ public enum BossPhantomType {
         synchronized (BossPhantomType.class) {
             if (mapsInitialized) return;
             for (BossPhantomType t : values()) {
+                if (t.className.isEmpty()) continue;
                 CLASS_NAME_TO_TYPE.put(t.className, t);
                 CLASS_NAME_TO_TEXTURE.put(t.className, ResourceLocation.parse(t.texturePath));
                 CLASS_NAME_TO_COLOR.put(t.className, t.color);

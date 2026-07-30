@@ -26,6 +26,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
@@ -552,7 +553,7 @@ public class BossPhantomManager {
 
     // ========== 结束 ==========
 
-    private void endPhantom(ServerPlayer p, BossPhantomData d, boolean apply) {
+    void endPhantom(ServerPlayer p, BossPhantomData d, boolean apply) {
         // 恢复游戏模式（旁观者 → 原模式）
         net.minecraft.world.level.GameType original = originalGameTypes.remove(p.getUUID());
         if (original != null) p.setGameMode(original);
@@ -753,6 +754,23 @@ public class BossPhantomManager {
     }
 
     // ========== 断线重连修复 ==========
+
+    /**
+     * 玩家在幻灵表演期间死亡时，立即结束幻灵并恢复游戏模式，
+     * 防止玩家卡在旁观者模式。
+     */
+    @SubscribeEvent
+    public static void onPlayerDeath(LivingDeathEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            BossPhantomManager mgr = getInstance();
+            BossPhantomData d = mgr.activePhantoms.get(player.getUUID());
+            if (d != null) {
+                mgr.endPhantom(player, d, false);
+                mgr.activePhantoms.remove(player.getUUID());
+                mgr.originalGameTypes.remove(player.getUUID());
+            }
+        }
+    }
 
     /**
      * 玩家断线时清理活跃幻灵，防止残留实体。

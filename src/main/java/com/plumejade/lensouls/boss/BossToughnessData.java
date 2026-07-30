@@ -54,7 +54,7 @@ public class BossToughnessData {
 
     /** 是否处于削韧无敌窗口 */
     public boolean isInvincible() { return invincibleTicks > 0; }
-    public void setInvincibleTicks(int ticks) { this.invincibleTicks = ticks; }
+    public void setInvincibleTicks(int ticks) { this.invincibleTicks = Math.max(0, ticks); }
 
     /** 减伤比例 [0..1]: 满韧性时 = config 值，破防后 = 0 */
     public float getDamageReduction(float maxReduction) {

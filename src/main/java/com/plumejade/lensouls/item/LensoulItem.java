@@ -229,7 +229,7 @@ public class LensoulItem extends Item {
         tooltipComponents.add(Component.translatable("item.lensouls.soul.use_hint"));
 
         // ---- BOSS 镜魂额外特效提示 ----
-        if (this.damageMultiplier > 1.0f || this.applySlowness) {
+        if (this.damageMultiplier > 1.0f || this.applySlowness || this.cooldownSeconds > 0) {
             tooltipComponents.add(Component.translatable("item.lensouls.soul.boss_hint")
                     .withStyle(net.minecraft.ChatFormatting.LIGHT_PURPLE));
         }

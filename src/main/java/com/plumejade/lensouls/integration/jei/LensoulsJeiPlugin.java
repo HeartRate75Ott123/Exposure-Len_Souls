@@ -106,13 +106,13 @@ public class LensoulsJeiPlugin implements IModPlugin {
 
         // ---- 相机镜头 ----
         addSingleInfo(registration, ModItems.LENS_TIER_1.get().getDefaultInstance(),
-                Component.literal("§7Tier 1 lens — required to damage Tier 1 bosses' toughness"));
+                Component.translatable("jei.lensouls.lens_tier_1"));
         addSingleInfo(registration, ModItems.LENS_TIER_2.get().getDefaultInstance(),
-                Component.literal("§7Tier 2 lens — required to damage up to Tier 2 bosses' toughness"));
+                Component.translatable("jei.lensouls.lens_tier_2"));
         addSingleInfo(registration, ModItems.LENS_TIER_3.get().getDefaultInstance(),
-                Component.literal("§7Tier 3 lens — required to damage up to Tier 3 bosses' toughness"));
+                Component.translatable("jei.lensouls.lens_tier_3"));
         addSingleInfo(registration, ModItems.LENS_TIER_4.get().getDefaultInstance(),
-                Component.literal("§7Tier 4 lens — required to damage up to Tier 4 bosses' toughness"));
+                Component.translatable("jei.lensouls.lens_tier_4"));
 
         // ---- 转换器 ----
         addSingleInfo(registration, ModItems.CONVERTER.get().getDefaultInstance(),

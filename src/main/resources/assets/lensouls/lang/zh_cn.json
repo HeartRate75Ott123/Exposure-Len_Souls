@@ -260,4 +260,9 @@
   "trophy.lensouls.toughness_bonus": "§6韧性伤害 x%s",
   "trophy.lensouls.stun_extend": "§6定身时长 +%s",
   "trophy.lensouls.invincible_shorten": "§6白霸体 -%s"
+,
+  "jei.lensouls.lens_tier_1": "§7摄魂升级 I — 可对 1 阶 BOSS 造成韧性伤害",
+  "jei.lensouls.lens_tier_2": "§7摄魂升级 II — 可对 1-2 阶 BOSS 造成韧性伤害",
+  "jei.lensouls.lens_tier_3": "§7摄魂升级 III — 可对 1-3 阶 BOSS 造成韧性伤害",
+  "jei.lensouls.lens_tier_4": "§7摄魂升级 IV — 可对 1-4 阶 BOSS 造成韧性伤害"
 }

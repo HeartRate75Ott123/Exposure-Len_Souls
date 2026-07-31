@@ -23,6 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * 全程使用 MASK_TYPE_ITEM（alpha test 抠干净），
  * renderArmWithItem 的 stack.isEmpty() 判断当前手是否为空，
  * 空手时临时关闭 captureEntityId 以跳过 mask 写入。
+ * 挥砍中整体跳过第一人称捕获（由第三人称管线处理），避免快速移动产生描边噪点。
  */
 @Mixin(value = ItemInHandRenderer.class, priority = 900)
 public abstract class ItemInHandRendererMixin {
@@ -38,10 +39,13 @@ public abstract class ItemInHandRendererMixin {
 
         if (player.getMainHandItem().isEmpty() && player.getOffhandItem().isEmpty()) return;
 
+        // 挥砍中跳过第一人称 mask 捕获，避免快速移动的 item 产生描边噪点
+        if (player.getAttackAnim(partialTick) > 0.001f) return;
+
         BossOutlineColors colors = BossOutlineColors.fromEntity(player);
         if (colors == null) return;
 
-        if (!BossOutlineManager.tryStartCapture(player.getId())) return;
+        BossOutlineManager.startCapture(player.getId());
 
         ItemRenderTracker.beginItemRender();
         BossOutlineManager.setColors(colors);

@@ -4,9 +4,9 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexMultiConsumer;
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.ability.client.BossMaskRenderTypes;
 import com.plumejade.lensouls.ability.client.BossOutlineManager;
 import com.plumejade.lensouls.ability.client.ItemRenderTracker;
-import com.plumejade.lensouls.ability.client.MaskRenderTypes;
 import net.minecraft.client.renderer.RenderType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -40,7 +40,7 @@ public abstract class BossBufferSourceMixin {
 
 
         RenderType maskType = ItemRenderTracker.isRenderingItem()
-                ? MaskRenderTypes.MASK_TYPE_ITEM : MaskRenderTypes.MASK_TYPE;
+                ? BossMaskRenderTypes.MASK_TYPE_ITEM : BossMaskRenderTypes.MASK_TYPE;
 
         BossOutlineManager.setInMaskWrite(true);
         try {

@@ -8,6 +8,8 @@ import net.minecraft.world.inventory.InventoryMenu;
 
 /**
  * BOSS 镜魂专用的 mask RenderType — OutputStateShard 绑定 {@link BossOutlineManager} 的独立 mask FBO。
+ * <p>
+ * 与 {@link MaskRenderTypes}（冻结描边 FBO）分离，避免 mask 写错目标。
  */
 public class BossMaskRenderTypes extends RenderStateShard {
 
@@ -23,19 +25,7 @@ public class BossMaskRenderTypes extends RenderStateShard {
             BossOutlineManager::restoreMainTarget
     );
 
-    /** LESS 深度测试（反射创建）— 正反面深度相同时只通过最先渲染的那面，消除薄物品 Z-fighting */
-    private static final DepthTestStateShard LESS_DEPTH_TEST;
-    static {
-        try {
-            var ctor = DepthTestStateShard.class.getDeclaredConstructor(String.class, int.class);
-            ctor.setAccessible(true);
-            LESS_DEPTH_TEST = ctor.newInstance("lensouls_less", 513); // GL_LESS
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create LESS_DEPTH_TEST", e);
-        }
-    }
-
-    /** 身体 mask — LESS 深度测试，消除薄模型正反面 Z-fighting */
+    /** 实体 mask — 无纹理纯白 */
     public static final RenderType MASK_TYPE = RenderType.create(
             "lensouls_boss_mask_entity",
             DefaultVertexFormat.NEW_ENTITY,
@@ -46,11 +36,11 @@ public class BossMaskRenderTypes extends RenderStateShard {
                     .setTransparencyState(NO_TRANSPARENCY)
                     .setWriteMaskState(COLOR_DEPTH_WRITE)
                     .setCullState(NO_CULL)
-                    .setDepthTestState(LESS_DEPTH_TEST)
+                    .setDepthTestState(LEQUAL_DEPTH_TEST)
                     .createCompositeState(false)
     );
 
-    /** 物品 mask — alpha 抠图 + CULL（剔除背面），防止 crossed-quad 工具两 quad 交叉处 Z-fighting */
+    /** 物品 mask — 带纹理 alpha 测试，避免透明区域方框 */
     public static final RenderType MASK_TYPE_ITEM = RenderType.create(
             "lensouls_boss_mask_item",
             DefaultVertexFormat.NEW_ENTITY,
@@ -62,7 +52,7 @@ public class BossMaskRenderTypes extends RenderStateShard {
                     .setTransparencyState(NO_TRANSPARENCY)
                     .setWriteMaskState(COLOR_DEPTH_WRITE)
                     .setCullState(NO_CULL)
-                    .setDepthTestState(LESS_DEPTH_TEST)
+                    .setDepthTestState(LEQUAL_DEPTH_TEST)
                     .createCompositeState(false)
     );
 

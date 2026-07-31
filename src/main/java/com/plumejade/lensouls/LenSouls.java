@@ -56,6 +56,7 @@ public class LenSouls {
         ModDataComponents.register(modEventBus);
         ModEntities.register(modEventBus);
         com.plumejade.lensouls.recipe.DimensionalGunRecipes.register(modEventBus);
+        com.plumejade.lensouls.recipe.CopySoulRecipes.register(modEventBus);
         com.plumejade.lensouls.particle.ModParticleTypes.register(modEventBus);
         com.plumejade.lensouls.sound.ModSounds.register(modEventBus);
         PacketHandler.register(modEventBus);
@@ -68,7 +69,7 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(EnchantmentRemovalListener.class);
         NeoForge.EVENT_BUS.register(VillagerTradeHandler.class);
         NeoForge.EVENT_BUS.register(GunKillHandler.class);
-        NeoForge.EVENT_BUS.register(BossPhantomManager.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.event.HealPotionHandler.class);        NeoForge.EVENT_BUS.register(BossPhantomManager.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.entity.PhantomDamageHandler.class);
 
         // ---- 能力系统 ----
@@ -99,6 +100,7 @@ public class LenSouls {
 
         // ---- 物品获取方式（掉落+配方监听） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.AcquisitionHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.CopySoulDropHandler.class);
 
         // ---- 元素活性 tooltip（客户端物品 hover 提示） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.ElementActivityTooltipHandler.class);

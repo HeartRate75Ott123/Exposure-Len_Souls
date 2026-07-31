@@ -66,5 +66,13 @@
         "stream": false
       }
     ]
+  },
+  "heal.use": {
+    "sounds": [
+      {
+        "name": "lensouls:heal_pickup",
+        "stream": false
+      }
+    ]
   }
 }

@@ -90,6 +90,12 @@ public class ModCreativeTabs {
 
                         output.accept(ModItems.GRAVITY_GUN.get());
 
+                        // ---- 回复药水 ----
+                        output.accept(ModItems.HEAL_POTION.get());
+
+                        // ---- 复制之魂 ----
+                        output.accept(ModItems.COPY_SOUL.get());
+
                         // 摄魂术附魔书（通过参数查找注册表避免闪退）
                         var enchants = params.holders()
                                 .lookupOrThrow(Registries.ENCHANTMENT);

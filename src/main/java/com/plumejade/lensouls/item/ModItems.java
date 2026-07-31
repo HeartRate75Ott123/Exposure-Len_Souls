@@ -130,6 +130,14 @@ public class ModItems {
     public static final DeferredItem<EntityPhotographItem> ENTITY_PHOTOGRAPH =
             ITEMS.register("entity_photograph", () -> new EntityPhotographItem(new Item.Properties().stacksTo(1)));
 
+    // ---- 回复药水 ----
+    public static final DeferredItem<HealPotionItem> HEAL_POTION = ITEMS.register("heal_potion",
+            () -> new HealPotionItem(new Item.Properties()));
+
+    // ---- 复制之魂 ----
+    public static final DeferredItem<CopySoulItem> COPY_SOUL = ITEMS.register("copy_soul",
+            () -> new CopySoulItem(new Item.Properties()));
+
     // ---- 子弹物品（仅用于渲染弹射物模型） ----
     public static final DeferredItem<Item> OVERWORLD_BULLET = ITEMS.register("overworld_bullet",
             () -> new Item(new Item.Properties()));

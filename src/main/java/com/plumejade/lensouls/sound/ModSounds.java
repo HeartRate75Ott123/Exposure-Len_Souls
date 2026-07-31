@@ -36,6 +36,10 @@ public class ModSounds {
             SOUNDS.register("boss.toughness_fail", () -> SoundEvent.createVariableRangeEvent(
                     ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "boss.toughness_fail")));
 
+    public static final DeferredHolder<SoundEvent, SoundEvent> HEAL_USE =
+            SOUNDS.register("heal.use", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "heal.use")));
+
     public static void register(IEventBus modEventBus) {
         SOUNDS.register(modEventBus);
     }

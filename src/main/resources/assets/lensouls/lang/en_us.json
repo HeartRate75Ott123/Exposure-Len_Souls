@@ -252,9 +252,6 @@
   "curios.identifier.photograph": "Photograph"
 ,
   "command.lensouls.toughness.get": "Get boss toughness attributes",
-  "command.lensouls.toughness.set": "Set boss toughness attributes"
-,
-  "command.lensouls.toughness.get": "Get boss toughness attributes",
   "command.lensouls.toughness.set": "Set boss toughness attributes",
   "trophy.lensouls.toughness_bonus": "§6Toughness Damage x%s",
   "trophy.lensouls.stun_extend": "§6Stun Duration +%s",
@@ -266,4 +263,12 @@
   "jei.lensouls.lens_tier_4": "Tier 4 lens — required to damage up to Tier 4 bosses' toughness"
 ,
   "jei.lensouls.photograph_curio": "Ability-steal photo — requires Soul Photography enchantment. Equippable in Photograph slot. Entity: %s"
+,
+  "item.lensouls.heal_potion": "Heal Potion",
+  "item.lensouls.heal_potion.desc": "Uses left: %s (restore full health + 20 hunger & saturation)",
+  "item.lensouls.heal_potion.dim_count": "Dimensions visited: %s",
+  "message.lensouls.heal_potion.empty": "§cHeal energy depleted! Explore new dimensions to gain more uses"
+,
+  "item.lensouls.copy_soul": "§bCopy Soul",
+  "item.lensouls.copy_soul.desc": "§aCrafting table: combine with any item — consumes this item, outputs an exact copy (enchantments/components/NBT preserved)"
 }

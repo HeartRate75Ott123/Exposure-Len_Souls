@@ -38,6 +38,7 @@ public class DimensionalGunItem extends Item {
     private static final String KEY_LAST_REGEN = "LastRegenTime";
     private static final String KEY_LAST_FIRE_TICK = "LastFireTick";
     private static final String KEY_CHARGE_START = "DGChargeStart";
+    private static final String KEY_MAXED = "Maxed";
 
     private static final String[] AMMO_NAMES = {"ammo.lensouls.overworld", "ammo.lensouls.hell", "ammo.lensouls.ender"};
     private static final String[] FIRE_MODE_NAMES = {"fire_mode.lensouls.semi", "fire_mode.lensouls.auto"};
@@ -194,11 +195,10 @@ public class DimensionalGunItem extends Item {
 
     private double getScaledDamage(ItemStack stack) {
         float progress = getKillProgress(stack);
-        int kills = getKills(stack);
-        int target = Config.DG_KILL_TARGET.get();
         double base = Config.DG_BASE_DAMAGE.get();
         double dmg = base + 15.0 * progress;
-        if (kills >= target) {
+        // 满级奖励仅由合成（Maxed 标志）授予，击杀达成不再自动发放
+        if (isMaxed(stack)) {
             dmg += 20.0;
         }
         return dmg;
@@ -319,6 +319,18 @@ public class DimensionalGunItem extends Item {
     private void setAmmo(ItemStack stack, int val) { write(stack, KEY_AMMO, val); }
     private int getKills(ItemStack stack) { return stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag().getInt(KEY_KILLS); }
     public void setKills(ItemStack stack, int val) { write(stack, KEY_KILLS, val); }
+
+    /** 是否已合成满级（Maxed 标志） */
+    public boolean isMaxed(ItemStack stack) {
+        return stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag().getBoolean(KEY_MAXED);
+    }
+
+    public void setMaxed(ItemStack stack, boolean val) {
+        var tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag();
+        tag.putBoolean(KEY_MAXED, val);
+        stack.set(DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
+        stack.set(ModDataComponents.GUN_KILLS.get(), new GunKillData(getKills(stack)));
+    }
     private int getSelectedAmmo(ItemStack stack) {
         var tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag();
         if (!tag.contains(KEY_SELECTED)) return 0;
@@ -382,7 +394,11 @@ public class DimensionalGunItem extends Item {
         boolean maxed = kills >= target;
         tooltip.add(Component.translatable("message.lensouls.dimensional_gun.kills", kills, target, Math.round(progress * 100.0f)).withStyle(ChatFormatting.GRAY));
         if (maxed) {
-            tooltip.add(Component.translatable("message.lensouls.dimensional_gun.max_level_unlocked").withStyle(ChatFormatting.GOLD));
+            if (isMaxed(stack)) {
+                tooltip.add(Component.translatable("message.lensouls.dimensional_gun.max_level_unlocked").withStyle(ChatFormatting.GOLD));
+            } else {
+                tooltip.add(Component.translatable("message.lensouls.dimensional_gun.max_level_hint").withStyle(ChatFormatting.GOLD));
+            }
         }
         double rawDmg = getScaledDamage(stack);
         double rawPen = getScaledArmorPen(stack);

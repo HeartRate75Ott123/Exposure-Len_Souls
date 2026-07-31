@@ -1,0 +1,10 @@
+{
+  "type": "lensouls:gun_upgrade",
+  "category": "misc",
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:mod_loaded",
+      "modid": "eternal_starlight"
+    }
+  ]
+}

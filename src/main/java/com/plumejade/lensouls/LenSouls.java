@@ -55,6 +55,7 @@ public class LenSouls {
         ModCreativeTabs.register(modEventBus);
         ModDataComponents.register(modEventBus);
         ModEntities.register(modEventBus);
+        com.plumejade.lensouls.recipe.DimensionalGunRecipes.register(modEventBus);
         com.plumejade.lensouls.particle.ModParticleTypes.register(modEventBus);
         com.plumejade.lensouls.sound.ModSounds.register(modEventBus);
         PacketHandler.register(modEventBus);

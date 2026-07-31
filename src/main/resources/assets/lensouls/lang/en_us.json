@@ -106,6 +106,7 @@
   "message.lensouls.dimensional_gun.fire_mode": "Fire Mode: %s",
   "message.lensouls.dimensional_gun.kills": "Kills: %s/%s (%s%%)",
   "message.lensouls.dimensional_gun.max_level_unlocked": "§6MAXED! +20 DMG unlocked",
+  "message.lensouls.dimensional_gun.max_level_hint": "§6Craft with Tenacious Vine and Oxidized Golem Steel Ingot to upgrade to MAXED gun",
   "message.lensouls.dimensional_gun.stats": "DMG: %.1f | Pen: %.0f%% | Charge: %.1fs",
   "message.lensouls.dimensional_gun.out_of_ammo": "Out of ammo!",
   "message.lensouls.dimensional_gun.cycled": "Ammo Type: %s",

@@ -15,7 +15,7 @@ import java.util.List;
 public class CopySoulItem extends Item {
 
     public CopySoulItem(Properties properties) {
-        super(properties.stacksTo(1));
+        super(properties.stacksTo(64));
     }
 
     @Override

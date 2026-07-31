@@ -13,13 +13,12 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * 灾变 BOSS 伤害桶 + 单次伤害上限绕过 Mixin。
+ * 灾变 BOSS 伤害限制绕过 Mixin。
  * <p>
- * 三层绕过逻辑：
+ * 两层绕过逻辑：
  * <ol>
- *   <li>破定中 → 清空桶（已有逻辑）</li>
- *   <li>武器有元素活性 + 目标有弱点 → 清空桶（不限等级）</li>
- *   <li>武器活性等级 5 + 目标有弱点 → 绕过 Math.min(DamageCap(), amount)（单次上限）</li>
+ *   <li><b>桶限制全移除</b>：无条件清空 damageBucket，每次攻击全额生效（不再 tps 过高变 0.1）</li>
+ *   <li><b>破定绕上限</b>：破定期间 + 元素弱点武器 → 绕过 Math.min(DamageCap(), amount)（单次上限）</li>
  * </ol>
  */
 @Mixin(value = {
@@ -36,22 +35,12 @@ public abstract class CataclysmDamageBucketMixin {
                                        CallbackInfoReturnable<Boolean> cir) {
         if (source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) return;
 
+        // ① 桶限制全移除：无条件清空，每次攻击全额生效
+        this.damageBucket = 0;
+
+        // ② 破定 + 元素弱点 → 设置单次上限绕过标志
         LivingEntity self = (LivingEntity) (Object) this;
-
-        // ① 破定中 → 清空桶
-        var manager = BossToughnessManager.getInstance();
-        if (manager.has(self)) {
-            var data = manager.get(self);
-            if (data != null && data.isBroken()) {
-                this.damageBucket = 0;
-                return; // 破定优先，不继续检查元素绕过
-            }
-        }
-
-        // ② 元素活性 + 弱点 → 清空桶（同时可能设置 cap 绕过标志）
-        if (ElementBypassHelper.evaluateAndShouldBypassBucket(source, self)) {
-            this.damageBucket = 0;
-        }
+        ElementBypassHelper.evaluateAndShouldBypassBucket(source, self);
     }
 
     @ModifyArg(

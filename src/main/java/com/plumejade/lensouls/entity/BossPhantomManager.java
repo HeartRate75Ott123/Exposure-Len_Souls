@@ -162,6 +162,8 @@ public class BossPhantomManager {
 
             // 3. 幻灵标记（双重标记：persistentData + customName，对抗实体类 save/load 丢失）
             entity.getPersistentData().putBoolean("lensouls:phantom", true);
+            // 记录镜魂等级（1-5），供穿透伤害按等级取值
+            entity.getPersistentData().putInt("lensouls:phantom_level", amplifier + 1);
             entity.setCustomName(Component.translatable("entity.lensouls.boss_phantom." + type.name().toLowerCase()));
             entity.setCustomNameVisible(false);
             // 持久化保存玩家原始游戏模式（对抗断线丢失）

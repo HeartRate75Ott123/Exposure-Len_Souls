@@ -29,8 +29,9 @@ public class ElementBypassHelper {
 
     /**
      * 在 BOSS hurt() 方法开头调用：判断武器活性 + 目标弱点是否匹配。
-     * 如果匹配，设置对应的绕过标志。
-     * @return true = 需要绕过伤害桶（调用方应将 damageBucket 置 0）
+     * <p>
+     * 破定期间 + 元素弱点武器 → 额外绕过单次伤害上限（不限活性等级）。
+     * @return true = 命中元素弱点
      */
     public static boolean evaluateAndShouldBypassBucket(DamageSource source, LivingEntity target) {
         BYPASS_CAP.set(false);
@@ -42,6 +43,14 @@ public class ElementBypassHelper {
         ResourceLocation weaponId = BuiltInRegistries.ITEM.getKey(weapon.getItem());
         ResourceLocation targetId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
 
+        // 破定状态：韧性条打爆（定身中）时元素武器可突破单次上限
+        boolean broken = false;
+        var mgr = com.plumejade.lensouls.boss.BossToughnessManager.getInstance();
+        if (mgr.has(target)) {
+            var data = mgr.get(target);
+            broken = data != null && data.isBroken();
+        }
+
         for (ElementDamage element : ElementDamage.values()) {
             if (element == ElementDamage.PROJECTILE) continue;
             if (!DataPackLoader.getAllWeaknesses(targetId).containsKey(element)) continue;
@@ -49,9 +58,8 @@ public class ElementBypassHelper {
             int level = ItemElementActivityLoader.getLevel(weaponId, element);
             if (level <= 0) continue;
 
-            // 有活性 + 有弱点 → 绕过桶（不限等级）
-            // 活性等级 5 → 额外绕过单次伤害上限
-            if (level >= 5) {
+            // 破定期间 + 有弱点 → 绕过单次伤害上限（不限活性等级）
+            if (broken) {
                 BYPASS_CAP.set(true);
             }
             return true;

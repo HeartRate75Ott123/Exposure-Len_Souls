@@ -1,20 +1,20 @@
 package com.plumejade.lensouls.entity;
 
-import com.plumejade.lensouls.config.DataPackLoader;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 
 /**
- * 幻灵伤害补偿器 — 检测幻灵实体的攻击，按元素强度动态分配倍率 + 附加元素标签。
+ * 幻灵穿透伤害 — 幻灵每次命中覆盖为固定穿透伤害。
  * <p>
- * 补偿倍率 = itemMultiplier × 1.25（Ingis 2.0→2.5x 为基准）。
- * 元素标签 = DataPackLoader.getWeakness(target, element) 提供的元素弱点倍率。
+ * 按镜魂等级（SoulLevel 1-5）取值：10 / 18 / 21 / 35 / 37，
+ * 无视护甲、无视伤害桶、无视单次伤害上限（setNewDamage 在事件阶段直接替换最终伤害）。
+ * 攻击动画照常播放，命中即掉血，完全同步。
  */
 public class PhantomDamageHandler {
+
+    private static final int[] PEN_DAMAGE = {10, 18, 21, 35, 37};
 
     @SubscribeEvent
     public static void onLivingDamage(LivingDamageEvent.Pre event) {
@@ -23,22 +23,11 @@ public class PhantomDamageHandler {
 
         Entity attacker = event.getSource().getDirectEntity();
         if (attacker == null) return;
-
-        if (!BossPhantomType.isPhantomClassName(attacker.getClass().getName())) return;
         if (!attacker.getPersistentData().getBoolean("lensouls:phantom")) return;
 
-        BossPhantomType type = BossPhantomType.getTypeForClass(attacker.getClass().getName());
-        if (type == null) return;
-
-        float compensation = type.getDamageMultiplier() * 1.25f;
-
-        LivingEntity target = event.getEntity();
-        ResourceLocation targetId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
-        float weakness = DataPackLoader.getWeakness(targetId, type.getElement());
-
-        float total = compensation + weakness;
-        float original = event.getOriginalDamage();
-        float boosted = original * Math.max(1.0f, total);
-        event.setNewDamage(boosted);
+        // 命中 → 覆盖为固定穿透伤害（按镜魂等级 1-5）
+        int level = attacker.getPersistentData().getInt("lensouls:phantom_level");
+        if (level < 1 || level > 5) level = 1;
+        event.setNewDamage(PEN_DAMAGE[level - 1]);
     }
 }

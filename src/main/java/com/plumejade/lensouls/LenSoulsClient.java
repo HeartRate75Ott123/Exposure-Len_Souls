@@ -105,11 +105,14 @@ public class LenSoulsClient {
                 ModEffects.EARTH_INFUSION, ModEffects.ENDER_INFUSION);
     }
 
-    /** 注册幻灵渲染器 */
+    /** 注册幻灵渲染器（灾变/传奇怪物任一未装时整个幻灵渲染不启用——渲染器构造硬依赖两者模型，幻灵生成已被 isModLoaded 保护） */
     private static void registerEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
-        event.registerEntityRenderer(
-                com.plumejade.lensouls.entity.ModEntities.BOSS_PHANTOM.get(),
-                BossPhantomRenderer::new);
+        if (net.neoforged.fml.ModList.get().isLoaded("cataclysm")
+                && net.neoforged.fml.ModList.get().isLoaded("legendary_monsters")) {
+            event.registerEntityRenderer(
+                    com.plumejade.lensouls.entity.ModEntities.BOSS_PHANTOM.get(),
+                    BossPhantomRenderer::new);
+        }
         event.registerEntityRenderer(ModEntities.GUN_BULLET.get(),
                 ctx -> new net.minecraft.client.renderer.entity.ThrownItemRenderer<com.plumejade.lensouls.entity.GunBulletEntity>(ctx, 0.8f, false));
         event.registerEntityRenderer(ModEntities.GRAVITY_BULLET.get(),

@@ -97,8 +97,12 @@ public class TemporalRecallHandler {
         }
     }
 
-    /** 易伤增伤：在窗口内且易伤未过期时增伤 */
-    @SubscribeEvent
+    /**
+     * 易伤增伤：在窗口内且易伤未过期时增伤。
+     * HIGH 优先级：先于时空回溯（NORMAL），确保回溯检测到的是易伤放大后的伤害，
+     * 防止"原始伤害不致命、放大后致命"时漏触发回溯。
+     */
+    @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.HIGH)
     public static void onVulnerabilityDamage(LivingDamageEvent.Pre event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (player.level().isClientSide) return;

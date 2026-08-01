@@ -34,20 +34,20 @@ public class BossTierLoader {
         put("cataclysm:the_harbinger", 2);
 
         // Tier 3 — 紫色
-        put("legendary_monsters:shulker_mimic", 3);
-        put("legendary_monsters:endersent", 3);
-        put("legendary_monsters:annihilation_pursuer", 3);
         put("legendary_monsters:posessed_paladin", 3);
         put("legendary_monsters:cloud_golem", 3);
         put("minecraft:wither", 3);
         put("minecraft:warden", 3);
+        put("cataclysm:the_leviathan", 3);
+        put("cataclysm:ignis", 3);
+        put("block_factorys_bosses:underworld_knight", 3);
 
-        // Tier 4 — 粉红
-        put("cataclysm:the_leviathan", 4);
+        // Tier 4 — 红色
+        put("legendary_monsters:shulker_mimic", 4);
+        put("legendary_monsters:endersent", 4);
+        put("legendary_monsters:annihilation_pursuer", 4);
         put("cataclysm:ender_guardian", 4);
         put("minecraft:ender_dragon", 4);
-        put("cataclysm:ignis", 4);
-        put("block_factorys_bosses:underworld_knight", 4);
         put("legendary_monsters:the_obliterator", 4);
     }
 

@@ -1,7 +1,5 @@
 package com.plumejade.lensouls.entity;
 
-import com.github.L_Ender.lionfishapi.server.animation.Animation;
-import com.github.L_Ender.lionfishapi.server.animation.IAnimatedEntity;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -14,9 +12,12 @@ import org.jetbrains.annotations.NotNull;
 import java.util.UUID;
 
 /**
- * BOSS 虚影幻灵实体——纯视觉效果，实现 IAnimatedEntity 以支持 LionfishAPI 动画。
+ * BOSS 虚影幻灵实体——纯视觉效果。
+ * <p>
+ * 动画对象以 {@link Object} 存储（运行时为 LionfishAPI 的 Animation，仅在有灾变/lionfishapi 时存在），
+ * 避免无联动 mod 时服务端实体注册加载失败。
  */
-public class BossPhantomEntity extends Entity implements IAnimatedEntity {
+public class BossPhantomEntity extends Entity {
 
     private static final EntityDataAccessor<Integer> DATA_BOSS_TYPE =
             SynchedEntityData.defineId(BossPhantomEntity.class, EntityDataSerializers.INT);
@@ -26,7 +27,7 @@ public class BossPhantomEntity extends Entity implements IAnimatedEntity {
             SynchedEntityData.defineId(BossPhantomEntity.class, EntityDataSerializers.INT);
 
     private UUID ownerUuid;
-    private Animation animation;
+    private Object animation;
     private int animationTick;
 
     public BossPhantomEntity(EntityType<? extends BossPhantomEntity> type, Level level) {
@@ -43,28 +44,21 @@ public class BossPhantomEntity extends Entity implements IAnimatedEntity {
         setOldPosAndRot();
     }
 
-    // ========== IAnimatedEntity ==========
+    // ========== 动画（Object 承载，运行时为 LionfishAPI Animation） ==========
 
-    @Override
     public int getAnimationTick() { return animationTick; }
 
-    @Override
     public void setAnimationTick(int tick) { this.animationTick = tick; }
 
-    @Override
-    public Animation getAnimation() { return animation; }
+    public Object getAnimation() { return animation; }
 
-    @Override
-    public void setAnimation(Animation anim) {
+    public void setAnimation(Object anim) {
         this.animation = anim;
         this.animationTick = 0;
     }
 
-    @Override
-    public Animation[] getAnimations() { return new Animation[0]; }
-
     /** BossPhantomManager 在启动幻灵时调用此方法设置技能动画 */
-    public void startAnimation(Animation anim) {
+    public void startAnimation(Object anim) {
         setAnimation(anim);
     }
 
@@ -135,11 +129,9 @@ public class BossPhantomEntity extends Entity implements IAnimatedEntity {
     @Override
     public void tick() {
         super.tick();
+        // 动画进度推进（原 getDuration 封顶逻辑依赖 lionfishapi，已移除；渲染端按 keyframe 总长自然结束）
         if (animation != null) {
             animationTick++;
-            if (animationTick >= animation.getDuration()) {
-                animationTick = animation.getDuration(); // 停在最后一帧
-            }
         }
     }
 }

@@ -1,6 +1,5 @@
 package com.plumejade.lensouls.entity;
 
-import com.github.L_Ender.lionfishapi.server.animation.Animation;
 import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
@@ -104,7 +103,7 @@ public class BossPhantomManager {
                 player.level(), type, pid, ox, oy + 1.5, oz, oyaw);
         phantom.setCustomName(Component.translatable("entity.lensouls.boss_phantom." + type.name().toLowerCase()));
         phantom.setCustomNameVisible(false);
-        Animation lionAnim = getLionfishAnimation(type);
+        Object lionAnim = getLionfishAnimation(type);
         if (lionAnim != null) phantom.startAnimation(lionAnim);
         player.level().addFreshEntity(phantom);
 
@@ -788,9 +787,9 @@ public class BossPhantomManager {
         }
     }
 
-    /** 通过反射获取 Ignis / Ender Guardian 的技能 Animation 对象 */
+    /** 通过反射获取 Ignis / Ender Guardian 的技能 Animation 对象（Object 承载，避免编译期依赖 lionfishapi） */
     @javax.annotation.Nullable
-    private static Animation getLionfishAnimation(BossPhantomType type) {
+    private static Object getLionfishAnimation(BossPhantomType type) {
         if (type == BossPhantomType.IGNIS) {
             return getAnimField("com.github.L_Ender.cataclysm.entity.AnimationMonster.BossMonsters.Ignis_Entity", "SPIN_ATTACK");
         }
@@ -801,11 +800,11 @@ public class BossPhantomManager {
     }
 
     @javax.annotation.Nullable
-    private static Animation getAnimField(String className, String fieldName) {
+    private static Object getAnimField(String className, String fieldName) {
         try {
             Class<?> clazz = Class.forName(className);
             java.lang.reflect.Field f = clazz.getDeclaredField(fieldName);
-            return (Animation) f.get(null);
+            return f.get(null);
         } catch (Exception e) {
             return null;
         }

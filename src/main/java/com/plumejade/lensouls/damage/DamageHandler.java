@@ -154,7 +154,9 @@ public class DamageHandler {
         }
 
         if (!level.isClientSide && totalBonusMultiplier > 0f) {
-            event.setNewDamage(originalDamage + originalDamage * totalBonusMultiplier);
+            // 基于护甲结算后的当前伤害叠加（Pre 事件时护甲已结算，用 originalDamage 会撤销护甲）
+            float current = event.getNewDamage();
+            event.setNewDamage(current + current * totalBonusMultiplier);
         }
     }
 

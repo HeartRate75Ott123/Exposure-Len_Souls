@@ -43,9 +43,9 @@ public class EnderGuardianAnimator {
 
     public void animate(BossPhantomEntity entity) {
         model.resetToDefaultPose();
-        animator.update(entity);
+        animator.update(LionfishAnimationAdapter.adapt(entity));
 
-        Animation anim = entity.getAnimation();
+        Animation anim = (Animation) entity.getAnimation();
         if (anim == null) return;
         animator.setAnimation(anim);
 

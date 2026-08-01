@@ -142,9 +142,9 @@ public class PhotoSpecialEffects {
         }
 
         if (event.getSource().getEntity() instanceof ServerPlayer player) {
-            // 飞行照片的伤害惩罚仅在飞行时生效，走地时正常伤害
+            // 飞行照片的伤害惩罚仅在飞行时生效，走地时正常伤害（基于护甲结算后伤害，避免撤销护甲）
             if (player.getPersistentData().getBoolean(FLIGHT_TAG) && player.getAbilities().flying) {
-                event.setNewDamage(event.getOriginalDamage() * 0.1f);
+                event.setNewDamage(event.getNewDamage() * 0.1f);
             }
             if (hasEntityInGear(player, id -> "cataclysm:ignis".equals(id))) {
                 if (player.getRandom().nextFloat() < 0.2f) {

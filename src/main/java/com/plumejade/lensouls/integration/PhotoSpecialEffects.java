@@ -43,6 +43,15 @@ public class PhotoSpecialEffects {
         DAMAGE_RULES.put("legendary_monsters:ancient_guardian", new DamageRule(e -> e.getSource().is(DamageTypes.MAGIC) || e.getSource().is(DamageTypes.INDIRECT_MAGIC), 0.75f));
         DAMAGE_RULES.put("legendary_monsters:endersent", new DamageRule(e -> true, 0.5f));
         DAMAGE_RULES.put("legendary_monsters:annihilation_pursuer", new DamageRule(e -> e.getSource().is(DamageTypes.MOB_ATTACK) || e.getSource().is(DamageTypes.PLAYER_ATTACK), 0.8f));
+        DAMAGE_RULES.put("twilightforest:alpha_yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
+        DAMAGE_RULES.put("minecraft:wither", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
+        DAMAGE_RULES.put("block_factorys_bosses:underworld_knight", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
+        DAMAGE_RULES.put("minecraft:ender_dragon", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
+        DAMAGE_RULES.put("legendary_monsters:cloud_golem", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
+        DAMAGE_RULES.put("twilightforest:hydra", new DamageRule(e -> e.getSource().is(net.minecraft.tags.DamageTypeTags.IS_PROJECTILE), 0.7f));
+        DAMAGE_RULES.put("cataclysm:ignis", new DamageRule(e -> e.getSource().is(DamageTypes.EXPLOSION) || e.getSource().is(DamageTypes.PLAYER_EXPLOSION), 0.7f));
+        DAMAGE_RULES.put("legendary_monsters:frostbitten_golem", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
+        DAMAGE_RULES.put("block_factorys_bosses:yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
     }
 
     private static final Map<String, AttributeEntry> ATTRIBUTES = new HashMap<>();
@@ -57,6 +66,7 @@ public class PhotoSpecialEffects {
         ATTRIBUTES.put("minecraft:spider",  new AttributeEntry(Attributes.JUMP_STRENGTH.value(), "spider_photo", 0.3, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
         ATTRIBUTES.put("minecraft:ender_dragon", new AttributeEntry(Attributes.KNOCKBACK_RESISTANCE.value(), "dragon_photo", 1.0, AttributeModifier.Operation.ADD_VALUE));
         ATTRIBUTES.put("legendary_monsters:posessed_paladin", new AttributeEntry(Attributes.ARMOR.value(), "paladin_photo", 2.0, AttributeModifier.Operation.ADD_VALUE));
+        ATTRIBUTES.put("legendary_monsters:posessed_paladin", new AttributeEntry(Attributes.KNOCKBACK_RESISTANCE.value(), "paladin_knockback", 1.0, AttributeModifier.Operation.ADD_VALUE));
         ATTRIBUTES.put("legendary_monsters:cloud_golem", new AttributeEntry(Attributes.JUMP_STRENGTH.value(), "golem_photo", 0.5, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
         ATTRIBUTES.put("legendary_monsters:frostbitten_golem", new AttributeEntry(Attributes.ARMOR.value(), "frost_photo", 3.0, AttributeModifier.Operation.ADD_VALUE));
         ATTRIBUTES.put("legendary_monsters:dune_sentinel", new AttributeEntry(Attributes.MOVEMENT_SPEED.value(), "dune_photo", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
@@ -81,6 +91,16 @@ public class PhotoSpecialEffects {
         }
 
         applyAttributes(player);
+
+        // 末影人：装备照片时周围末影人不主动攻击玩家（节流到每 10 tick）
+        if (player.tickCount % 10 == 0 && hasEntityInGear(player, id -> "minecraft:enderman".equals(id))) {
+            player.level().getEntities(player, player.getBoundingBox().inflate(16.0),
+                            e -> e instanceof net.minecraft.world.entity.monster.EnderMan)
+                    .forEach(e -> {
+                        net.minecraft.world.entity.monster.EnderMan em = (net.minecraft.world.entity.monster.EnderMan) e;
+                        if (em.getTarget() == player) em.setTarget(null);
+                    });
+        }
 
         // 遍历所有 Curios 槽位应用照片效果
         CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
@@ -110,6 +130,15 @@ public class PhotoSpecialEffects {
                     }
                 }
             }
+
+            // 荆棘：受到近战攻击时概率反伤（仿原版 ThornsEnchantment：15% 概率反 1~4 点）
+            if (hasEntityInGear(player, id -> "twilightforest:naga".equals(id))) {
+                net.minecraft.world.entity.Entity attacker = event.getSource().getEntity();
+                if (attacker instanceof LivingEntity le && attacker.distanceToSqr(player) < 16.0
+                        && player.getRandom().nextFloat() < 0.15f) {
+                    attacker.hurt(player.damageSources().thorns(player), 1.0f + player.getRandom().nextInt(4));
+                }
+            }
         }
 
         if (event.getSource().getEntity() instanceof ServerPlayer player) {
@@ -132,6 +161,70 @@ public class PhotoSpecialEffects {
                     }
                 }
             }
+        }
+    }
+
+    /** 防递归标志：witch 手动添加缩短版效果时跳过自身处理 */
+    private static boolean handlingWitch = false;
+
+    /** 灾变/传奇怪物注册的诅咒效果 ID（maledictus 诅咒免疫仅针对这些） */
+    private static final Set<String> CURSE_EFFECTS = Set.of(
+            "cataclysm:abyssal_curse",
+            "cataclysm:curse_of_desert",
+            "legendary_monsters:curse_of_desert"
+    );
+
+    /** 巫婆：负面效果时长 -50%；守卫者：黑暗免疫；诅咒魔：诅咒效果免疫 */
+    @SubscribeEvent
+    public static void onEffectApplicable(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        net.minecraft.world.effect.MobEffectInstance inst = event.getEffectInstance();
+        if (inst == null) return;
+
+        boolean beneficial = inst.getEffect().value().isBeneficial();
+        String effectId = net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.getKey(inst.getEffect().value()).toString();
+
+        boolean warden = hasEntityInGear(player, id -> "minecraft:warden".equals(id));
+        boolean maledictus = hasEntityInGear(player, id -> "cataclysm:maledictus".equals(id));
+        boolean witch = hasEntityInGear(player, id -> "minecraft:witch".equals(id));
+
+        if (warden && effectId.equals("minecraft:darkness")) {
+            event.setResult(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+            return;
+        }
+        if (hasEntityInGear(player, id -> "minecraft:cave_spider".equals(id)) && effectId.equals("minecraft:poison")) {
+            event.setResult(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+            return;
+        }
+        if (maledictus && CURSE_EFFECTS.contains(effectId)) {
+            event.setResult(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+            return;
+        }
+        if (!handlingWitch && witch && !beneficial && inst.getDuration() > 1) {
+            handlingWitch = true;
+            try {
+                event.setResult(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+                player.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                        inst.getEffect(), inst.getDuration() / 2, inst.getAmplifier(),
+                        inst.isAmbient(), inst.isVisible(), inst.showIcon()));
+            } finally {
+                handlingWitch = false;
+            }
+        }
+    }
+
+    /** 仿生傀儡：被弹射物命中时偏转（取消命中并反向弹射物） */
+    @SubscribeEvent
+    public static void onProjectileImpact(net.neoforged.neoforge.event.entity.ProjectileImpactEvent event) {
+        if (event.getEntity().level().isClientSide) return;
+        if (event.getRayTraceResult() instanceof net.minecraft.world.phys.EntityHitResult hit
+                && hit.getEntity() instanceof ServerPlayer player
+                && hasEntityInGear(player, id -> "legendary_monsters:shulker_mimic".equals(id))) {
+            net.minecraft.world.phys.Vec3 vel = event.getProjectile().getDeltaMovement();
+            if (vel.lengthSqr() > 0.001) {
+                event.getProjectile().setDeltaMovement(vel.scale(-1.0));
+            }
+            event.setCanceled(true);
         }
     }
 

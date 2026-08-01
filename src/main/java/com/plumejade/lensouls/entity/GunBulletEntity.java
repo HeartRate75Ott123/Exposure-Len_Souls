@@ -19,6 +19,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
@@ -27,6 +28,7 @@ import net.neoforged.neoforge.entity.PartEntity;
 
 import javax.annotation.Nullable;
 import java.util.Optional;
+import java.util.UUID;
 
 public class GunBulletEntity extends ThrowableItemProjectile {
     /** PartEntity 碰撞检测结果 */
@@ -39,18 +41,21 @@ public class GunBulletEntity extends ThrowableItemProjectile {
 
     private double damage;
     private double armorPen;
+    private UUID gunId;
+
+    public UUID getGunId() { return gunId; }
 
     public GunBulletEntity(EntityType<? extends GunBulletEntity> type, Level level) {
         super(type, level);
     }
 
-    public GunBulletEntity(Level level, LivingEntity shooter, int bulletType, double damage, double armorPen) {
+    public GunBulletEntity(Level level, LivingEntity shooter, int bulletType, double damage, double armorPen, UUID gunId) {
         super(ModEntities.GUN_BULLET.get(), level);
         setOwner(shooter);
         this.damage = damage;
         this.armorPen = armorPen;
+        this.gunId = gunId;
         entityData.set(DATA_BULLET_TYPE, (byte) bulletType);
-        // 同步弹射物物品栈到客户端，使 ThrownItemRenderer 渲染正确的弹药贴图
         setItem(getDefaultItem().getDefaultInstance());
         setPos(shooter.getX(), shooter.getEyeY() - 0.1, shooter.getZ());
     }
@@ -245,8 +250,8 @@ public class GunBulletEntity extends ThrowableItemProjectile {
     }
     @Override public boolean isNoGravity() { return true; }
     @Override protected boolean canHitEntity(Entity target) { return target instanceof LivingEntity && !target.equals(getOwner()); }
-    @Override public void readAdditionalSaveData(CompoundTag tag) { super.readAdditionalSaveData(tag); damage = tag.getDouble("Damage"); armorPen = tag.getDouble("ArmorPen"); }
-    @Override public void addAdditionalSaveData(CompoundTag tag) { super.addAdditionalSaveData(tag); tag.putDouble("Damage", damage); tag.putDouble("ArmorPen", armorPen); }
+    @Override public void readAdditionalSaveData(CompoundTag tag) { super.readAdditionalSaveData(tag); damage = tag.getDouble("Damage"); armorPen = tag.getDouble("ArmorPen"); if (tag.contains("GunId")) { gunId = tag.getUUID("GunId"); } }
+    @Override public void addAdditionalSaveData(CompoundTag tag) { super.addAdditionalSaveData(tag); tag.putDouble("Damage", damage); tag.putDouble("ArmorPen", armorPen); if (gunId != null) { tag.putUUID("GunId", gunId); } }
     @Override public boolean shouldRenderAtSqrDistance(double d) { return d < 4096; }
 
     /** 创建 lensouls:gun_bullet 伤害源（带 cataclysm:bypasses_hurt_time 标签，绕过 DPS 桶） */

@@ -53,6 +53,16 @@ public class BossPhantomManager {
 
     public static BossPhantomManager getInstance() { return INSTANCE; }
 
+    /** 通过幻灵实体 ID 反查玩家 */
+    public ServerPlayer findPlayerByPhantomEntityId(int phantomEntityId) {
+        for (var entry : activePhantoms.entrySet()) {
+            if (entry.getValue().phantomEntityId() == phantomEntityId) {
+                return findPlayer(entry.getKey());
+            }
+        }
+        return null;
+    }
+
     // ========== 启动 ==========
 
     public void startPhantom(ServerPlayer player, BossPhantomType type, String descId, int amplifier) {

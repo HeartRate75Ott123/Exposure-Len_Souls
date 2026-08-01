@@ -59,8 +59,9 @@ public class PhotoDamageHandler {
         // 应用增伤 + 弱点透镜螺旋粒子
         float bonus = Config.PHOTO_BONUS.get().floatValue();
         if (bonus > 0f) {
-            float bonusDamage = originalDamage * bonus;
-            event.setNewDamage(originalDamage + bonusDamage);
+            // 基于当前总伤害（已含元素追加）叠加，而非覆盖原始伤害
+            float currentDamage = event.getNewDamage();
+            event.setNewDamage(currentDamage + originalDamage * bonus);
             if (!target.level().isClientSide) {
                 PacketDistributor.sendToPlayersTrackingEntity(target,
                         new ElementSpiralPacket(target.getId(), 0, true));

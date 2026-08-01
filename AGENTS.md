@@ -12,6 +12,7 @@ NeoForge 1.21.1 模组（镜魂），基于 Exposure 相机模组的扩展。详
 - git bash 下用 `./gradlew`（不要用 `gradlew.bat`）
 - 版本号在 `gradle.properties` 的 `mod_version`，构建前先递增
 - 常用交付：构建后复制 JAR 到桌面（`C:/Users/volans/Desktop/`）；提交/推送需用户明确要求
+- 语言文件（`assets/lensouls/lang/*.json`）只**追加**键，追加后跑 `python -c "import json; json.load(...)"` 验证；曾发现 en_us 遗留重复键（`command.lensouls.toughness.*`）已清理
 
 ## 工作区结构（只读参考项目）
 
@@ -21,6 +22,7 @@ NeoForge 1.21.1 模组（镜魂），基于 Exposure 相机模组的扩展。详
 | `Exposure/` `ExposurePolaroid/` | 相机模组源码，出片/帧流程查阅 |
 | `[灾变] L_Ender's Cataclysm 1.21.1-3.32/` | 灾变解压 class，`javap -p -c` 反编译查桶/上限逻辑 |
 | `Legendary-Monsters-1.21.1-NeoForge/` | 传奇怪物源码 |
+| `~/.gradle/caches/neoformruntime/` | **ModDevGradle 产物**：`artifacts/minecraft_1.21.1_client.jar`、`intermediate_results/recompile_*.jar`（含全类）——反编译原版/NeoForge 首选，`javap -p -c` 即可，无需下载源码 |
 
 ## 照片注入管线（拍照能力系统）
 
@@ -61,6 +63,24 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
 - 升级：满击杀枪 + `eternal_starlight:tenacious_vine` + `eternal_starlight:oxidized_golem_steel_ingot`（自定义配方 `lensouls:gun_upgrade`，JSON 带 mod_loaded 条件）
 - 降级：满级枪 + 龙首 → `lensouls:gun_downgrade`（移除 Maxed 标志）
 - 伤害成长曲线：`getKillProgress`（Hermite S 曲线，慢快慢）；弹药/蓄力用 `getFastSlowProgress`（√t）
+
+## 1.21.1 合成/容器机制（复制之魂实现验证，反编译确认）
+
+- **`Recipe.getResultItem(CraftingInput)` 在 1.21.1 不存在**——覆写会编译报错"不会覆盖超类型方法"。动态输出只能覆写 `assemble(CraftingInput, HolderLookup)`（`CraftingMenu.slotChangedCraftingGrid` 每次格子变化都调它，工作台预览即动态）
+- **"原物品不消耗"实现**：覆写 `Recipe.getRemainingItems(CraftingInput)`（NeoForge 补丁的泛型版，返回按槽 `NonNullList<ItemStack>`，可带 NBT）。`ResultSlot.onTake` 流程：每槽 `removeItem(1)` → `RecipeManager.getRemainingItemsFor` → 非空 remaining 放回原槽（同组件 grow 合并）。这就是"消耗水保留桶"的服务端版本，`CopySoulRecipe` 即范例
+- 工作台硬限制：结果槽仅 1 堆、输入全消耗（无 NeoForge hook 可改）——"输出 2 个"或"保留原物"在纯配方层不可能
+- **铁砧两个坑**（AnvilMenu 反编译）：`mayPickup` 要求 **cost > 0 且玩家等级 ≥ cost** 才可取出（cost=0 拿不出）；`onTake` 取出时左槽 `setItem(0, EMPTY)` 直接清空——铁砧无法实现"保留左槽物品"
+
+## 新道具机制（次元瓶/复制之魂）
+
+- **次元瓶**：使用次数 = 耐久条（总耐久 = 1 + 已到访维度数）。维度列表存玩家 persistentData（`lensouls/visited_dimensions`，**与是否手持无关**每 20 tick 记录，防漏记历史维度）；手持时同步到 stack tag（`lensouls:visited_count`）驱动动态 `getMaxDamage`。30s 恢复 1 点：`inventoryTick` 每 20 tick + `lensouls:last_regen` 时间戳（使用/恢复时重置）
+- **复制之魂**：BOSS（有 boss bar）死亡掉落 5-20 个；工作台复制配方（见上）
+- **BOSS 判定（无注册表可查）**：1.21.1 `MinecraftServer` 无 `getBossOverlay`（仅 `getCustomBossEvents`，那是 /bossbar 命令用的），原版 EnderDragon/Wither 的 bossEvent 是私有字段不暴露。通用检测 = 反射沿类层次找 `BossEvent` 类型字段（`CopySoulDropHandler.hasBossBar`，ServerBossEvent 再查 `isVisible()`），覆盖原版+暮色 BossEventServer+各 mod BOSS
+
+## 音效（易踩坑）
+
+- **自定义音效在服务端 `player.playSound()` 播放不可靠**（曾实测无声）——项目惯例：在**客户端**分支本地播放（`use()` 里 `level.isClientSide` 时判定成功条件后 `player.playSound`），参照 `ToughnessHitSoundPacket`/`ClientPhantomHandler`
+- 新增音效：ffmpeg 转 `-c:a libvorbis` 的 ogg 放 `assets/lensouls/sounds/`，`sounds.json` 注册（key 带点如 `heal.use` 可行），`ModSounds` 注册 DeferredHolder
 
 ## 跨模组依赖
 

@@ -43,7 +43,7 @@ public class TrophyModifierHandler {
         Random rnd = new Random();
         String type = MODS[rnd.nextInt(MODS.length)];
         float value = switch (type) {
-            case "toughness_bonus" -> 1.0f + rnd.nextInt(5) * 0.5f;   // 1.0 / 1.5 / 2.0 / 2.5 / 3.0
+            case "toughness_bonus" -> 1.0f + rnd.nextInt(3);             // +1 ~ +3 次削韧（随机，加法叠加）
             case "stun_extend" -> 1.25f + rnd.nextInt(6) * 0.05f;    // +25% ~ +50% 步长5%
             case "invincible_shorten" -> 0.50f + rnd.nextInt(6) * 0.05f; // ×50% ~ ×75% 步长5%
             default -> 1.0f;
@@ -97,25 +97,27 @@ public class TrophyModifierHandler {
         float total = baseHits;
         for (ItemStack stack : getTrophyStacks(player)) {
             TrophyMod m = getModifier(stack);
-            if (m != null && "toughness_bonus".equals(m.type)) total *= m.value;
+            if (m != null && "toughness_bonus".equals(m.type)) total += m.value;
         }
         return total;
     }
 
     public static int applyStunModifier(ServerPlayer player, int baseStun) {
+        float sumBonus = 0f;
         for (ItemStack stack : getTrophyStacks(player)) {
             TrophyMod m = getModifier(stack);
-            if (m != null && "stun_extend".equals(m.type)) return (int) (baseStun * m.value);
+            if (m != null && "stun_extend".equals(m.type)) sumBonus += (m.value - 1f);
         }
-        return baseStun;
+        return (int) (baseStun * (1f + sumBonus));
     }
 
     public static int applyInvincibleModifier(ServerPlayer player, int baseInvincible) {
+        float sumBonus = 0f;
         for (ItemStack stack : getTrophyStacks(player)) {
             TrophyMod m = getModifier(stack);
-            if (m != null && "invincible_shorten".equals(m.type)) return Math.max(1, (int) (baseInvincible * m.value));
+            if (m != null && "invincible_shorten".equals(m.type)) sumBonus += (m.value - 1f);
         }
-        return baseInvincible;
+        return Math.max(1, (int) (baseInvincible * (1f + sumBonus)));
     }
 
     @SubscribeEvent
@@ -124,7 +126,7 @@ public class TrophyModifierHandler {
         TrophyMod m = getModifier(stack);
         if (m == null) return;
         String line = switch (m.type) {
-            case "toughness_bonus" -> "§6韧性伤害 +" + String.format("%.1f", m.value - 1);
+            case "toughness_bonus" -> "§6韧性伤害 +" + String.format("%.0f", m.value);
             case "stun_extend" -> "§6破刹时长 ×" + String.format("%.0f%%", m.value * 100);
             case "invincible_shorten" -> "§6白霸体时长 ×" + String.format("%.0f%%", m.value * 100);
             default -> "";

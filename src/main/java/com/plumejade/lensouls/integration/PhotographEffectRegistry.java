@@ -29,56 +29,57 @@ public class PhotographEffectRegistry {
     public record SpecialEffect(BiConsumer<LivingEntity, String> handler) implements EffectEntry {}
 
     static {
-        potion("minecraft:creeper",          "爆炸伤害 -20%%", null, 0);
+        potion("minecraft:creeper",          "受到的爆炸伤害 -20%", null, 0);
         attr("minecraft:zombie",             "最大生命 +4");
-        attr("minecraft:skeleton",           "远程伤害 +10%%");
-        potion("minecraft:spider",           "跳跃提升 I", "minecraft:jump_boost", 0);
+        attr("minecraft:skeleton",           "攻击伤害 +10%");
+        potion("minecraft:spider",           "跳跃高度 +30%", "minecraft:jump_boost", 0);
         spec("minecraft:enderman",           "末影人不主动攻击");
         potion("minecraft:blaze",            "火焰免疫", "minecraft:fire_resistance", 0);
-        dmg("minecraft:ghast",               "爆炸伤害 -20%%", "minecraft:explosion");
-        spec("minecraft:witch",              "受到的负面效果时长 -50%%");
+        dmg("minecraft:ghast",               "受到的爆炸伤害 -20%", "minecraft:explosion");
+        spec("minecraft:witch",              "受到的负面效果时长 -50%");
         spec("minecraft:cave_spider",        "中毒免疫");
         spec("minecraft:warden",             "黑暗效果免疫");
-        potion("minecraft:wither",           "凋零免疫", "minecraft:fire_resistance", 0);
+        spec("minecraft:wither",           "凋零免疫");
         spec("minecraft:ender_dragon",       "击退抗性 + 摔落免疫");
-        potion("twilightforest:hydra",       "火焰免疫 + 弹射物伤害 -30%%", "minecraft:fire_resistance", 0);
-        dmg("twilightforest:knight_phantom", "受到亡灵伤害 -25%%", "minecraft:generic");
-        potion("twilightforest:alpha_yeti",  "冰冻免疫", "minecraft:fire_resistance", 0);
+        potion("twilightforest:hydra",       "火焰免疫 + 受到的弹射物伤害 -30%", "minecraft:fire_resistance", 0);
+        dmg("twilightforest:knight_phantom", "受到的凋零伤害 -25%", "minecraft:generic");
+        spec("twilightforest:alpha_yeti",  "冰冻免疫");
         spec("twilightforest:naga",          "荆棘 I");
-        potion("cataclysm:ignis",            "火焰免疫 + 爆炸伤害 -30%%", "minecraft:fire_resistance", 0);
-        dmg("cataclysm:ender_guardian",      "末影伤害 -30%%", "minecraft:generic");
-        dmg("cataclysm:netherite_monstrosity", "物理伤害 -15%%", "minecraft:generic");
+        potion("cataclysm:ignis",            "火焰免疫 + 受到的爆炸伤害 -30%", "minecraft:fire_resistance", 0);
+        dmg("cataclysm:ender_guardian",      "受到的所有伤害 -30%", "minecraft:generic");
+        dmg("cataclysm:netherite_monstrosity", "受到的近战伤害 -15%", "minecraft:generic");
         potion("cataclysm:the_leviathan",    "水下呼吸 + 游泳加速", "minecraft:water_breathing", 0);
-        dmg("cataclysm:scylla",              "魔法伤害 -20%%", "minecraft:generic");
+        dmg("cataclysm:scylla",              "受到的魔法伤害 -20%", "minecraft:generic");
         spec("cataclysm:maledictus",         "诅咒免疫");
         potion("legendary_monsters:cloud_golem", "摔落免疫 + 跳跃提升 II", "minecraft:jump_boost", 1);
         attr("legendary_monsters:posessed_paladin", "击退抗性 + 护甲 +2");
-        dmg("legendary_monsters:the_obliterator", "所有伤害 -10%%", "minecraft:generic");
+        dmg("legendary_monsters:the_obliterator", "受到的所有伤害 -10%", "minecraft:generic");
         potion("legendary_monsters:lava_eater", "火焰免疫", "minecraft:fire_resistance", 0);
         potion("legendary_monsters:overgrown_colossus", "再生 I", "minecraft:regeneration", 0);
-        spec("legendary_monsters:dune_sentinel", "移动速度 +10%%");
-        dmg("legendary_monsters:skeletosaurus", "弓箭伤害 -30%%", "minecraft:generic");
+        spec("legendary_monsters:dune_sentinel", "移动速度 +10%");
+        dmg("legendary_monsters:skeletosaurus", "受到的弓箭伤害 -30%", "minecraft:generic");
         potion("legendary_monsters:frostbitten_golem", "冰冻免疫 + 护甲 +3", "minecraft:fire_resistance", 0);
-        dmg("legendary_monsters:ancient_guardian", "魔法伤害 -25%%", "minecraft:generic");
+        dmg("legendary_monsters:ancient_guardian", "受到的魔法伤害 -25%", "minecraft:generic");
         spec("legendary_monsters:shulker_mimic", "弹射物偏转");
-        dmg("legendary_monsters:endersent", "末影伤害 -50%%", "minecraft:generic");
-        dmg("legendary_monsters:annihilation_pursuer", "物理伤害 -20%%", "minecraft:generic");
+        dmg("legendary_monsters:endersent", "受到的所有伤害 -50%", "minecraft:generic");
+        dmg("legendary_monsters:annihilation_pursuer", "受到的近战伤害 -20%", "minecraft:generic");
         potion("block_factorys_bosses:yeti", "冰冻免疫 + 力量 I", "minecraft:strength", 0);
         potion("block_factorys_bosses:underworld_knight", "火焰免疫 + 凋零免疫", "minecraft:fire_resistance", 0);
-        spec("cataclysm:ignis",        "攻击时 20%% 概率施加炽焰烙印（防具 -20%%）");
-        spec("cataclysm:the_leviathan", "获得海豚恩惠（水中加速）");
-        spec("twilightforest:ur_ghast", "创造飞行（伤害 -90%%）");
-        spec("twilightforest:snow_queen", "创造飞行（伤害 -90%%）");
-        spec("minecraft:bat",          "创造飞行（伤害 -90%%）");
-        spec("minecraft:ender_dragon", "创造飞行（伤害 -90%%）");
-        spec("minecraft:wither",       "创造飞行（伤害 -90%%）");
-        spec("minecraft:phantom",      "创造飞行（伤害 -90%%）");
+        spec("cataclysm:ignis",        "攻击时 20% 概率给敌人施加炽焰烙印（敌人防具 -20%）");
+        potion("cataclysm:the_leviathan", "获得海豚恩惠（水中加速）", "minecraft:dolphins_grace", 0);
+        spec("twilightforest:ur_ghast", "创造飞行（飞行时造成的伤害 -90%）");
+        spec("twilightforest:snow_queen", "创造飞行（飞行时造成的伤害 -90%）");
+        spec("minecraft:bat",          "创造飞行（飞行时造成的伤害 -90%）");
+        spec("minecraft:ender_dragon", "创造飞行（飞行时造成的伤害 -90%）");
+        spec("minecraft:wither",       "创造飞行（飞行时造成的伤害 -90%）");
+        spec("minecraft:phantom",      "创造飞行（飞行时造成的伤害 -90%）");
     }
 
     private static void potion(String id, String desc, String effectId, int amp) {
         Holder<MobEffect> effect = effectId != null ?
                 BuiltInRegistries.MOB_EFFECT.getHolder(ResourceLocation.parse(effectId)).orElse(null) : null;
-        add(id, desc, effect != null ? new PotionEffect(effect, amp) : null);
+        if (effect != null) add(id, desc, new PotionEffect(effect, amp));
+        else add(id, desc, new SpecialEffect((e, s) -> {}));
     }
 
     private static void attr(String id, String desc) {

@@ -26,6 +26,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
+import java.util.UUID;
 
 public class DimensionalGunItem extends Item {
 
@@ -39,6 +40,7 @@ public class DimensionalGunItem extends Item {
     private static final String KEY_LAST_FIRE_TICK = "LastFireTick";
     private static final String KEY_CHARGE_START = "DGChargeStart";
     private static final String KEY_MAXED = "Maxed";
+    private static final String KEY_GUN_ID = "GunId";
 
     private static final String[] AMMO_NAMES = {"ammo.lensouls.overworld", "ammo.lensouls.hell", "ammo.lensouls.ender"};
     private static final String[] FIRE_MODE_NAMES = {"fire_mode.lensouls.semi", "fire_mode.lensouls.auto"};
@@ -127,7 +129,8 @@ public class DimensionalGunItem extends Item {
                 (random.nextDouble() - 0.5) * spread
         ).normalize().scale(3.9);
 
-        GunBulletEntity bullet = new GunBulletEntity(level, player, selected, damage, armorPen);
+        UUID gunId = ensureGunId(stack);
+        GunBulletEntity bullet = new GunBulletEntity(level, player, selected, damage, armorPen, gunId);
         bullet.setDeltaMovement(velocity);
         level.addFreshEntity(bullet);
 
@@ -319,6 +322,23 @@ public class DimensionalGunItem extends Item {
     private void setAmmo(ItemStack stack, int val) { write(stack, KEY_AMMO, val); }
     private int getKills(ItemStack stack) { return stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag().getInt(KEY_KILLS); }
     public void setKills(ItemStack stack, int val) { write(stack, KEY_KILLS, val); }
+
+    /** 枪的唯一 ID：子弹携带它，击杀时按 ID 在玩家背包里找回同一把枪（解决射击后切物品击杀错记/漏记） */
+    public UUID getGunId(ItemStack stack) {
+        var tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag();
+        if (!tag.contains(KEY_GUN_ID)) return null;
+        return UUID.fromString(tag.getString(KEY_GUN_ID));
+    }
+
+    public UUID ensureGunId(ItemStack stack) {
+        UUID id = getGunId(stack);
+        if (id != null) return id;
+        id = UUID.randomUUID();
+        var tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag();
+        tag.putString(KEY_GUN_ID, id.toString());
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        return id;
+    }
 
     /** 是否已合成满级（Maxed 标志） */
     public boolean isMaxed(ItemStack stack) {

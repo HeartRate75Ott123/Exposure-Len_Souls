@@ -69,7 +69,7 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(EnchantmentRemovalListener.class);
         NeoForge.EVENT_BUS.register(VillagerTradeHandler.class);
         NeoForge.EVENT_BUS.register(GunKillHandler.class);
-        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.event.HealPotionHandler.class);        NeoForge.EVENT_BUS.register(BossPhantomManager.class);
+        NeoForge.EVENT_BUS.register(BossPhantomManager.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.entity.PhantomDamageHandler.class);
 
         // ---- 能力系统 ----

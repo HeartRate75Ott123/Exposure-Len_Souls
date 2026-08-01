@@ -20,7 +20,7 @@ import java.util.List;
  * <p>
  * 剩余耐久 &gt; 1 时右键可用一次（消耗 1 耐久），回满生命 + 20 饥饿/20 饱和度。
  * 总耐久 = 1 + 已到访维度数（初始主世界 1 个 → 2 耐久，可用 1 次；每多探索一个维度 +1 总耐久）。
- * 耐久上限在手持时由 {@link com.plumejade.lensouls.event.HealPotionHandler} 每 20 tick 同步更新。
+ * 已到访维度列表存于物品自身（死亡/换人后不丢失），背包任意槽位每 20 tick 记录当前维度。
  * 已消耗耐久每 30 秒自动回复 1 点（动态恢复，背包中任意槽位生效）。
  */
 public class HealPotionItem extends Item {
@@ -28,13 +28,14 @@ public class HealPotionItem extends Item {
     /** 恢复间隔（tick）：30 秒 = 600 ticks */
     public static final long REGEN_INTERVAL_TICKS = 600L;
 
-    /** stack CUSTOM_DATA 键：当前已知的已到访维度数 */
-    public static final String KEY_VISITED_COUNT = "lensouls:visited_count";
+    /** stack CUSTOM_DATA 键：已到访维度列表（ListTag<String>，entity id 全名） */
+    public static final String KEY_VISITED_LIST = "lensouls:visited_list";
     /** stack CUSTOM_DATA 键：上次回复时间戳（world gameTime） */
     public static final String KEY_LAST_REGEN = "lensouls:last_regen";
-    /** 玩家 persistent data 键：已到访维度列表（ListTag<String>，entity id 全名） */
+    /** 玩家 persistent data 键（仅旧存档迁移用） */
     public static final String PLAYER_KEY = "lensouls";
-    public static final String KEY_VISITED_LIST = "visited_dimensions";
+    /** 旧版本玩家 persistent data 列表键 */
+    public static final String LEGACY_PLAYER_LIST = "visited_dimensions";
 
     public HealPotionItem(Properties properties) {
         super(properties.stacksTo(1).durability(2));
@@ -62,7 +63,7 @@ public class HealPotionItem extends Item {
         }
 
         // 使用前同步最新维度数（避免刚拿起未到 tick 更新的情况）
-        HealPotionItem.syncVisited(stack, player);
+        HealPotionItem.recordVisited(stack, player);
         int remaining = stack.getMaxDamage() - stack.getDamageValue();
         if (remaining <= 1) {
             player.displayClientMessage(Component.translatable("message.lensouls.heal_potion.empty"), true);
@@ -84,10 +85,14 @@ public class HealPotionItem extends Item {
     public void inventoryTick(ItemStack stack, Level level, net.minecraft.world.entity.Entity entity,
                               int slot, boolean selected) {
         if (level.isClientSide) return;
-        if (!(entity instanceof Player)) return;
+        if (!(entity instanceof Player player)) return;
+        if (entity.tickCount % 20 != 0) return;
+
+        // 记录当前维度到物品（信息跟随物品，死亡/换人/放箱后不丢失）
+        recordVisited(stack, player);
+
         int damage = stack.getDamageValue();
         if (damage <= 0) return;
-        if (entity.tickCount % 20 != 0) return;
 
         long now = level.getGameTime();
         long last = getLastRegen(stack);
@@ -129,35 +134,33 @@ public class HealPotionItem extends Item {
         }
     }
 
-    /** stack 上记录的已到访维度数（未同步过默认 1，即主世界） */
+    /** stack 上记录的已到访维度数（未记录过默认 1，即主世界） */
     public static int getVisitedCount(ItemStack stack) {
         CompoundTag tag = stack.getOrDefault(
                 net.minecraft.core.component.DataComponents.CUSTOM_DATA,
                 net.minecraft.world.item.component.CustomData.EMPTY).copyTag();
-        return Math.max(1, tag.getInt(KEY_VISITED_COUNT));
+        if (tag.contains(KEY_VISITED_LIST, Tag.TAG_LIST)) {
+            return Math.max(1, tag.getList(KEY_VISITED_LIST, Tag.TAG_STRING).size());
+        }
+        return 1;
     }
 
-    public static void setVisitedCount(ItemStack stack, int count) {
+    /**
+     * 记录当前维度到物品 stack，返回已到访维度总数（≥1）。
+     * 首次记录时若 stack 无列表，则从玩家旧 persistent data 迁移。
+     */
+    public static int recordVisited(ItemStack stack, Player player) {
         CompoundTag tag = stack.getOrDefault(
                 net.minecraft.core.component.DataComponents.CUSTOM_DATA,
                 net.minecraft.world.item.component.CustomData.EMPTY).copyTag();
-        if (tag.getInt(KEY_VISITED_COUNT) != count) {
-            tag.putInt(KEY_VISITED_COUNT, count);
-            stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
-                    net.minecraft.world.item.component.CustomData.of(tag));
+        boolean dirty = false;
+        ListTag list;
+        if (tag.contains(KEY_VISITED_LIST, Tag.TAG_LIST)) {
+            list = tag.getList(KEY_VISITED_LIST, Tag.TAG_STRING);
+        } else {
+            list = migrateLegacyList(player);
+            dirty = true;
         }
-    }
-
-    /** 将玩家已到访维度数同步到物品 stack（仅在变化时写 NBT） */
-    public static void syncVisited(ItemStack stack, Player player) {
-        setVisitedCount(stack, getPlayerVisitedCount(player));
-    }
-
-    /** 记录当前维度到玩家持久数据，返回已到访维度总数（≥1） */
-    public static int getPlayerVisitedCount(Player player) {
-        CompoundTag root = player.getPersistentData();
-        CompoundTag lensouls = root.getCompound(PLAYER_KEY);
-        ListTag list = lensouls.getList(KEY_VISITED_LIST, Tag.TAG_STRING);
 
         String current = player.level().dimension().location().toString();
         boolean has = false;
@@ -169,10 +172,25 @@ public class HealPotionItem extends Item {
         }
         if (!has) {
             list.add(StringTag.valueOf(current));
-            lensouls.put(KEY_VISITED_LIST, list);
-            root.put(PLAYER_KEY, lensouls);
-            return list.size();
+            dirty = true;
+        }
+        if (dirty) {
+            tag.put(KEY_VISITED_LIST, list);
+            stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
+                    net.minecraft.world.item.component.CustomData.of(tag));
         }
         return Math.max(1, list.size());
+    }
+
+    /** 旧版本（玩家 persistent data 中 visited_dimensions 列表）迁移，无则空列表 */
+    private static ListTag migrateLegacyList(Player player) {
+        CompoundTag root = player.getPersistentData();
+        CompoundTag lensouls = root.getCompound(PLAYER_KEY);
+        for (String key : new String[]{KEY_VISITED_LIST, LEGACY_PLAYER_LIST}) {
+            if (lensouls.contains(key, Tag.TAG_LIST)) {
+                return lensouls.getList(key, Tag.TAG_STRING);
+            }
+        }
+        return new ListTag();
     }
 }

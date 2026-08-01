@@ -66,5 +66,11 @@ public class PacketHandler {
                 TemporalRecallTriggerPacket.STREAM_CODEC,
                 TemporalRecallTriggerPacket::handle
         );
+
+        registrar.playToServer(
+                AbilityListPacket.TYPE,
+                AbilityListPacket.STREAM_CODEC,
+                AbilityListPacket::handle
+        );
     }
 }

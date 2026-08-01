@@ -58,6 +58,12 @@
 
   "key.category.lensouls": "Len Souls",
   "key.lensouls.converter": "Activate Converter (G)",
+  "key.lensouls.ability_list": "List Acquired Abilities (;)",
+
+  "message.lensouls.ability_list.header": "§6Acquired abilities:",
+  "message.lensouls.ability_list.item": "§a- %s",
+  "message.lensouls.ability_list.enabled": "§a- %s (enabled)",
+  "message.lensouls.ability_list.empty": "§cNo abilities acquired",
 
   "message.lensouls.soul_activated": "%s activated!",
   "message.lensouls.soul_cooldown": "Cooldown: %s seconds remaining.",
@@ -265,7 +271,7 @@
   "jei.lensouls.photograph_curio": "Ability-steal photo — requires Soul Photography enchantment. Equippable in Photograph slot. Entity: %s"
 ,
   "item.lensouls.heal_potion": "Heal Potion",
-  "item.lensouls.heal_potion.desc": "Uses left: %s (restore full health + 20 hunger & saturation)",
+  "item.lensouls.heal_potion.desc": "Uses left: %s (restore full health + 20 hunger, 20 saturation)",
   "item.lensouls.heal_potion.dim_count": "Dimensions visited: %s",
   "message.lensouls.heal_potion.empty": "§cHeal energy depleted! Explore new dimensions to gain more uses"
 ,

@@ -51,6 +51,12 @@
 
   "key.category.lensouls": "镜魂",
   "key.lensouls.converter": "激活转换器 (G)",
+  "key.lensouls.ability_list": "列出已获取能力 (;)",
+
+  "message.lensouls.ability_list.header": "§6已获取能力列表：",
+  "message.lensouls.ability_list.item": "§a- %s",
+  "message.lensouls.ability_list.enabled": "§a- %s（启用中）",
+  "message.lensouls.ability_list.empty": "§c暂无已获取能力",
 
   "message.lensouls.soul_activated": "%s 已激活！",
   "message.lensouls.soul_cooldown": "冷却中：剩余 %s 秒。",
@@ -261,7 +267,7 @@
   "jei.lensouls.photograph_curio": "照片（能力窃取），需要相机附魔摄魂术，可装备在照片饰品栏。实体：%s"
 ,
   "item.lensouls.heal_potion": "§a次元瓶",
-  "item.lensouls.heal_potion.desc": "§d剩余使用次数：%s（回满生命 + 20 饥饿与饱和度）",
+  "item.lensouls.heal_potion.desc": "§d剩余使用次数：%s（回满生命 + 饥饿值 20、饱和度 20）",
   "item.lensouls.heal_potion.dim_count": "§d已到访维度：%s",
   "message.lensouls.heal_potion.empty": "§c回复能量耗尽！探索新维度可增加使用次数"
 ,

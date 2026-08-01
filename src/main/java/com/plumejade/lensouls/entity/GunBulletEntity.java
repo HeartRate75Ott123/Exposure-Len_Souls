@@ -239,6 +239,9 @@ public class GunBulletEntity extends ThrowableItemProjectile {
 
     public byte getBulletType() { return entityData.get(DATA_BULLET_TYPE); }
 
+    /** 穿甲值（百分点，0~80，config dgBase/dgMaxArmorPen） */
+    public double getArmorPen() { return armorPen; }
+
     /** 弹药类型→元素映射（0=土, 1=火, 2=末影） */
     public static ElementDamage getBulletElement(byte bulletType) {
         return switch (bulletType) {

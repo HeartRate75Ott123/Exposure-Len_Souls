@@ -8,6 +8,7 @@ import com.plumejade.lensouls.ability.handler.FreezeCleanupHandler;
 import com.plumejade.lensouls.ability.util.FreezeTracker;
 import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.component.ModDataComponents;
+import com.plumejade.lensouls.damage.ArmorPenHandler;
 import com.plumejade.lensouls.damage.DamageHandler;
 import com.plumejade.lensouls.damage.PhotoDamageHandler;
 import com.plumejade.lensouls.effect.ModEffects;
@@ -66,6 +67,7 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(DamageHandler.class);
         NeoForge.EVENT_BUS.register(PhotoDamageHandler.class);
+        NeoForge.EVENT_BUS.register(ArmorPenHandler.class);
         NeoForge.EVENT_BUS.register(EnchantmentRemovalListener.class);
         NeoForge.EVENT_BUS.register(VillagerTradeHandler.class);
         NeoForge.EVENT_BUS.register(GunKillHandler.class);

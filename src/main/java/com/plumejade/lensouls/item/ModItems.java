@@ -138,6 +138,10 @@ public class ModItems {
     public static final DeferredItem<CopySoulItem> COPY_SOUL = ITEMS.register("copy_soul",
             () -> new CopySoulItem(new Item.Properties()));
 
+    // ---- 羽·元素觉醒者（Curios 任意槽位饰品） ----
+    public static final DeferredItem<FeatherElementRiseItem> FEATHER_ELEMENTRISE =
+            ITEMS.register("feather_elementrise", () -> new FeatherElementRiseItem(new Item.Properties()));
+
     // ---- 子弹物品（仅用于渲染弹射物模型） ----
     public static final DeferredItem<Item> OVERWORLD_BULLET = ITEMS.register("overworld_bullet",
             () -> new Item(new Item.Properties()));

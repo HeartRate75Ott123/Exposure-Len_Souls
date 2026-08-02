@@ -276,5 +276,9 @@
   "message.lensouls.heal_potion.empty": "§cHeal energy depleted! Explore new dimensions to gain more uses"
 ,
   "item.lensouls.copy_soul": "§bCopy Soul",
-  "item.lensouls.copy_soul.desc": "§aCrafting table: combine with any item — consumes this item, outputs an exact copy (enchantments/components/NBT preserved)"
+  "item.lensouls.copy_soul.desc": "§aCrafting table: combine with any item — consumes this item, outputs an exact copy (enchantments/components/NBT preserved)",
+  "item.lensouls.feather_elementrise": "§dFeather of Elemental Awakening",
+  "item.lensouls.feather_elementrise.desc1": "§dA feather with game-changing magic",
+  "item.lensouls.feather_elementrise.desc2": "§eWorks when worn in any trinket slot",
+  "item.lensouls.feather_elementrise.desc3": "§cWhile worn: +60% damage taken, +75% damage dealt, permanent +2 potency to all potions. Bosses drop no Copy Souls, and you cannot use them"
 }

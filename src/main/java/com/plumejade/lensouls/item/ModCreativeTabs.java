@@ -96,6 +96,9 @@ public class ModCreativeTabs {
                         // ---- 复制之魂 ----
                         output.accept(ModItems.COPY_SOUL.get());
 
+                        // ---- 羽·元素觉醒者 ----
+                        output.accept(ModItems.FEATHER_ELEMENTRISE.get());
+
                         // 摄魂术附魔书（通过参数查找注册表避免闪退）
                         var enchants = params.holders()
                                 .lookupOrThrow(Registries.ENCHANTMENT);

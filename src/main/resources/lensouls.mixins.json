@@ -7,7 +7,8 @@
     "SoulOutlineMixinTrigger",
     "ability.PlayerInteractionMixin",
     "BossDetectionMixin",
-    "compat.VitalStrikeNoFilmConsumeMixin"
+    "compat.VitalStrikeNoFilmConsumeMixin",
+    "CraftingMenuMixin"
   ],
   "client": [
     "client.FrozenEntityRenderMixin",

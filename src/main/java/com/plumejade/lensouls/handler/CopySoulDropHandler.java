@@ -4,6 +4,7 @@ import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
@@ -24,6 +25,10 @@ public class CopySoulDropHandler {
         LivingEntity entity = event.getEntity();
         if (entity.level().isClientSide) return;
         if (!hasBossBar(entity)) return;
+
+        // 佩戴羽·元素觉醒者的玩家击杀 → BOSS 不掉落复制之魂
+        LivingEntity killer = entity.getKillCredit();
+        if (killer instanceof Player player && FeatherElementRiseHandler.hasFeather(player)) return;
 
         int count = 5 + entity.level().random.nextInt(16); // 5..20
         event.getDrops().add(new ItemEntity(entity.level(),

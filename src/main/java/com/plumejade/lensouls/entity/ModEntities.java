@@ -4,7 +4,9 @@ import com.plumejade.lensouls.LenSouls;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.monster.Zombie;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -45,7 +47,21 @@ public class ModEntities {
                     .updateInterval(1)
                     .build("gravity_bullet"));
 
+    /** 扭曲者（惩罚性怪物，僵尸 AI 只攻击归属玩家） */
+    public static final DeferredHolder<EntityType<?>, EntityType<TwitcherEntity>> TWITCHER =
+            ENTITIES.register("twitcher", () -> EntityType.Builder.<TwitcherEntity>of(
+                            TwitcherEntity::new, MobCategory.MONSTER)
+                    .sized(0.6f, 1.95f)
+                    .clientTrackingRange(8)
+                    .build("twitcher"));
+
     public static void register(IEventBus modEventBus) {
         ENTITIES.register(modEventBus);
+        modEventBus.addListener(ModEntities::registerAttributes);
+    }
+
+    /** 扭曲者属性：基于僵尸基础属性（后续生成时按玩家状态覆写） */
+    private static void registerAttributes(EntityAttributeCreationEvent event) {
+        event.put(TWITCHER.get(), Zombie.createAttributes().build());
     }
 }

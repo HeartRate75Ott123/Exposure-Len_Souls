@@ -8,7 +8,9 @@
     "ability.PlayerInteractionMixin",
     "BossDetectionMixin",
     "compat.VitalStrikeNoFilmConsumeMixin",
-    "CraftingMenuMixin"
+    "CraftingMenuMixin",
+    "ResultSlotMixin",
+    "PlayerDropEquipmentMixin"
   ],
   "client": [
     "client.FrozenEntityRenderMixin",

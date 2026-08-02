@@ -274,7 +274,13 @@
   "item.lensouls.copy_soul": "§b复制之魂",
   "item.lensouls.copy_soul.desc": "§a在工作台与物品合成：消耗本物品，输出原物品的完整副本（附魔/组件/NBT 全保留）",
   "item.lensouls.feather_elementrise": "§d羽·元素觉醒者",
-  "item.lensouls.feather_elementrise.desc1": "§d具有改变游戏规则魔力的羽毛",
-  "item.lensouls.feather_elementrise.desc2": "§e佩戴在饰品栏任意槽位上即可生效",
-  "item.lensouls.feather_elementrise.desc3": "§c佩戴时，受到伤害增加60%，造成伤害增加75%，获得常驻全药水活性2级。并且boss死亡不会掉落复制之魂，你也无法使用它"
+  "item.lensouls.feather_elementrise.desc1": "§d具有元素魔力的羽毛，但排斥复制之魂",
+  "item.lensouls.feather_elementrise.desc2": "§e佩戴在饰品栏任意槽位上即可生效，戴上后无法取下",
+  "item.lensouls.feather_elementrise.desc3": "§c佩戴时：受到伤害+60%、造成伤害+75%、常驻全药水活性2级；佩戴期间BOSS死亡不掉落复制之魂，复制之魂无法用于合成",
+  "item.lensouls.feather_twitcher": "§d羽·扭曲之人",
+  "item.lensouls.feather_twitcher.desc1": "§d被扭曲命运纠缠的羽毛",
+  "item.lensouls.feather_twitcher.desc2": "§e佩戴在饰品栏任意槽位上即可生效，戴上后无法取下",
+  "item.lensouls.feather_twitcher.desc3": "§c佩戴时，受到伤害+100%、造成伤害-25%。扭曲值初始为0：使用复制之魂合成（按实际消耗的魂数）扭曲值+，死亡+10，上限100；扭曲值越高造成伤害增幅越高，最高+250%",
+  "item.lensouls.feather_twitcher.desc4": "§c扭曲值满100死亡时：生成只攻击你的扭曲者（若死亡点32格内有存活扭曲者或附近有BOSS则不生成），扭曲值清零；此次死亡不受死亡不掉落保护",
+  "item.lensouls.feather_twitcher.desc5": "§c扭曲者死亡后扭曲值恢复0"
 }

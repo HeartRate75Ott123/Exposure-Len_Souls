@@ -106,7 +106,7 @@ public class LenSouls {
 
         // ---- 羽·元素觉醒者效果 ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherElementRiseHandler.class);
-
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherTwitcherHandler.class);
         // ---- 元素活性 tooltip（客户端物品 hover 提示） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.ElementActivityTooltipHandler.class);
 

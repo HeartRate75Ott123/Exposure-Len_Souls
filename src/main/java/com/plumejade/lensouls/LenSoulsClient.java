@@ -76,6 +76,7 @@ public class LenSoulsClient {
         NeoForge.EVENT_BUS.register(GravityTetherRenderer.class);
         NeoForge.EVENT_BUS.register(ToughnessBarRenderer.class);
         NeoForge.EVENT_BUS.register(ScreenShakeApplier.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.SanBarOverlay.class);
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onPlayerTick);
         // 客户端断线时清理幻灵状态
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onClientLogout);
@@ -117,6 +118,8 @@ public class LenSoulsClient {
                 ctx -> new net.minecraft.client.renderer.entity.ThrownItemRenderer<com.plumejade.lensouls.entity.GunBulletEntity>(ctx, 0.8f, false));
         event.registerEntityRenderer(ModEntities.GRAVITY_BULLET.get(),
                 ctx -> new net.minecraft.client.renderer.entity.ThrownItemRenderer<com.plumejade.lensouls.entity.GravityBulletEntity>(ctx, 1.5f, false));
+        event.registerEntityRenderer(ModEntities.TWITCHER.get(),
+                com.plumejade.lensouls.client.render.TwitcherRenderer::new);
     }
 
     /** 注册幻灵模型层定义 */
@@ -359,6 +362,13 @@ public class LenSoulsClient {
                 com.plumejade.lensouls.network.ElementSpiralPacket.TYPE,
                 com.plumejade.lensouls.network.ElementSpiralPacket.STREAM_CODEC,
                 com.plumejade.lensouls.network.ElementSpiralPacket::handle
+        );
+
+        // ---- 扭曲值同步 S2C（左侧 bar） ----
+        registrar.playToClient(
+                com.plumejade.lensouls.network.TwistSyncPacket.TYPE,
+                com.plumejade.lensouls.network.TwistSyncPacket.STREAM_CODEC,
+                com.plumejade.lensouls.network.TwistSyncPacket::handle
         );
     }
 

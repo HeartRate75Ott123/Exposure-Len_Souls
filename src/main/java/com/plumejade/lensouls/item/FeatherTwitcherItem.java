@@ -1,6 +1,6 @@
 package com.plumejade.lensouls.item;
 
-import com.plumejade.lensouls.handler.FeatherTwitcherHandler;
+import com.plumejade.lensouls.handler.FeatherElementRiseHandler;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.player.Player;
@@ -14,21 +14,15 @@ import top.theillusivec4.curios.api.type.capability.ICurioItem;
 import java.util.List;
 
 /**
- * 羽·元素觉醒者：Curios 任意槽位饰品。
+ * 羽·扭曲之人：Curios 任意槽位饰品。
  * <p>
- * 绑定机制（参考绑定魔咒）：
- * <ul>
- *   <li>右键可直接佩戴（{@code canEquipFromUse}）</li>
- *   <li>戴上后无法取下（{@code canUnequip} 恒 false）</li>
- *   <li>无法主动丢弃（{@code onDroppedByPlayer} 恒 false）</li>
- *   <li>死亡掉落赦免（{@code getDropRule} = ALWAYS_KEEP，keepInventory 为 false 时也不掉落）</li>
- *   <li>与羽·扭曲之人互斥，不能同时佩戴（{@code canEquip}）</li>
- * </ul>
- * 战斗/药水效果由 {@link com.plumejade.lensouls.handler.FeatherElementRiseHandler} 实现。
+ * 与羽·元素觉醒者互斥（不能同时佩戴）。绑定机制参考元素羽毛：
+ * 右键直接佩戴、戴上无法取下（创造除外）、不可丢弃、死亡不掉落（ALWAYS_KEEP）。
+ * 扭曲值机制见 {@link com.plumejade.lensouls.handler.FeatherTwitcherHandler}。
  */
-public class FeatherElementRiseItem extends Item implements ICurioItem {
+public class FeatherTwitcherItem extends Item implements ICurioItem {
 
-    public FeatherElementRiseItem(Properties properties) {
+    public FeatherTwitcherItem(Properties properties) {
         super(properties.stacksTo(1).fireResistant());
     }
 
@@ -38,11 +32,11 @@ public class FeatherElementRiseItem extends Item implements ICurioItem {
         return true;
     }
 
-    /** 互斥：已佩戴羽·扭曲之人则无法佩戴 */
+    /** 互斥：已佩戴羽·元素觉醒者则无法佩戴 */
     @Override
     public boolean canEquip(SlotContext slotContext, ItemStack stack) {
         if (slotContext.entity() instanceof Player player) {
-            return !FeatherTwitcherHandler.hasTwitcher(player);
+            return !FeatherElementRiseHandler.hasFeather(player);
         }
         return true;
     }
@@ -75,8 +69,10 @@ public class FeatherElementRiseItem extends Item implements ICurioItem {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("item.lensouls.feather_elementrise.desc1"));
-        tooltip.add(Component.translatable("item.lensouls.feather_elementrise.desc2"));
-        tooltip.add(Component.translatable("item.lensouls.feather_elementrise.desc3"));
+        tooltip.add(Component.translatable("item.lensouls.feather_twitcher.desc1"));
+        tooltip.add(Component.translatable("item.lensouls.feather_twitcher.desc2"));
+        tooltip.add(Component.translatable("item.lensouls.feather_twitcher.desc3"));
+        tooltip.add(Component.translatable("item.lensouls.feather_twitcher.desc4"));
+        tooltip.add(Component.translatable("item.lensouls.feather_twitcher.desc5"));
     }
 }

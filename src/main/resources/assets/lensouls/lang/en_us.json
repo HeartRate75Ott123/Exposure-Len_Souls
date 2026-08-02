@@ -278,7 +278,13 @@
   "item.lensouls.copy_soul": "§bCopy Soul",
   "item.lensouls.copy_soul.desc": "§aCrafting table: combine with any item — consumes this item, outputs an exact copy (enchantments/components/NBT preserved)",
   "item.lensouls.feather_elementrise": "§dFeather of Elemental Awakening",
-  "item.lensouls.feather_elementrise.desc1": "§dA feather with game-changing magic",
-  "item.lensouls.feather_elementrise.desc2": "§eWorks when worn in any trinket slot",
-  "item.lensouls.feather_elementrise.desc3": "§cWhile worn: +60% damage taken, +75% damage dealt, permanent +2 potency to all potions. Bosses drop no Copy Souls, and you cannot use them"
+  "item.lensouls.feather_elementrise.desc1": "§dA feather of elemental magic, but repels Copy Souls",
+  "item.lensouls.feather_elementrise.desc2": "§eWorks when worn in any trinket slot, cannot be removed once equipped",
+  "item.lensouls.feather_elementrise.desc3": "§cWhile worn: +60% damage taken, +75% damage dealt, permanent +2 potency to all potions; bosses drop no Copy Souls and Copy Souls cannot be used in crafting",
+  "item.lensouls.feather_twitcher": "§dFeather of the Twisted",
+  "item.lensouls.feather_twitcher.desc1": "§dA feather entangled by a twisted fate",
+  "item.lensouls.feather_twitcher.desc2": "§eWorks when worn in any trinket slot, cannot be removed once equipped",
+  "item.lensouls.feather_twitcher.desc3": "§cWhile worn: +100% damage taken, -25% damage dealt. Twist starts at 0: crafting with Copy Souls (per soul actually consumed) adds twist, death adds +10, cap 100; higher twist grants up to +250% damage",
+  "item.lensouls.feather_twitcher.desc4": "§cDying at 100 twist spawns a Twitcher that hunts only you (skipped if a Twitcher is alive within 32 blocks or a boss is nearby), twist resets to 0; that death ignores keepInventory protection",
+  "item.lensouls.feather_twitcher.desc5": "§cTwist returns to 0 when the Twitcher dies"
 }

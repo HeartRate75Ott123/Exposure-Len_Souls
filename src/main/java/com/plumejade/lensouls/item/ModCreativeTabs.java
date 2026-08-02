@@ -99,6 +99,9 @@ public class ModCreativeTabs {
                         // ---- 羽·元素觉醒者 ----
                         output.accept(ModItems.FEATHER_ELEMENTRISE.get());
 
+                        // ---- 羽·扭曲之人 ----
+                        output.accept(ModItems.FEATHER_TWITCHER.get());
+
                         // 摄魂术附魔书（通过参数查找注册表避免闪退）
                         var enchants = params.holders()
                                 .lookupOrThrow(Registries.ENCHANTMENT);

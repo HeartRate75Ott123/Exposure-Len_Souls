@@ -36,8 +36,8 @@ public class CopySoulDropHandler {
                 new ItemStack(ModItems.COPY_SOUL.get(), count)));
     }
 
-    /** 反射检测实体是否持有可见的 BOSS 血条（沿类层次遍历字段） */
-    private static boolean hasBossBar(LivingEntity entity) {
+    /** 反射检测实体是否持有可见的 BOSS 血条（沿类层次遍历字段，供扭曲羽毛生成判定复用） */
+    public static boolean hasBossBar(LivingEntity entity) {
         Class<?> clazz = entity.getClass();
         while (clazz != null && clazz != Object.class) {
             for (Field field : clazz.getDeclaredFields()) {

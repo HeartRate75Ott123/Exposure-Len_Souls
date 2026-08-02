@@ -4,6 +4,7 @@ import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
+import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -43,6 +44,13 @@ public class PhotoInjectionHandler {
             if (frame == null) return;
             String exposureId = frame.identifier() != null ? frame.identifier().toString() : null;
             if (exposureId == null || exposureId.isEmpty()) return;
+
+            // 羽·荒厄遗咒：残存魔力被吞噬，无法发动相机能力
+            if (FeatherHardmanHandler.hasHardman(player)) {
+                player.displayClientMessage(
+                        net.minecraft.network.chat.Component.translatable("message.lensouls.hardman.inject_fail"), true);
+                return;
+            }
 
             AbilityManager am = AbilityManager.getInstance();
             AbilityType ability = am.getEnabled(player);

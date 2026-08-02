@@ -143,8 +143,10 @@ public class ModItems {
             ITEMS.register("feather_elementrise", () -> new FeatherElementRiseItem(new Item.Properties()));
 
     // ---- 羽·扭曲之人（Curios 任意槽位饰品，与元素羽毛互斥） ----
-    public static final DeferredItem<FeatherTwitcherItem> FEATHER_TWITCHER =
-            ITEMS.register("feather_twitcher", () -> new FeatherTwitcherItem(new Item.Properties()));
+public static final DeferredItem<FeatherTwitcherItem> FEATHER_TWITCHER =
+ITEMS.register("feather_twitcher", () -> new FeatherTwitcherItem(new Item.Properties()));
+public static final DeferredItem<FeatherHardmanItem> FEATHER_HARDMAN =
+ITEMS.register("feather_hardman", () -> new FeatherHardmanItem(new Item.Properties()));
 
     // ---- 子弹物品（仅用于渲染弹射物模型） ----
     public static final DeferredItem<Item> OVERWORLD_BULLET = ITEMS.register("overworld_bullet",

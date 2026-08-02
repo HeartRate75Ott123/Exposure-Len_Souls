@@ -26,9 +26,12 @@ public class CopySoulDropHandler {
         if (entity.level().isClientSide) return;
         if (!hasBossBar(entity)) return;
 
-        // 佩戴羽·元素觉醒者的玩家击杀 → BOSS 不掉落复制之魂
+        // 佩戴羽·元素觉醒者/羽·荒厄遗咒的玩家击杀 → BOSS 不掉落复制之魂
         LivingEntity killer = entity.getKillCredit();
-        if (killer instanceof Player player && FeatherElementRiseHandler.hasFeather(player)) return;
+        if (killer instanceof Player player
+                && (FeatherElementRiseHandler.hasFeather(player) || FeatherHardmanHandler.hasHardman(player))) {
+            return;
+        }
 
         int count = 5 + entity.level().random.nextInt(16); // 5..20
         event.getDrops().add(new ItemEntity(entity.level(),

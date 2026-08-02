@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.item;
 
+import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import com.plumejade.lensouls.handler.FeatherTwitcherHandler;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -39,11 +40,12 @@ public class FeatherElementRiseItem extends Item implements ICurioItem {
         return true;
     }
 
-    /** 互斥：已佩戴羽·扭曲之人则无法佩戴 */
+    /** 互斥：已佩戴其他羽毛（扭曲/荒厄）则无法佩戴 */
     @Override
     public boolean canEquip(SlotContext slotContext, ItemStack stack) {
         if (slotContext.entity() instanceof Player player) {
-            return !FeatherTwitcherHandler.hasTwitcher(player);
+            return !FeatherTwitcherHandler.hasTwitcher(player)
+                    && !FeatherHardmanHandler.hasHardman(player);
         }
         return true;
     }

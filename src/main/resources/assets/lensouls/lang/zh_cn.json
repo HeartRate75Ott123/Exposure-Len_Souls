@@ -252,5 +252,14 @@
   "item.lensouls.feather_twitcher.desc3": "§c佩戴时，受到伤害+100%、造成伤害-25%。扭曲值初始为0：每消耗1个复制之魂+1，真实死亡+10，上限100；扭曲值上升会带来伤害增幅，最高+250%",
   "item.lensouls.feather_twitcher.desc4": "§c扭曲值满100死亡时：生成扭曲者（若死亡点32格内有存活且归属你的扭曲者，或64格内有BOSS，则不生成，扭曲值保持100；生成则扭曲值清零），此次死亡不受死亡不掉落保护",
   "item.lensouls.feather_twitcher.desc5": "§c扭曲者死亡后扭曲值恢复0",
-  "item.lensouls.curio_any_slot": "§e栏位：任意饰品栏"
+  "item.lensouls.curio_any_slot": "§e栏位：任意饰品栏",
+  "item.lensouls.feather_hardman": "§d羽·荒厄遗咒",
+  "item.lensouls.feather_hardman.desc1": "§d被荒厄诅咒缠绕的羽毛，吞噬残存魔力",
+  "item.lensouls.feather_hardman.desc2": "§e佩戴在饰品栏任意槽位上即可生效，戴上后无法取下",
+  "item.lensouls.feather_hardman.desc3": "§c佩戴时，你的残存魔力也被吞噬：失去所有元素亲和力，药水活性对你无效，无法发动相机能力，无法使用复制之魂",
+  "item.lensouls.feather_hardman.desc4": "§c基础护甲值+10，受到伤害+75%，造成伤害+125%",
+  "item.lensouls.feather_hardman.desc5": "§c攻击对敌人有35%概率附加随机原版负面效果（等级1~20随机），持续5秒",
+  "item.lensouls.feather_hardman.desc6": "§c每隔1分钟，你也会获得一项随机原版负面效果，持续10秒",
+  "item.lensouls.feather_hardman.desc7": "§c死亡不掉落",
+  "message.lensouls.hardman.inject_fail": "奇怪，这东西怎么用来着"
 }

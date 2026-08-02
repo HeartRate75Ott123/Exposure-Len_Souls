@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.mixin;
 
 import com.plumejade.lensouls.handler.FeatherElementRiseHandler;
+import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import com.plumejade.lensouls.item.CopySoulItem;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -36,7 +37,7 @@ public class CraftingMenuMixin {
                                                                  CallbackInfo ci) {
         if (level.isClientSide) return;
 
-        if (!FeatherElementRiseHandler.hasFeather(player)) return;
+        if (!FeatherElementRiseHandler.hasFeather(player) && !FeatherHardmanHandler.hasHardman(player)) return;
         for (ItemStack stack : container.getItems()) {
             if (stack.getItem() instanceof CopySoulItem) {
                 result.setItem(0, ItemStack.EMPTY);

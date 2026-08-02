@@ -1,8 +1,8 @@
 package com.plumejade.lensouls.mixin.compat;
 
-import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.client.ClientAbilityCache;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -43,8 +43,12 @@ public class BetterCombatRangeMixin {
      * 从两个来源之一获取空间扭曲所需的攻击触及距离：
      * ① AbilityManager（服务端权威，UUID 匹配时客户线程也可查到）
      * ② ClientAbilityCache（远程客户端 S2C 缓存）
+     * <p>
+     * 仅客户端线程（{@link LocalPlayer}）膨胀——服务端 {@code ServerPlayer} 不膨胀，
+     * 否则 ServerNetwork 的 {@code validationRangeSquared} 校验会基于膨胀值放行球外实体。
      */
     private static double resolveWarpReach(Player player) {
+        if (!(player instanceof LocalPlayer)) return 0;
         // 优先级 1：服务端权威数据（单机整合服双线程通用）
         AbilityManager am = AbilityManager.getInstance();
         if (am.isSpatialWarpActive(player)) {

@@ -19,9 +19,13 @@ NeoForge 1.21.1 模组（镜魂），基于 Exposure 相机模组的扩展。详
 | 目录 | 用途 |
 |------|------|
 | `lensouls-template-1.21.1/` | **主力项目**（git 仓库根） |
-| `Exposure/` `ExposurePolaroid/` | 相机模组源码，出片/帧流程查阅 |
-| `[灾变] L_Ender's Cataclysm 1.21.1-3.32/` | 灾变解压 class，`javap -p -c` 反编译查桶/上限逻辑 |
-| `Legendary-Monsters-1.21.1-NeoForge/` | 传奇怪物源码 |
+| `../Exposure/` `../ExposurePolaroid/` | 相机模组源码，出片/帧流程查阅 |
+| `../Curios-1.21.1/` | **Curios 饰品模组源码**（common + neoforge），槽位判定/右键佩戴/掉落逻辑查阅 |
+| `../BetterCombat/` | **Better Combat 攻击模组源码**（common + neoforge），服务端攻击路径 `PlayerAttackHelper`、`NeoForgeEvents` 查阅 |
+| `../artifacts-1.21.1/` | Artifacts 饰品模组源码（Curios 集成参考，`data/curios/tags/item/` 槽 tag 模式） |
+| `../[灾变] L_Ender's Cataclysm 1.21.1-3.32/` | 灾变解压 class，`javap -p -c` 反编译查桶/上限逻辑 |
+| `../Legendary-Monsters-1.21.1-NeoForge/` | 传奇怪物源码 |
+| 项目内 `net/minecraft/` `net/neoforged/` `com/mojang/` | **项目辅助源码库（不全）**：仅渲染相关（`client/renderer`、blaze3d vertex）、NeoForge `common/conditions`/`registries`。原版/NeoForge 服务端代码一律用 neoformruntime 反编译 |
 | `~/.gradle/caches/neoformruntime/` | **ModDevGradle 产物**：`artifacts/minecraft_1.21.1_client.jar`、`intermediate_results/recompile_*.jar`（含全类）——反编译原版/NeoForge 首选，`javap -p -c` 即可，无需下载源码 |
 
 ## 照片注入管线（拍照能力系统）

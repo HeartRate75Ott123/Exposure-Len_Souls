@@ -9,7 +9,6 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 
@@ -71,30 +70,6 @@ public class FeatherElementRiseHandler {
         if (player.tickCount % 20 != 0) return;
         if (!hasFeather(player)) return;
         boostPotions(player);
-    }
-
-    /** 临时调试：右键佩戴链路检查 */
-    @SubscribeEvent
-    public static void onRightClickDebug(PlayerInteractEvent.RightClickItem evt) {
-        var stack = evt.getItemStack();
-        if (!(stack.getItem() instanceof com.plumejade.lensouls.item.FeatherElementRiseItem)) return;
-        var curioOpt = CuriosApi.getCurio(stack);
-        com.plumejade.lensouls.LenSouls.LOGGER.info("[Feather] right-click item={} instanceofICurioItem={} cap={}",
-                stack, stack.getItem() instanceof top.theillusivec4.curios.api.type.capability.ICurioItem, curioOpt.isPresent());
-        CuriosApi.getCuriosInventory(evt.getEntity()).ifPresent(inv -> {
-            for (var e : inv.getCurios().entrySet()) {
-                var h = e.getValue();
-                var dh = h.getStacks();
-                for (int i = 0; i < dh.getSlots(); i++) {
-                    boolean active = h.getActiveStates().size() > i && h.getActiveStates().get(i);
-                    var ctx = new top.theillusivec4.curios.api.SlotContext(e.getKey(), evt.getEntity(), i, false, true);
-                    boolean valid = dh.isItemValid(i, stack);
-                    boolean fromUse = curioOpt.map(c -> c.canEquipFromUse(ctx)).orElse(false);
-                    com.plumejade.lensouls.LenSouls.LOGGER.info("[Feather] slot={} idx={} active={} isItemValid={} canEquipFromUse={}",
-                            e.getKey(), i, active, valid, fromUse);
-                }
-            }
-        });
     }
 
     /**

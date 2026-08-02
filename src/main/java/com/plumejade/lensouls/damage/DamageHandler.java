@@ -72,8 +72,9 @@ public class DamageHandler {
                     target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 1, false, false, true));
                 }
 
-                BossPhantomType bossType = BossPhantomType.fromSoulItem(
-                        ElementDamage.getActivityByAmplifier(inst.getAmplifier()), slowness, element);
+                // BOSS 镜魂：按激活镜魂的 descriptionId 精确识别具体 BOSS（而非按活性等级猜测）
+                String soulDescId = ElementInfusionEffect.getPlayerCustomName(player, element);
+                BossPhantomType bossType = soulDescId != null ? BossPhantomType.fromDescriptionId(soulDescId) : null;
                 if (bossType != null) sendHitParticles((ServerLevel) level, target, bossType);
             }
 
@@ -200,6 +201,37 @@ public class DamageHandler {
                 level.sendParticles(ParticleTypes.LAVA, pos.x, pos.y, pos.z, 8, 0.5, 0.3, 0.5, 0.05);
                 level.sendParticles(ParticleTypes.FLAME, pos.x, pos.y, pos.z, 6, 0.4, 0.2, 0.4, 0.05);
                 level.sendParticles(ParticleTypes.LARGE_SMOKE, pos.x, pos.y, pos.z, 4, 0.3, 0.2, 0.3, 0.02);
+            }
+            case HYDRA -> {
+                level.sendParticles(ParticleTypes.FLAME, pos.x, pos.y, pos.z, 8, 0.5, 0.3, 0.5, 0.05);
+                level.sendParticles(ParticleTypes.LAVA, pos.x, pos.y, pos.z, 4, 0.3, 0.2, 0.3, 0.04);
+                level.sendParticles(ParticleTypes.SMOKE, pos.x, pos.y, pos.z, 3, 0.4, 0.2, 0.4, 0.02);
+            }
+            case KNIGHT_PHANTOM -> {
+                level.sendParticles(ParticleTypes.SOUL, pos.x, pos.y, pos.z, 6, 0.4, 0.3, 0.4, 0.04);
+                level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, pos.x, pos.y, pos.z, 4, 0.4, 0.3, 0.4, 0.02);
+            }
+            case ALPHA_YETI -> {
+                level.sendParticles(ParticleTypes.SNOWFLAKE, pos.x, pos.y, pos.z, 10, 0.6, 0.4, 0.6, 0.05);
+                level.sendParticles(ParticleTypes.CLOUD, pos.x, pos.y, pos.z, 5, 0.5, 0.3, 0.5, 0.04);
+            }
+            case NAGA -> {
+                level.sendParticles(ParticleTypes.CRIT, pos.x, pos.y, pos.z, 8, 0.4, 0.3, 0.4, 0.3);
+                level.sendParticles(ParticleTypes.ENCHANT, pos.x, pos.y, pos.z, 4, 0.3, 0.3, 0.3, 0.4);
+            }
+            case LAVA_EATER -> {
+                level.sendParticles(ParticleTypes.LAVA, pos.x, pos.y, pos.z, 10, 0.5, 0.3, 0.5, 0.05);
+                level.sendParticles(ParticleTypes.FLAME, pos.x, pos.y, pos.z, 5, 0.4, 0.2, 0.4, 0.04);
+                level.sendParticles(ParticleTypes.LARGE_SMOKE, pos.x, pos.y, pos.z, 3, 0.3, 0.2, 0.3, 0.02);
+            }
+            case THE_LEVIATHAN -> {
+                level.sendParticles(ParticleTypes.PORTAL, pos.x, pos.y, pos.z, 8, 0.6, 0.4, 0.6, 0.4);
+                level.sendParticles(ParticleTypes.SOUL, pos.x, pos.y, pos.z, 4, 0.4, 0.3, 0.4, 0.03);
+                level.sendParticles(ParticleTypes.BUBBLE, pos.x, pos.y, pos.z, 4, 0.4, 0.3, 0.4, 0.03);
+            }
+            case SCYLLA -> {
+                level.sendParticles(ParticleTypes.BUBBLE, pos.x, pos.y, pos.z, 10, 0.5, 0.3, 0.5, 0.04);
+                level.sendParticles(ParticleTypes.DRIPPING_WATER, pos.x, pos.y, pos.z, 4, 0.4, 0.3, 0.4, 0.02);
             }
         }
     }

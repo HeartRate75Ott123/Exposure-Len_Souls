@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.item;
 
 import com.plumejade.lensouls.handler.FeatherTwitcherHandler;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.player.Player;
@@ -71,6 +72,13 @@ public class FeatherElementRiseItem extends Item implements ICurioItem {
     @Override
     public boolean onDroppedByPlayer(ItemStack stack, Player player) {
         return false;
+    }
+
+    /** 栏位提示：替换 Curios 生成的槽位列表（通用 tag 会列出全部槽位），统一显示"任意饰品栏" */
+    @Override
+    public List<Component> getSlotsTooltip(List<Component> tooltips, TooltipContext context, ItemStack stack) {
+        return List.of(Component.translatable("item.lensouls.curio_any_slot")
+                .withStyle(ChatFormatting.GOLD));
     }
 
     @Override

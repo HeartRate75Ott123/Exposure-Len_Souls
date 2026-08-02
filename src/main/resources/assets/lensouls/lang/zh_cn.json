@@ -1,6 +1,5 @@
 {
   "itemGroup.lensouls": "镜魂",
-
   "effect.lensouls.fire_infusion": "火活性",
   "effect.lensouls.water_infusion": "水活性",
   "effect.lensouls.earth_infusion": "土活性",
@@ -13,7 +12,6 @@
   "effect.lensouls.water_infusion.description": "提升水流元素伤害，免疫水活性附加伤害",
   "effect.lensouls.earth_infusion.description": "提升大地元素伤害，免疫土活性附加伤害",
   "effect.lensouls.ender_infusion.description": "提升末影元素伤害，免疫末影活性附加伤害",
-
   "item.lensouls.fire_soul": "火焰镜魂",
   "item.lensouls.water_soul": "流水镜魂",
   "item.lensouls.earth_soul": "大地镜魂",
@@ -26,7 +24,6 @@
   "element.lensouls.ender.short": "末影",
   "element.lensouls.projectile.short": "弹射物",
   "item.lensouls.soul.boss_hint": "同时激活特殊效果",
-
   "item.lensouls.converter": "镜魂转换器",
   "item.lensouls.converter.tooltip": "右键：打开界面，按 §e%s§7：激活镜魂",
   "item.lensouls.ignis_soul": "焰魔镜魂（火）",
@@ -35,29 +32,23 @@
   "item.lensouls.obliterator_soul": "湮灭构造体镜魂（末影）",
   "item.lensouls.ender_guardian_soul": "末影守卫镜魂（末影）",
   "item.lensouls.netherite_monstrosity_soul": "下界合金巨兽镜魂（土）",
-
   "item.lensouls.skill_ball": "§a能力球",
   "item.lensouls.weakness_lens_ball": "§a能力球（弱点透镜）",
   "item.lensouls.spatial_warp_ball": "§a能力球（空间扭曲）",
   "item.lensouls.temporal_recall_ball": "§a能力球（时空回溯）",
   "item.lensouls.time_stop_ball": "§a能力球（时间定格）",
   "item.lensouls.vital_strike_ball": "§a能力球（要害打击）",
-
   "message.lensouls.skill_ball.already_unlocked": "§e你已经解锁 §a%s §e了！",
   "message.lensouls.skill_ball.tooltip": "右键解锁：%s",
   "message.lensouls.skill_ball.tooltip_random": "右键获得随机能力",
-
   "container.lensouls.converter": "转换器",
-
   "key.category.lensouls": "镜魂",
   "key.lensouls.converter": "激活转换器 (G)",
   "key.lensouls.ability_list": "列出已获取能力 (;)",
-
   "message.lensouls.ability_list.header": "§6已获取能力列表：",
   "message.lensouls.ability_list.item": "§a- %s",
   "message.lensouls.ability_list.enabled": "§a- %s（启用中）",
   "message.lensouls.ability_list.empty": "§c暂无已获取能力",
-
   "message.lensouls.soul_activated": "%s 已激活！",
   "message.lensouls.soul_cooldown": "冷却中：剩余 %s 秒。",
   "message.lensouls.effect_expiring": "%s 还有 %s 秒结束！",
@@ -69,7 +60,6 @@
   "message.lensouls.converter_phantom_active": "你现在不能使用boss级镜魂",
   "message.lensouls.freeze_already_active": "§c时间定格尚未结束",
   "message.lensouls.freeze_no_targets": "§e没有可定格的实体",
-
   "item.lensouls.dimensional_gun": "次元枪",
   "item.lensouls.gravity_gun": "引力枪",
   "item.lensouls.overworld_bullet": "主世界弹头",
@@ -77,7 +67,6 @@
   "item.lensouls.ender_bullet": "末地弹头",
   "entity.lensouls.gun_bullet": "枪弹",
   "entity.lensouls.gravity_bullet": "引力弹",
-
   "message.lensouls.dimensional_gun.ammo": "弹药: %s/%s",
   "message.lensouls.dimensional_gun.ammo_type": "弹药类型: %s",
   "message.lensouls.dimensional_gun.fire_mode": "射击模式: %s",
@@ -92,12 +81,10 @@
   "message.lensouls.dimensional_gun.tooltip.control1": "左键：切换弹药类型",
   "message.lensouls.dimensional_gun.tooltip.control2": "右键：蓄力射击",
   "message.lensouls.dimensional_gun.tooltip.control3": "Shift + 左键：切换射击模式",
-
   "message.lensouls.gravity_gun.tooltip.control1": "右键：发射引力弹",
   "message.lensouls.gravity_gun.tooltip.control2": "牵引时右键：释放目标",
   "message.lensouls.gravity_gun.tooltip.control3": "将实体牵引至面前",
   "message.lensouls.gravity_gun.tooltip.cooldown": "冷却：0.2秒",
-
   "message.lensouls.cooldown_active": "冷却中: 剩余 %s 秒",
   "message.lensouls.ammo_unlocked": "解锁新弹药类型: %s！",
   "ammo.lensouls.overworld": "主世界",
@@ -105,12 +92,10 @@
   "ammo.lensouls.ender": "末地",
   "fire_mode.lensouls.semi": "半自动",
   "fire_mode.lensouls.auto": "全自动",
-
   "element.lensouls.fire": "火焰镜魂",
   "element.lensouls.water": "流水镜魂",
   "element.lensouls.earth": "大地镜魂",
   "element.lensouls.ender": "末影镜魂",
-
   "enchantment.lensouls.soul_photography": "摄魂术",
   "enchantment.lensouls.soul_photography.desc": "将实体照片存入剑槽，攻击时获得额外伤害",
   "container.lensouls.photo_gui": "摄魂照片",
@@ -149,28 +134,22 @@
   "lensouls.configuration.ggPullForce": "引力枪拉力",
   "lensouls.configuration.ggPullDuration": "引力枪拉持续时间",
   "lensouls.configuration.ggSlownessDuration": "引力枪缓慢持续时间",
-
   "ability.lensouls.weakness_lens.name": "弱点透镜",
   "ability.lensouls.spatial_warp.name": "空间扭曲",
   "ability.lensouls.temporal_recall.name": "时空回溯",
   "ability.lensouls.time_stop.name": "时间定格",
   "ability.lensouls.vital_strike.name": "要害打击",
-
   "ability.lensouls.weakness_lens.description": "§a手持已附魔摄魂术的相机拍照，照片可装入附魔剑的剑槽，对该照片所摄的实体类型造成额外伤害。",
   "ability.lensouls.spatial_warp.description": "§a拍照时在照片中注入拍摄位置的坐标。手持该照片左键空气消耗发动，在拍摄位置展开空间扭曲圈，圈内可远程交互方块与实体。切换维度或切走能力时自动关闭。",
   "ability.lensouls.temporal_recall.description": "§a拍照时在照片中记录生命与方位快照。受到致命伤时自动消耗一张回溯照片保命，也可手持照片左键空气主动触发。§c每触发 5 次叠加 1 层易伤（受伤 +20%/层），持续 20 秒。窗口 5 分钟后重置。真正死亡时清空。",
   "ability.lensouls.time_stop.description": "§a手持已附魔摄魂术的相机右键，冻结视野内所有实体 5 秒。己身不受影响。",
   "ability.lensouls.vital_strike.description": "§a右键相机不消耗底片、不产生照片，直接对瞄准的 BOSS 造成 1 点削韧伤害。需要摄魂术附魔。",
-
   "ability.lensouls.spatial_warp.enabled": "§a空间扭曲：开启",
   "ability.lensouls.spatial_warp.disabled": "§a空间扭曲：关闭",
   "ability.lensouls.spatial_warp.expired": "§e空间扭曲区域已失效",
-
   "ability.lensouls.temporal_recall.triggered": "§a时空回溯已触发",
-
   "ability.lensouls.spatial_warp.photo_suffix": " (空间扭曲)",
   "ability.lensouls.temporal_recall.photo_suffix": " (时空回溯)",
-
   "lensouls.configuration.toughBarWidth": "韧性条宽度",
   "lensouls.configuration.toughBarHeight": "韧性条高度",
   "lensouls.configuration.toughBarVerticalOffset": "韧性条垂直偏移",
@@ -185,7 +164,6 @@
   "lensouls.configuration.toughnessBlacklist.tooltip": "加入黑名单的实体不会触发韧性。在配置界面点 + 号添加新条目。内置默认排除部分非原版BOSS",
   "lensouls.configuration.toughnessWhitelist": "韧性白名单",
   "lensouls.configuration.toughnessWhitelist.tooltip": "加入白名单的实体即使没有BOSS血条也触发韧性。在配置界面点 + 号添加新条目",
-
   "lensouls.configuration.enableBasicSoulDrop": "基础镜魂掉落",
   "lensouls.configuration.enableBasicSoulDrop.tooltip": "击杀怪物有 10% 概率掉落一个随机基础镜魂",
   "lensouls.configuration.enableBossSoulDrop": "BOSS镜魂掉落",
@@ -200,7 +178,6 @@
   "lensouls.configuration.enableConverterRecipe.tooltip": "启用转换器的合成配方",
   "lensouls.configuration.enableSkillBallBossLoot": "能力球BOSS掉落",
   "lensouls.configuration.enableSkillBallBossLoot.tooltip": "击杀 BOSS 有 50% 概率掉落一个随机能力球",
-
   "entity.lensouls.boss_phantom": "幻灵",
   "entity.lensouls.boss_phantom.ignis": "焰魔幻灵",
   "entity.lensouls.boss_phantom.cloud_golem": "云筑魔像幻灵",
@@ -208,10 +185,8 @@
   "entity.lensouls.boss_phantom.ender_guardian": "末影守卫幻灵",
   "entity.lensouls.boss_phantom.obliterator": "湮灭构造体幻灵",
   "entity.lensouls.boss_phantom.netherite_monstrosity": "下界合金巨兽幻灵",
-
   "command.lensouls.skill.set": "已设置能力 §b%s §f为 §e%s",
   "command.lensouls.skill.invalid": "无效能力: %s",
-
   "jei.lensouls.soul.basic": "击杀任意怪物有 10% 概率掉落一个随机基础镜魂",
   "jei.lensouls.soul.boss": "击杀 %s 必定掉落",
   "jei.lensouls.soul.anvil_upgrade": "在铁砧上与同级镜魂合成为下一级（最高 V 级）",
@@ -220,12 +195,9 @@
   "jei.lensouls.converter": "用于存放并切换镜魂。右击打开界面以放入镜魂",
   "jei.lensouls.dimensional_gun": "维度能量武器，蓄力可切换三种弹药类型进行射击",
   "jei.lensouls.gravity_gun": "引力武器，右键发射引力弹将实体牵引至面前",
-
   "jade.lensouls.weakness": "弱点：",
   "jade.lensouls.activity": "活性：",
-  "config.jade.plugin_lensouls.entity_weakness": "元素弱点"
-
-,
+  "config.jade.plugin_lensouls.entity_weakness": "元素弱点",
   "ability.lensouls.soul_sever.name": "夺魂索命",
   "ability.lensouls.soul_sever.description": "§a手持已附魔摄魂术的相机右键（取景器打开）：不消耗胶卷，30%% 概率造成目标 10%-20%% 当前生命伤害。成功有冲击波粒子，失败有提示音。冷却：成功 10 秒 / 失败 0.5 秒。",
   "ability.lensouls.ability_steal.name": "能力窃取",
@@ -245,8 +217,7 @@
   "entity.lensouls.boss_phantom.naga": "娜迦幻灵",
   "entity.lensouls.boss_phantom.lava_eater": "噬焰蜥幻灵",
   "entity.lensouls.boss_phantom.the_leviathan": "利维坦幻灵",
-  "entity.lensouls.boss_phantom.scylla": "斯库拉幻灵"
-,
+  "entity.lensouls.boss_phantom.scylla": "斯库拉幻灵",
   "item.lensouls.hydra_soul": "九头蛇镜魂",
   "item.lensouls.knight_phantom_soul": "幻影骑士镜魂",
   "item.lensouls.alpha_yeti_soul": "雪怪首领镜魂",
@@ -264,13 +235,11 @@
   "jei.lensouls.lens_tier_2": "§7摄魂升级 II — 可对 1-2 阶 BOSS 造成韧性伤害",
   "jei.lensouls.lens_tier_3": "§7摄魂升级 III — 可对 1-3 阶 BOSS 造成韧性伤害",
   "jei.lensouls.lens_tier_4": "§7摄魂升级 IV — 可对 1-4 阶 BOSS 造成韧性伤害",
-  "jei.lensouls.photograph_curio": "照片（能力窃取），需要相机附魔摄魂术，可装备在照片饰品栏。实体：%s"
-,
+  "jei.lensouls.photograph_curio": "照片（能力窃取），需要相机附魔摄魂术，可装备在照片饰品栏。实体：%s",
   "item.lensouls.heal_potion": "§a次元瓶",
   "item.lensouls.heal_potion.desc": "§d剩余使用次数：%s（回满生命 + 饥饿值 20、饱和度 20）",
   "item.lensouls.heal_potion.dim_count": "§d已到访维度：%s",
-  "message.lensouls.heal_potion.empty": "§c回复能量耗尽！探索新维度可增加使用次数"
-,
+  "message.lensouls.heal_potion.empty": "§c回复能量耗尽！探索新维度可增加使用次数",
   "item.lensouls.copy_soul": "§b复制之魂",
   "item.lensouls.copy_soul.desc": "§a在工作台与物品合成：消耗本物品，输出原物品的完整副本（附魔/组件/NBT 全保留）",
   "item.lensouls.feather_elementrise": "§d羽·元素觉醒者",
@@ -282,5 +251,6 @@
   "item.lensouls.feather_twitcher.desc2": "§e佩戴在饰品栏任意槽位上即可生效，戴上后无法取下",
   "item.lensouls.feather_twitcher.desc3": "§c佩戴时，受到伤害+100%、造成伤害-25%。扭曲值初始为0：使用复制之魂合成（按实际消耗的魂数）扭曲值+，死亡+10，上限100；扭曲值越高造成伤害增幅越高，最高+250%",
   "item.lensouls.feather_twitcher.desc4": "§c扭曲值满100死亡时：生成只攻击你的扭曲者（若死亡点32格内有存活扭曲者或附近有BOSS则不生成），扭曲值清零；此次死亡不受死亡不掉落保护",
-  "item.lensouls.feather_twitcher.desc5": "§c扭曲者死亡后扭曲值恢复0"
+  "item.lensouls.feather_twitcher.desc5": "§c扭曲者死亡后扭曲值恢复0",
+  "item.lensouls.curio_any_slot": "§e栏位：任意饰品栏"
 }

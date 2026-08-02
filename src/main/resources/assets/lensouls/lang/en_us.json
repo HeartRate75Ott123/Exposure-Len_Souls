@@ -1,6 +1,5 @@
 {
   "itemGroup.lensouls": "Len Souls",
-
   "effect.lensouls.fire_infusion": "Fire Activity",
   "effect.lensouls.water_infusion": "Water Activity",
   "effect.lensouls.earth_infusion": "Earth Activity",
@@ -13,7 +12,6 @@
   "effect.lensouls.water_infusion.description": "Boosts Water elemental damage, immune to elemental bonus damage from Water attackers",
   "effect.lensouls.earth_infusion.description": "Boosts Earth elemental damage, immune to elemental bonus damage from Earth attackers",
   "effect.lensouls.ender_infusion.description": "Boosts Ender elemental damage, immune to elemental bonus damage from Ender attackers",
-
   "item.lensouls.fire_soul": "Fire Soul",
   "item.lensouls.water_soul": "Water Soul",
   "item.lensouls.earth_soul": "Earth Soul",
@@ -33,7 +31,6 @@
   "item.lensouls.lens_tier_4": "§7Lens §8(Tier IV)",
   "message.lensouls.lens_tier_insufficient": "§cInsufficient tier! Cannot deal toughness damage. Install Soul Upgrade %s",
   "lensouls.photograph.entity_name": "§7Entity: %s",
-
   "item.lensouls.converter": "Element Converter",
   "item.lensouls.converter.tooltip": "Right-click: Open GUI, press §e%s§7: Activate soul",
   "item.lensouls.ignis_soul": "Ignis Soul",
@@ -42,29 +39,23 @@
   "item.lensouls.obliterator_soul": "Obliterator Soul",
   "item.lensouls.ender_guardian_soul": "Ender Guardian Soul",
   "item.lensouls.netherite_monstrosity_soul": "Netherite Monstrosity Soul",
-
   "item.lensouls.skill_ball": "§aSkill Ball",
   "item.lensouls.weakness_lens_ball": "§aSkill Ball (Weakness Lens)",
   "item.lensouls.spatial_warp_ball": "§aSkill Ball (Spatial Warp)",
   "item.lensouls.temporal_recall_ball": "§aSkill Ball (Temporal Recall)",
   "item.lensouls.time_stop_ball": "§aSkill Ball (Time Stop)",
   "item.lensouls.vital_strike_ball": "§aSkill Ball (Vital Strike)",
-
   "message.lensouls.skill_ball.already_unlocked": "§eYou already have §a%s§e!",
   "message.lensouls.skill_ball.tooltip": "Right-click to unlock: %s",
   "message.lensouls.skill_ball.tooltip_random": "Right-click for a random ability",
-
   "container.lensouls.converter": "Converter",
-
   "key.category.lensouls": "Len Souls",
   "key.lensouls.converter": "Activate Converter (G)",
   "key.lensouls.ability_list": "List Acquired Abilities (;)",
-
   "message.lensouls.ability_list.header": "§6Acquired abilities:",
   "message.lensouls.ability_list.item": "§a- %s",
   "message.lensouls.ability_list.enabled": "§a- %s (enabled)",
   "message.lensouls.ability_list.empty": "§cNo abilities acquired",
-
   "message.lensouls.soul_activated": "%s activated!",
   "message.lensouls.soul_cooldown": "Cooldown: %s seconds remaining.",
   "message.lensouls.effect_expiring": "%s ends in %s seconds!",
@@ -76,12 +67,10 @@
   "message.lensouls.converter_phantom_active": "You cannot use boss souls right now",
   "message.lensouls.freeze_already_active": "§cTime freeze is still active",
   "message.lensouls.freeze_no_targets": "§eNo entities to freeze",
-
   "element.lensouls.fire": "Fire Soul",
   "element.lensouls.water": "Water Soul",
   "element.lensouls.earth": "Earth Soul",
   "element.lensouls.ender": "Ender Soul",
-
   "enchantment.lensouls.soul_photography": "Soul Photography",
   "enchantment.lensouls.soul_photography.desc": "Store entity photos in the sword slot for bonus damage on attacks",
   "container.lensouls.photo_gui": "Soul Photograph",
@@ -98,7 +87,6 @@
   "lensouls.configuration.defaultDuration": "Default Soul Duration",
   "lensouls.configuration.defaultCooldown": "Default Soul Cooldown",
   "lensouls.configuration.bossCooldown": "Boss Soul Cooldown",
-
   "item.lensouls.dimensional_gun": "Dimensional Gun",
   "item.lensouls.gravity_gun": "Gravity Gun",
   "item.lensouls.overworld_bullet": "Overworld Bullet",
@@ -106,7 +94,6 @@
   "item.lensouls.ender_bullet": "Ender Bullet",
   "entity.lensouls.gun_bullet": "Gun Bullet",
   "entity.lensouls.gravity_bullet": "Gravity Bullet",
-
   "message.lensouls.dimensional_gun.ammo": "Ammo: %s/%s",
   "message.lensouls.dimensional_gun.ammo_type": "Ammo Type: %s",
   "message.lensouls.dimensional_gun.fire_mode": "Fire Mode: %s",
@@ -121,12 +108,10 @@
   "message.lensouls.dimensional_gun.tooltip.control1": "Left-click: Cycle ammo",
   "message.lensouls.dimensional_gun.tooltip.control2": "Right-click: Charge shot",
   "message.lensouls.dimensional_gun.tooltip.control3": "Shift + Left-click: Toggle fire mode",
-
   "message.lensouls.gravity_gun.tooltip.control1": "Right-click: Fire gravity bullet",
   "message.lensouls.gravity_gun.tooltip.control2": "Right-click while pulling: Release target",
   "message.lensouls.gravity_gun.tooltip.control3": "Pulls entities toward you",
   "message.lensouls.gravity_gun.tooltip.cooldown": "Cooldown: 0.2s",
-
   "message.lensouls.cooldown_active": "Cooldown: %s seconds remaining",
   "message.lensouls.ammo_unlocked": "New ammo type unlocked: %s!",
   "ammo.lensouls.overworld": "Overworld",
@@ -134,7 +119,6 @@
   "ammo.lensouls.ender": "Ender",
   "fire_mode.lensouls.semi": "Semi-Auto",
   "fire_mode.lensouls.auto": "Full-Auto",
-
   "lensouls.configuration.dgBaseMaxAmmo": "Dimensional Gun Base Max Ammo",
   "lensouls.configuration.dgBaseRegenTime": "Base Regen Time",
   "lensouls.configuration.dgBaseDamage": "Base Damage",
@@ -157,13 +141,11 @@
   "lensouls.configuration.ggPullForce": "Pull Force",
   "lensouls.configuration.ggPullDuration": "Pull Duration",
   "lensouls.configuration.ggSlownessDuration": "Slowness Duration",
-
   "ability.lensouls.weakness_lens.name": "Weakness Lens",
   "ability.lensouls.spatial_warp.name": "Spatial Warp",
   "ability.lensouls.temporal_recall.name": "Temporal Recall",
   "ability.lensouls.time_stop.name": "Time Stop",
   "ability.lensouls.vital_strike.name": "Vital Strike",
-
   "ability.lensouls.weakness_lens.description": "§aTake photos with a Soul Photography enchanted camera. The resulting photo can be mounted on an enchanted sword's slot to deal bonus damage against the entity type captured in the frame.",
   "ability.lensouls.spatial_warp.description": "§aInjects the capture location into the photo. Left-click air with the photo to consume it and create a spatial warp zone centered at that location, allowing ranged interaction with blocks and entities within the zone. Deactivates on dimension change or ability switch.",
   "ability.lensouls.temporal_recall.description": "§aInjects a health and position snapshot into the photo. A lethal hit automatically consumes one recall photo to save you. Can also be triggered manually by left-clicking air with the photo.",
@@ -175,16 +157,12 @@
   "ability.lensouls.ability_steal.description": "§aTake a photo to capture entity data. The resulting photo can be equipped in the Photograph curio slot for element infusion or special effects. See JEI for details per entity.",
   "item.lensouls.soul_sever_ball": "§aSkill Ball (Soul Sever)",
   "item.lensouls.ability_steal_ball": "§aSkill Ball (Ability Steal)",
-
   "ability.lensouls.spatial_warp.enabled": "§aSpatial Warp: ON",
   "ability.lensouls.spatial_warp.disabled": "§aSpatial Warp: OFF",
   "ability.lensouls.spatial_warp.expired": "§eSpatial Warp zone expired",
-
   "ability.lensouls.temporal_recall.triggered": "§aTemporal Recall triggered",
-
   "ability.lensouls.spatial_warp.photo_suffix": " (Spatial Warp)",
   "ability.lensouls.temporal_recall.photo_suffix": " (Temporal Recall)",
-
   "lensouls.configuration.toughBarWidth": "Toughness Bar Width",
   "lensouls.configuration.toughBarHeight": "Toughness Bar Height",
   "lensouls.configuration.toughBarVerticalOffset": "Toughness Bar Vertical Offset",
@@ -199,7 +177,6 @@
   "lensouls.configuration.toughnessBlacklist.tooltip": "Entities NEVER trigger toughness. Click + to add, e.g. \"minecraft:iron_golem\"",
   "lensouls.configuration.toughnessWhitelist": "Toughness Whitelist",
   "lensouls.configuration.toughnessWhitelist.tooltip": "Entities ALWAYS trigger toughness. Click + to add, e.g. \"cataclysm:ignis\"",
-
   "lensouls.configuration.enableBasicSoulDrop": "Basic Soul Drops",
   "lensouls.configuration.enableBasicSoulDrop.tooltip": "Mobs have a 10% chance to drop a random basic soul",
   "lensouls.configuration.enableBossSoulDrop": "Boss Soul Drops",
@@ -214,7 +191,6 @@
   "lensouls.configuration.enableConverterRecipe.tooltip": "Enable the Converter crafting recipe",
   "lensouls.configuration.enableSkillBallBossLoot": "Skill Ball Boss Drops",
   "lensouls.configuration.enableSkillBallBossLoot.tooltip": "Bosses have a 50% chance to drop a random Skill Ball",
-
   "entity.lensouls.boss_phantom": "Phantom",
   "entity.lensouls.boss_phantom.ignis": "Ignis Phantom",
   "entity.lensouls.boss_phantom.cloud_golem": "Cloud Golem Phantom",
@@ -229,10 +205,8 @@
   "entity.lensouls.boss_phantom.lava_eater": "Lava Eater Phantom",
   "entity.lensouls.boss_phantom.the_leviathan": "The Leviathan Phantom",
   "entity.lensouls.boss_phantom.scylla": "Scylla Phantom",
-
   "command.lensouls.skill.set": "Set §b%s §fto §e%s",
   "command.lensouls.skill.invalid": "Invalid ability: %s",
-
   "jei.lensouls.soul.basic": "10% chance to drop from any monster",
   "jei.lensouls.soul.boss": "Dropped by %s",
   "jei.lensouls.soul.anvil_upgrade": "Combine two same-level souls on an anvil to upgrade (max level V)",
@@ -241,12 +215,9 @@
   "jei.lensouls.converter": "Store and switch between souls. Right-click to place souls inside",
   "jei.lensouls.dimensional_gun": "Dimensional energy weapon. Charge to shoot, cycle between 3 ammo types",
   "jei.lensouls.gravity_gun": "Gravity weapon. Fire a gravity bullet to pull entities toward you",
-
   "jade.lensouls.weakness": "Weak: ",
   "jade.lensouls.activity": "Element: ",
-  "config.jade.plugin_lensouls.entity_weakness": "Element Weakness"
-
-,
+  "config.jade.plugin_lensouls.entity_weakness": "Element Weakness",
   "item.lensouls.hydra_soul": "Hydra Soul",
   "item.lensouls.knight_phantom_soul": "Knight Phantom Soul",
   "item.lensouls.alpha_yeti_soul": "Alpha Yeti Soul",
@@ -255,26 +226,21 @@
   "item.lensouls.the_leviathan_soul": "The Leviathan Soul",
   "item.lensouls.scylla_soul": "Scylla Soul",
   "item.lensouls.drag_bullet": "Drag Bullet",
-  "curios.identifier.photograph": "Photograph"
-,
+  "curios.identifier.photograph": "Photograph",
   "command.lensouls.toughness.get": "Get boss toughness attributes",
   "command.lensouls.toughness.set": "Set boss toughness attributes",
   "trophy.lensouls.toughness_bonus": "§6Toughness Damage x%s",
   "trophy.lensouls.stun_extend": "§6Stun Duration +%s",
-  "trophy.lensouls.invincible_shorten": "§6Invincible Window -%s"
-,
+  "trophy.lensouls.invincible_shorten": "§6Invincible Window -%s",
   "jei.lensouls.lens_tier_1": "Tier 1 lens — required to damage Tier 1 bosses' toughness",
   "jei.lensouls.lens_tier_2": "Tier 2 lens — required to damage up to Tier 2 bosses' toughness",
   "jei.lensouls.lens_tier_3": "Tier 3 lens — required to damage up to Tier 3 bosses' toughness",
-  "jei.lensouls.lens_tier_4": "Tier 4 lens — required to damage up to Tier 4 bosses' toughness"
-,
-  "jei.lensouls.photograph_curio": "Ability-steal photo — requires Soul Photography enchantment. Equippable in Photograph slot. Entity: %s"
-,
+  "jei.lensouls.lens_tier_4": "Tier 4 lens — required to damage up to Tier 4 bosses' toughness",
+  "jei.lensouls.photograph_curio": "Ability-steal photo — requires Soul Photography enchantment. Equippable in Photograph slot. Entity: %s",
   "item.lensouls.heal_potion": "Heal Potion",
   "item.lensouls.heal_potion.desc": "Uses left: %s (restore full health + 20 hunger, 20 saturation)",
   "item.lensouls.heal_potion.dim_count": "Dimensions visited: %s",
-  "message.lensouls.heal_potion.empty": "§cHeal energy depleted! Explore new dimensions to gain more uses"
-,
+  "message.lensouls.heal_potion.empty": "§cHeal energy depleted! Explore new dimensions to gain more uses",
   "item.lensouls.copy_soul": "§bCopy Soul",
   "item.lensouls.copy_soul.desc": "§aCrafting table: combine with any item — consumes this item, outputs an exact copy (enchantments/components/NBT preserved)",
   "item.lensouls.feather_elementrise": "§dFeather of Elemental Awakening",
@@ -286,5 +252,6 @@
   "item.lensouls.feather_twitcher.desc2": "§eWorks when worn in any trinket slot, cannot be removed once equipped",
   "item.lensouls.feather_twitcher.desc3": "§cWhile worn: +100% damage taken, -25% damage dealt. Twist starts at 0: crafting with Copy Souls (per soul actually consumed) adds twist, death adds +10, cap 100; higher twist grants up to +250% damage",
   "item.lensouls.feather_twitcher.desc4": "§cDying at 100 twist spawns a Twitcher that hunts only you (skipped if a Twitcher is alive within 32 blocks or a boss is nearby), twist resets to 0; that death ignores keepInventory protection",
-  "item.lensouls.feather_twitcher.desc5": "§cTwist returns to 0 when the Twitcher dies"
+  "item.lensouls.feather_twitcher.desc5": "§cTwist returns to 0 when the Twitcher dies",
+  "item.lensouls.curio_any_slot": "§eSlots: Any"
 }

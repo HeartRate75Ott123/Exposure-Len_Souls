@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.integration;
 
+import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.util.TriState;
@@ -15,6 +16,11 @@ public class CuriosIntegration {
         if (!"photograph".equals(slotId) && !"lensouls:photograph".equals(slotId)) return;
 
         ItemStack stack = event.getStack();
+        // 羽毛类饰品不限制：可佩戴进任意槽位（含照片栏）
+        if (stack.is(ModItems.FEATHER_TWITCHER.get()) || stack.is(ModItems.FEATHER_ELEMENTRISE.get())) {
+            return;
+        }
+
         boolean hasTag = false;
         if (stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA) != null) {
             hasTag = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA)

@@ -77,6 +77,14 @@ public class FeatherHardmanItem extends Item implements ICurioItem {
     @Override
     public List<Component> getSlotsTooltip(List<Component> tooltips, TooltipContext context, ItemStack stack) {
         return List.of(Component.translatable("item.lensouls.curio_any_slot")
-                .withStyle(ChatFormatting.DARK_GRAY));
+                .withStyle(ChatFormatting.GOLD));
+    }
+
+    @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+        tooltip.add(Component.translatable("item.lensouls.feather_hardman.desc1"));
+        tooltip.add(Component.translatable("item.lensouls.feather_hardman.desc2"));
+        tooltip.add(Component.translatable("item.lensouls.feather_hardman.desc3"));
+        tooltip.add(Component.translatable("item.lensouls.feather_hardman.desc4"));
     }
 }

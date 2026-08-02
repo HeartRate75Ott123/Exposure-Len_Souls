@@ -51,10 +51,11 @@ public class TrophyModifierHandler {
         return new TrophyMod(type, value);
     }
 
-    /** 每 tick 检查：首次装备时生成修饰符 */
+    /** 每 20 tick 检查：首次装备时生成修饰符（一次性逻辑，低频轮询足够） */
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (player.tickCount % 20 != 0) return;
         CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
             for (var stacksHandler : handler.getCurios().values()) {
                 var stackHandler = stacksHandler.getStacks();

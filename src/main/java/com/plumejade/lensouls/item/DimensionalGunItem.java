@@ -9,6 +9,7 @@ import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.entity.GunBulletEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -168,29 +169,34 @@ public class DimensionalGunItem extends Item {
     @Override
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
         if (level.isClientSide || !(entity instanceof Player)) return;
-        int ammo = getAmmo(stack);
-        int maxAmmo = getScaledMaxAmmo(stack);
+        // 单次解析 NBT，避免每 tick 多次 copyTag
+        var tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag();
+        int ammo = tag.getInt(KEY_AMMO);
+        int maxAmmo = getScaledMaxAmmo(tag);
         if (ammo >= maxAmmo) return;
 
         long gameTime = level.getGameTime();
-        long lastRegen = getLastRegenTime(stack);
-        long regenInterval = getRegenIntervalTicks(stack);
+        long lastRegen = tag.getLong(KEY_LAST_REGEN);
+        long regenInterval = getRegenIntervalTicks(tag);
         if (gameTime - lastRegen >= regenInterval) {
             int newAmmo = Math.min(maxAmmo, ammo + 1);
             // 合并一次 write：弹药 + 恢复时间
-            var tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag();
             tag.putInt(KEY_AMMO, newAmmo);
             tag.putLong(KEY_LAST_REGEN, gameTime);
             stack.set(DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
             stack.set(ModDataComponents.GUN_AMMO.get(), new GunAmmoData(newAmmo, maxAmmo));
-            stack.set(ModDataComponents.GUN_KILLS.get(), new GunKillData(getKills(stack)));
+            stack.set(ModDataComponents.GUN_KILLS.get(), new GunKillData(tag.getInt(KEY_KILLS)));
         }
     }
 
     // ======================== Scaling ========================
 
     private int getScaledMaxAmmo(ItemStack stack) {
-        float progress = getFastSlowProgress(stack);
+        return getScaledMaxAmmo(stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag());
+    }
+
+    private int getScaledMaxAmmo(CompoundTag tag) {
+        float progress = getFastSlowProgress(tag);
         int base = Config.DG_BASE_MAX_AMMO.get();
         int max = Config.DG_MAX_AMMO.get();
         return base + (int) ((max - base) * progress);
@@ -226,11 +232,15 @@ public class DimensionalGunItem extends Item {
     }
 
     private long getRegenIntervalTicks(ItemStack stack) {
-        float progress = getFastSlowProgress(stack);
+        return getRegenIntervalTicks(stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag());
+    }
+
+    private long getRegenIntervalTicks(CompoundTag tag) {
+        float progress = getFastSlowProgress(tag);
         int baseTime = Config.DG_BASE_REGEN_TIME.get();
         int minTime = Config.DG_MIN_REGEN_TIME.get();
         int totalSeconds = (int) (baseTime - (baseTime - minTime) * progress);
-        int maxAmmo = getScaledMaxAmmo(stack);
+        int maxAmmo = getScaledMaxAmmo(tag);
         return (totalSeconds * 20L) / maxAmmo;
     }
 
@@ -244,7 +254,11 @@ public class DimensionalGunItem extends Item {
 
     /** 平方根曲线（弹药上限、蓄力时间、恢复间隔用）：前期快、后期慢 */
     private float getFastSlowProgress(ItemStack stack) {
-        int kills = getKills(stack);
+        return getFastSlowProgress(stack.getOrDefault(DataComponents.CUSTOM_DATA, empty()).copyTag());
+    }
+
+    private float getFastSlowProgress(CompoundTag tag) {
+        int kills = tag.getInt(KEY_KILLS);
         int target = Config.DG_KILL_TARGET.get();
         float t = Math.min(1.0f, (float) kills / target);
         return (float) Math.sqrt(t);

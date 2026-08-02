@@ -76,7 +76,13 @@ public class PhotoSpecialEffects {
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
-        boolean hasFlightPhoto = hasEntityInGear(player, FLYING_ENTITIES::contains);
+        // 一次遍历收集全部照片实体 ID，供飞行/末影人/效果/属性共用（避免每 tick 多次全槽扫描）
+        List<String> gearEntities = collectGearEntities(player);
+
+        boolean hasFlightPhoto = false;
+        for (String id : gearEntities) {
+            if (FLYING_ENTITIES.contains(id)) { hasFlightPhoto = true; break; }
+        }
         if (hasFlightPhoto) {
             player.getAbilities().mayfly = true;
             player.onUpdateAbilities();
@@ -90,10 +96,10 @@ public class PhotoSpecialEffects {
             }
         }
 
-        applyAttributes(player);
+        applyAttributes(player, gearEntities);
 
         // 末影人：装备照片时周围末影人不主动攻击玩家（节流到每 10 tick）
-        if (player.tickCount % 10 == 0 && hasEntityInGear(player, id -> "minecraft:enderman".equals(id))) {
+        if (player.tickCount % 10 == 0 && gearEntities.contains("minecraft:enderman")) {
             player.level().getEntities(player, player.getBoundingBox().inflate(16.0),
                             e -> e instanceof net.minecraft.world.entity.monster.EnderMan)
                     .forEach(e -> {
@@ -102,7 +108,15 @@ public class PhotoSpecialEffects {
                     });
         }
 
-        // 遍历所有 Curios 槽位应用照片效果
+        // 应用照片效果（保持原逐槽顺序）
+        for (String stolen : gearEntities) {
+            PhotographEffectRegistry.applyEffects(player, stolen);
+        }
+    }
+
+    /** 一次遍历 Curios 全部槽位，按槽位顺序收集照片实体 ID（非照片槽物品自动忽略） */
+    private static List<String> collectGearEntities(ServerPlayer player) {
+        List<String> ids = new ArrayList<>();
         CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
             for (var stacksHandler : handler.getCurios().values()) {
                 IDynamicStackHandler stackHandler = stacksHandler.getStacks();
@@ -110,10 +124,11 @@ public class PhotoSpecialEffects {
                     ItemStack stack = stackHandler.getStackInSlot(i);
                     if (stack.isEmpty()) continue;
                     String stolen = PhotographEffectRegistry.getStolenEntity(stack);
-                    if (stolen != null) PhotographEffectRegistry.applyEffects(player, stolen);
+                    if (stolen != null) ids.add(stolen);
                 }
             }
         });
+        return ids;
     }
 
     @SubscribeEvent
@@ -184,15 +199,16 @@ public class PhotoSpecialEffects {
         boolean beneficial = inst.getEffect().value().isBeneficial();
         String effectId = net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.getKey(inst.getEffect().value()).toString();
 
-        boolean warden = hasEntityInGear(player, id -> "minecraft:warden".equals(id));
-        boolean maledictus = hasEntityInGear(player, id -> "cataclysm:maledictus".equals(id));
-        boolean witch = hasEntityInGear(player, id -> "minecraft:witch".equals(id));
+        List<String> gearEntities = collectGearEntities(player);
+        boolean warden = gearEntities.contains("minecraft:warden");
+        boolean maledictus = gearEntities.contains("cataclysm:maledictus");
+        boolean witch = gearEntities.contains("minecraft:witch");
 
         if (warden && effectId.equals("minecraft:darkness")) {
             event.setResult(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
             return;
         }
-        if (hasEntityInGear(player, id -> "minecraft:cave_spider".equals(id)) && effectId.equals("minecraft:poison")) {
+        if (gearEntities.contains("minecraft:cave_spider") && effectId.equals("minecraft:poison")) {
             event.setResult(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
             return;
         }
@@ -228,12 +244,15 @@ public class PhotoSpecialEffects {
         }
     }
 
-    private static void applyAttributes(ServerPlayer player) {
+    private static void applyAttributes(ServerPlayer player, List<String> gearEntities) {
         Set<String> active = new HashSet<>();
         for (var entry : ATTRIBUTES.entrySet()) {
-            if (hasEntityInGear(player, id -> id.equals(entry.getKey()))) active.add(entry.getKey());
+            if (gearEntities.contains(entry.getKey())) active.add(entry.getKey());
         }
+        String joined = String.join(",", active);
         String prev = player.getPersistentData().getString(ATTR_TAG);
+        // 无变化直接跳过（原实现每 tick 遍历属性并写 NBT）
+        if (prev.equals(joined)) return;
         if (!prev.isEmpty()) {
             for (String id : prev.split(",")) {
                 if (!active.contains(id)) {
@@ -254,7 +273,7 @@ public class PhotoSpecialEffects {
                     ai.addTransientModifier(new AttributeModifier(mid, ae.amount(), ae.operation()));
             }
         }
-        player.getPersistentData().putString(ATTR_TAG, String.join(",", active));
+        player.getPersistentData().putString(ATTR_TAG, joined);
     }
 
     public static boolean hasEntityInGear(ServerPlayer player, java.util.function.Predicate<String> predicate) {

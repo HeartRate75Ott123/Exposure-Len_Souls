@@ -63,21 +63,34 @@ public class FeatherElementRiseHandler {
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (player.tickCount % 20 != 0) return;
-        if (!hasFeather(player)) return;
-        boostPotions(player);
+        if (hasFeather(player)) {
+            boostPotions(player);
+        } else {
+            removeBoostPotions(player);
+        }
     }
+
+    private static final net.minecraft.core.Holder<MobEffect>[] INFUSIONS = new net.minecraft.core.Holder[]{
+            ModEffects.FIRE_INFUSION,
+            ModEffects.WATER_INFUSION,
+            ModEffects.EARTH_INFUSION,
+            ModEffects.ENDER_INFUSION
+    };
 
     /** 直接赋予水火土末影活性 2 级（无限时长），周期性刷新兜底维持 */
     private static void boostPotions(ServerPlayer player) {
-        @SuppressWarnings("unchecked")
-        net.minecraft.core.Holder<MobEffect>[] infusions = new net.minecraft.core.Holder[]{
-                ModEffects.FIRE_INFUSION,
-                ModEffects.WATER_INFUSION,
-                ModEffects.EARTH_INFUSION,
-                ModEffects.ENDER_INFUSION
-        };
-        for (net.minecraft.core.Holder<MobEffect> infusion : infusions) {
+        for (net.minecraft.core.Holder<MobEffect> infusion : INFUSIONS) {
             player.addEffect(new MobEffectInstance(infusion, INFUSION_DURATION, INFUSION_LEVEL, true, true, true));
+        }
+    }
+
+    /** 摘下羽毛时移除常驻灌注（仅限无限时长者，保留玩家自己喝的有限时长活性药水） */
+    private static void removeBoostPotions(ServerPlayer player) {
+        for (net.minecraft.core.Holder<MobEffect> infusion : INFUSIONS) {
+            MobEffectInstance inst = player.getEffect(infusion);
+            if (inst != null && inst.getDuration() == MobEffectInstance.INFINITE_DURATION) {
+                player.removeEffect(infusion);
+            }
         }
     }
 }

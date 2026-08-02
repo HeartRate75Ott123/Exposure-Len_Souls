@@ -196,13 +196,17 @@ public class DimensionalGunItem extends Item {
         return base + (int) ((max - base) * progress);
     }
 
+    /** 满级合成（Maxed）的额外伤害奖励 */
+    private static final double MAXED_DAMAGE_BONUS = 5.0;
+
     private double getScaledDamage(ItemStack stack) {
         float progress = getKillProgress(stack);
         double base = Config.DG_BASE_DAMAGE.get();
-        double dmg = base + 15.0 * progress;
+        double max = Config.DG_MAX_DAMAGE.get();
+        double dmg = base + (max - base) * progress;
         // 满级奖励仅由合成（Maxed 标志）授予，击杀达成不再自动发放
         if (isMaxed(stack)) {
-            dmg += 20.0;
+            dmg += MAXED_DAMAGE_BONUS;
         }
         return dmg;
     }
@@ -234,8 +238,8 @@ public class DimensionalGunItem extends Item {
         int kills = getKills(stack);
         int target = Config.DG_KILL_TARGET.get();
         float t = Math.min(1.0f, (float) kills / target);
-        // 三次 Hermite S 曲线：前半段快、后半段慢
-        return t < 0.5f ? 4.0f * t * t * t : 1.0f - 4.0f * (1.0f - t) * (1.0f - t) * (1.0f - t);
+        // 平滑 S 曲线（smoothstep）：慢快慢
+        return t * t * (3.0f - 2.0f * t);
     }
 
     /** 平方根曲线（弹药上限、蓄力时间、恢复间隔用）：前期快、后期慢 */
@@ -425,7 +429,7 @@ public class DimensionalGunItem extends Item {
         double rawCharge = getChargeTicks(stack) / 20.0f;
         tooltip.add(Component.translatable("message.lensouls.dimensional_gun.stats",
                 Math.round(rawDmg * 10) / 10.0,
-                (int) Math.round(rawPen),       // 百分比值（config 80 = 80%）
+                (int) Math.round(rawPen),       // 百分比值（config 60 = 60%）
                 Math.round(rawCharge * 10) / 10.0
         ).withStyle(ChatFormatting.DARK_GRAY));
         tooltip.add(Component.translatable("message.lensouls.dimensional_gun.ammo_unlock_hint")

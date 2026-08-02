@@ -16,6 +16,8 @@ import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -252,7 +254,21 @@ public class GunBulletEntity extends ThrowableItemProjectile {
         };
     }
     @Override public boolean isNoGravity() { return true; }
-    @Override protected boolean canHitEntity(Entity target) { return target instanceof LivingEntity && !target.equals(getOwner()); }
+    @Override protected boolean canHitEntity(Entity target) {
+        if (!(target instanceof LivingEntity) || target.equals(getOwner())) return false;
+        // 跳过友方单位：其他玩家、自己的宠物/坐骑、同盟实体
+        return !isFriendlyTarget(target, getOwner());
+    }
+
+    /** 友方单位判定：其他玩家、驯养宠物（owned）、自身骑乘关系、同盟实体 */
+    private static boolean isFriendlyTarget(Entity target, Entity owner) {
+        if (target instanceof Player) return true;
+        if (owner instanceof LivingEntity lo) {
+            if (target instanceof TamableAnimal tame && tame.isOwnedBy(lo)) return true;
+            if (owner.getVehicle() == target || target.getVehicle() == owner) return true;
+        }
+        return owner != null && target.isAlliedTo(owner);
+    }
     @Override public void readAdditionalSaveData(CompoundTag tag) { super.readAdditionalSaveData(tag); damage = tag.getDouble("Damage"); armorPen = tag.getDouble("ArmorPen"); if (tag.contains("GunId")) { gunId = tag.getUUID("GunId"); } }
     @Override public void addAdditionalSaveData(CompoundTag tag) { super.addAdditionalSaveData(tag); tag.putDouble("Damage", damage); tag.putDouble("ArmorPen", armorPen); if (gunId != null) { tag.putUUID("GunId", gunId); } }
     @Override public boolean shouldRenderAtSqrDistance(double d) { return d < 4096; }

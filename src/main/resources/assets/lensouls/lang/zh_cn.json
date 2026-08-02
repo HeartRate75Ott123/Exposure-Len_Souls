@@ -71,7 +71,7 @@
   "message.lensouls.dimensional_gun.ammo_type": "弹药类型: %s",
   "message.lensouls.dimensional_gun.fire_mode": "射击模式: %s",
   "message.lensouls.dimensional_gun.kills": "击杀: %s/%s (%s%%)",
-  "message.lensouls.dimensional_gun.max_level_unlocked": "§6已满级！伤害 +20 已解锁",
+  "message.lensouls.dimensional_gun.max_level_unlocked": "§6已满级！伤害 +5 已解锁",
   "message.lensouls.dimensional_gun.max_level_hint": "§6与坚韧月藤和氧化傀儡钢锭合成，升级为满级次元枪",
   "message.lensouls.dimensional_gun.stats": "伤害: %.1f | 穿透: %.0f%% | 蓄力: %.1fs",
   "message.lensouls.dimensional_gun.out_of_ammo": "弹药耗尽！",
@@ -249,8 +249,8 @@
   "item.lensouls.feather_twitcher": "§d羽·扭曲之人",
   "item.lensouls.feather_twitcher.desc1": "§d被扭曲命运纠缠的羽毛",
   "item.lensouls.feather_twitcher.desc2": "§e佩戴在饰品栏任意槽位上即可生效，戴上后无法取下",
-  "item.lensouls.feather_twitcher.desc3": "§c佩戴时，受到伤害+100%、造成伤害-25%。扭曲值初始为0：使用复制之魂合成（按实际消耗的魂数）扭曲值+，死亡+10，上限100；扭曲值越高造成伤害增幅越高，最高+250%",
-  "item.lensouls.feather_twitcher.desc4": "§c扭曲值满100死亡时：生成只攻击你的扭曲者（若死亡点32格内有存活扭曲者或附近有BOSS则不生成），扭曲值清零；此次死亡不受死亡不掉落保护",
+  "item.lensouls.feather_twitcher.desc3": "§c佩戴时，受到伤害+100%、造成伤害-25%。扭曲值初始为0：每消耗1个复制之魂+1，真实死亡+10，上限100；扭曲值上升会带来伤害增幅，最高+250%",
+  "item.lensouls.feather_twitcher.desc4": "§c扭曲值满100死亡时：生成扭曲者（若死亡点32格内有存活且归属你的扭曲者，或64格内有BOSS，则不生成，扭曲值保持100；生成则扭曲值清零），此次死亡不受死亡不掉落保护",
   "item.lensouls.feather_twitcher.desc5": "§c扭曲者死亡后扭曲值恢复0",
   "item.lensouls.curio_any_slot": "§e栏位：任意饰品栏"
 }

@@ -98,7 +98,7 @@
   "message.lensouls.dimensional_gun.ammo_type": "Ammo Type: %s",
   "message.lensouls.dimensional_gun.fire_mode": "Fire Mode: %s",
   "message.lensouls.dimensional_gun.kills": "Kills: %s/%s (%s%%)",
-  "message.lensouls.dimensional_gun.max_level_unlocked": "§6MAXED! +20 DMG unlocked",
+  "message.lensouls.dimensional_gun.max_level_unlocked": "§6MAXED! +5 DMG unlocked",
   "message.lensouls.dimensional_gun.max_level_hint": "§6Craft with Tenacious Vine and Oxidized Golem Steel Ingot to upgrade to MAXED gun",
   "message.lensouls.dimensional_gun.stats": "DMG: %.1f | Pen: %.0f%% | Charge: %.1fs",
   "message.lensouls.dimensional_gun.out_of_ammo": "Out of ammo!",
@@ -250,8 +250,8 @@
   "item.lensouls.feather_twitcher": "§dFeather of the Twisted",
   "item.lensouls.feather_twitcher.desc1": "§dA feather entangled by a twisted fate",
   "item.lensouls.feather_twitcher.desc2": "§eWorks when worn in any trinket slot, cannot be removed once equipped",
-  "item.lensouls.feather_twitcher.desc3": "§cWhile worn: +100% damage taken, -25% damage dealt. Twist starts at 0: crafting with Copy Souls (per soul actually consumed) adds twist, death adds +10, cap 100; higher twist grants up to +250% damage",
-  "item.lensouls.feather_twitcher.desc4": "§cDying at 100 twist spawns a Twitcher that hunts only you (skipped if a Twitcher is alive within 32 blocks or a boss is nearby), twist resets to 0; that death ignores keepInventory protection",
+  "item.lensouls.feather_twitcher.desc3": "§cWhile worn: +100% damage taken, -25% damage dealt. Twist starts at 0: +1 per Copy Soul consumed in crafting, real death +10, cap 100; higher twist increases damage dealt, up to +250%",
+  "item.lensouls.feather_twitcher.desc4": "§cDying at 100 twist spawns a Twitcher (skipped if a Twitcher owned by you is alive within 32 blocks or a boss is within 64 blocks, twist stays 100; spawned -> twist resets to 0); that death ignores keepInventory protection",
   "item.lensouls.feather_twitcher.desc5": "§cTwist returns to 0 when the Twitcher dies",
   "item.lensouls.curio_any_slot": "§eSlots: Any"
 }

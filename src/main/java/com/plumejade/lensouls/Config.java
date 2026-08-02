@@ -55,13 +55,13 @@ public class Config {
             .defineInRange("dgBaseArmorPen", 0.0, 0.0, 100.0);
     public static final ModConfigSpec.IntValue DG_KILL_TARGET = BUILDER
             .comment("Dimensional Gun: Kills required for max level")
-            .defineInRange("dgKillTarget", 400, 1, 10000);
+            .defineInRange("dgKillTarget", 800, 1, 10000);
     public static final ModConfigSpec.DoubleValue DG_MAX_DAMAGE = BUILDER
             .comment("Dimensional Gun: Max damage at max kills")
-            .defineInRange("dgMaxDamage", 40.0, 1.0, 500.0);
+            .defineInRange("dgMaxDamage", 10.0, 1.0, 500.0);
     public static final ModConfigSpec.DoubleValue DG_MAX_ARMOR_PEN = BUILDER
             .comment("Dimensional Gun: Max armor penetration ratio (0-100%)")
-            .defineInRange("dgMaxArmorPen", 80.0, 0.0, 100.0);
+            .defineInRange("dgMaxArmorPen", 60.0, 0.0, 100.0);
     public static final ModConfigSpec.IntValue DG_MAX_AMMO = BUILDER
             .comment("Dimensional Gun: Max ammo at max kills")
             .defineInRange("dgMaxAmmo", 25, 1, 100);

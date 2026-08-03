@@ -12,6 +12,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 
 import java.util.List;
@@ -86,6 +87,16 @@ public class FeatherTwitcherHandler {
     /** 增加扭曲值（封顶 100）并同步客户端 */
     public static void addTwist(ServerPlayer player, int delta) {
         setTwist(player, getTwist(player) + delta);
+    }
+
+    /** 玩家登录时同步扭曲值到客户端槽（大退重进后立即恢复显示，避免客户端缓存停留在 0） */
+    @SubscribeEvent
+    public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            int twist = getTwist(player);
+            LOGGER.info("[LoginSync] Player {} logged in, sending twist={}", player.getName().getString(), twist);
+            TwistSyncPacket.send(player, twist);
+        }
     }
 
     /** 受到伤害 +100% */

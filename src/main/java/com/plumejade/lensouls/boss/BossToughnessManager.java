@@ -137,6 +137,8 @@ public class BossToughnessManager {
         if (player != null) {
             stunTicks = com.plumejade.lensouls.integration.TrophyModifierHandler.applyStunModifier(player, stunTicks);
         }
+        // 状态互斥：破定接管控制权——若实体仍被时间定格冻结，先解除冻结（AI 移交破定锁定）
+        com.plumejade.lensouls.ability.util.FreezeTracker.getInstance().unfreezeEntity(entity);
         data.setStunTicks(stunTicks);
 
         // 应用定身效果（参考 FreezeTracker 的冻结逻辑）
@@ -153,12 +155,15 @@ public class BossToughnessManager {
         BossToughnessData data = dataMap.get(entity.getUUID());
         if (data == null) return;
 
-        // 解除定身
-        if (entity instanceof Mob mob) {
-            mob.setNoAi(false);
-            mob.setNoGravity(false);
+        // 解除定身；若实体仍被时间定格冻结，则不恢复 AI（由 FreezeTracker 到期时统一恢复）
+        boolean stillFrozen = com.plumejade.lensouls.ability.util.FreezeTracker.getInstance().isEntityFrozen(entity);
+        if (!stillFrozen) {
+            if (entity instanceof Mob mob) {
+                mob.setNoAi(false);
+                mob.setNoGravity(false);
+            }
+            entity.setNoGravity(false);
         }
-        entity.setNoGravity(false);
 
         data.onStunEnd();
 

@@ -27,7 +27,8 @@ public abstract class FrozenEntityRenderMixin {
     private void lensouls$beginCapture(
             LivingEntity entity, float yaw, float partialTick, PoseStack poseStack,
             MultiBufferSource bufferSource, int packedLight, CallbackInfo ci) {
-        if (entity != null && ClientFreezeCache.isFrozen(entity.getId())) {
+        if (entity != null && !BossToughnessClientCache.isStunned(entity.getId())
+                && ClientFreezeCache.isFrozen(entity.getId())) {
             FrozenOutlineManager.ensureMaskCleared();
             CaptureState.tryStartCapture(entity.getId());
         }
@@ -38,9 +39,11 @@ public abstract class FrozenEntityRenderMixin {
             LivingEntity entity, float yaw, float partialTick, PoseStack poseStack,
             MultiBufferSource bufferSource, int packedLight, CallbackInfo ci) {
         int id = CaptureState.getCaptureEntityId();
-        boolean isFrozen = id >= 0 && ClientFreezeCache.isFrozen(id);
         boolean isStunned = entity != null && BossToughnessClientCache.isStunned(entity.getId());
         boolean isInvincible = entity != null && BossToughnessClientCache.isInvincible(entity.getId());
+        // 状态互斥：破定（红）优先，其次无敌闪烁，冻结描边仅在其余状态下渲染，
+        // 避免同一实体同时叠加两套 glint 渲染逻辑
+        boolean isFrozen = id >= 0 && !isStunned && ClientFreezeCache.isFrozen(id);
 
         if (!isFrozen && !isStunned && !isInvincible) return;
 
@@ -58,7 +61,7 @@ public abstract class FrozenEntityRenderMixin {
             model.renderToBuffer(poseStack, stunConsumer, packedLight, OverlayTexture.NO_OVERLAY);
         }
 
-        if (isInvincible && !isStunned) {
+        if (isInvincible && !isStunned && !isFrozen) {
             VertexConsumer invConsumer = bufferSource.getBuffer(com.plumejade.lensouls.boss.InvincibleGlintRenderTypes.bodyGlint());
             model.renderToBuffer(poseStack, invConsumer, packedLight, OverlayTexture.NO_OVERLAY);
         }

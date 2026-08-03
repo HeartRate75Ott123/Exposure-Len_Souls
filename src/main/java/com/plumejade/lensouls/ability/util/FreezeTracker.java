@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
@@ -93,6 +94,35 @@ public class FreezeTracker {
         return activeFreezes.values().stream().anyMatch(e -> e.targets.contains(entity));
     }
 
+    /**
+     * 解除单个实体的时间冻结（状态互斥用：破定接管时调用）。
+     * 从所有冻结条目中移除该实体并同步解冻到各来源玩家；恢复其 AI。
+     */
+    public void unfreezeEntity(Entity entity) {
+        if (activeFreezes.isEmpty()) return;
+        List<UUID> sources = new ArrayList<>();
+        for (Map.Entry<UUID, FreezeEntry> entry : activeFreezes.entrySet()) {
+            if (entry.getValue().targets.remove(entity)) {
+                sources.add(entry.getKey());
+            }
+        }
+        if (sources.isEmpty()) return;
+        for (UUID source : sources) {
+            ServerPlayer sp = null;
+            MinecraftServer server = activeFreezes.get(source) != null
+                    ? activeFreezes.get(source).server : null;
+            if (server != null) {
+                sp = server.getPlayerList().getPlayer(source);
+            }
+            if (sp != null) {
+                PacketDistributor.sendToPlayer(sp, new FreezeSyncPacket(false, List.of(entity.getId())));
+            }
+        }
+        if (!isEntityFrozen(entity)) {
+            applyFreeze(Set.of(entity), false);
+        }
+    }
+
     /** 玩家退出时清理其冻结的所有实体 */
     public void unfreezePlayerSource(Player source) {
         FreezeEntry entry = activeFreezes.remove(source.getUUID());
@@ -103,18 +133,25 @@ public class FreezeTracker {
 
     // ========== 冻结/解冻效果 ==========
 
+    /** 实体是否仍处于破定定身（韧性打爆状态）——此时解冻不得恢复 AI */
+    private static boolean isStunLocked(Entity e) {
+        if (!(e instanceof LivingEntity living)) return false;
+        com.plumejade.lensouls.boss.BossToughnessData data =
+                com.plumejade.lensouls.boss.BossToughnessManager.getInstance().get(living);
+        return data != null && data.isBroken();
+    }
+
     private void applyFreeze(Set<Entity> targets, boolean frozen) {
         for (Entity e : targets) {
             if (e instanceof Mob mob) {
-                mob.setNoAi(frozen);
-                mob.setNoGravity(frozen);
+                boolean stunLocked = isStunLocked(mob);
+                mob.setNoAi(frozen || stunLocked);
+                mob.setNoGravity(frozen || stunLocked);
                 if (frozen) {
                     mob.setDeltaMovement(Vec3.ZERO);
                     mob.hurtMarked = true;
                     mob.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 120, 254, false, false, false));
                 } else {
-                    mob.setNoAi(false);
-                    mob.setNoGravity(false);
                     mob.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
                 }
             } else if (e instanceof Player player) {

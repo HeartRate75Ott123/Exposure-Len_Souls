@@ -197,6 +197,7 @@ public class Config {
                     "twilightforest:hydra",
                     "eternal_starlight:lunar_monstrosity",
                     "eternal_starlight:starlight_golem",
+                    "eternal_starlight:the_gatekeeper",
                     "minecraft:wither",
                     "minecraft:ender_dragon"
             ), () -> "", o -> o instanceof String);

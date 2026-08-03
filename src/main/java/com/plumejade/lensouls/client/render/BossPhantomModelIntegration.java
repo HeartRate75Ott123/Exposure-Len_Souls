@@ -1,9 +1,5 @@
 package com.plumejade.lensouls.client.render;
 
-import com.github.L_Ender.cataclysm.client.model.CMModelLayers;
-import com.github.L_Ender.cataclysm.client.model.entity.Ender_Guardian_Model;
-import com.github.L_Ender.cataclysm.client.model.entity.Ignis_Model;
-import com.github.L_Ender.cataclysm.client.model.entity.Netherite_Monstrosity_Model;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.plumejade.lensouls.LenSouls;
@@ -29,6 +25,9 @@ import org.jetbrains.annotations.Nullable;
  * <p>
  * HierarchicalModel 模型：加载原生模型+技能动画定义，反射调用 animate()
  * LionfishAPI 模型（Ignis / Ender Guardian）：加载原生模型，wrapStaticModel 包装
+ * <p>
+ * 灾变（Cataclysm）兼容代码已隔离到 {@link CataclysmCompat}，
+ * 通过 Class.forName() 动态加载，避免无灾变模组时类加载崩溃。
  */
 public class BossPhantomModelIntegration {
 
@@ -48,13 +47,20 @@ public class BossPhantomModelIntegration {
                 ModelPart p = context.bakeLayer(ModModelLayers.THE_OBLITERATOR_LAYER);
                 return new ModelWithAnimation(new TheObliteratorModel<>(p), TheObliteratorAnimations.rightArmSpinSmash);
             });
-            case NETHERITE_MONSTROSITY -> loadIfLoaded("cataclysm", () -> {
-                ModelPart p = context.bakeLayer(CMModelLayers.NETHERITE_MONSTROSITY_MODEL);
-                return new ModelWithAnimation(
-                        new Netherite_Monstrosity_Model(p),
-                        com.github.L_Ender.cataclysm.client.animation.Netherite_Monstrosity_Animation.SMASH);
-            });
-            case IGNIS, ENDER_GUARDIAN -> null;
+            case NETHERITE_MONSTROSITY -> {
+                // Netherite Monstrosity 已移至 CataclysmCompat
+                if (!ModList.get().isLoaded("cataclysm")) yield null;
+                try {
+                    Class<?> compatClass = Class.forName("com.plumejade.lensouls.client.render.CataclysmCompat");
+                    Object result = compatClass.getMethod("createMonstrosityAnim", EntityRendererProvider.Context.class)
+                            .invoke(null, context);
+                    yield (ModelWithAnimation) result;
+                } catch (Exception e) {
+                    LenSouls.LOGGER.warn("[幻灵] CataclysmCompat Netherite Monstrosity 加载失败", e);
+                    yield null;
+                }
+            }
+            case IGNIS, ENDER_GUARDIAN -> null; // 已移至 CataclysmCompat
             default -> null;
         };
     }
@@ -63,8 +69,24 @@ public class BossPhantomModelIntegration {
     @Nullable
     public static EntityModel<?> loadStaticModel(EntityRendererProvider.Context context, BossPhantomType type) {
         return switch (type) {
-            case IGNIS -> loadIfLoaded("cataclysm", () -> wrapStatic(new Ignis_Model()));
-            case ENDER_GUARDIAN -> loadIfLoaded("cataclysm", () -> wrapStatic(new Ender_Guardian_Model()));
+            case IGNIS -> {
+                if (!ModList.get().isLoaded("cataclysm")) yield null;
+                try {
+                    Class<?> compatClass = Class.forName("com.plumejade.lensouls.client.render.CataclysmCompat");
+                    yield (EntityModel<?>) compatClass.getMethod("createIgnisModel").invoke(null);
+                } catch (Exception e) {
+                    yield null;
+                }
+            }
+            case ENDER_GUARDIAN -> {
+                if (!ModList.get().isLoaded("cataclysm")) yield null;
+                try {
+                    Class<?> compatClass = Class.forName("com.plumejade.lensouls.client.render.CataclysmCompat");
+                    yield (EntityModel<?>) compatClass.getMethod("createEnderGuardianModel").invoke(null);
+                } catch (Exception e) {
+                    yield null;
+                }
+            }
             default -> null;
         };
     }

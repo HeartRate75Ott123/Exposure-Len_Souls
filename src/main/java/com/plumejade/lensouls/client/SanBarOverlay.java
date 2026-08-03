@@ -44,17 +44,19 @@ public class SanBarOverlay {
         // background 全帧完整显示（上下 2px 槽由它提供视觉）
         g.blit(BACKGROUND, X, y, drawW, drawH, 0, 0, FRAME_WIDTH, FRAME_HEIGHT, FRAME_WIDTH, FRAME_HEIGHT);
 
-        // 能量填充：fillPx 个纹理像素，从 bar 底部（v=32 线）往上裁剪，6 帧动画照常播放
+        // 能量填充：从 bar 区底边（v=32 线，即 y=31 底端，丢掉下 2 行边框）往上按比例裁剪
+        // 比例直接用浮点：30 行蓝色区 × 扭曲值/100，不逐级取整，视觉与数值严格线性
         int twist = TwistClientCache.get();
-        int fillPx = (int) Math.ceil(BAR_HEIGHT * twist / 100.0);
-        if (fillPx > 0) {
+        float fillPx = BAR_HEIGHT * twist / 100.0f;
+        int drawHpx = Math.round(fillPx * scaleY);
+        if (drawHpx > 0) {
             int frame = (mc.gui.getGuiTicks() / FRAME_TIME) % FRAME_COUNT;
-            int vStart = frame * FRAME_HEIGHT + (BAR_BOTTOM + 1) - fillPx;
-            int drawHpx = Math.round(fillPx * scaleY);
+            float vStart = frame * FRAME_HEIGHT + (BAR_BOTTOM + 1) - fillPx;
             // 底边对齐 v=32 线（bar 区底端），不压背景的下 2px 槽
             int barBottomY = y + Math.round((BAR_BOTTOM + 1) * scaleY);
             g.blit(BAR, X, barBottomY - drawHpx, drawW, drawHpx,
-                    0, vStart, FRAME_WIDTH, fillPx, FRAME_WIDTH, FRAME_COUNT * FRAME_HEIGHT);
+                    0, vStart, FRAME_WIDTH, (int) Math.ceil(fillPx),
+                    FRAME_WIDTH, FRAME_COUNT * FRAME_HEIGHT);
         }
     }
 }

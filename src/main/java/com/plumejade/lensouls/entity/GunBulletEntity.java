@@ -260,14 +260,26 @@ public class GunBulletEntity extends ThrowableItemProjectile {
         return !isFriendlyTarget(target, getOwner());
     }
 
-    /** 友方单位判定：其他玩家、驯养宠物（owned）、自身骑乘关系、同盟实体 */
+    /** 友方单位判定：其他玩家、驯养宠物（owned）、自身骑乘关系、同盟实体、玩家归属的构造体（gytrinket） */
     private static boolean isFriendlyTarget(Entity target, Entity owner) {
         if (target instanceof Player) return true;
         if (owner instanceof LivingEntity lo) {
             if (target instanceof TamableAnimal tame && tame.isOwnedBy(lo)) return true;
             if (owner.getVehicle() == target || target.getVehicle() == owner) return true;
+            if (owner instanceof Player player && isOwnedConstruct(target, player)) return true;
         }
         return owner != null && target.isAlliedTo(owner);
+    }
+
+    /** gytrinket 构造体无人机的归属判定（反射调用 getOwnerUUID，无编译依赖）：拥有者 == 子弹射击者 */
+    private static boolean isOwnedConstruct(Entity target, Player owner) {
+        if (!target.getClass().getName().contains("gytrinket")) return false;
+        try {
+            var ownerUuid = target.getClass().getMethod("getOwnerUUID").invoke(target);
+            return ownerUuid != null && ownerUuid.equals(owner.getUUID());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) { super.readAdditionalSaveData(tag); damage = tag.getDouble("Damage"); armorPen = tag.getDouble("ArmorPen"); if (tag.contains("GunId")) { gunId = tag.getUUID("GunId"); } }
     @Override public void addAdditionalSaveData(CompoundTag tag) { super.addAdditionalSaveData(tag); tag.putDouble("Damage", damage); tag.putDouble("ArmorPen", armorPen); if (gunId != null) { tag.putUUID("GunId", gunId); } }

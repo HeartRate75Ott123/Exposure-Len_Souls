@@ -60,14 +60,41 @@ public enum EntityWeaknessComponentProvider implements IEntityComponentProvider 
         }
         tooltip.add(line.copy().withStyle(ChatFormatting.GREEN));
 
-        // 活性：实体固有元素（来自 attacker_element 数据包）
-        if (AttackerElementLoader.hasMapping(entityId)) {
-            ElementDamage atkElement = AttackerElementLoader.getElement(entityId);
-            String shortKey = "element.lensouls." + atkElement.getSerializedName() + ".short";
-            MutableComponent atkLine = Component.translatable("jade.lensouls.activity");
-            atkLine = atkLine.append(Component.translatable(shortKey));
+        // 活性：实体固有元素（来自 attacker_element 数据包，多元素逐一显示 + 等级）
+        Map<ElementDamage, Float> levels = AttackerElementLoader.getLevels(entityId);
+        boolean hasActivity = false;
+        MutableComponent atkLine = Component.translatable("jade.lensouls.activity");
+        for (ElementDamage element : ElementDamage.values()) {
+            Float level = levels.get(element);
+            if (level == null || level <= 0f) continue;
+            if (hasActivity) atkLine = atkLine.append("、");
+            hasActivity = true;
+            atkLine = atkLine.append(Component.translatable(
+                    "element.lensouls." + element.getSerializedName() + ".short"));
+            atkLine = atkLine.append(" ").append(formatLevel(level));
+        }
+        if (hasActivity) {
             tooltip.add(atkLine.copy().withStyle(ChatFormatting.GREEN));
         }
+    }
+
+    /** 等级显示：1~5 用罗马数字，其余（0.5 步进/超 5）显示数值 */
+    private static String formatLevel(float level) {
+        if (level == Math.floor(level)) {
+            int n = (int) level;
+            if (n >= 1 && n <= 5) {
+                return switch (n) {
+                    case 1 -> "I";
+                    case 2 -> "II";
+                    case 3 -> "III";
+                    case 4 -> "IV";
+                    case 5 -> "V";
+                    default -> String.valueOf(n);
+                };
+            }
+            return String.valueOf(n);
+        }
+        return String.valueOf(level);
     }
 
     @Override

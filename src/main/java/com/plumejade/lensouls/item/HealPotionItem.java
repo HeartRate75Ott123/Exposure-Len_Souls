@@ -19,8 +19,8 @@ import java.util.List;
 /**
  * 回复药水：使用次数以耐久条实现。
  * <p>
- * 剩余耐久 &gt; 1 时右键可用一次（消耗 1 耐久），回复饥饿值和饱和度：
- * 饥饿值 &lt; 20 时补满 20 饥饿 + 20 饱和度；饥饿值已满（≥20）时不可用。
+ * 剩余耐久 &gt; 1 时右键可用一次（消耗 1 耐久），回满生命；回复饥饿值和饱和度：
+ * 饥饿值与饱和度各自独立——未满（&lt;20）补满 20，已满（≥20）不回复。
  * 总耐久 = 1 + 已到访维度数（初始主世界 1 个 → 2 耐久，可用 1 次；每多探索一个维度 +1 总耐久）。
  * 已到访维度列表存于物品自身（死亡/换人后不丢失），背包任意槽位每 20 tick 记录当前维度。
  * 已消耗耐久每 30 秒自动回复 1 点（动态恢复，背包中任意槽位生效）。
@@ -56,7 +56,7 @@ public class HealPotionItem extends Item {
         if (level.isClientSide) {
             // 客户端本地播放音效（与项目其他自定义音效一致，避免服务端广播丢失）
             int remaining = stack.getMaxDamage() - stack.getDamageValue();
-            if (remaining > 1 && player.getFoodData().getFoodLevel() < 20) {
+            if (remaining > 1) {
                 float vol = 1.0f + (level.random.nextFloat() * 2 - 1) * 0.15f;
                 float pitch = 1.0f + (level.random.nextFloat() * 2 - 1) * 0.15f;
                 player.playSound(com.plumejade.lensouls.sound.ModSounds.HEAL_USE.get(), vol, pitch);
@@ -71,16 +71,16 @@ public class HealPotionItem extends Item {
             player.displayClientMessage(Component.translatable("message.lensouls.heal_potion.empty"), true);
             return InteractionResultHolder.fail(stack);
         }
-        // 削弱：饥饿值已满（≥20）时无法使用
-        if (player.getFoodData().getFoodLevel() >= 20) {
-            player.displayClientMessage(Component.translatable("message.lensouls.heal_potion.full"), true);
-            return InteractionResultHolder.fail(stack);
-        }
         stack.setDamageValue(stack.getDamageValue() + 1);
-        // 回复饥饿值补满 20，饱和度同步补满（setSaturation 上限受饥饿值约束）
+        player.heal(player.getMaxHealth());
+        // 削弱：饥饿值与饱和度独立判断，各自未满才回复（饱和度上限受饥饿值约束）
         FoodData food = player.getFoodData();
-        food.setFoodLevel(20);
-        food.setSaturation(20.0f);
+        if (food.getFoodLevel() < 20) {
+            food.setFoodLevel(20);
+        }
+        if (food.getSaturationLevel() < 20.0f) {
+            food.setSaturation(20.0f);
+        }
         // 使用后重置恢复计时（下次从当前时刻起 30 秒回复 1 点）
         setLastRegen(stack, level.getGameTime());
         return InteractionResultHolder.success(stack);

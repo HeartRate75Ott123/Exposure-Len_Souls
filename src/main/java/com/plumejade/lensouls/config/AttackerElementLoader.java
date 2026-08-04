@@ -2,6 +2,7 @@ package com.plumejade.lensouls.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.plumejade.lensouls.LenSouls;
@@ -11,28 +12,36 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * 攻击者实体类型 → 元素活性映射加载器。
+ * 攻击者实体类型 → 元素活性等级映射加载器。
  * <p>
  * 路径: {@code data/lensouls/attacker_element/&lt;任意文件名&gt;.json}
  * <p>
- * 格式（仿 entity_weakness，从文件内容中读取实体 ID）：
+ * 格式：一组数据 = 实体 ID + 元素类型 + 对应等级（0~9，0.5 步进；0 = 无活性）。
+ * 单元素直接写对象，多元素用数组罗列：
  * <pre>
  * {
- *   "minecraft:blaze": { "element": "fire", "activity": 1.2 },
- *   "irons_spellbooks:fire_elemental": { "element": "fire", "activity": 1.5 },
- *   "cataclysm:ignis": { "element": "fire", "activity": 2.0 }
+ *   "minecraft:blaze": { "element": "fire", "level": 3 },
+ *   "cataclysm:ignis": [
+ *     { "element": "fire", "level": 5 },
+ *     { "element": "earth", "level": 2 }
+ *   ]
  * }
  * </pre>
+ * 等级 → 活性倍率：1→1.0x, 2→1.5x, 3→2.0x, 4→2.5x, 5→3.0x … 9→5.0x（每级 +0.5）
  */
 public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
 
     private static final Gson GSON = new GsonBuilder().setLenient().create();
     private static final String FOLDER = "attacker_element";
-    private static Map<ResourceLocation, AttackerEntry> mappings = Map.of();
+    /** 等级上限（数据包允许 0~9） */
+    private static final float MAX_LEVEL = 9f;
+    private static Map<ResourceLocation, Map<ElementDamage, Float>> mappings = Map.of();
 
     public AttackerElementLoader() {
         super(GSON, FOLDER);
@@ -40,7 +49,7 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
 
     @Override
     protected void apply(Map<ResourceLocation, JsonElement> entries, ResourceManager manager, ProfilerFiller profiler) {
-        Map<ResourceLocation, AttackerEntry> newMap = new HashMap<>();
+        Map<ResourceLocation, Map<ElementDamage, Float>> newMap = new HashMap<>();
 
         for (Map.Entry<ResourceLocation, JsonElement> entry : entries.entrySet()) {
             JsonElement json = entry.getValue();
@@ -56,24 +65,13 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
                     continue;
                 }
 
-                try {
-                    JsonObject obj = root.getAsJsonObject(entityKey);
-                    String elementName = obj.get("element").getAsString();
-                    float activity = obj.get("activity").getAsFloat();
-
-                    ElementDamage element = ElementDamage.byName(elementName);
-                    if (element == null) {
-                        LenSouls.LOGGER.warn("[AttackerElement] 未知元素: {} (文件: {})", elementName, entry.getKey());
-                        continue;
-                    }
-                    if (activity <= 0f) {
-                        LenSouls.LOGGER.warn("[AttackerElement] activity <= 0, 跳过: {} (文件: {})", entityKey, entry.getKey());
-                        continue;
-                    }
-
-                    newMap.put(entityId, new AttackerEntry(element, activity));
-                } catch (Exception e) {
-                    LenSouls.LOGGER.error("[AttackerElement] 解析失败: {} (文件: {})", entityKey, entry.getKey(), e);
+                Map<ElementDamage, Float> parsed = parseEntries(entityKey, root.get(entityKey), entry.getKey());
+                if (!parsed.isEmpty()) {
+                    newMap.merge(entityId, parsed, (a, b) -> {
+                        Map<ElementDamage, Float> m = new HashMap<>(a);
+                        m.putAll(b);
+                        return m;
+                    });
                 }
             }
         }
@@ -82,11 +80,60 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
         LenSouls.LOGGER.info("[AttackerElement] 加载了 {} 条映射", mappings.size());
     }
 
-    /** 查询实体类型的元素活性（返回 0 表示无映射） */
+    /** 解析单元素对象或多元素数组 */
+    private static Map<ElementDamage, Float> parseEntries(String entityKey, JsonElement value, ResourceLocation sourceFile) {
+        List<JsonObject> entries = new ArrayList<>();
+        if (value.isJsonArray()) {
+            for (JsonElement e : value.getAsJsonArray()) {
+                if (e.isJsonObject()) entries.add(e.getAsJsonObject());
+            }
+        } else if (value.isJsonObject()) {
+            entries.add(value.getAsJsonObject());
+        }
+
+        Map<ElementDamage, Float> result = new HashMap<>();
+        for (JsonObject obj : entries) {
+            String elementName = obj.has("element") ? obj.get("element").getAsString() : null;
+            if (elementName == null) {
+                LenSouls.LOGGER.warn("[AttackerElement] 缺少 element 字段 (实体: {}, 文件: {})", entityKey, sourceFile);
+                continue;
+            }
+            ElementDamage element = ElementDamage.byName(elementName);
+            if (element == null) {
+                LenSouls.LOGGER.warn("[AttackerElement] 未知元素: {} (实体: {}, 文件: {})", elementName, entityKey, sourceFile);
+                continue;
+            }
+            float level = 0f;
+            if (obj.has("level")) {
+                level = obj.get("level").getAsFloat();
+            } else if (obj.has("activity")) {
+                // 兼容旧字段名（旧值 1.0 按等级 1 处理）
+                level = obj.get("activity").getAsFloat();
+            }
+            if (level < 0f) {
+                LenSouls.LOGGER.warn("[AttackerElement] 等级不能为负 (实体: {}, 文件: {})", entityKey, sourceFile);
+                level = 0f;
+            }
+            if (level > MAX_LEVEL) {
+                LenSouls.LOGGER.warn("[AttackerElement] 等级 {} 超过上限 9 (实体: {}, 文件: {}), 钳位为 9", level, entityKey, sourceFile);
+                level = MAX_LEVEL;
+            }
+            result.put(element, level);
+        }
+        return result;
+    }
+
+    /** 查询实体类型的元素活性等级（0=无映射/无活性） */
+    public static float getLevel(ResourceLocation entityId, ElementDamage element) {
+        Map<ElementDamage, Float> m = mappings.get(entityId);
+        if (m == null) return 0f;
+        return m.getOrDefault(element, 0f);
+    }
+
+    /** 查询实体类型的元素活性倍率（0=无映射） */
     public static float getActivity(ResourceLocation entityId, ElementDamage element) {
-        AttackerEntry ae = mappings.get(entityId);
-        if (ae != null && ae.element == element) return ae.activity;
-        return 0f;
+        float level = getLevel(entityId, element);
+        return level > 0 ? ElementDamage.getActivityByLevel(level) : 0;
     }
 
     /** 判断该实体类型是否有任何元素映射 */
@@ -94,11 +141,23 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
         return mappings.containsKey(entityId);
     }
 
-    /** 获取映射的元素 */
-    public static ElementDamage getElement(ResourceLocation entityId) {
-        AttackerEntry ae = mappings.get(entityId);
-        return ae != null ? ae.element : null;
+    /** 获取实体映射的全部元素等级（可能为空 Map） */
+    public static Map<ElementDamage, Float> getLevels(ResourceLocation entityId) {
+        return mappings.getOrDefault(entityId, Map.of());
     }
 
-    private record AttackerEntry(ElementDamage element, float activity) {}
+    /** 获取实体映射中等级最高的元素（无映射返回 null） */
+    public static ElementDamage getElement(ResourceLocation entityId) {
+        Map<ElementDamage, Float> m = mappings.get(entityId);
+        if (m == null || m.isEmpty()) return null;
+        ElementDamage best = null;
+        float bestLevel = -1f;
+        for (Map.Entry<ElementDamage, Float> e : m.entrySet()) {
+            if (e.getValue() > bestLevel) {
+                bestLevel = e.getValue();
+                best = e.getKey();
+            }
+        }
+        return best;
+    }
 }

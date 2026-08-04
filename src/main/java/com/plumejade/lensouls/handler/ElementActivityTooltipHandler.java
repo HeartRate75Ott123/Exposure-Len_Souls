@@ -27,30 +27,38 @@ public class ElementActivityTooltipHandler {
 
         // 从注册名查活性配置
         var itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        Map<ElementDamage, Integer> levels = ItemElementActivityLoader.getLevels(itemId);
+        Map<ElementDamage, Float> levels = ItemElementActivityLoader.getLevels(itemId);
         if (levels == null || levels.isEmpty()) return;
 
         // 按元素顺序添加 tooltip
         for (ElementDamage element : ElementDamage.values()) {
             if (element == ElementDamage.PROJECTILE) continue;
-            Integer level = levels.get(element);
-            if (level != null && level >= 1 && level <= 5) {
+            Float level = levels.get(element);
+            if (level != null && level > 0f) {
                 String elementKey = "element.lensouls." + element.getSerializedName() + ".short";
                 event.getToolTip().add(Component.translatable("item.lensouls.element_activity_tooltip",
                         Component.translatable(elementKey),
-                        toRoman(level)).copy().withStyle(ChatFormatting.GREEN));
+                        formatLevel(level)).copy().withStyle(ChatFormatting.GREEN));
             }
         }
     }
 
-    private static String toRoman(int n) {
-        return switch (n) {
-            case 1 -> "I";
-            case 2 -> "II";
-            case 3 -> "III";
-            case 4 -> "IV";
-            case 5 -> "V";
-            default -> String.valueOf(n);
-        };
+    /** 等级显示：1~5 用罗马数字，其余（0.5 步进/超 5）显示数值 */
+    private static String formatLevel(float level) {
+        if (level == Math.floor(level)) {
+            int n = (int) level;
+            if (n >= 1 && n <= 5) {
+                return switch (n) {
+                    case 1 -> "I";
+                    case 2 -> "II";
+                    case 3 -> "III";
+                    case 4 -> "IV";
+                    case 5 -> "V";
+                    default -> String.valueOf(n);
+                };
+            }
+        }
+        if (level == Math.floor(level)) return String.valueOf((int) level);
+        return String.valueOf(level);
     }
 }

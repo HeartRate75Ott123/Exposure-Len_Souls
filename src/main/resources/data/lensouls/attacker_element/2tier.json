@@ -1,7 +1,7 @@
 {
-  "cataclysm:maledictus": { "element": "earth", "activity": 1.0 },
-  "cataclysm:netherite_monstrosity": { "element": "fire", "activity": 1.0 },
-  "cataclysm:scylla": { "element": "water", "activity": 1.0 },
-  "cataclysm:ancient_remnant": { "element": "earth", "activity": 1.0 },
-  "cataclysm:the_harbinger": { "element": "fire", "activity": 1.0 }
+  "cataclysm:maledictus": { "element": "earth", "level": 2 },
+  "cataclysm:netherite_monstrosity": { "element": "fire", "level": 2 },
+  "cataclysm:scylla": { "element": "water", "level": 2 },
+  "cataclysm:ancient_remnant": { "element": "earth", "level": 2 },
+  "cataclysm:the_harbinger": { "element": "fire", "level": 2 }
 }

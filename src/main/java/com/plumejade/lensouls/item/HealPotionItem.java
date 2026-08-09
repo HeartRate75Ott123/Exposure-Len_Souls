@@ -11,7 +11,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.food.FoodData;
 import net.minecraft.world.level.Level;
 
 import java.util.List;
@@ -19,8 +18,7 @@ import java.util.List;
 /**
  * 回复药水：使用次数以耐久条实现。
  * <p>
- * 剩余耐久 &gt; 1 时右键可用一次（消耗 1 耐久），回满生命；回复饥饿值和饱和度：
- * 饥饿值与饱和度各自独立——未满（&lt;20）补满 20，已满（≥20）不回复。
+ * 剩余耐久 &gt; 1 时右键可用一次（消耗 1 耐久），回满生命（不回复饥饿值/饱和度）。
  * 总耐久 = 1 + 已到访维度数（初始主世界 1 个 → 2 耐久，可用 1 次；每多探索一个维度 +1 总耐久）。
  * 已到访维度列表存于物品自身（死亡/换人后不丢失），背包任意槽位每 20 tick 记录当前维度。
  * 已消耗耐久每 30 秒自动回复 1 点（动态恢复，背包中任意槽位生效）。
@@ -73,14 +71,6 @@ public class HealPotionItem extends Item {
         }
         stack.setDamageValue(stack.getDamageValue() + 1);
         player.heal(player.getMaxHealth());
-        // 削弱：饥饿值与饱和度独立判断，各自未满才回复（饱和度上限受饥饿值约束）
-        FoodData food = player.getFoodData();
-        if (food.getFoodLevel() < 20) {
-            food.setFoodLevel(20);
-        }
-        if (food.getSaturationLevel() < 20.0f) {
-            food.setSaturation(20.0f);
-        }
         // 使用后重置恢复计时（下次从当前时刻起 30 秒回复 1 点）
         setLastRegen(stack, level.getGameTime());
         return InteractionResultHolder.success(stack);

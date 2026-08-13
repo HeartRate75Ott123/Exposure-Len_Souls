@@ -2,7 +2,6 @@ package com.plumejade.lensouls.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.plumejade.lensouls.LenSouls;
@@ -22,7 +21,7 @@ import java.util.Map;
  * <p>
  * 路径: {@code data/lensouls/attacker_element/&lt;任意文件名&gt;.json}
  * <p>
- * 格式：一组数据 = 实体 ID + 元素类型 + 对应等级（0~9，0.5 步进；0 = 无活性）。
+ * 格式：一组数据 = 实体 ID + 元素类型 + 对应等级（0~9 整数；0 = 无活性）。
  * 单元素直接写对象，多元素用数组罗列：
  * <pre>
  * {
@@ -40,8 +39,8 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
     private static final Gson GSON = new GsonBuilder().setLenient().create();
     private static final String FOLDER = "attacker_element";
     /** 等级上限（数据包允许 0~9） */
-    private static final float MAX_LEVEL = 9f;
-    private static Map<ResourceLocation, Map<ElementDamage, Float>> mappings = Map.of();
+    private static final int MAX_LEVEL = 9;
+    private static Map<ResourceLocation, Map<ElementDamage, Integer>> mappings = Map.of();
 
     public AttackerElementLoader() {
         super(GSON, FOLDER);
@@ -49,7 +48,7 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
 
     @Override
     protected void apply(Map<ResourceLocation, JsonElement> entries, ResourceManager manager, ProfilerFiller profiler) {
-        Map<ResourceLocation, Map<ElementDamage, Float>> newMap = new HashMap<>();
+        Map<ResourceLocation, Map<ElementDamage, Integer>> newMap = new HashMap<>();
 
         for (Map.Entry<ResourceLocation, JsonElement> entry : entries.entrySet()) {
             JsonElement json = entry.getValue();
@@ -65,10 +64,10 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
                     continue;
                 }
 
-                Map<ElementDamage, Float> parsed = parseEntries(entityKey, root.get(entityKey), entry.getKey());
+                Map<ElementDamage, Integer> parsed = parseEntries(entityKey, root.get(entityKey), entry.getKey());
                 if (!parsed.isEmpty()) {
                     newMap.merge(entityId, parsed, (a, b) -> {
-                        Map<ElementDamage, Float> m = new HashMap<>(a);
+                        Map<ElementDamage, Integer> m = new HashMap<>(a);
                         m.putAll(b);
                         return m;
                     });
@@ -81,7 +80,7 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
     }
 
     /** 解析单元素对象或多元素数组 */
-    private static Map<ElementDamage, Float> parseEntries(String entityKey, JsonElement value, ResourceLocation sourceFile) {
+    private static Map<ElementDamage, Integer> parseEntries(String entityKey, JsonElement value, ResourceLocation sourceFile) {
         List<JsonObject> entries = new ArrayList<>();
         if (value.isJsonArray()) {
             for (JsonElement e : value.getAsJsonArray()) {
@@ -91,7 +90,7 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
             entries.add(value.getAsJsonObject());
         }
 
-        Map<ElementDamage, Float> result = new HashMap<>();
+        Map<ElementDamage, Integer> result = new HashMap<>();
         for (JsonObject obj : entries) {
             String elementName = obj.has("element") ? obj.get("element").getAsString() : null;
             if (elementName == null) {
@@ -103,16 +102,16 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
                 LenSouls.LOGGER.warn("[AttackerElement] 未知元素: {} (实体: {}, 文件: {})", elementName, entityKey, sourceFile);
                 continue;
             }
-            float level = 0f;
+            int level = 0;
             if (obj.has("level")) {
-                level = obj.get("level").getAsFloat();
+                level = obj.get("level").getAsInt();
             } else if (obj.has("activity")) {
                 // 兼容旧字段名（旧值 1.0 按等级 1 处理）
-                level = obj.get("activity").getAsFloat();
+                level = obj.get("activity").getAsInt();
             }
-            if (level < 0f) {
+            if (level < 0) {
                 LenSouls.LOGGER.warn("[AttackerElement] 等级不能为负 (实体: {}, 文件: {})", entityKey, sourceFile);
-                level = 0f;
+                level = 0;
             }
             if (level > MAX_LEVEL) {
                 LenSouls.LOGGER.warn("[AttackerElement] 等级 {} 超过上限 9 (实体: {}, 文件: {}), 钳位为 9", level, entityKey, sourceFile);
@@ -124,15 +123,15 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
     }
 
     /** 查询实体类型的元素活性等级（0=无映射/无活性） */
-    public static float getLevel(ResourceLocation entityId, ElementDamage element) {
-        Map<ElementDamage, Float> m = mappings.get(entityId);
-        if (m == null) return 0f;
-        return m.getOrDefault(element, 0f);
+    public static int getLevel(ResourceLocation entityId, ElementDamage element) {
+        Map<ElementDamage, Integer> m = mappings.get(entityId);
+        if (m == null) return 0;
+        return m.getOrDefault(element, 0);
     }
 
     /** 查询实体类型的元素活性倍率（0=无映射） */
     public static float getActivity(ResourceLocation entityId, ElementDamage element) {
-        float level = getLevel(entityId, element);
+        int level = getLevel(entityId, element);
         return level > 0 ? ElementDamage.getActivityByLevel(level) : 0;
     }
 
@@ -142,17 +141,17 @@ public class AttackerElementLoader extends SimpleJsonResourceReloadListener {
     }
 
     /** 获取实体映射的全部元素等级（可能为空 Map） */
-    public static Map<ElementDamage, Float> getLevels(ResourceLocation entityId) {
+    public static Map<ElementDamage, Integer> getLevels(ResourceLocation entityId) {
         return mappings.getOrDefault(entityId, Map.of());
     }
 
     /** 获取实体映射中等级最高的元素（无映射返回 null） */
     public static ElementDamage getElement(ResourceLocation entityId) {
-        Map<ElementDamage, Float> m = mappings.get(entityId);
+        Map<ElementDamage, Integer> m = mappings.get(entityId);
         if (m == null || m.isEmpty()) return null;
         ElementDamage best = null;
-        float bestLevel = -1f;
-        for (Map.Entry<ElementDamage, Float> e : m.entrySet()) {
+        int bestLevel = -1;
+        for (Map.Entry<ElementDamage, Integer> e : m.entrySet()) {
             if (e.getValue() > bestLevel) {
                 bestLevel = e.getValue();
                 best = e.getKey();

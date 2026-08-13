@@ -48,19 +48,18 @@ public enum ElementDamage {
     /**
      * 等级 → 活性倍率：等级 0 = 无活性，等级 1 起活性 1.0，每加一级 +0.5。
      * <pre>
-     * level 0   → 0.0（无活性）
-     * level 1   → 1.0
-     * level 1.5 → 1.25
-     * level 2   → 1.5
-     * level 5   → 3.0
-     * level 9   → 5.0
+     * level 0 → 0.0（无活性）
+     * level 1 → 1.0
+     * level 2 → 1.5
+     * level 5 → 3.0
+     * level 9 → 5.0
      * </pre>
      *
-     * @param level 活性等级（0~9，允许 0.5 步进，负值按 0 处理）
+     * @param level 活性等级（0~9 整数，负值按 0 处理）
      */
-    public static float getActivityByLevel(float level) {
-        if (level <= 0f) return 0f;
-        return 1f + (level - 1f) * 0.5f;
+    public static float getActivityByLevel(int level) {
+        if (level <= 0) return 0f;
+        return 1f + (level - 1) * 0.5f;
     }
 
     /**

@@ -83,7 +83,7 @@ public class DamageHandler {
             if (element == ElementDamage.PROJECTILE) continue;
 
             // 攻击方活性等级（免伤对抗用）：玩家 = 武器等级，实体 = attacker_element 等级
-            float attackerLevel = 0f;
+            int attackerLevel = 0;
             float activitySum = 0f;
 
             if (isPlayer) {
@@ -126,7 +126,7 @@ public class DamageHandler {
             if (activitySum <= 0f) continue;
 
             // 免伤对抗：受击方药水等级 ≥ 攻击方等级 → 该元素追加完全免疫
-            if (attackerLevel > 0f && getPotionLevel(target, element) >= attackerLevel) continue;
+            if (attackerLevel > 0 && getPotionLevel(target, element) >= attackerLevel) continue;
 
             float weakness = DataPackLoader.getWeakness(entityId, element);
             if (weakness > 0f) {
@@ -150,14 +150,14 @@ public class DamageHandler {
     }
 
     /** 获取实体身上指定元素的灌注药水等级（无灌注 = 0） */
-    private static float getPotionLevel(LivingEntity entity, ElementDamage element) {
+    private static int getPotionLevel(LivingEntity entity, ElementDamage element) {
         for (MobEffectInstance inst : entity.getActiveEffects()) {
             if (inst.getEffect().value() instanceof ElementInfusionEffect effect
                     && effect.getElement() == element) {
-                return inst.getAmplifier() + 1f;
+                return inst.getAmplifier() + 1;
             }
         }
-        return 0f;
+        return 0;
     }
 
     /** 发射元素弱点螺旋粒子（仅显式配置的弱点） */

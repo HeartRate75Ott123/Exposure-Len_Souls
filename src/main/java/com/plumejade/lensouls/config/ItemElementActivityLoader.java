@@ -19,11 +19,11 @@ import java.util.Map;
  * <p>
  * 路径: {@code data/lensouls/item_element_activity/&lt;任意文件名&gt;.json}
  * <p>
- * 格式（值直接填活性等级，0~9，允许 0.5 步进；0 = 无活性）：
+ * 格式（值直接填活性等级，0~9 整数；0 = 无活性）：
  * <pre>
  * {
  *   "minecraft:diamond_sword": {
- *     "values": { "lensouls:fire": 3, "lensouls:water": 1.5 }
+ *     "values": { "lensouls:fire": 3, "lensouls:water": 2 }
  *   },
  *   "twilightforest:fiery_sword": {
  *     "values": { "lensouls:fire": 5 }
@@ -36,9 +36,9 @@ public class ItemElementActivityLoader extends SimpleJsonResourceReloadListener 
 
     private static final Gson GSON = new Gson();
     /** 等级上限（数据包允许 0~9） */
-    private static final float MAX_LEVEL = 9f;
+    private static final int MAX_LEVEL = 9;
     /** itemId → element → level */
-    private static Map<ResourceLocation, Map<ElementDamage, Float>> activityMap = new HashMap<>();
+    private static Map<ResourceLocation, Map<ElementDamage, Integer>> activityMap = new HashMap<>();
 
     public ItemElementActivityLoader() {
         super(GSON, "item_element_activity");
@@ -46,7 +46,7 @@ public class ItemElementActivityLoader extends SimpleJsonResourceReloadListener 
 
     @Override
     protected void apply(Map<ResourceLocation, JsonElement> entries, ResourceManager manager, ProfilerFiller profiler) {
-        Map<ResourceLocation, Map<ElementDamage, Float>> newMap = new HashMap<>();
+        Map<ResourceLocation, Map<ElementDamage, Integer>> newMap = new HashMap<>();
 
         for (Map.Entry<ResourceLocation, JsonElement> entry : entries.entrySet()) {
             JsonElement json = entry.getValue();
@@ -66,24 +66,24 @@ public class ItemElementActivityLoader extends SimpleJsonResourceReloadListener 
                 if (!(valElem instanceof JsonObject valObj) || !valObj.has("values")) continue;
 
                 JsonObject values = valObj.getAsJsonObject("values");
-                Map<ElementDamage, Float> elementLevels = new HashMap<>();
+                Map<ElementDamage, Integer> elementLevels = new HashMap<>();
 
                 for (String key : values.keySet()) {
                     ElementDamage element = ElementDamage.byName(key.replace("lensouls:", ""));
                     if (element == null) continue;
-                    float level = values.get(key).getAsFloat();
+                    int level = values.get(key).getAsInt();
                     if (level > MAX_LEVEL) {
                         LenSouls.LOGGER.warn("[ItemElementActivity] 等级 {} 超过上限 9 (物品: {}, 元素: {}), 钳位为 9", level, itemKey, element.getSerializedName());
                         level = MAX_LEVEL;
                     }
-                    if (level >= 0f) {
+                    if (level >= 0) {
                         elementLevels.put(element, level);
                     }
                 }
 
                 if (!elementLevels.isEmpty()) {
                     newMap.merge(itemId, elementLevels, (a, b) -> {
-                        Map<ElementDamage, Float> m = new HashMap<>(a);
+                        Map<ElementDamage, Integer> m = new HashMap<>(a);
                         m.putAll(b);
                         return m;
                     });
@@ -96,15 +96,15 @@ public class ItemElementActivityLoader extends SimpleJsonResourceReloadListener 
     }
 
     /** 获取某物品对某元素的活性等级（0=无配置） */
-    public static float getLevel(ResourceLocation itemId, ElementDamage element) {
-        Map<ElementDamage, Float> levels = activityMap.get(itemId);
-        if (levels == null) return 0f;
-        return levels.getOrDefault(element, 0f);
+    public static int getLevel(ResourceLocation itemId, ElementDamage element) {
+        Map<ElementDamage, Integer> levels = activityMap.get(itemId);
+        if (levels == null) return 0;
+        return levels.getOrDefault(element, 0);
     }
 
     /** 获取某物品对某元素的活性倍率（0=无加成返回 0） */
     public static float getActivity(ResourceLocation itemId, ElementDamage element) {
-        float level = getLevel(itemId, element);
+        int level = getLevel(itemId, element);
         return level > 0 ? ElementDamage.getActivityByLevel(level) : 0;
     }
 
@@ -115,7 +115,7 @@ public class ItemElementActivityLoader extends SimpleJsonResourceReloadListener 
     }
 
     /** 获取物品的所有元素等级映射（可能为 null） */
-    public static Map<ElementDamage, Float> getLevels(ResourceLocation itemId) {
+    public static Map<ElementDamage, Integer> getLevels(ResourceLocation itemId) {
         return activityMap.get(itemId);
     }
 

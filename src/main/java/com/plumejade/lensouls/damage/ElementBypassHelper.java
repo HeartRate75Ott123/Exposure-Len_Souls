@@ -55,8 +55,8 @@ public class ElementBypassHelper {
             if (element == ElementDamage.PROJECTILE) continue;
             if (!DataPackLoader.getAllWeaknesses(targetId).containsKey(element)) continue;
 
-            float level = ItemElementActivityLoader.getLevel(weaponId, element);
-            if (level <= 0f) continue;
+            int level = ItemElementActivityLoader.getLevel(weaponId, element);
+            if (level <= 0) continue;
 
             // 破定期间 + 有弱点 → 绕过单次伤害上限（不限活性等级）
             if (broken) {

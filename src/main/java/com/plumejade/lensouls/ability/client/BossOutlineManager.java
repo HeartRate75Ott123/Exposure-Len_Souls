@@ -14,17 +14,16 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fStack;
 import org.lwjgl.opengl.GL11;
 
 /**
- * BOSS 镜魂描边管理器 — 独立 mask FBO + composite。
- * composite 用 goldOutlineShader（Sobel 纯边缘描边 + BOSS 色），走 RenderType 管线 Iris 兼容。
- * <p>
- * 帧级去重机制（仿 {@link CaptureState}）:
+ * BOSS 镜魂描边管理�?�?独立 mask FBO + composite�? * composite �?goldOutlineShader（Sobel 纯边缘描�?+ BOSS 色），走 RenderType 管线 Iris 兼容�? * <p>
+ * 帧级去重机制（仿 {@link CaptureState}�?
  * - AFTER_SKY 清空 mask + 清空去重集合
  * - Shadow pass 捕获→被 AFTER_SKY 丢弃
- * - 主 pass 捕获→最终保留
- */
+ * - �?pass 捕获→最终保�? */
 @EventBusSubscriber(value = Dist.CLIENT)
 public class BossOutlineManager {
 
@@ -37,7 +36,7 @@ public class BossOutlineManager {
     private static MultiBufferSource.BufferSource maskBufferSource;
     private static BossOutlineColors currentColors;
 
-    /** 帧级去重集合（仿 CaptureState） */
+    /** 帧级去重集合（仿 CaptureState�?*/
     private static final IntOpenHashSet capturedThisFrame = new IntOpenHashSet();
 
     public static boolean tryStartCapture(int entityId) {
@@ -46,7 +45,7 @@ public class BossOutlineManager {
         return true;
     }
 
-    /** AFTER_SKY 时清空去重集合，下一阶段（主 pass）的实体可重新捕获 */
+    /** AFTER_SKY 时清空去重集合，下一阶段（主 pass）的实体可重新捕�?*/
     public static void clearFrameCaptures() {
         capturedThisFrame.clear();
     }
@@ -113,13 +112,10 @@ public class BossOutlineManager {
     public static void setCompositeShader(ShaderInstance shader) {}
     public static void beginFrame() { currentColors = null; }
 
-    // ========== 帧事件 ==========
+    // ========== 帧事�?==========
 
     /**
-     * AFTER_SKY → 清空 mask + 清空去重集合。
-     * Iris shadow pass 在 AFTER_SKY 之前运行，其捕获结果被此方法丢弃；
-     * 主 pass 在 AFTER_SKY 之后运行，捕获结果保留到帧末 composite。
-     */
+     * AFTER_SKY �?清空 mask + 清空去重集合�?     * Iris shadow pass �?AFTER_SKY 之前运行，其捕获结果被此方法丢弃�?     * �?pass �?AFTER_SKY 之后运行，捕获结果保留到帧末 composite�?     */
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
@@ -158,12 +154,26 @@ public class BossOutlineManager {
             shader.getUniform("Time").set((wrapped + partialTick) * 0.05f);
         }
 
-        var bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
-        var consumer = bufferSource.getBuffer(CompositeRenderTypes.MAIN_QUAD);
-        consumer.addVertex(-1, -1, 0).setUv(0, 0);
-        consumer.addVertex( 1, -1, 0).setUv(1, 0);
-        consumer.addVertex( 1,  1, 0).setUv(1, 1);
-        consumer.addVertex(-1,  1, 0).setUv(0, 1);
-        bufferSource.endBatch(CompositeRenderTypes.MAIN_QUAD);
+        // 全屏四边形以 NDC (-1..1) 直接铺满屏幕，必须用 identity 投影/视图矩阵�?        // 当前 RenderSystem 残留世界渲染的相机透视矩阵，不重置会投影成地面矩形
+        RenderSystem.backupProjectionMatrix();
+        RenderSystem.setProjectionMatrix(new Matrix4f(), VertexSorting.ORTHOGRAPHIC_Z);
+        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+        modelViewStack.pushMatrix();
+        modelViewStack.identity();
+        RenderSystem.applyModelViewMatrix();
+
+        try {
+            var bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
+            var consumer = bufferSource.getBuffer(CompositeRenderTypes.MAIN_QUAD);
+            consumer.addVertex(-1, -1, 0).setUv(0, 0);
+            consumer.addVertex( 1, -1, 0).setUv(1, 0);
+            consumer.addVertex( 1,  1, 0).setUv(1, 1);
+            consumer.addVertex(-1,  1, 0).setUv(0, 1);
+            bufferSource.endBatch(CompositeRenderTypes.MAIN_QUAD);
+        } finally {
+            modelViewStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
+            RenderSystem.restoreProjectionMatrix();
+        }
     }
 }

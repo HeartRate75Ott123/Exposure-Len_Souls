@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.logging.LogUtils;
 import com.plumejade.lensouls.ability.client.CaptureState;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import com.plumejade.lensouls.ability.client.ItemRenderTracker;
@@ -12,6 +13,7 @@ import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.entity.PartEntity;
+import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -36,6 +38,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @OnlyIn(Dist.CLIENT)
 @Mixin(EntityRenderDispatcher.class)
 public abstract class EntityRenderDispatcherMixin {
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final String RENDER_METHOD =
             "render(Lnet/minecraft/world/entity/Entity;DDDFFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V";
@@ -62,8 +66,17 @@ public abstract class EntityRenderDispatcherMixin {
                 != StatusGlintBufferSource.State.FROZEN) {
             return;
         }
+        // 只在主渲染 pass 捕获（Iris 阴影 pass 在 AFTER_SKY 之前渲染实体，
+        // 若捕获会把阴影投影写入 mask，描边错位；原版 outline 同样只在主 pass 生效）
+        if (!CaptureState.isMainPassActive()) {
+            return;
+        }
         FrozenOutlineManager.ensureMaskCleared();
-        CaptureState.tryStartCapture(root.getId());
+        boolean captured = CaptureState.tryStartCapture(root.getId());
+        if (captured) {
+            LOGGER.info("[FrozenMask] render entity={} (id={}) state=FROZEN captured=true",
+                    root.getName().getString(), root.getId());
+        }
     }
 
     @SuppressWarnings("rawtypes")

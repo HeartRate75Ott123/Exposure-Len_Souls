@@ -216,6 +216,20 @@ public class LenSoulsClient {
         } catch (java.io.IOException e) {
             LenSouls.LOGGER.error("[SoulGlow] FBO item mask 着色器加载失败", e);
         }
+
+        // 状态光效 glint（物品版）— 采样物品图集做 alpha 测试，剔除透明像素
+        try {
+            event.registerShader(
+                    new ShaderInstance(provider,
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "rendertype_status_glint_item"),
+                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX),
+                    instance -> {
+                        com.plumejade.lensouls.ability.client.StatusGlintItemRenderTypes.itemGlintShader = instance;
+                    }
+            );
+        } catch (java.io.IOException e) {
+            LenSouls.LOGGER.error("[Glint] 物品状态光效着色器加载失败", e);
+        }
     }
 
     /** 注册粒子提供器 */

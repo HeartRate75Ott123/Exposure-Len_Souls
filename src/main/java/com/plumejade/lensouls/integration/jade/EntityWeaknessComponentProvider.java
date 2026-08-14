@@ -81,8 +81,10 @@ public enum EntityWeaknessComponentProvider implements IEntityComponentProvider 
         com.plumejade.lensouls.boss.ToughnessEntry toughness =
                 com.plumejade.lensouls.boss.BossToughnessClientCache.find(entity.getId());
         if (toughness != null && toughness.requiredHits() > 0) {
-            int current = Math.min(toughness.requiredHits(),
+            // progress = 已削韧比例（0=满，1=破防），显示剩余韧性（初始 x/x，逐次降低）
+            int removed = Math.min(toughness.requiredHits(),
                     Math.round(toughness.progress() * toughness.requiredHits()));
+            int current = toughness.requiredHits() - removed;
             tooltip.add(Component.translatable("jade.lensouls.toughness",
                     current, toughness.requiredHits()).withStyle(ChatFormatting.GOLD));
         }

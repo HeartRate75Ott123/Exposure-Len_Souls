@@ -14,19 +14,59 @@ NeoForge 1.21.1 模组（镜魂），基于 Exposure 相机模组的扩展。详
 - 常用交付：构建后复制 JAR 到桌面（`C:/Users/volans/Desktop/`）；提交/推送需用户明确要求
 - 语言文件（`assets/lensouls/lang/*.json`）只**追加**键，追加后跑 `python -c "import json; json.load(...)"` 验证；曾发现 en_us 遗留重复键（`command.lensouls.toughness.*`）已清理
 
-## 工作区结构（只读参考项目）
+## 工作区路径地图（全面整理后，2026-08 扫描确认）
 
-| 目录 | 用途 |
+> 仓库根 = `E:\volans\Documents\GitHub\lensouls\lensouls-template-1.21.1\`（git）。上级 `E:\volans\Documents\GitHub\lensouls\` 是多项目工作区。
+> 注意：PowerShell 访问含 `[` 的目录名必须用 `-LiteralPath`（如 `[灾变]`、`[暮色森林]`），否则被当作通配符导致扫描为空。
+
+### 主力项目内部
+
+| 路径（相对仓库根） | 用途 |
 |------|------|
-| `lensouls-template-1.21.1/` | **主力项目**（git 仓库根） |
-| `../Exposure/` `../ExposurePolaroid/` | 相机模组源码，出片/帧流程查阅 |
-| `../Curios-1.21.1/` | **Curios 饰品模组源码**（common + neoforge），槽位判定/右键佩戴/掉落逻辑查阅 |
-| `../BetterCombat/` | **Better Combat 攻击模组源码**（common + neoforge），服务端攻击路径 `PlayerAttackHelper`、`NeoForgeEvents` 查阅 |
-| `../artifacts-1.21.1/` | Artifacts 饰品模组源码（Curios 集成参考，`data/curios/tags/item/` 槽 tag 模式） |
-| `../[灾变] L_Ender's Cataclysm 1.21.1-3.32/` | 灾变解压 class，`javap -p -c` 反编译查桶/上限逻辑 |
-| `../Legendary-Monsters-1.21.1-NeoForge/` | 传奇怪物源码 |
-| 项目内 `net/minecraft/` `net/neoforged/` `com/mojang/` | **项目辅助源码库（不全）**：仅渲染相关（`client/renderer`、blaze3d vertex）、NeoForge `common/conditions`/`registries`。原版/NeoForge 服务端代码一律用 neoformruntime 反编译 |
-| `~/.gradle/caches/neoformruntime/` | **ModDevGradle 产物**：`artifacts/minecraft_1.21.1_client.jar`、`intermediate_results/recompile_*.jar`（含全类）——反编译原版/NeoForge 首选，`javap -p -c` 即可，无需下载源码 |
+| `src/main/java/com/plumejade/lensouls/` | 模组全部源码：`ability/`（四能力系统）、`boss/`（韧性）、`client/`（渲染/模型）、`component/`、`config/`（Config.java）、`damage/`（元素伤害核心）、`effect/`、`enchantment/`、`entity/`、`event/`、`gui/`、`handler/`、`integration/`（JEI/Jade）、`item/`（次元枪/瓶/镜魂）、`key/`、`mixin/`（ability/client/compat 子包）、`network/`（CustomPacketPayload）、`particle/`、`recipe/`、`sound/`、`timer/`、`util/` |
+| `src/main/resources/assets/lensouls/` | 语言 `lang/zh_cn.json`/`en_us.json`、物品模型 `items/`、纹理 `textures/`、音效 `sounds/`、着色器 `shaders/core/` |
+| `src/main/resources/data/lensouls/` | 数据包：`entity_weakness/`（实体弱点）、`attacker_element/`（实体活性等级）、`item_element_activity/`（武器活性）、`damage_type_element/`、`recipe/` |
+| `src/main/resources/lensouls.mixins.json` | 必装 mixin 配置（refmap 占位必备） |
+| `src/main/resources/lensouls.compat.mixins.json` | 可选兼容 mixin（required:false，灾变/传奇怪物/BetterCombat/拍立得） |
+| `src/main/templates/META-INF/neoforge.mods.toml` | 模组元数据模板 |
+| `docs/` | 设计文档：`元素伤害系统.md`、`渲染体系.md`、`shader.md`、`soul-outline-system.md`、`phantom-system.md`、`glow-fbo-pipeline.md`、`frozen-outline.md`、`build-guide.md`、`curseforge_modrinth.md`、`重构方案-双FBO解耦.md` |
+| `outline-system/` | 描边系统独立备份：`java/`（源码）、`resources/shaders/core/`（全部 outline 着色器）、`docs/README.md` |
+| `tools/PaletteExtractor.java` | 调色板提取工具 |
+| `libs/` | 本地 flatDir：`cataclysm.jar`、`legendary_monsters.jar`、`lionfishapi.jar`（build.gradle `compileOnly "lensouls:..."` 引用） |
+| `run/mods/` | 测试环境全部模组 jar（21+ 个）：Exposure 1.9.18、ExposurePolaroid 1.1.5、Curios 9.5.1 为 `implementation`；JEI 19.27.0、Jade 15.10.5 为 `compileOnly`；灾变 3.32、传奇怪物 2.1.20、LionfishAPI 3.1、暮色 4.8.3345、BetterCombat 2.3.2、GeckoLib 4.9.2、Iris 1.8.14、Sodium 0.8.12 等 |
+| `run/config/lensouls-common.toml` | 运行时配置（改 Config.java 默认值需删此文件重生成） |
+| `com/` `net/`（项目内） | 辅助源码库（不全）：仅渲染相关（mojang blaze3d vertex、原版渲染类），服务端一律用 neoformruntime 反编译 |
+| `.claude/memories/` | Claude Code 长期记忆（`soul-item-outline.md` 等） |
+
+### 工作区参考项目（只读查阅）
+
+| 路径（相对工作区根 `E:\volans\Documents\GitHub\lensouls\`） | 用途 |
+|------|------|
+| `参考项目的源码\Exposure\`（common\src\main\java\io\github\mortuusars） | 相机模组源码，出片/帧流程/StackedPhotographs 查阅 |
+| `参考项目的源码\ExposurePolaroid\`（common → io.github.mortuusars） | 拍立得扩展源码 |
+| `参考项目的源码\exposure-expanded\`（common → dev.titanite.sparkwave） | Exposure 功能扩展源码 |
+| `参考项目的源码\curios\Curios-1.21.1\`（common → top.theillusivec4） | Curios 饰品槽源码 |
+| `参考项目的源码\BetterCombat\`（common → net.bettercombat） | Better Combat 攻击模组源码（PlayerAttackHelper、NeoForgeEvents、getRangeForItem） |
+| `参考项目的源码\Legendary-Monsters-1.21.1-NeoForge\`（src\main\java\net\miauczel） | 传奇怪物源码（compileOnly 引用） |
+| `参考项目的源码\[暮色森林]twilightforest-1.21.1\` | 暮色森林完整源码（10136 文件，gradle 项目 + tf-asm） |
+| `参考项目的源码\Malum-Mod-1.21.1\`（com.sammy.malum） | Malum 魔法模组源码 |
+| `参考项目的源码\Iris-1.21.1\` | Iris 光影源码（渲染管线兼容研究） |
+| `参考项目的源码\Photon-1.21\`（com.lowdragmc） | Photon 渲染 VFX 模组源码 |
+| `参考项目的源码\LDLib2-1.21\`（com.lowdragmc） | LowDragonLib2 基础库源码 |
+| `参考项目的源码\SubtleEffects-main\`（einstein.subtle_effects） | 粒子特效模组源码 |
+| `参考项目的源码\minecraftPlayerAnimator\`（minecraft\common） | Player Animator 库源码（coreLib） |
+| `boss源项目\Legendary-Monsters-1.21.1-NeoForge\`（src\main\java\net\miauczel） | 传奇怪物源码（另一份） |
+| `boss源项目\lionfish_1.21\`（src\main\java\com\github） | LionfishAPI 源码（灾变前置，compileOnly 引用） |
+| `bossJAR解包\[传奇怪物] legendary_monsters-2.1.20 MC 1.21.1\` | 传奇怪物 jar 解包（net/、minecraft/、assets/、data/，`javap -p -c` 反编译用） |
+| `bossJAR解包\[灾变] L_Ender's Cataclysm 1.21.1-3.32\`（及 boss源项目、参考项目的源码 下同名目录） | 灾变 jar 解包（com/、assets/、data/，三处内容相同，`javap -p -c` 查桶/上限逻辑） |
+| `better-climbing-1.21-\`（Xplat → artemis.better_climbing） | 攀爬模组源码（NeoForge+Fabric+Xplat） |
+| `block-place-particles-1.21-v0.4\`（common → games.enchanted） | 方块放置粒子模组源码 |
+| `damage_number-master\`（src\main\java\cc\xypp） | 伤害数字模组源码（1.21，`[伤害数字显示]` jar 对应） |
+| `com\`（工作区根） | **旧版 lensouls 1.2.0 jar 解包**（.class：ability/boss/damage/entity 等，与 `lensouls-1.2.0.jar` 对应） |
+| `data\`（工作区根） | 测试数据包：`cataclysm\tags\damage_type\bypasses_hurt_time.json` |
+| `docs\`（工作区根） | 空（预留） |
+| `lensouls-1.2.0.jar` | 旧版成品 jar（808KB） |
+| `~/.gradle/caches/neoformruntime/` | ModDevGradle 产物：`artifacts/minecraft_1.21.1_client.jar`、`intermediate_results/recompile_*.jar`——反编译原版/NeoForge 首选，`javap -p -c` 即可 |
 
 ## 照片注入管线（拍照能力系统）
 

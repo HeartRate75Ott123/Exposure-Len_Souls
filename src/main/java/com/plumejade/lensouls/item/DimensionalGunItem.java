@@ -8,6 +8,7 @@ import com.plumejade.lensouls.component.GunKillData;
 import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.entity.GunBulletEntity;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -451,7 +452,9 @@ public class DimensionalGunItem extends Item {
         tooltip.add(Component.empty());
         tooltip.add(Component.translatable("message.lensouls.dimensional_gun.tooltip.control1").withStyle(ChatFormatting.YELLOW));
         tooltip.add(Component.translatable("message.lensouls.dimensional_gun.tooltip.control2").withStyle(ChatFormatting.YELLOW));
-        tooltip.add(Component.translatable("message.lensouls.dimensional_gun.tooltip.control3").withStyle(ChatFormatting.YELLOW));
+        // 实际潜行键绑定（不硬写 Shift，玩家改键后显示跟随）
+        Component sneakKey = Minecraft.getInstance().options.keyShift.getTranslatedKeyMessage();
+        tooltip.add(Component.translatable("message.lensouls.dimensional_gun.tooltip.control3", sneakKey).withStyle(ChatFormatting.YELLOW));
     }
 
     // ======================== Ammo Bar ========================

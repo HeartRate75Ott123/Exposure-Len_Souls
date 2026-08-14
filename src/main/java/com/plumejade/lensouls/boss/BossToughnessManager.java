@@ -8,6 +8,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -141,10 +143,11 @@ public class BossToughnessManager {
         com.plumejade.lensouls.ability.util.FreezeTracker.getInstance().unfreezeEntity(entity);
         data.setStunTicks(stunTicks);
 
-        // 应用定身效果（参考 FreezeTracker 的冻结逻辑）
-        if (entity instanceof Mob mob) {
-            mob.setNoAi(true);
-            mob.setNoGravity(true);
+        // 定身改用药水效果（不再 setNoAi，兼容自定义 AI/行为树的 BOSS）：
+        // 怪物强迟缓 255 级，触发破定的玩家获得抗性 V，时长均为破定时长
+        entity.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, stunTicks, 254, false, false));
+        if (player != null) {
+            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, stunTicks, 4, false, false));
         }
         entity.setNoGravity(true);
 
@@ -155,13 +158,10 @@ public class BossToughnessManager {
         BossToughnessData data = dataMap.get(entity.getUUID());
         if (data == null) return;
 
-        // 解除定身；若实体仍被时间定格冻结，则不恢复 AI（由 FreezeTracker 到期时统一恢复）
+        // 解除定身：移除破防时施加的强迟缓效果；若实体仍被时间定格冻结，则不恢复重力（由 FreezeTracker 到期时统一恢复）
+        entity.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
         boolean stillFrozen = com.plumejade.lensouls.ability.util.FreezeTracker.getInstance().isEntityFrozen(entity);
         if (!stillFrozen) {
-            if (entity instanceof Mob mob) {
-                mob.setNoAi(false);
-                mob.setNoGravity(false);
-            }
             entity.setNoGravity(false);
         }
 
@@ -268,7 +268,7 @@ public class BossToughnessManager {
         if (entity.level().isClientSide) return;
 
         List<ToughnessEntry> single = List.of(
-                new ToughnessEntry(entity.getId(), data.getProgress(), data.isBroken(), data.isInvincible()));
+                new ToughnessEntry(entity.getId(), data.getProgress(), data.isBroken(), data.isInvincible(), data.getRequiredHits()));
         PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessSyncPacket(single));
     }
 
@@ -285,7 +285,7 @@ public class BossToughnessManager {
             for (ServerLevel sl : server.getAllLevels()) {
                 Entity entity = sl.getEntity(entry.getKey());
                 if (entity instanceof LivingEntity le && le.isAlive()) {
-                    allEntries.add(new ToughnessEntry(le.getId(), data.getProgress(), data.isBroken(), data.isInvincible()));
+                    allEntries.add(new ToughnessEntry(le.getId(), data.getProgress(), data.isBroken(), data.isInvincible(), data.getRequiredHits()));
                     break;
                 }
             }

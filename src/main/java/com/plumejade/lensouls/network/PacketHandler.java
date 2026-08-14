@@ -1,6 +1,6 @@
 package com.plumejade.lensouls.network;
 
-import com.plumejade.lensouls.ability.network.AbilityCyclePacket;
+import com.plumejade.lensouls.ability.network.AbilityOpenGuiPacket;
 import com.plumejade.lensouls.ability.network.SpatialWarpActivatePacket;
 import com.plumejade.lensouls.ability.network.TemporalRecallTriggerPacket;
 import net.neoforged.bus.api.IEventBus;
@@ -50,9 +50,9 @@ public class PacketHandler {
 
         // ---- 能力系统 C2S 包 ----
         registrar.playToServer(
-                AbilityCyclePacket.TYPE,
-                AbilityCyclePacket.STREAM_CODEC,
-                AbilityCyclePacket::handle
+                AbilityOpenGuiPacket.TYPE,
+                AbilityOpenGuiPacket.STREAM_CODEC,
+                AbilityOpenGuiPacket::handle
         );
 
         registrar.playToServer(
@@ -65,12 +65,6 @@ public class PacketHandler {
                 TemporalRecallTriggerPacket.TYPE,
                 TemporalRecallTriggerPacket.STREAM_CODEC,
                 TemporalRecallTriggerPacket::handle
-        );
-
-        registrar.playToServer(
-                AbilityListPacket.TYPE,
-                AbilityListPacket.STREAM_CODEC,
-                AbilityListPacket::handle
         );
     }
 }

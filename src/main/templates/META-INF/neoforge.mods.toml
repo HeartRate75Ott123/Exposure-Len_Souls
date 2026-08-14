@@ -102,6 +102,13 @@ config="${mod_id}.compat.mixins.json"
     ordering="NONE"
     side="BOTH"
 
+# ---- 前置：LDLib2 GUI 框架（能力选择界面） ----
+[[dependencies.${mod_id}]]
+    modId="ldlib2"
+    type="required"
+    ordering="NONE"
+    side="BOTH"
+
 # ---- 可选附属：Exposure 拍立得扩展 ----
 [[dependencies.${mod_id}]]
     modId="exposure_polaroid"

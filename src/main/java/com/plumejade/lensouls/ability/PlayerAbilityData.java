@@ -18,6 +18,8 @@ public class PlayerAbilityData {
     public static final double SPATIAL_WARP_RADIUS = 7.0;
 
     private final boolean[] unlocked = new boolean[COUNT];
+    /** 解锁顺序（最近解锁在尾部），GUI 排序用 */
+    private final java.util.List<AbilityType> unlockOrder = new java.util.ArrayList<>();
     private int currentOrdinal = 0;                     // 当前启用能力的 ordinal
 
     // 空间扭曲：以照片拍摄坐标为中心的范围圈（warpDim == null 表示未激活）
@@ -35,6 +37,16 @@ public class PlayerAbilityData {
 
     public boolean isUnlocked(AbilityType type) {
         return unlocked[type.ordinal()];
+    }
+
+    /** 解锁顺序（旧→新）。缺历史数据时回退为枚举序。 */
+    public java.util.List<AbilityType> getUnlockOrder() {
+        if (unlockOrder.isEmpty()) {
+            for (AbilityType type : AbilityType.values()) {
+                if (unlocked[type.ordinal()]) unlockOrder.add(type);
+            }
+        }
+        return unlockOrder;
     }
 
     public AbilityType getEnabled() {
@@ -72,7 +84,13 @@ public class PlayerAbilityData {
     // ========== 写入 ==========
 
     public void setUnlocked(AbilityType type, boolean value) {
+        boolean wasUnlocked = unlocked[type.ordinal()];
         unlocked[type.ordinal()] = value;
+        if (value && !wasUnlocked) {
+            unlockOrder.add(type);
+        } else if (!value) {
+            unlockOrder.remove(type);
+        }
         if (!value && currentOrdinal == type.ordinal()) {
             fallbackToFirstUnlocked();
         }
@@ -154,6 +172,7 @@ public class PlayerAbilityData {
     private static final String TAG_SW_Y = "sw_y";
     private static final String TAG_SW_Z = "sw_z";
     private static final String TAG_DESC_SENT = "desc_sent";
+    private static final String TAG_UNLOCK_ORDER = "unlock_order";
 
     public CompoundTag serialize() {
         CompoundTag tag = new CompoundTag();
@@ -181,6 +200,13 @@ public class PlayerAbilityData {
             descList.add(st);
         }
         tag.put(TAG_DESC_SENT, descList);
+
+        // 解锁顺序（持久化，GUI「新解锁排最前」用）
+        ListTag orderList = new ListTag();
+        for (AbilityType type : getUnlockOrder()) {
+            orderList.add(net.minecraft.nbt.IntTag.valueOf(type.ordinal()));
+        }
+        tag.put(TAG_UNLOCK_ORDER, orderList);
         return tag;
     }
 
@@ -214,6 +240,17 @@ public class PlayerAbilityData {
             ListTag descList = tag.getList(TAG_DESC_SENT, Tag.TAG_STRING);
             for (int i = 0; i < descList.size(); i++) {
                 data.descriptionsSent.add(descList.getString(i));
+            }
+        }
+
+        // 解锁顺序（旧档无此键 → getUnlockOrder 回退枚举序）
+        if (tag.contains(TAG_UNLOCK_ORDER, Tag.TAG_LIST)) {
+            ListTag orderList = tag.getList(TAG_UNLOCK_ORDER, Tag.TAG_INT);
+            for (int i = 0; i < orderList.size(); i++) {
+                int ordinal = orderList.getInt(i);
+                if (ordinal >= 0 && ordinal < COUNT) {
+                    data.unlockOrder.add(AbilityType.values()[ordinal]);
+                }
             }
         }
 

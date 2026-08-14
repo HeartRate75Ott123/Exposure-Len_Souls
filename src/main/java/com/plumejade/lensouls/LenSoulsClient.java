@@ -80,6 +80,8 @@ public class LenSoulsClient {
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onPlayerTick);
         // 客户端断线时清理幻灵状态
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onClientLogout);
+        // 客户端断线时清空能力缓存，防止切换存档跨档污染
+        NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.ability.client.ClientAbilityCache::onClientLogout);
         // 客户端元素螺旋粒子 Tick 驱动
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.particle.ClientElementSpiralHandler::onClientTick);
         // 药水效果 tooltip 追加描述行

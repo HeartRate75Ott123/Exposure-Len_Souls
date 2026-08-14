@@ -76,6 +76,16 @@ public enum EntityWeaknessComponentProvider implements IEntityComponentProvider 
         if (hasActivity) {
             tooltip.add(atkLine.copy().withStyle(ChatFormatting.GREEN));
         }
+
+        // 韧性：生物韧性 x/x（服务端同步的 requiredHits + progress）
+        com.plumejade.lensouls.boss.ToughnessEntry toughness =
+                com.plumejade.lensouls.boss.BossToughnessClientCache.find(entity.getId());
+        if (toughness != null && toughness.requiredHits() > 0) {
+            int current = Math.min(toughness.requiredHits(),
+                    Math.round(toughness.progress() * toughness.requiredHits()));
+            tooltip.add(Component.translatable("jade.lensouls.toughness",
+                    current, toughness.requiredHits()).withStyle(ChatFormatting.GOLD));
+        }
     }
 
     @Override

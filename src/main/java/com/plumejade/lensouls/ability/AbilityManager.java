@@ -10,6 +10,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 // PlayerRespawnEvent is used as PlayerEvent.PlayerRespawnEvent (inner class of PlayerEvent)
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -50,16 +51,16 @@ public class AbilityManager {
         save(player, data);
         syncToClient(player);
         if (next != null) {
-            player.sendSystemMessage(
+            player.displayClientMessage(
                     Component.translatable("ability.lensouls." + next.getId() + ".name")
-                            .copy().withStyle(net.minecraft.ChatFormatting.GREEN));
+                            .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
             return true;
         } else {
             AbilityType current = data.getEnabled();
             if (current != null) {
-                player.sendSystemMessage(
+                player.displayClientMessage(
                         Component.translatable("ability.lensouls." + current.getId() + ".name")
-                                .copy().withStyle(net.minecraft.ChatFormatting.GREEN));
+                                .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
             }
             return false;
         }
@@ -70,8 +71,25 @@ public class AbilityManager {
     }
 
     /**
+     * 直接设置当前启用能力（GUI 卡片「选择」按钮用）。
+     * 仅在目标能力已解锁时生效。
+     *
+     * @return 是否设置成功
+     */
+    public boolean setEnabled(ServerPlayer player, AbilityType type) {
+        PlayerAbilityData data = get(player);
+        if (!data.isUnlocked(type)) return false;
+        data.setEnabled(type);
+        save(player, data);
+        syncToClient(player);
+        player.displayClientMessage(
+                Component.translatable(type.getNameKey())
+                        .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
+        return true;
+    }
+
+    /**
      * 设置能力的解锁状态。
-     * false→true 时触发首次描述播报检查。
      * true→false 且该能力当前启用时，自动回退到弱点透镜。
      */
     public void setUnlocked(ServerPlayer player, AbilityType type, boolean value) {
@@ -84,15 +102,13 @@ public class AbilityManager {
         save(player, data);
         syncToClient(player);
 
-        if (value && !wasUnlocked && !data.hasSentDescription(type)) {
-            // 首次解锁 → 播报能力描述
-            data.markDescriptionSent(type);
-            save(player, data);
+        if (value && !wasUnlocked) {
+            // 解锁成功提示（消息栏）
             player.sendSystemMessage(
-                    Component.translatable("ability.lensouls." + type.getId() + ".description")
+                    Component.translatable("message.lensouls.ability.unlocked",
+                            Component.translatable(type.getNameKey()))
                             .copy().withStyle(net.minecraft.ChatFormatting.GREEN));
         }
-
     }
 
     // ========== 空间扭曲（以照片坐标为圆心） ==========
@@ -161,11 +177,27 @@ public class AbilityManager {
         return get(player).hasSentDescription(type);
     }
 
+    /** 解锁顺序（旧→新，最近解锁在尾部），GUI「新解锁排最前」用 */
+    public java.util.List<AbilityType> getUnlockOrder(Player player) {
+        return get(player).getUnlockOrder();
+    }
+
     // ========== S2C 同步 ==========
 
     public void syncToClient(ServerPlayer player) {
         PlayerAbilityData data = get(player);
         AbilityType enabled = data.getEnabled();
+        long unlockedMask = 0L;
+        AbilityType[] values = AbilityType.values();
+        for (int i = 0; i < values.length; i++) {
+            if (data.isUnlocked(values[i])) unlockedMask |= (1L << i);
+        }
+        // 解锁顺序（GUI 排序用）
+        java.util.List<AbilityType> order = data.getUnlockOrder();
+        int[] unlockOrder = new int[order.size()];
+        for (int i = 0; i < order.size(); i++) {
+            unlockOrder[i] = order.get(i).ordinal();
+        }
         boolean swActive = data.isSpatialWarpActive();
         double wx = 0, wy = 0, wz = 0;
         String wDim = "";
@@ -176,7 +208,7 @@ public class AbilityManager {
         }
         PacketDistributor.sendToPlayer(player,
                 new AbilitySyncPacket(enabled != null ? enabled.ordinal() : -1,
-                        swActive, wx, wy, wz, wDim));
+                        unlockedMask, unlockOrder, swActive, wx, wy, wz, wDim));
     }
 
     // ========== 持久化 ==========
@@ -223,6 +255,17 @@ public class AbilityManager {
         if (event.getEntity() instanceof ServerPlayer) {
             getInstance().unload(event.getEntity());
         }
+    }
+
+    /**
+     * 服务端停止时清空缓存，防止跨存档污染。
+     * <p>
+     * 单机集成服务器切换存档时，若玩家登出事件未触发，同 UUID 玩家会命中旧存档
+     * 残留缓存（离线模式 UUID 由用户名固定生成），导致新档凭空出现已解锁能力。
+     */
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        getInstance().cache.clear();
     }
 
     /**

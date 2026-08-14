@@ -1,9 +1,11 @@
 package com.plumejade.lensouls.ability;
 
+import net.minecraft.resources.ResourceLocation;
+
 /**
- * 摄魂术四能力枚举。
+ * 摄魂术能力枚举。
  * <p>
- * 固定顺序用于循环切换：WEAKNESS_LENS → SPATIAL_WARP → TEMPORAL_RECALL → TIME_STOP
+ * 声明顺序即 GUI 中卡片展示顺序（新能力追加枚举即可自动收纳）。
  */
 public enum AbilityType {
 
@@ -23,6 +25,26 @@ public enum AbilityType {
 
     public String getId() {
         return id;
+    }
+
+    /** 能力显示名翻译键：ability.lensouls.{id}.name */
+    public String getNameKey() {
+        return "ability.lensouls." + id + ".name";
+    }
+
+    /** 能力简介翻译键（首次解锁播报/卡片简介用） */
+    public String getDescriptionKey() {
+        return "ability.lensouls." + id + ".description";
+    }
+
+    /** 能力长文案翻译键（GUI 详情介绍框用） */
+    public String getDetailKey() {
+        return "ability.lensouls." + id + ".detail";
+    }
+
+    /** 能力图标（占位用能力球物品）：lensouls:{id}_ball */
+    public ResourceLocation getIconItemId() {
+        return ResourceLocation.fromNamespaceAndPath("lensouls", id + "_ball");
     }
 
     /**

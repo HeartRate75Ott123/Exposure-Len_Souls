@@ -11,7 +11,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * S2C：同步能力状态 + 空间扭曲球心坐标。
+ * S2C：同步能力状态（当前启用 + 解锁位图）+ 空间扭曲球心坐标。
  */
 public class AbilitySyncPacket implements CustomPacketPayload {
 
@@ -23,13 +23,20 @@ public class AbilitySyncPacket implements CustomPacketPayload {
             StreamCodec.ofMember(AbilitySyncPacket::encode, AbilitySyncPacket::new);
 
     private final int enabledOrdinal;
+    /** 解锁位图：第 N 位 = AbilityType.values()[N] 是否解锁 */
+    private final long unlockedMask;
+    /** 解锁顺序（旧→新，最近解锁在尾部），GUI 排序用 */
+    private final int[] unlockOrder;
     private final boolean spatialWarpActive;
     private final double warpX, warpY, warpZ;
     private final String warpDimension;
 
-    public AbilitySyncPacket(int enabledOrdinal, boolean spatialWarpActive,
+    public AbilitySyncPacket(int enabledOrdinal, long unlockedMask, int[] unlockOrder,
+                             boolean spatialWarpActive,
                              double warpX, double warpY, double warpZ, String warpDimension) {
         this.enabledOrdinal = enabledOrdinal;
+        this.unlockedMask = unlockedMask;
+        this.unlockOrder = unlockOrder;
         this.spatialWarpActive = spatialWarpActive;
         this.warpX = warpX;
         this.warpY = warpY;
@@ -39,6 +46,12 @@ public class AbilitySyncPacket implements CustomPacketPayload {
 
     private AbilitySyncPacket(RegistryFriendlyByteBuf buf) {
         this.enabledOrdinal = buf.readInt();
+        this.unlockedMask = buf.readLong();
+        int orderLen = buf.readVarInt();
+        this.unlockOrder = new int[orderLen];
+        for (int i = 0; i < orderLen; i++) {
+            this.unlockOrder[i] = buf.readVarInt();
+        }
         this.spatialWarpActive = buf.readBoolean();
         if (this.spatialWarpActive) {
             this.warpX = buf.readDouble();
@@ -53,6 +66,11 @@ public class AbilitySyncPacket implements CustomPacketPayload {
 
     private void encode(RegistryFriendlyByteBuf buf) {
         buf.writeInt(enabledOrdinal);
+        buf.writeLong(unlockedMask);
+        buf.writeVarInt(unlockOrder.length);
+        for (int ordinal : unlockOrder) {
+            buf.writeVarInt(ordinal);
+        }
         buf.writeBoolean(spatialWarpActive);
         if (spatialWarpActive) {
             buf.writeDouble(warpX);
@@ -70,8 +88,8 @@ public class AbilitySyncPacket implements CustomPacketPayload {
 
     public static void handle(AbilitySyncPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
-            ClientAbilityCache.set(packet.enabledOrdinal, packet.spatialWarpActive,
-                    packet.warpX, packet.warpY, packet.warpZ, packet.warpDimension);
+            ClientAbilityCache.set(packet.enabledOrdinal, packet.unlockedMask, packet.unlockOrder,
+                    packet.spatialWarpActive, packet.warpX, packet.warpY, packet.warpZ, packet.warpDimension);
         });
     }
 }

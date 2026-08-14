@@ -42,6 +42,8 @@ public class ToughnessBarRenderer {
     private static RenderType getN() { if (rtN == null) rtN = make(NO_PROTECTION, "lensouls_bar_n"); return rtN; }
 
     private static final float POS_SMOOTH = 0.06f;
+    /** 碰撞箱顶面与韧性条底部的固定空隙（世界格），避免与高模型头部重叠 */
+    private static final double BAR_HEAD_CLEARANCE = 0.5;
     private static float debugProgress = 0.3f;
     private static boolean useDebug = false;
     private static final Map<UUID, Vec3> smoothPos = new ConcurrentHashMap<>();
@@ -78,7 +80,10 @@ public class ToughnessBarRenderer {
     }
 
     private static void renderBar(RenderLevelStageEvent event, Minecraft mc, Camera cam, LivingEntity target, float progress, VertexConsumer vc, VertexConsumer nc) {
-        Vec3 raw = target.position().add(0, target.getBbHeight() + Config.TOUGH_BAR_VERTICAL_OFFSET.get(), 0);
+        // 基准改为碰撞箱顶面（bb.maxY），向上留固定空隙后叠加配置偏移，不再贴模型头部
+        Vec3 raw = new Vec3(target.getX(),
+                target.getBoundingBox().maxY + BAR_HEAD_CLEARANCE + Config.TOUGH_BAR_VERTICAL_OFFSET.get(),
+                target.getZ());
         UUID uid = target.getUUID();
         float speed = target.hurtTime > 0 ? POS_SMOOTH * 0.5f : POS_SMOOTH;
         Vec3 pos = smoothPos.compute(uid, (k, v) -> {

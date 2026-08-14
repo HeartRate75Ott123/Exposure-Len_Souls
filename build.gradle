@@ -31,6 +31,8 @@ repositories {
     flatDir {
         dirs 'libs'
     }
+    // LDLib2 (FirstDark Maven snapshots)
+    maven { url = "https://maven.firstdark.dev/snapshots" }
 }
 
 base {
@@ -149,11 +151,17 @@ dependencies {
     implementation files("run/mods/exposure_polaroid-neoforge-1.21.1-1.1.5.jar")
     // ---- Curios 饰品 API ----
     implementation files("run/mods/curios-neoforge-9.5.1+1.21.1.jar")
+    // ---- LDLib2 GUI 框架（能力选择界面，本地 libs/ 文件方式，避免远程 snapshot 解析卡顿） ----
+    implementation files("libs/ldlib2-neoforge-1.21.1-2.2.35-all.jar")
+    // LDLib2 传递依赖（flatDir 不解析传递依赖，显式声明）
+    implementation files("libs/kotlin-stdlib-2.1.20.jar")
+    implementation files("libs/yoga-1.0.0.jar")
+    implementation files("libs/taffy-1.1.4.jar")
     compileOnly "lensouls:legendary_monsters:2.1.20"
     compileOnly "lensouls:cataclysm:3.32"
     compileOnly "lensouls:lionfishapi:3.1"
     // ---- JEI 兼容（compileOnly，运行时可选） ----
-    compileOnly files("run/mods/[JEI物品管理器] jei-1.21.1-neoforge-19.27.0.343.jar")
+    compileOnly files("run/mods/[JEI物品管理器] jei-1.21.1-neoforge-19.44.0.401.jar")
     // ---- Jade/WTHIT 兼容（compileOnly，运行时可选） ----
     compileOnly files("run/mods/[辅助][玉 🔍] Jade-1.21.1-NeoForge-15.10.5.jar")
 

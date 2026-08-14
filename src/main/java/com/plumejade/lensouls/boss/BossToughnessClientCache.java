@@ -24,18 +24,20 @@ public class BossToughnessClientCache {
 
     /** 某实体是否处于破防定身状态 */
     public static boolean isStunned(int entityId) {
-        for (ToughnessEntry e : entries) {
-            if (e.entityId() == entityId && e.broken()) return true;
-        }
-        return false;
+        return find(entityId) != null && find(entityId).broken();
     }
 
     /** 某实体是否处于削韧无敌窗口 */
     public static boolean isInvincible(int entityId) {
+        return find(entityId) != null && find(entityId).invincible();
+    }
+
+    /** 查找实体的韧性条目（Jade 显示韧性值用） */
+    public static ToughnessEntry find(int entityId) {
         for (ToughnessEntry e : entries) {
-            if (e.entityId() == entityId && e.invincible()) return true;
+            if (e.entityId() == entityId) return e;
         }
-        return false;
+        return null;
     }
 
     public static void clear() {

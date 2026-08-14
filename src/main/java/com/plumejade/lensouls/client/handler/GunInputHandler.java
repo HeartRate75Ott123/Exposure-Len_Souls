@@ -29,11 +29,7 @@ public class GunInputHandler {
 
         // Only on air (no entity targeted)
         if (mc.hitResult == null || mc.hitResult.getType() == HitResult.Type.MISS) {
-            long window = mc.getWindow().getWindow();
-            boolean shiftDown = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS
-                    || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
-
-            if (shiftDown) {
+            if (mc.player.isShiftKeyDown()) {
                 PacketDistributor.sendToServer(new DimensionalGunTogglePacket());
             } else {
                 PacketDistributor.sendToServer(new DimensionalGunCyclePacket());

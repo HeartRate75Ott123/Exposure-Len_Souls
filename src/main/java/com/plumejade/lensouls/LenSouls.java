@@ -1,6 +1,7 @@
 package com.plumejade.lensouls;
 
 import com.plumejade.lensouls.ability.AbilityManager;
+import com.plumejade.lensouls.ability.gui.AbilityGuiHolder;
 import com.plumejade.lensouls.ability.handler.PhotoInjectionHandler;
 import com.plumejade.lensouls.ability.handler.SpatialWarpHandler;
 import com.plumejade.lensouls.ability.handler.TemporalRecallHandler;
@@ -61,6 +62,9 @@ public class LenSouls {
         com.plumejade.lensouls.particle.ModParticleTypes.register(modEventBus);
         com.plumejade.lensouls.sound.ModSounds.register(modEventBus);
         PacketHandler.register(modEventBus);
+
+        // 能力选择 GUI（LDLib2 服务端菜单，客户端与服务端共同构建 UI 树）
+        AbilityGuiHolder.register();
 
         modEventBus.addListener(this::registerConditions);
 

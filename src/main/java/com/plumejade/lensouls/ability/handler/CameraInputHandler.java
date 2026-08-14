@@ -3,13 +3,22 @@ package com.plumejade.lensouls.ability.handler;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.ability.client.ClientAbilityCache;
-import com.plumejade.lensouls.ability.network.AbilityCyclePacket;
+import com.plumejade.lensouls.ability.gui.AbilityGuiHolder;
+import com.plumejade.lensouls.ability.network.AbilityOpenGuiPacket;
 import com.plumejade.lensouls.ability.network.SpatialWarpActivatePacket;
 import com.plumejade.lensouls.ability.network.TemporalRecallTriggerPacket;
 import com.plumejade.lensouls.ability.util.TemporalSnapshot;
+import com.lowdragmc.lowdraglib2.gui.holder.ModularUIContainerMenu;
+import com.lowdragmc.lowdraglib2.gui.holder.ModularUIContainerScreen;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.Input;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.HitResult;
@@ -17,6 +26,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.client.event.MovementInputUpdateEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
@@ -50,9 +61,9 @@ public class CameraInputHandler {
             return;
         }
 
-        // ── 手持相机 → 循环切换能力（首次切换自动发送弱点透镜描述） ──
+        // ── 手持相机 → 打开能力选择 GUI ──
         if (isCamera(stack)) {
-            PacketDistributor.sendToServer(new AbilityCyclePacket());
+            PacketDistributor.sendToServer(new AbilityOpenGuiPacket());
         }
     }
 
@@ -60,6 +71,70 @@ public class CameraInputHandler {
 
     private static final ResourceLocation CAMERA_ID = ResourceLocation.parse("exposure:camera");
     private static final ResourceLocation POLAROID_ID = ResourceLocation.parse("exposure_polaroid:instant_camera");
+
+    /**
+     * 手持相机时，当前能力常态显示在物品栏上方（actionbar）。
+     * 每 tick 刷新让提示常驻；换手/无能力时停止刷新自然淡出。
+     */
+    @SubscribeEvent
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
+        if (!event.getEntity().level().isClientSide) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        if (!isCamera(mc.player.getMainHandItem())) return;
+
+        AbilityType enabled = ClientAbilityCache.getEnabled();
+        if (enabled == null) return;
+
+        mc.gui.setOverlayMessage(
+                Component.translatable(enabled.getNameKey())
+                        .copy().withStyle(ChatFormatting.GREEN), false);
+    }
+
+    /**
+     * 能力选择 GUI 打开时仍可移动（WASD/跳跃/潜行/冲刺）。
+     * <p>
+     * 原版 Screen 打开时 KeyMapping 不更新，input.tick 读到全 false；
+     * 该事件在 {@code input.tick} 之后、移动逻辑之前触发，
+     * 用 GLFW 原始键位覆写 Input 字段即可正常移动（仅限本模组能力 GUI）。
+     */
+    @SubscribeEvent
+    public static void onMovementInput(MovementInputUpdateEvent event) {
+        if (!(event.getEntity() instanceof LocalPlayer)) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen == null) return;
+        if (!(mc.screen instanceof ModularUIContainerScreen cs)) return;
+        if (!(cs.getMenu() instanceof ModularUIContainerMenu menu)) return;
+        if (!AbilityGuiHolder.isGuiOpen(menu.getModularUI())) return;
+
+        Input input = event.getInput();
+        boolean up = keyDown(mc, mc.options.keyUp);
+        boolean down = keyDown(mc, mc.options.keyDown);
+        boolean left = keyDown(mc, mc.options.keyLeft);
+        boolean right = keyDown(mc, mc.options.keyRight);
+        input.up = up;
+        input.down = down;
+        input.left = left;
+        input.right = right;
+        input.forwardImpulse = impulse(up, down);
+        input.leftImpulse = impulse(left, right);
+        input.jumping = keyDown(mc, mc.options.keyJump);
+        input.shiftKeyDown = keyDown(mc, mc.options.keyShift);
+        // 冲刺由 aiStep 读 keySprint.isDown() 触发，直接同步原始键位
+        mc.options.keySprint.setDown(keyDown(mc, mc.options.keySprint));
+    }
+
+    private static float impulse(boolean input, boolean otherInput) {
+        return input == otherInput ? 0.0F : (input ? 1.0F : -1.0F);
+    }
+
+    private static boolean keyDown(Minecraft mc, KeyMapping km) {
+        var key = km.getKey();
+        if (key.getType() != InputConstants.Type.KEYSYM) return false;
+        return InputConstants.isKeyDown(mc.getWindow().getWindow(), key.getValue());
+    }
 
     private static boolean isCamera(ItemStack stack) {
         ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());

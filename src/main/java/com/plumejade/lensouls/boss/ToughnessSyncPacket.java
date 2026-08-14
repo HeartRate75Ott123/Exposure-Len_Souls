@@ -44,7 +44,8 @@ public class ToughnessSyncPacket implements CustomPacketPayload {
             float progress = buf.readFloat();
             boolean broken = buf.readBoolean();
             boolean invincible = buf.readBoolean();
-            list.add(new ToughnessEntry(entityId, progress, broken, invincible));
+            int requiredHits = buf.readVarInt();
+            list.add(new ToughnessEntry(entityId, progress, broken, invincible, requiredHits));
         }
         this.entries = list;
     }
@@ -56,6 +57,7 @@ public class ToughnessSyncPacket implements CustomPacketPayload {
             buf.writeFloat(entry.progress());
             buf.writeBoolean(entry.broken());
             buf.writeBoolean(entry.invincible());
+            buf.writeVarInt(entry.requiredHits());
         }
     }
 

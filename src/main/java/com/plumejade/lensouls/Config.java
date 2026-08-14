@@ -168,15 +168,15 @@ public class Config {
 
     public static final ModConfigSpec.IntValue TOUGH_BAR_WIDTH = BUILDER
             .comment("Boss toughness bar width (pixels)")
-            .defineInRange("toughBarWidth", 32, 8, 200);
+            .defineInRange("toughBarWidth", 64, 8, 400);
 
     public static final ModConfigSpec.IntValue TOUGH_BAR_HEIGHT = BUILDER
             .comment("Boss toughness bar height (pixels)")
-            .defineInRange("toughBarHeight", 32, 8, 200);
+            .defineInRange("toughBarHeight", 64, 8, 400);
 
     public static final ModConfigSpec.DoubleValue TOUGH_BAR_VERTICAL_OFFSET = BUILDER
             .comment("Boss toughness bar vertical offset above head (blocks)")
-            .defineInRange("toughBarVerticalOffset", 0.5, 0.0, 5.0);
+            .defineInRange("toughBarVerticalOffset", 2.5, 0.0, 8.0);
 
     static { BUILDER.pop(); }
 

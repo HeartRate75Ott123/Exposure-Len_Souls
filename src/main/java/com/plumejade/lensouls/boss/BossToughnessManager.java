@@ -145,7 +145,7 @@ public class BossToughnessManager {
 
         // 定身改用药水效果（不再 setNoAi，兼容自定义 AI/行为树的 BOSS）：
         // 怪物强迟缓 255 级，触发破定的玩家获得抗性 V，时长均为破定时长
-        entity.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, stunTicks, 254, false, false));
+        entity.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, stunTicks, 254, false, true));
         if (player != null) {
             player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, stunTicks, 4, false, false));
         }
@@ -201,6 +201,7 @@ public class BossToughnessManager {
 
         List<UUID> pendingStunEnd = new ArrayList<>();
         List<UUID> pendingResetSound = new ArrayList<>();
+        List<UUID> pendingStunEnsure = new ArrayList<>();
 
         for (Map.Entry<UUID, BossToughnessData> entry : dataMap.entrySet()) {
             BossToughnessData data = entry.getValue();
@@ -219,6 +220,12 @@ public class BossToughnessManager {
             // 定身到期标记，稍后查找实体解除
             if (data.isBroken() && data.getStunRemainingTicks() <= 0) {
                 pendingStunEnd.add(entry.getKey());
+            }
+
+            // 破防持续期：确保实体持有强迟缓 255（兜底：防被外部效果清除/覆盖后丢失，
+            // 时长与破防剩余对齐，保证"韧性清空 → 迟缓 255"始终成立）
+            if (data.isBroken() && data.getStunRemainingTicks() > 0) {
+                pendingStunEnsure.add(entry.getKey());
             }
         }
 
@@ -248,6 +255,27 @@ public class BossToughnessManager {
                         Entity entity = sl.getEntity(uuid);
                         if (entity instanceof LivingEntity le && le.isAlive()) {
                             onStunEnd(le);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 破防持续期补迟缓 255（同上，复用实体查找；缺失才补，避免每 tick 无谓操作）
+        if (!pendingStunEnsure.isEmpty()) {
+            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+            if (server != null) {
+                for (UUID uuid : pendingStunEnsure) {
+                    BossToughnessData data = dataMap.get(uuid);
+                    if (data == null) continue;
+                    for (ServerLevel sl : server.getAllLevels()) {
+                        Entity entity = sl.getEntity(uuid);
+                        if (entity instanceof LivingEntity le && le.isAlive()) {
+                            if (!le.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)) {
+                                le.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,
+                                        Math.max(40, data.getStunRemainingTicks()), 254, false, true));
+                            }
                             break;
                         }
                     }

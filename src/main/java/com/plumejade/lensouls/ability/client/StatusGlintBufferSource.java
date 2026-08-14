@@ -12,6 +12,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import org.joml.Matrix4f;
 
 /**
  * 状态光效 BufferSource 包装器（顶点双写方案）。
@@ -64,16 +65,20 @@ public class StatusGlintBufferSource implements MultiBufferSource {
                 && format != DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP) {
             return delegate.getBuffer(type);
         }
+        // per-纹理方案：每层类型即时提取该层纹理（反射缓存，失败白像素兜底）。
+        // mask/glint 类型按纹理区分，BufferSource 层切换即 flush——
+        // 多纹理实体（焰魔身体+盾牌、斯库拉身体+剑）每层用自己纹理做 alpha 测试
+        int textureId = CaptureState.entityTextureId(type);
         // 先取主类型：BufferSource 类型切换即 endBatch，先主后 glint = 先画主后画光效
         VertexConsumer main = delegate.getBuffer(type);
-        VertexConsumer glint = delegate.getBuffer(glintType());
+        VertexConsumer glint = delegate.getBuffer(glintType(textureId));
         if (state == State.FROZEN && format == DefaultVertexFormat.NEW_ENTITY) {
             // 冰蓝描边 mask（独立 buffer，由 dispatcher RETURN 的 flushMask 提交）。
             // 只双写实体模型格式：eyes 类发光层（POSITION_COLOR_TEX_LIGHTMAP）不进 mask
             // （原版光灵箭 outline 同样排除），避免异常坐标/颜色污染描边；
             // 手持物品用 alpha 测试类型，避免透明纹理区域产生方框
             RenderType maskType = ItemRenderTracker.isRenderingItem()
-                    ? MaskRenderTypes.MASK_TYPE_ITEM : MaskRenderTypes.MASK_TYPE;
+                    ? MaskRenderTypes.MASK_TYPE_ITEM : MaskRenderTypes.maskTypeForEntity(textureId);
             // mask 顶点颜色强制白色（仿原版 EntityOutlineGenerator：丢弃 setColor 等），
             // sobel 边缘检测只对形状边缘响应
             VertexConsumer mask = new MaskColorConsumer(
@@ -85,16 +90,16 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         return VertexMultiConsumer.create(main, glint);
     }
 
-    private RenderType glintType() {
+    private RenderType glintType(int textureId) {
         // 手持物品：物品模型是方块网格，纹理含透明像素——
         // 必须用带图集 alpha 测试的类型，否则透明区域也铺上光效形成完整方片
         if (ItemRenderTracker.isRenderingItem()) {
             return StatusGlintItemRenderTypes.itemGlint(state);
         }
         return switch (state) {
-            case STUNNED -> StunGlintRenderTypes.bodyGlint();
-            case INVINCIBLE -> InvincibleGlintRenderTypes.bodyGlint();
-            case FROZEN -> FrozenBlueGlintRenderTypes.bodyGlint();
+            case STUNNED -> StunGlintRenderTypes.bodyGlint(textureId);
+            case INVINCIBLE -> InvincibleGlintRenderTypes.bodyGlint(textureId);
+            case FROZEN -> FrozenBlueGlintRenderTypes.bodyGlint(textureId);
             default -> throw new IllegalStateException("NONE 已在 getBuffer 提前返回");
         };
     }
@@ -121,6 +126,19 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         public VertexConsumer addVertex(float x, float y, float z) {
             CaptureState.recordMaskVertex(x, y, z);
             this.delegate.addVertex(x, y, z).setColor(255, 255, 255, 255);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer addVertex(Matrix4f matrix4f, float x, float y, float z) {
+            // 必须显式转发矩阵版：接口 default 4 参会变换后转调 3 参，
+            // 而 BufferBuilder 的 3 参实现又用 RenderSystem 当前 ModelViewMat 变换一次——
+            // 二次变换会让 mask 顶点依赖全局矩阵状态（Iris 下错位）
+            float x2 = matrix4f.m00() * x + matrix4f.m01() * y + matrix4f.m02() * z + matrix4f.m03();
+            float y2 = matrix4f.m10() * x + matrix4f.m11() * y + matrix4f.m12() * z + matrix4f.m13();
+            float z2 = matrix4f.m20() * x + matrix4f.m21() * y + matrix4f.m22() * z + matrix4f.m23();
+            CaptureState.recordMaskVertex(x2, y2, z2);
+            this.delegate.addVertex(matrix4f, x, y, z).setColor(255, 255, 255, 255);
             return this;
         }
 

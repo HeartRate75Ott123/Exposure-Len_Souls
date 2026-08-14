@@ -104,6 +104,8 @@ public abstract class EntityRenderDispatcherMixin {
                                      float rotationYaw, float partialTicks,
                                      PoseStack poseStack, MultiBufferSource buffer,
                                      int packedLight, CallbackInfo ci) {
+        // mask 顶点已按 per-纹理类型写入（层切换即 flush，每层绑自己纹理），
+        // 这里兜底 flush 最后一层
         CaptureState.flushMask();
         CaptureState.endCapture();
     }

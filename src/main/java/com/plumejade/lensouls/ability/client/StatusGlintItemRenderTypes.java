@@ -14,12 +14,8 @@ import net.minecraft.world.inventory.InventoryMenu;
 import java.util.EnumMap;
 
 /**
- * 手持物品状态光效 RenderType 工厂（破定/无敌/冻结的 glint 物品版）。
- * <p>
- * 物品模型是方块网格，纹理含透明像素——直接复用身体 glint 类型会把透明区域也铺上
- * 光效，形成完整方片。本类型额外采样物品图集（Sampler1）做 alpha 测试，
- * 透明像素 discard，光效只出现在实体纹理区域。
- */
+ * 鎵嬫寔鐗╁搧鐘舵€佸厜鏁?RenderType 宸ュ巶锛堢牬瀹?鏃犳晫/鍐荤粨鐨?glint 鐗╁搧鐗堬級銆? * <p>
+ * 鐗╁搧妯″瀷鏄柟鍧楃綉鏍硷紝绾圭悊鍚€忔槑鍍忕礌鈥斺€旂洿鎺ュ鐢ㄨ韩浣?glint 绫诲瀷浼氭妸閫忔槑鍖哄煙涔熼摵涓? * 鍏夋晥锛屽舰鎴愬畬鏁存柟鐗囥€傛湰绫诲瀷棰濆閲囨牱鐗╁搧鍥鹃泦锛圫ampler1锛夊仛 alpha 娴嬭瘯锛? * 閫忔槑鍍忕礌 discard锛屽厜鏁堝彧鍑虹幇鍦ㄥ疄浣撶汗鐞嗗尯鍩熴€? */
 public class StatusGlintItemRenderTypes {
 
     public static ShaderInstance itemGlintShader;
@@ -43,14 +39,14 @@ public class StatusGlintItemRenderTypes {
             case STUNNED -> STUN_TEXTURE;
             case INVINCIBLE -> INVINCIBLE_TEXTURE;
             case FROZEN -> FROZEN_BLUE_TEXTURE;
-            default -> throw new IllegalStateException("NONE 不应进入物品 glint");
+            default -> throw new IllegalStateException("NONE 涓嶅簲杩涘叆鐗╁搧 glint");
         };
 
         var shaderState   = new RenderStateShard.ShaderStateShard(() -> itemGlintShader);
         var textureState  = new RenderStateShard.TextureStateShard(glintTexture, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
         var depthState    = RenderStateShard.NO_DEPTH_TEST;
-        var cullState     = RenderStateShard.NO_CULL;
+        var cullState     = RenderStateShard.CULL;
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;
         var layeringState = RenderStateShard.VIEW_OFFSET_Z_LAYERING;
@@ -67,7 +63,7 @@ public class StatusGlintItemRenderTypes {
                 1536, false, false,
                 () -> {
                     textureState.setupRenderState();
-                    // Sampler1 = 物品图集：与物品模型 UV 同源，alpha 测试剔除透明像素
+                    // Sampler1 = 鐗╁搧鍥鹃泦锛氫笌鐗╁搧妯″瀷 UV 鍚屾簮锛宎lpha 娴嬭瘯鍓旈櫎閫忔槑鍍忕礌
                     RenderSystem.setShaderTexture(1,
                             Minecraft.getInstance().getTextureManager()
                                     .getTexture(InventoryMenu.BLOCK_ATLAS).getId());

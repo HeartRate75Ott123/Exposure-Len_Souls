@@ -19,11 +19,11 @@ import org.joml.Matrix4fStack;
 import org.lwjgl.opengl.GL11;
 
 /**
- * BOSS 镜魂描边管理�?�?独立 mask FBO + composite�? * composite �?goldOutlineShader（Sobel 纯边缘描�?+ BOSS 色），走 RenderType 管线 Iris 兼容�? * <p>
- * 帧级去重机制（仿 {@link CaptureState}�?
- * - AFTER_SKY 清空 mask + 清空去重集合
- * - Shadow pass 捕获→被 AFTER_SKY 丢弃
- * - �?pass 捕获→最终保�? */
+ * BOSS 闀滈瓊鎻忚竟绠＄悊鍣?鈥?鐙珛 mask FBO + composite銆? * composite 鐢?goldOutlineShader锛圫obel 绾竟缂樻弿杈?+ BOSS 鑹诧級锛岃蛋 RenderType 绠＄嚎 Iris 鍏煎銆? * <p>
+ * 甯х骇鍘婚噸鏈哄埗锛堜豢 {@link CaptureState}锛?
+ * - AFTER_SKY 娓呯┖ mask + 娓呯┖鍘婚噸闆嗗悎
+ * - Shadow pass 鎹曡幏鈫掕 AFTER_SKY 涓㈠純
+ * - 涓?pass 鎹曡幏鈫掓渶缁堜繚鐣? */
 @EventBusSubscriber(value = Dist.CLIENT)
 public class BossOutlineManager {
 
@@ -36,7 +36,7 @@ public class BossOutlineManager {
     private static MultiBufferSource.BufferSource maskBufferSource;
     private static BossOutlineColors currentColors;
 
-    /** 帧级去重集合（仿 CaptureState�?*/
+    /** 甯х骇鍘婚噸闆嗗悎锛堜豢 CaptureState锛?*/
     private static final IntOpenHashSet capturedThisFrame = new IntOpenHashSet();
 
     public static boolean tryStartCapture(int entityId) {
@@ -45,7 +45,7 @@ public class BossOutlineManager {
         return true;
     }
 
-    /** AFTER_SKY 时清空去重集合，下一阶段（主 pass）的实体可重新捕�?*/
+    /** AFTER_SKY 鏃舵竻绌哄幓閲嶉泦鍚堬紝涓嬩竴闃舵锛堜富 pass锛夌殑瀹炰綋鍙噸鏂版崟鑾?*/
     public static void clearFrameCaptures() {
         capturedThisFrame.clear();
     }
@@ -59,7 +59,7 @@ public class BossOutlineManager {
     public static boolean isInMaskWrite() { return inMaskWrite.get(); }
     public static void setInMaskWrite(boolean v) { inMaskWrite.set(v); }
 
-    // ========== 颜色 ==========
+    // ========== 棰滆壊 ==========
 
     public static void setColors(BossOutlineColors colors) { currentColors = colors; }
     public static BossOutlineColors getCurrentColors() { return currentColors; }
@@ -90,7 +90,7 @@ public class BossOutlineManager {
         }
     }
 
-    /** 清空 mask 颜色 + 深度 */
+    /** 娓呯┖ mask 棰滆壊 + 娣卞害 */
     public static void clearAndBind() {
         ensureTarget();
         maskTarget.bindWrite(true);
@@ -112,10 +112,10 @@ public class BossOutlineManager {
     public static void setCompositeShader(ShaderInstance shader) {}
     public static void beginFrame() { currentColors = null; }
 
-    // ========== 帧事�?==========
+    // ========== 甯т簨浠?==========
 
     /**
-     * AFTER_SKY �?清空 mask + 清空去重集合�?     * Iris shadow pass �?AFTER_SKY 之前运行，其捕获结果被此方法丢弃�?     * �?pass �?AFTER_SKY 之后运行，捕获结果保留到帧末 composite�?     */
+     * AFTER_SKY 鈫?娓呯┖ mask + 娓呯┖鍘婚噸闆嗗悎銆?     * Iris shadow pass 鍦?AFTER_SKY 涔嬪墠杩愯锛屽叾鎹曡幏缁撴灉琚鏂规硶涓㈠純锛?     * 涓?pass 鍦?AFTER_SKY 涔嬪悗杩愯锛屾崟鑾风粨鏋滀繚鐣欏埌甯ф湯 composite銆?     */
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
@@ -154,7 +154,7 @@ public class BossOutlineManager {
             shader.getUniform("Time").set((wrapped + partialTick) * 0.05f);
         }
 
-        // 全屏四边形以 NDC (-1..1) 直接铺满屏幕，必须用 identity 投影/视图矩阵�?        // 当前 RenderSystem 残留世界渲染的相机透视矩阵，不重置会投影成地面矩形
+        // 鍏ㄥ睆鍥涜竟褰互 NDC (-1..1) 鐩存帴閾烘弧灞忓箷锛屽繀椤荤敤 identity 鎶曞奖/瑙嗗浘鐭╅樀锛?        // 褰撳墠 RenderSystem 娈嬬暀涓栫晫娓叉煋鐨勭浉鏈洪€忚鐭╅樀锛屼笉閲嶇疆浼氭姇褰辨垚鍦伴潰鐭╁舰
         RenderSystem.backupProjectionMatrix();
         RenderSystem.setProjectionMatrix(new Matrix4f(), VertexSorting.ORTHOGRAPHIC_Z);
         Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();

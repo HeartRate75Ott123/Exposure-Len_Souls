@@ -1,39 +1,41 @@
 package com.plumejade.lensouls.boss;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.renderer.GameRenderer;
+import com.plumejade.lensouls.ability.client.CaptureState;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * 定身红色脉冲闪烁 RenderType 工厂。
  * <p>
- * 与 {@link com.plumejade.lensouls.ability.client.FrozenBlueGlintRenderTypes} 完全同构，
- * 使用原版 {@link GameRenderer#getRendertypeArmorEntityGlintShader} 着色器。
- * 纹理为附魔闪烁纹理，由纹理本身提供颜色。
+ * per-纹理方案：{@link #bodyGlint(int)} 每实体层一个类型（绑定该层纹理做
+ * Sampler1 alpha 剔除），层切换即 flush——多纹理实体每层用自己纹理，互不误滤。
  */
 public class StunGlintRenderTypes {
 
     private static final ResourceLocation STUN_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("lensouls", "textures/misc/stun_glint_entity.png");
 
-    // ========== 身体光效 RenderType（懒加载，避免类加载时序） ==========
+    // ========== 身体光效 RenderType（per-纹理） ==========
 
-    private static RenderType bodyGlint = null;
+    private static final Map<Integer, RenderType> BODY_GLINT_BY_TEXTURE = new HashMap<>();
 
-    public static RenderType bodyGlint() {
-        if (bodyGlint == null) bodyGlint = createBodyGlint();
-        return bodyGlint;
+    public static RenderType bodyGlint(int textureId) {
+        return BODY_GLINT_BY_TEXTURE.computeIfAbsent(textureId, StunGlintRenderTypes::createBodyGlint);
     }
 
-    private static RenderType createBodyGlint() {
-        var shaderState   = new RenderStateShard.ShaderStateShard(GameRenderer::getRendertypeArmorEntityGlintShader);
+    private static RenderType createBodyGlint(int textureId) {
+        var shaderState   = new RenderStateShard.ShaderStateShard(() -> CaptureState.glintEntityShader);
         var textureState  = new RenderStateShard.TextureStateShard(STUN_TEXTURE, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
         var depthState    = RenderStateShard.NO_DEPTH_TEST;
-        var cullState     = RenderStateShard.NO_CULL;
+        var cullState     = RenderStateShard.CULL;
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;
         var layeringState = RenderStateShard.VIEW_OFFSET_Z_LAYERING;
@@ -44,13 +46,15 @@ public class StunGlintRenderTypes {
         var lineState     = RenderStateShard.DEFAULT_LINE;
 
         return new RenderType(
-                "lensouls_stun_glint",
+                "lensouls_stun_glint_" + textureId,
                 DefaultVertexFormat.POSITION_TEX,
                 VertexFormat.Mode.QUADS,
                 1536, false, false,
                 () -> {
                     textureState.setupRenderState();
                     shaderState.setupRenderState();
+                    // Sampler1 = 本层实体纹理（alpha==0 剔除透明面；反射失败白像素兜底）
+                    RenderSystem.setShaderTexture(1, textureId);
                     blendState.setupRenderState();
                     depthState.setupRenderState();
                     cullState.setupRenderState();
@@ -66,6 +70,7 @@ public class StunGlintRenderTypes {
                 () -> {
                     textureState.clearRenderState();
                     shaderState.clearRenderState();
+                    RenderSystem.setShaderTexture(1, 0);
                     blendState.clearRenderState();
                     depthState.clearRenderState();
                     cullState.clearRenderState();

@@ -9,7 +9,7 @@ import net.minecraft.client.renderer.RenderType;
  * BOSS 镜魂发光 RenderType 工厂。
  * <p>
  * 物品使用 {@code NEW_ENTITY} 格式（与 {@code ItemRenderer.renderModelLists} 兼容）。
- * 实体使用 {@code POSITION_TEX} 格式（与 {@code GoldGlintRenderTypes} 一致，
+ * 实体使用 {@code POSITION_TEX} 格式（与 {@code FrozenBlueGlintRenderTypes} 一致，
  * {@code EntityModel.renderToBuffer()} 会忽略多余元素）。
  */
 public class SoulGlowRenderTypes {
@@ -35,7 +35,7 @@ public class SoulGlowRenderTypes {
         return itemAura;
     }
 
-    // === 实体发光 RenderType（POSITION_TEX 格式，仿 GoldGlintRenderTypes） ===
+    // === 实体发光 RenderType（POSITION_TEX 格式，仿 FrozenBlueGlintRenderTypes） ===
 
     private static RenderType entityBossGlow;
 

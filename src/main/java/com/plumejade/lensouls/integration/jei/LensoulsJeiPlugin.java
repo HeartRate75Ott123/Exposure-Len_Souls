@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.integration.jei;
 
+import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import com.plumejade.lensouls.item.ModItems;
@@ -87,8 +88,12 @@ public class LensoulsJeiPlugin implements IModPlugin {
                 bossSoulInfo("entity.cataclysm.scylla"));
 
         // ---- 能力球 ----
-        addSingleInfo(registration, ModItems.SKILL_BALL.get().getDefaultInstance(),
-                Component.translatable("jei.lensouls.skill_ball"));
+        // 随机能力球：随配置动态显示——禁用 boss 掉落时自动隐藏该条目，概率实时取自配置
+        if (Config.ENABLE_SKILL_BALL_BOSS_LOOT.get()) {
+            int chance = Math.round((float) (double) Config.SKILL_BALL_DROP_CHANCE.get() * 100.0f);
+            addSingleInfo(registration, ModItems.SKILL_BALL.get().getDefaultInstance(),
+                    Component.translatable("jei.lensouls.skill_ball", chance));
+        }
         addSingleInfo(registration, ModItems.WEAKNESS_LENS_BALL.get().getDefaultInstance(),
                 Component.translatable("jei.lensouls.skill_ball.creative"));
         addSingleInfo(registration, ModItems.SPATIAL_WARP_BALL.get().getDefaultInstance(),

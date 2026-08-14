@@ -14,7 +14,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 /**
  * 玩家身体金色光效调试层。
  * <p>
- * 自包含 RenderType {@link GoldGlintRenderTypes#bodyGlint()}，
+ * 自包含 RenderType {@link FrozenBlueGlintRenderTypes#bodyGlint()}，
  * 直接绑定金色贴图 + 原版 glint 着色器 + UV 滚动动画。
  * 不依赖任何 mixin 拦截，不影响其他物品/实体光效。
  */
@@ -33,7 +33,7 @@ public class GoldenPlayerGlintLayer extends RenderLayer<AbstractClientPlayer, Pl
                        float partialTick, float ageInTicks, float netHeadYaw, float headPitch) {
         if (!visible) return;
 
-        VertexConsumer consumer = bufferSource.getBuffer(GoldGlintRenderTypes.bodyGlint());
+        VertexConsumer consumer = bufferSource.getBuffer(FrozenBlueGlintRenderTypes.bodyGlint());
         getParentModel().renderToBuffer(poseStack, consumer, packedLight, OverlayTexture.NO_OVERLAY);
     }
 }

@@ -10,7 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 定身红色脉冲闪烁 RenderType 工厂。
  * <p>
- * 与 {@link com.plumejade.lensouls.ability.client.GoldGlintRenderTypes} 完全同构，
+ * 与 {@link com.plumejade.lensouls.ability.client.FrozenBlueGlintRenderTypes} 完全同构，
  * 使用原版 {@link GameRenderer#getRendertypeArmorEntityGlintShader} 着色器。
  * 纹理为附魔闪烁纹理，由纹理本身提供颜色。
  */

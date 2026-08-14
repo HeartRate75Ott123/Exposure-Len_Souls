@@ -8,15 +8,16 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * 金色光效 RenderType 工厂。
+ * 定格蓝色光效 RenderType 工厂。
  * <p>
- * 自包含方案：不依赖任何 mixin 拦截，直接绑定金色贴图。
+ * 自包含方案：不依赖任何 mixin 拦截，直接绑定蓝色光效贴图
+ * （enchanted_glint_entity.png，纹理本身为蓝色）。
  */
-public class GoldGlintRenderTypes {
+public class FrozenBlueGlintRenderTypes {
 
     public static boolean enabled = false;
 
-    private static final ResourceLocation GOLD_TEXTURE =
+    private static final ResourceLocation FROZEN_BLUE_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("lensouls", "textures/misc/enchanted_glint_entity.png");
 
     // ========== 身体光效 RenderType ==========
@@ -29,7 +30,7 @@ public class GoldGlintRenderTypes {
 
     private static RenderType createBodyGlint() {
         var shaderState   = new RenderStateShard.ShaderStateShard(GameRenderer::getRendertypeArmorEntityGlintShader);
-        var textureState  = new RenderStateShard.TextureStateShard(GOLD_TEXTURE, true, false);
+        var textureState  = new RenderStateShard.TextureStateShard(FROZEN_BLUE_TEXTURE, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
         var depthState    = RenderStateShard.NO_DEPTH_TEST;
         var cullState     = RenderStateShard.NO_CULL;
@@ -43,7 +44,7 @@ public class GoldGlintRenderTypes {
         var lineState     = RenderStateShard.DEFAULT_LINE;
 
         return new RenderType(
-                "lensouls_body_glint",
+                "lensouls_frozen_blue_glint",
                 DefaultVertexFormat.POSITION_TEX,
                 VertexFormat.Mode.QUADS,
                 1536, false, false,
@@ -80,5 +81,5 @@ public class GoldGlintRenderTypes {
         ) {};
     }
 
-    private GoldGlintRenderTypes() {}
+    private FrozenBlueGlintRenderTypes() {}
 }

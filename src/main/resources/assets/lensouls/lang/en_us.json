@@ -206,7 +206,7 @@
   "jei.lensouls.soul.basic": "10% chance to drop from any monster",
   "jei.lensouls.soul.boss": "Dropped by %s",
   "jei.lensouls.soul.anvil_upgrade": "Combine two same-level souls on an anvil to upgrade (max level V)",
-  "jei.lensouls.skill_ball": "50% chance to drop from bosses",
+  "jei.lensouls.skill_ball": "%s%% chance to drop from bosses",
   "jei.lensouls.skill_ball.creative": "Creative-only. Right-click to unlock the ability",
   "jei.lensouls.converter": "Store and switch between souls. Right-click to place souls inside",
   "jei.lensouls.dimensional_gun": "Dimensional energy weapon. Charge to shoot, cycle between 3 ammo types",

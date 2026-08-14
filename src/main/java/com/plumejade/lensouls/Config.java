@@ -240,6 +240,10 @@ public class Config {
             .comment("Skill Ball drops from bosses (50% chance)")
             .define("enableSkillBallBossLoot", true);
 
+    public static final ModConfigSpec.DoubleValue SKILL_BALL_DROP_CHANCE = BUILDER
+            .comment("Skill Ball drop chance from bosses (0.0 ~ 1.0)")
+            .defineInRange("skillBallDropChance", 0.5, 0.0, 1.0);
+
     static { BUILDER.pop(); }
 
     static final ModConfigSpec SPEC = BUILDER.build();

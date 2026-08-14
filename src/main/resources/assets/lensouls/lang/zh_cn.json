@@ -186,7 +186,7 @@
   "jei.lensouls.soul.basic": "击杀任意怪物有 10% 概率掉落一个随机基础镜魂",
   "jei.lensouls.soul.boss": "击杀 %s 必定掉落",
   "jei.lensouls.soul.anvil_upgrade": "在铁砧上与同级镜魂合成为下一级（最高 V 级）",
-  "jei.lensouls.skill_ball": "击杀 BOSS 有 50% 概率掉落",
+  "jei.lensouls.skill_ball": "击杀 BOSS 有 %s%% 概率掉落",
   "jei.lensouls.skill_ball.creative": "仅创造模式获取，右键解锁对应能力",
   "jei.lensouls.converter": "用于存放并切换镜魂。右击打开界面以放入镜魂",
   "jei.lensouls.dimensional_gun": "维度能量武器，蓄力可切换三种弹药类型进行射击",

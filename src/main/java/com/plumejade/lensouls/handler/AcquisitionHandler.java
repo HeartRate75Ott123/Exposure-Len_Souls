@@ -107,8 +107,9 @@ public class AcquisitionHandler {
             }
         }
 
-        // ---- 能力球（50% 概率） ----
-        if (Config.ENABLE_SKILL_BALL_BOSS_LOOT.get() && entity.getRandom().nextFloat() < 0.5f) {
+        // ---- 能力球（概率由配置控制，默认 50%） ----
+        if (Config.ENABLE_SKILL_BALL_BOSS_LOOT.get()
+                && entity.getRandom().nextFloat() < (float) (double) Config.SKILL_BALL_DROP_CHANCE.get()) {
             event.getDrops().add(createItemEntity(event, new ItemStack(ModItems.SKILL_BALL.get())));
         }
     }

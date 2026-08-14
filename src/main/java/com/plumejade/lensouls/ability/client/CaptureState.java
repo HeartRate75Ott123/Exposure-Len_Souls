@@ -7,11 +7,14 @@ import net.minecraft.client.renderer.RenderBuffers;
 /**
  * 冻结实体描边捕获状态管理。
  * <p>
- * 由 {@link com.plumejade.lensouls.mixin.client.FrozenEntityRenderMixin} 在
- * {@code LivingEntityRenderer.render()} HEAD/RETURN 中管理生命周期。
+ * 由 {@link com.plumejade.lensouls.mixin.client.EntityRenderDispatcherMixin} 在
+ * {@code EntityRenderDispatcher.render()} HEAD/RETURN 中管理生命周期；
+ * mask 顶点由 {@link StatusGlintBufferSource}（顶点双写）直接写入
+ * {@link #getMaskBufferSource()}。
  * <p>
- * {@link com.plumejade.lensouls.mixin.client.BufferSourceGetBufferMixin} 在
- * {@code BufferSource.getBuffer()} RETURN 中读取。
+ * Iris 光影下另由
+ * {@code IrisBufferSourceGetBufferMixin}（lensouls.compat.mixins.json）在
+ * {@code FullyBufferedMultiBufferSource.getBuffer()} RETURN 中读取。
  */
 public class CaptureState {
 

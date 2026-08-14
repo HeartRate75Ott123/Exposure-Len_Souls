@@ -131,7 +131,7 @@ public class LenSoulsClient {
                 com.plumejade.lensouls.client.model.BossPhantomModel::createLayer);
     }
 
-    /** 冻结描边不再使用 RenderLayer（改用 FrozenEntityRenderMixin + FrozenOutlineManager） */
+    /** 冻结描边不再使用 RenderLayer（改用 EntityRenderDispatcherMixin + FrozenOutlineManager） */
     private static void registerLayers(EntityRenderersEvent.AddLayers event) {
         // 玩家身体金色光效调试层（自包含 RenderType，不依赖 mixin）
         for (var skin : net.minecraft.client.resources.PlayerSkin.Model.values()) {

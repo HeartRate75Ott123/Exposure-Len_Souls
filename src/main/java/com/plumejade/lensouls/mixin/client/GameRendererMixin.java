@@ -24,6 +24,8 @@ public abstract class GameRendererMixin {
                                           CallbackInfo ci) {
         RenderTarget mainTarget = minecraft.getMainRenderTarget();
         if (mainTarget == null) return;
+        // 灰度合成已提前到 renderLevel RETURN（LevelRendererMixin），
+        // 此处只做描边合成（在灰度与手部渲染之后）
         FrozenOutlineManager.compositeIfNeeded(minecraft, mainTarget);
     }
 }

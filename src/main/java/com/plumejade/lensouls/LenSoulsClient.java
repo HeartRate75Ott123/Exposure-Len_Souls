@@ -244,6 +244,48 @@ public class LenSoulsClient {
         } catch (java.io.IOException e) {
             LenSouls.LOGGER.error("[Glint] 实体状态光效着色器加载失败", e);
         }
+
+        // 时间定格黑洞星空 — 天空球（POSITION_COLOR）
+        try {
+            event.registerShader(
+                    new ShaderInstance(provider,
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "black_hole_ring"),
+                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR),
+                    instance -> {
+                        com.plumejade.lensouls.ability.client.GrayOutManager.blackHoleShader = instance;
+                    }
+            );
+        } catch (java.io.IOException e) {
+            LenSouls.LOGGER.error("[GrayOut] 黑洞星空着色器加载失败", e);
+        }
+
+        // 时间定格黑白滤镜 — 全屏灰阶 + 星空/玩家深度豁免（POSITION_TEX quad）
+        try {
+            event.registerShader(
+                    new ShaderInstance(provider,
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "rendertype_blackwhite"),
+                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX),
+                    instance -> {
+                        com.plumejade.lensouls.ability.client.BlackWhitePost.blackWhiteShader = instance;
+                    }
+            );
+        } catch (java.io.IOException e) {
+            LenSouls.LOGGER.error("[GrayOut] 黑白滤镜着色器加载失败", e);
+        }
+
+        // 时间定格复制/glint 叠加 — 全屏复制（POSITION_TEX quad）
+        try {
+            event.registerShader(
+                    new ShaderInstance(provider,
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "rendertype_color_copy"),
+                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX),
+                    instance -> {
+                        com.plumejade.lensouls.ability.client.BlackWhitePost.colorCopyShader = instance;
+                    }
+            );
+        } catch (java.io.IOException e) {
+            LenSouls.LOGGER.error("[GrayOut] 复制叠加着色器加载失败", e);
+        }
     }
 
     /** 注册粒子提供器 */

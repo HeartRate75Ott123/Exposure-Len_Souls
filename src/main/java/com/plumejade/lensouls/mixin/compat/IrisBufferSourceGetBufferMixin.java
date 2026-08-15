@@ -5,10 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexMultiConsumer;
 import com.plumejade.lensouls.ability.client.BossMaskRenderTypes;
 import com.plumejade.lensouls.ability.client.BossOutlineManager;
-import com.plumejade.lensouls.ability.client.CaptureState;
-import com.plumejade.lensouls.ability.client.ClientFreezeCache;
 import com.plumejade.lensouls.ability.client.ItemRenderTracker;
-import com.plumejade.lensouls.ability.client.MaskRenderTypes;
 import net.minecraft.client.renderer.RenderType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -40,24 +37,7 @@ public abstract class IrisBufferSourceGetBufferMixin {
                 } finally {
                     BossOutlineManager.setInMaskWrite(false);
                 }
-                return;
             }
-        }
-
-        // ── 冻结描边捕获（Iris 路径） ──
-        if (CaptureState.isInMaskWrite()) return;
-        int id = CaptureState.getCaptureEntityId();
-        if (id < 0 || !ClientFreezeCache.isFrozen(id)) return;
-
-        RenderType maskType = ItemRenderTracker.isRenderingItem()
-                ? MaskRenderTypes.MASK_TYPE_ITEM : MaskRenderTypes.MASK_TYPE;
-
-        CaptureState.setInMaskWrite(true);
-        try {
-            VertexConsumer mask = CaptureState.getMaskBufferSource().getBuffer(maskType);
-            ci.setReturnValue(VertexMultiConsumer.create(mask, main));
-        } finally {
-            CaptureState.setInMaskWrite(false);
         }
     }
 }

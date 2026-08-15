@@ -3,9 +3,12 @@ package com.plumejade.lensouls.mixin.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.logging.LogUtils;
 import com.plumejade.lensouls.ability.client.CaptureState;
+import com.plumejade.lensouls.ability.client.ClientFreezeCache;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import com.plumejade.lensouls.ability.client.ItemRenderTracker;
+import com.plumejade.lensouls.ability.client.PlayerDepthBufferSource;
 import com.plumejade.lensouls.ability.client.StatusGlintBufferSource;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -62,8 +65,8 @@ public abstract class EntityRenderDispatcherMixin {
                                        PoseStack poseStack, MultiBufferSource buffer,
                                        int packedLight, CallbackInfo ci) {
         Entity root = resolveRoot(entity);
-        if (StatusGlintBufferSource.resolveState(root)
-                != StatusGlintBufferSource.State.FROZEN) {
+        // 纯冻结判定（不经 STUNNED 优先级）：冻结中破韧实体也画蓝描边
+        if (!ClientFreezeCache.isFrozen(root.getId())) {
             return;
         }
         // 只在主渲染 pass 捕获（Iris 阴影 pass 在 AFTER_SKY 之前渲染实体，
@@ -85,18 +88,25 @@ public abstract class EntityRenderDispatcherMixin {
                                          float rotationYaw, float partialTicks,
                                          PoseStack poseStack, MultiBufferSource buffer,
                                          int packedLight) {
+        Entity root = resolveRoot(entity);
+        // 本地玩家：时停时几何双写玩家深度（黑白滤镜的玩家豁免基准）
+        if (root == Minecraft.getInstance().player && ClientFreezeCache.isTimeFrozen()) {
+            buffer = new PlayerDepthBufferSource(buffer);
+        }
         if (ItemRenderTracker.isRenderingItem()) {
             renderer.render(entity, rotationYaw, partialTicks, poseStack, buffer, packedLight);
             return;
         }
-        StatusGlintBufferSource.State state =
-                StatusGlintBufferSource.resolveState(resolveRoot(entity));
+        StatusGlintBufferSource.State state = StatusGlintBufferSource.resolveState(root);
         if (state == StatusGlintBufferSource.State.NONE) {
+            // 玩家/普通实体：照常渲染（彩色）
             renderer.render(entity, rotationYaw, partialTicks, poseStack, buffer, packedLight);
             return;
         }
         renderer.render(entity, rotationYaw, partialTicks, poseStack,
-                new StatusGlintBufferSource(buffer, state), packedLight);
+                new StatusGlintBufferSource(buffer, state,
+                        ClientFreezeCache.isFrozen(root.getId())),
+                packedLight);
     }
 
     @Inject(method = RENDER_METHOD, at = @At("RETURN"))

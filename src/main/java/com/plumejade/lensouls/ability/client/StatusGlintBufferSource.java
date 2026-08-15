@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexMultiConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.logging.LogUtils;
 import com.plumejade.lensouls.boss.BossToughnessClientCache;
 import com.plumejade.lensouls.boss.InvincibleGlintRenderTypes;
 import com.plumejade.lensouls.boss.StunGlintRenderTypes;
@@ -13,6 +14,7 @@ import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import org.joml.Matrix4f;
+import org.slf4j.Logger;
 
 /**
  * 状态光效 BufferSource 包装器（顶点双写方案）。
@@ -32,6 +34,8 @@ import org.joml.Matrix4f;
 @OnlyIn(Dist.CLIENT)
 public class StatusGlintBufferSource implements MultiBufferSource {
 
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     /** 状态互斥顺序：破定 > 无敌 > 定格。 */
     public enum State {
         NONE, STUNNED, INVINCIBLE, FROZEN
@@ -39,10 +43,15 @@ public class StatusGlintBufferSource implements MultiBufferSource {
 
     private final MultiBufferSource delegate;
     private final State state;
+    /** 是否写入冻结描边 mask（纯冻结判定，与 glint 颜色分离——冻结中破韧 = 蓝描边 + 红 glint）。 */
+    private final boolean maskActive;
 
-    public StatusGlintBufferSource(MultiBufferSource delegate, State state) {
+    public StatusGlintBufferSource(MultiBufferSource delegate, State state, boolean maskActive) {
         this.delegate = delegate;
         this.state = state;
+        this.maskActive = maskActive;
+        LOGGER.info("[Lensouls][Glint] wrap bufferSource state={} mask={} shader={}",
+                state, maskActive, CaptureState.glintEntityShader != null);
     }
 
     /** 解析实体状态，互斥顺序：破定 > 定格 > 无敌（冻结优先于白霸体）。 */
@@ -69,10 +78,11 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         // mask/glint 类型按纹理区分，BufferSource 层切换即 flush——
         // 多纹理实体（焰魔身体+盾牌、斯库拉身体+剑）每层用自己纹理做 alpha 测试
         int textureId = CaptureState.entityTextureId(type);
-        // 先取主类型：BufferSource 类型切换即 endBatch，先主后 glint = 先画主后画光效
+        // 先取主类型：BufferSource 类型切换即 endBatch，先主后 glint = 先画主后画光效。
+        // 时停冻结怪本体经 shader 替换渲染为灰度（单层），glint 首次直接彩色叠加
         VertexConsumer main = delegate.getBuffer(type);
         VertexConsumer glint = delegate.getBuffer(glintType(textureId));
-        if (state == State.FROZEN && format == DefaultVertexFormat.NEW_ENTITY) {
+        if (maskActive && format == DefaultVertexFormat.NEW_ENTITY) {
             // 冰蓝描边 mask（独立 buffer，由 dispatcher RETURN 的 flushMask 提交）。
             // 只双写实体模型格式：eyes 类发光层（POSITION_COLOR_TEX_LIGHTMAP）不进 mask
             // （原版光灵箭 outline 同样排除），避免异常坐标/颜色污染描边；

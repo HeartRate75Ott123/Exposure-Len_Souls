@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.mixin.client;
 
+import com.plumejade.lensouls.ability.client.BlackWhitePost;
 import com.plumejade.lensouls.ability.client.BossOutlineManager;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import net.minecraft.client.Minecraft;
@@ -17,6 +18,7 @@ public class GameRendererFrameEndMixin {
     private void lensouls$beginFrame(DeltaTracker deltaTracker, boolean renderLevel, CallbackInfo ci) {
         FrozenOutlineManager.resetFrame();
         BossOutlineManager.beginFrame();
+        // 二分：BlackWhitePost.beginFrame() 已禁用
     }
 
     @Inject(method = "render", at = @At("RETURN"), require = 1)
@@ -25,6 +27,7 @@ public class GameRendererFrameEndMixin {
         var mainTarget = minecraft.getMainRenderTarget();
         if (mainTarget == null) return;
 
+        // 二分：BlackWhitePost.compositeIfNeeded(minecraft, mainTarget) 已禁用
         FrozenOutlineManager.compositeIfNeeded(minecraft, mainTarget);
         BossOutlineManager.composite(minecraft, mainTarget);
     }

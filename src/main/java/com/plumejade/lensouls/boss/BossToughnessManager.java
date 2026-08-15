@@ -8,8 +8,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -139,16 +137,11 @@ public class BossToughnessManager {
         if (player != null) {
             stunTicks = com.plumejade.lensouls.integration.TrophyModifierHandler.applyStunModifier(player, stunTicks);
         }
-        // 状态互斥：破定接管控制权——若实体仍被时间定格冻结，先解除冻结（AI 移交破定锁定）
-        com.plumejade.lensouls.ability.util.FreezeTracker.getInstance().unfreezeEntity(entity);
+        // 时停中破韧并存：全局冻结不解除，视觉由 resolveState 优先级（STUNNED > FROZEN）自动接管
         data.setStunTicks(stunTicks);
 
-        // 定身改用药水效果（不再 setNoAi，兼容自定义 AI/行为树的 BOSS）：
-        // 怪物强迟缓 255 级，触发破定的玩家获得抗性 V，时长均为破定时长
-        entity.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, stunTicks, 254, false, true));
-        if (player != null) {
-            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, stunTicks, 4, false, false));
-        }
+        // 定身由「暂停实体刻」接管（BossStunTickMixin：AI/重力/移动全停），
+        // 无需迟缓 255；暂停期间实体刻不走，效果时长也会冻结，故不再施加任何效果
         entity.setNoGravity(true);
 
     }
@@ -158,12 +151,8 @@ public class BossToughnessManager {
         BossToughnessData data = dataMap.get(entity.getUUID());
         if (data == null) return;
 
-        // 解除定身：移除破防时施加的强迟缓效果；若实体仍被时间定格冻结，则不恢复重力（由 FreezeTracker 到期时统一恢复）
-        entity.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
-        boolean stillFrozen = com.plumejade.lensouls.ability.util.FreezeTracker.getInstance().isEntityFrozen(entity);
-        if (!stillFrozen) {
-            entity.setNoGravity(false);
-        }
+        // 解除定身：恢复重力（暂停实体刻期间重力不结算，解除后恢复正常）
+        entity.setNoGravity(false);
 
         data.onStunEnd();
 
@@ -201,7 +190,6 @@ public class BossToughnessManager {
 
         List<UUID> pendingStunEnd = new ArrayList<>();
         List<UUID> pendingResetSound = new ArrayList<>();
-        List<UUID> pendingStunEnsure = new ArrayList<>();
 
         for (Map.Entry<UUID, BossToughnessData> entry : dataMap.entrySet()) {
             BossToughnessData data = entry.getValue();
@@ -220,12 +208,6 @@ public class BossToughnessManager {
             // 定身到期标记，稍后查找实体解除
             if (data.isBroken() && data.getStunRemainingTicks() <= 0) {
                 pendingStunEnd.add(entry.getKey());
-            }
-
-            // 破防持续期：确保实体持有强迟缓 255（兜底：防被外部效果清除/覆盖后丢失，
-            // 时长与破防剩余对齐，保证"韧性清空 → 迟缓 255"始终成立）
-            if (data.isBroken() && data.getStunRemainingTicks() > 0) {
-                pendingStunEnsure.add(entry.getKey());
             }
         }
 
@@ -255,27 +237,6 @@ public class BossToughnessManager {
                         Entity entity = sl.getEntity(uuid);
                         if (entity instanceof LivingEntity le && le.isAlive()) {
                             onStunEnd(le);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        // 破防持续期补迟缓 255（同上，复用实体查找；缺失才补，避免每 tick 无谓操作）
-        if (!pendingStunEnsure.isEmpty()) {
-            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-            if (server != null) {
-                for (UUID uuid : pendingStunEnsure) {
-                    BossToughnessData data = dataMap.get(uuid);
-                    if (data == null) continue;
-                    for (ServerLevel sl : server.getAllLevels()) {
-                        Entity entity = sl.getEntity(uuid);
-                        if (entity instanceof LivingEntity le && le.isAlive()) {
-                            if (!le.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)) {
-                                le.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,
-                                        Math.max(40, data.getStunRemainingTicks()), 254, false, true));
-                            }
                             break;
                         }
                     }

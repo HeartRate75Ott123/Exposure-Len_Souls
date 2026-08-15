@@ -74,10 +74,12 @@ public class FrozenOutlineManager {
             maskTarget.clear(Minecraft.ON_OSX);
             main.bindWrite(false);
             maskClearedInFrame = false;
-            CaptureState.clearFrameCaptures();
-            // 涓?pass 寮€濮嬶紙Iris 闃村奖 pass 鍦ㄦ涔嬪墠锛屽凡鍏ㄩ儴缁撴潫锛?            CaptureState.setMainPassActive(true);
+CaptureState.clearFrameCaptures();
+            CaptureState.setMainPassActive(true);
+            GrayOutManager.frameStart();
         } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
             CaptureState.setMainPassActive(false);
+            GrayOutManager.markActive();
             if (goldOutlineShader != null && maskTarget != null
                     && (ClientFreezeCache.isTestMode() || ClientFreezeCache.hasAnyFrozen())) {
                 needsComposite = true;

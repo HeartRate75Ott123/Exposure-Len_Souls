@@ -1,36 +1,52 @@
 package com.plumejade.lensouls.ability.client;
 
 import net.minecraft.client.Minecraft;
-
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 
 /**
- * 客户端冻结实体 ID 缓存。
+ * 客户端全局时间定格状态缓存。
  * <p>
  * 由 {@link com.plumejade.lensouls.ability.network.FreezeSyncPacket} 更新，
- * 控制冻结实体的描边渲染。
+ * 控制冻结实体的描边/glint 渲染与灰度画面。
+ * <p>
+ * 实体判定：全局冻结中且实体存在且非玩家 → 视为冻结（渲染路径天然视锥过滤，
+ * 只有玩家看到的实体能走到判定点，无需扫描/距离计算）。
  * <p>
  * 支持测试模式：开启后本地玩家始终显示描边效果，用于调试。
  */
 public class ClientFreezeCache {
 
-    private static final Set<Integer> FROZEN_IDS = new HashSet<>();
+    private static volatile boolean timeFrozen = false;
 
-    private static boolean testMode = false;
+    private static volatile boolean testMode = false;
 
+    /** 实体是否处于冻结（全局冻结 && 实体存在 && 非玩家）。 */
     public static boolean isFrozen(int entityId) {
-        if (FROZEN_IDS.contains(entityId)) return true;
         if (testMode) {
             var mc = Minecraft.getInstance();
             if (mc.player != null && mc.player.getId() == entityId) return true;
         }
-        return false;
+        if (!timeFrozen) return false;
+        var mc = Minecraft.getInstance();
+        if (mc.level == null) return false;
+        Entity entity = mc.level.getEntity(entityId);
+        if (entity == null) return false;
+        if (entity instanceof Player) return false;
+        return true;
     }
 
+    /** 是否处于全局冻结（合成闸门）。 */
     public static boolean hasAnyFrozen() {
-        return !FROZEN_IDS.isEmpty();
+        return timeFrozen;
+    }
+
+    public static boolean isTimeFrozen() {
+        return timeFrozen;
+    }
+
+    public static void setTimeFrozen(boolean value) {
+        timeFrozen = value;
     }
 
     public static boolean isTestMode() {
@@ -45,25 +61,7 @@ public class ClientFreezeCache {
         testMode = !testMode;
     }
 
-    public static void freezeAll(Collection<Integer> ids) {
-        FROZEN_IDS.addAll(ids);
-    }
-
-    public static void unfreezeAll(Collection<Integer> ids) {
-        FROZEN_IDS.removeAll(ids);
-    }
-
     public static void clear() {
-        FROZEN_IDS.clear();
-    }
-
-    /** 添加单个实体 ID（供 BOSS 镜魂描边临时借用） */
-    public static void add(int entityId) {
-        FROZEN_IDS.add(entityId);
-    }
-
-    /** 移除单个实体 ID */
-    public static void remove(int entityId) {
-        FROZEN_IDS.remove(entityId);
+        timeFrozen = false;
     }
 }

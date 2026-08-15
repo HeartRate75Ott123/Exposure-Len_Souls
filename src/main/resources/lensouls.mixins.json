@@ -9,7 +9,10 @@
     "compat.VitalStrikeNoFilmConsumeMixin",
     "CraftingMenuMixin",
     "ResultSlotMixin",
-    "PlayerDropEquipmentMixin"
+    "PlayerDropEquipmentMixin",
+    "BossStunTickMixin",
+    "BossStunHurtMixin",
+    "EntityInvulnerableTimeAccessor"
   ],
   "client": [
     "client.EntityRenderDispatcherMixin",
@@ -23,7 +26,8 @@
     "client.PlayerClientMixin",
     "client.MultiPlayerGameModeMixin",
     "client.GameRendererFrameEndMixin",
-    "client.LivingEntityPhantomMixin"
+    "client.LivingEntityPhantomMixin",
+    "client.LevelRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

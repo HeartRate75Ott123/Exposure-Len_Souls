@@ -44,12 +44,13 @@ public class AbilityWheelHud {
     private static final float ALPHA_FALLOFF = 0.35f;
 
     private static final String KEY_HINT = "gui.lensouls.ability.hint";
+    private static final String KEY_HINT_OPEN = "gui.lensouls.ability.hint_open";
 
     /** 能力球物品图标缓存（按枚举序，懒加载：registry 就绪后首次渲染时填充） */
     private static final ItemStack[] ICONS = new ItemStack[AbilityType.values().length];
 
-    /** 滚动目标（列表内索引，本地乐观更新，服务端 sync 后校正） */
-    private static int target = 0;
+    /** 滚动目标（物理单调坐标，可超出 [0,size)，跨环不翻转方向；仅发包/渲染时取模） */
+    private static int physicalTarget = 0;
     /** 平滑滚动位置（浮点，tick 步进驱动） */
     private static float scrollPos = 0f;
     /** 上一 tick 的滚动位置（渲染时在 prev→curr 之间补间，避免回跳振荡） */
@@ -75,8 +76,10 @@ public class AbilityWheelHud {
         int size = list.size();
         // 与原版热栏一致：滚轮向下 → 下一个能力
         int dir = delta < 0 ? 1 : -1;
-        target = Math.floorMod(target + dir, size);
-        PacketDistributor.sendToServer(new AbilitySelectPacket(list.get(target).ordinal()));
+        // 物理坐标单调累加，不取模：跨环（0↔size-1）方向保持连续，动画不翻转
+        physicalTarget += dir;
+        PacketDistributor.sendToServer(
+                new AbilitySelectPacket(list.get(Math.floorMod(physicalTarget, size)).ordinal()));
     }
 
     // ========== 动画 ==========
@@ -85,30 +88,35 @@ public class AbilityWheelHud {
     public static void onClientTick(ClientTickEvent.Post event) {
         List<AbilityType> list = getUnlockedList();
         if (list.isEmpty()) {
-            target = 0;
+            physicalTarget = 0;
             scrollPos = 0f;
+            prevScrollPos = 0f;
             return;
         }
         int size = list.size();
 
-        // 服务端 sync 校正（仅动画静止时生效：滚动进行中本地 target 权威，
-        // 服务端回包延迟不再回拉；覆盖初始状态与拒绝等场景的兜底）
-        if (Math.abs(scrollPos - target) < 0.001f) {
+        // 服务端 sync 校正（仅动画静止时生效：滚动进行中本地物理坐标权威，
+        // 服务端回包延迟不再回拉）。校正保持物理连续：把当前取模项对齐到 sync 项。
+        if (Math.abs(scrollPos - physicalTarget) < 0.001f) {
             AbilityType enabled = ClientAbilityCache.getEnabled();
             if (enabled != null) {
                 int syncIdx = list.indexOf(enabled);
-                if (syncIdx >= 0 && syncIdx != target) {
-                    target = syncIdx;
+                if (syncIdx >= 0) {
+                    int currentIdx = Math.floorMod(Math.round(scrollPos), size);
+                    if (currentIdx != syncIdx) {
+                        physicalTarget = Math.round(scrollPos) - currentIdx + syncIdx;
+                        scrollPos = physicalTarget;
+                        prevScrollPos = scrollPos;
+                    }
                 }
             }
         }
 
-        // 归一化到 target 最近邻域（坐标系平移），prev 与 curr 同一坐标系，
-        // 渲染补间只跨越 ≤1 格，环绕滚动（末↔头）平滑不横跳
-        float prev = normalizeToward(scrollPos, target, size);
-        prevScrollPos = prev;
-        scrollPos = prev + (target - prev) * SCROLL_SPEED;
-        if (Math.abs(scrollPos - target) < 0.001f) scrollPos = target;
+        // 物理坐标单调逼近（不取模、不归一化）：跨环动画沿滚动方向走 1 格，
+        // 方向永不翻转，prev 与 curr 同一坐标系，渲染补间无横跳
+        prevScrollPos = scrollPos;
+        scrollPos += (physicalTarget - scrollPos) * SCROLL_SPEED;
+        if (Math.abs(scrollPos - physicalTarget) < 0.001f) scrollPos = physicalTarget;
     }
 
     // ========== 渲染 ==========
@@ -132,9 +140,12 @@ public class AbilityWheelHud {
         int up = Math.min(WINDOW_MAX, (size - 1) / 2);
         int down = Math.min(WINDOW_MAX, size - 1 - up);
 
-        // 提示文字（列表上方，&a 绿色）
+        // 提示文字（列表上方，&a 绿色）：第一行=左键打开界面，第二行=潜行滚轮切换
+        int hintTop = centerY - up * ROW_HEIGHT - ROW_HEIGHT / 2 - 27;
+        g.drawCenteredString(mc.font, Component.translatable(KEY_HINT_OPEN),
+                x + ROW_WIDTH / 2, hintTop, 0xFF55FF55);
         g.drawCenteredString(mc.font, Component.translatable(KEY_HINT),
-                x + ROW_WIDTH / 2, centerY - up * ROW_HEIGHT - ROW_HEIGHT / 2 - 16, 0xFF55FF55);
+                x + ROW_WIDTH / 2, hintTop + 11, 0xFF55FF55);
 
         // 帧级补间：只把 tick 步进（prev→curr）平滑成连续动画，不插向 target，
         // partialTick 单调递增，永不回跳（修复回跳导致的抽搐与残影）
@@ -197,17 +208,6 @@ public class AbilityWheelHud {
     }
 
     // ========== 数据 ==========
-
-    /**
-     * 把 value 归一化到 target 的最近邻域（循环取模语义）：
-     * 返回的 value' 满足 |value' - target| ≤ size/2，且 value' ≡ value (mod size)。
-     */
-    private static float normalizeToward(float value, float target, int size) {
-        float v = value;
-        while (v - target > size / 2f) v -= size;
-        while (target - v > size / 2f) v += size;
-        return v;
-    }
 
     /** 已解锁能力列表（新解锁最前，与容器 GUI 排序一致） */
     private static List<AbilityType> getUnlockedList() {

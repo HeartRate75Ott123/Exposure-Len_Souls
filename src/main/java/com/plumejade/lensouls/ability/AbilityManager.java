@@ -50,20 +50,7 @@ public class AbilityManager {
         AbilityType next = data.cycleToNext();
         save(player, data);
         syncToClient(player);
-        if (next != null) {
-            player.displayClientMessage(
-                    Component.translatable("ability.lensouls." + next.getId() + ".name")
-                            .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
-            return true;
-        } else {
-            AbilityType current = data.getEnabled();
-            if (current != null) {
-                player.displayClientMessage(
-                        Component.translatable("ability.lensouls." + current.getId() + ".name")
-                                .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
-            }
-            return false;
-        }
+        return next != null;
     }
 
     public boolean isUnlocked(Player player, AbilityType type) {
@@ -82,9 +69,6 @@ public class AbilityManager {
         data.setEnabled(type);
         save(player, data);
         syncToClient(player);
-        player.displayClientMessage(
-                Component.translatable(type.getNameKey())
-                        .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
         return true;
     }
 

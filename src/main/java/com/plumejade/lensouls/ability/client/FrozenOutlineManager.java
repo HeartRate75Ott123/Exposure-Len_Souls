@@ -26,17 +26,10 @@ public class FrozenOutlineManager {
     public static ShaderInstance itemMaskShader;
 
     public static void resetFrame() {
-        compositedThisFrame = false;
     }
 
     private static boolean needsComposite = false;
     private static boolean maskClearedInFrame = false;
-    private static boolean compositedThisFrame = false;
-
-    /** 本帧是否已执行描边合成（用于帧末判断是否重绘第一人称手）。 */
-    public static boolean wasCompositedThisFrame() {
-        return compositedThisFrame;
-    }
 
     public static void bindMaskTarget() {
         if (maskTarget == null) ensureTarget();
@@ -144,8 +137,6 @@ CaptureState.clearFrameCaptures();
             RenderSystem.applyModelViewMatrix();
             RenderSystem.restoreProjectionMatrix();
         }
-
-        compositedThisFrame = true;
     }
 
     private static void ensureTarget() {

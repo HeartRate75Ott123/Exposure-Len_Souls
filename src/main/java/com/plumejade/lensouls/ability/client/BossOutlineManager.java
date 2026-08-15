@@ -39,13 +39,6 @@ public class BossOutlineManager {
     /** 甯х骇鍘婚噸闆嗗悎锛堜豢 CaptureState锛?*/
     private static final IntOpenHashSet capturedThisFrame = new IntOpenHashSet();
 
-    private static boolean compositedThisFrame = false;
-
-    /** 本帧是否已执行描边合成（用于帧末判断是否重绘第一人称手）。 */
-    public static boolean wasCompositedThisFrame() {
-        return compositedThisFrame;
-    }
-
     public static boolean tryStartCapture(int entityId) {
         if (!capturedThisFrame.add(entityId)) return false;
         captureEntityId.set(entityId);
@@ -117,10 +110,7 @@ public class BossOutlineManager {
     }
 
     public static void setCompositeShader(ShaderInstance shader) {}
-    public static void beginFrame() {
-        currentColors = null;
-        compositedThisFrame = false;
-    }
+    public static void beginFrame() { currentColors = null; }
 
     // ========== 甯т簨浠?==========
 
@@ -184,7 +174,5 @@ public class BossOutlineManager {
             RenderSystem.applyModelViewMatrix();
             RenderSystem.restoreProjectionMatrix();
         }
-
-        compositedThisFrame = true;
     }
 }

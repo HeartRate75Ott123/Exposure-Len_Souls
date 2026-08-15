@@ -79,7 +79,7 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         // 多纹理实体（焰魔身体+盾牌、斯库拉身体+剑）每层用自己纹理做 alpha 测试
         int textureId = CaptureState.entityTextureId(type);
         // 先取主类型：BufferSource 类型切换即 endBatch，先主后 glint = 先画主后画光效。
-        // 时停冻结怪本体经 shader 替换渲染为灰度（单层），glint 首次直接彩色叠加
+        // glint 双写主目标（PostChain 黑白滤镜在 render 中段统一灰化，后续版本再恢复彩色）
         VertexConsumer main = delegate.getBuffer(type);
         VertexConsumer glint = delegate.getBuffer(glintType(textureId));
         if (maskActive && format == DefaultVertexFormat.NEW_ENTITY) {

@@ -15,19 +15,9 @@ import net.neoforged.api.distmarker.OnlyIn;
 import org.joml.Matrix4f;
 
 /**
- * 时间定格视觉管理器（后处理方案）。
+ * 时间定格视觉管理器。
  * <p>
- * 时停画面分层（全屏黑白后处理 {@link BlackWhitePost} + 彩色豁免）：
- * <ul>
- *   <li>地形/方块实体/怪物/粒子：黑白 —— 帧末全屏灰阶滤镜
- *       （{@link BlackWhitePost#compositeIfNeeded}）；</li>
- *   <li>黑洞星空：彩色 —— 星空深度豁免（本类画球时同步写深度，
- *       {@link BlackWhitePost#writeStarDepth}）；</li>
- *   <li>玩家（身体 + 手部）：彩色 —— 玩家深度豁免
- *       （{@link PlayerDepthBufferSource}）；</li>
- *   <li>glint（破韧红/无敌白/冻结蓝）：彩色 —— glint FBO 帧末叠加；</li>
- *   <li>描边：彩色 —— 现有描边合成（帧末最后）。</li>
- * </ul>
+ * 时停画面：全屏黑白后处理（原版 PostChain {@link GrayPostChain}）+ 黑洞星空天空球。
  * 本类只负责黑洞星空天空球的渲染。
  */
 @OnlyIn(Dist.CLIENT)
@@ -59,7 +49,8 @@ public class GrayOutManager {
      * 顶点位置只负责提供片元覆盖与深度（球面深度远 → 地形近处覆盖）。
      * 星空动画用墙钟时间驱动（时停中依然旋转）。
      * <p>
-     * 主目标渲染后同步写星空球面深度（黑白滤镜的星空豁免基准）。
+     * 主目标渲染（黑洞星空为彩色，PostChain 黑白滤镜处理主目标时一并灰化；
+     * 后续版本再按深度豁免恢复彩色）。
      */
     public static void renderBlackHoleSky(Matrix4f modelViewMatrix) {
         if (blackHoleShader == null) return;
@@ -72,10 +63,9 @@ public class GrayOutManager {
         RenderSystem.setShaderGameTime((long) (System.nanoTime() / 5.0E7), 0.0F);
 
         drawSkySphere(modelViewMatrix);
-        BlackWhitePost.writeStarDepth(modelViewMatrix);
     }
 
-    /** 画星空球（主目标；或由 {@link BlackWhitePost#writeStarDepth} 在深度 FBO 上复用）。 */
+    /** 画星空球（主目标）。 */
     public static void drawSkySphere(Matrix4f modelViewMatrix) {
         RenderSystem.enableDepthTest();
         RenderSystem.disableCull();

@@ -6,9 +6,7 @@ import com.plumejade.lensouls.ability.client.CaptureState;
 import com.plumejade.lensouls.ability.client.ClientFreezeCache;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import com.plumejade.lensouls.ability.client.ItemRenderTracker;
-import com.plumejade.lensouls.ability.client.PlayerDepthBufferSource;
 import com.plumejade.lensouls.ability.client.StatusGlintBufferSource;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -89,10 +87,6 @@ public abstract class EntityRenderDispatcherMixin {
                                          PoseStack poseStack, MultiBufferSource buffer,
                                          int packedLight) {
         Entity root = resolveRoot(entity);
-        // 本地玩家：时停时几何双写玩家深度（黑白滤镜的玩家豁免基准）
-        if (root == Minecraft.getInstance().player && ClientFreezeCache.isTimeFrozen()) {
-            buffer = new PlayerDepthBufferSource(buffer);
-        }
         if (ItemRenderTracker.isRenderingItem()) {
             renderer.render(entity, rotationYaw, partialTicks, poseStack, buffer, packedLight);
             return;

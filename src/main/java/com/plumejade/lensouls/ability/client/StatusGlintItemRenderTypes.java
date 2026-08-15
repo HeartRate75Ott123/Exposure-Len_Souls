@@ -50,7 +50,7 @@ public class StatusGlintItemRenderTypes {
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;
         var layeringState = RenderStateShard.VIEW_OFFSET_Z_LAYERING;
-        var outputState   = BlackWhitePost.GLINT_OUTPUT;
+        var outputState   = RenderStateShard.MAIN_TARGET;
         var texturingState = RenderStateShard.ENTITY_GLINT_TEXTURING;
         var writeState    = RenderStateShard.COLOR_WRITE;
         var colorLogicState = RenderStateShard.NO_COLOR_LOGIC;

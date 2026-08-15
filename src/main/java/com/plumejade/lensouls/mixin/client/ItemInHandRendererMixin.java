@@ -2,9 +2,7 @@ package com.plumejade.lensouls.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.plumejade.lensouls.ability.client.BossOutlineManager;
-import com.plumejade.lensouls.ability.client.ClientFreezeCache;
 import com.plumejade.lensouls.ability.client.ItemRenderTracker;
-import com.plumejade.lensouls.ability.client.PlayerDepthBufferSource;
 import com.plumejade.lensouls.client.outline.BossOutlineColors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
@@ -17,19 +15,15 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 第一人称手部渲染 BOSS mask 捕获 + 时停玩家深度双写。
+ * 第一人称手部渲染 BOSS mask 捕获。
  * <p>
  * 全程使用 MASK_TYPE_ITEM（alpha test 抠干净），
  * renderArmWithItem 的 stack.isEmpty() 判断当前手是否为空，
  * 空手时临时关闭 captureEntityId 以跳过 mask 写入。
  * 挥砍中整体跳过第一人称捕获（由第三人称管线处理），避免快速移动产生描边噪点。
- * <p>
- * 时停时 renderPlayerArm 的 buffer 替换为 {@link PlayerDepthBufferSource}：
- * 手臂/手持物品几何双写玩家深度（黑白滤镜的玩家豁免基准，含第一人称）。
  */
 @Mixin(value = ItemInHandRenderer.class, priority = 900)
 public abstract class ItemInHandRendererMixin {
@@ -58,19 +52,6 @@ public abstract class ItemInHandRendererMixin {
     }
 
     /** 时停：手臂 + 手持物品渲染 buffer 替换为玩家深度双写。 */
-    @ModifyArg(method = "renderHandsWithItems",
-            at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/ItemInHandRenderer;renderArmWithItem(" +
-                            "Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;" +
-                            "FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;" +
-                            "Lnet/minecraft/client/renderer/MultiBufferSource;I)V"),
-            index = 8, require = 2)
-    private MultiBufferSource lensouls$wrapPlayerArmBuffer(MultiBufferSource bufferSource) {
-        if (ClientFreezeCache.isTimeFrozen()) {
-            return new PlayerDepthBufferSource(bufferSource);
-        }
-        return bufferSource;
-    }
 
     // ── renderArmWithItem：stack.isEmpty() 判断空手，临时关闭 capture ──
 

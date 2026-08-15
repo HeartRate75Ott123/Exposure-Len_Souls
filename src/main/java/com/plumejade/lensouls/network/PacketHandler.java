@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.network;
 
 import com.plumejade.lensouls.ability.network.AbilityOpenGuiPacket;
+import com.plumejade.lensouls.ability.network.AbilitySelectPacket;
 import com.plumejade.lensouls.ability.network.SpatialWarpActivatePacket;
 import com.plumejade.lensouls.ability.network.TemporalRecallTriggerPacket;
 import net.neoforged.bus.api.IEventBus;
@@ -53,6 +54,12 @@ public class PacketHandler {
                 AbilityOpenGuiPacket.TYPE,
                 AbilityOpenGuiPacket.STREAM_CODEC,
                 AbilityOpenGuiPacket::handle
+        );
+
+        registrar.playToServer(
+                AbilitySelectPacket.TYPE,
+                AbilitySelectPacket.STREAM_CODEC,
+                AbilitySelectPacket::handle
         );
 
         registrar.playToServer(

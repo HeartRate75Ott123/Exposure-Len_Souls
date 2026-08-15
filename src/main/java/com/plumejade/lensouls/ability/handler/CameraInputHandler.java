@@ -136,7 +136,8 @@ public class CameraInputHandler {
         return InputConstants.isKeyDown(mc.getWindow().getWindow(), key.getValue());
     }
 
-    private static boolean isCamera(ItemStack stack) {
+    /** 相机检测（按 ID 比对，无编译依赖）；HUD 滚动列表等客户端组件复用 */
+    public static boolean isCamera(ItemStack stack) {
         ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return CAMERA_ID.equals(id) || POLAROID_ID.equals(id);
     }

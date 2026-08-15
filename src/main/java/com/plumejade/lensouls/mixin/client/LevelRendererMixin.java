@@ -49,7 +49,8 @@ public abstract class LevelRendererMixin {
                                               float partialTicks,
                                               PoseStack poseStack,
                                               net.minecraft.client.renderer.MultiBufferSource buffer) {
-        if (StunPauseHelper.isToughnessBroken(entity)) {
+        // 破韧定身或时停定身：partialTicks 固定 1.0（插值取当前值，画面完全静止）
+        if (StunPauseHelper.isToughnessBroken(entity) || ClientFreezeCache.isFrozen(entity.getId())) {
             return 1.0F;
         }
         return partialTicks;

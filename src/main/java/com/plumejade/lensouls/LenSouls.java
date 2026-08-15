@@ -6,7 +6,7 @@ import com.plumejade.lensouls.ability.handler.PhotoInjectionHandler;
 import com.plumejade.lensouls.ability.handler.SpatialWarpHandler;
 import com.plumejade.lensouls.ability.handler.TemporalRecallHandler;
 import com.plumejade.lensouls.ability.handler.FreezeCleanupHandler;
-import com.plumejade.lensouls.ability.util.FreezeTracker;
+import com.plumejade.lensouls.ability.util.TimeFreezeManager;
 import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.damage.ArmorPenHandler;
@@ -153,7 +153,7 @@ public class LenSouls {
     public void onServerTick(ServerTickEvent.Post event) {
         TimerService.getInstance().tick();
         BossPhantomManager.getInstance().tick();
-        FreezeTracker.getInstance().tick();
+        TimeFreezeManager.getInstance().tick();
         com.plumejade.lensouls.boss.BossToughnessManager.getInstance().tick();
     }
 }

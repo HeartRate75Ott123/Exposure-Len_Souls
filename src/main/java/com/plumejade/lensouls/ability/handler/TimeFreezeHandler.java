@@ -3,17 +3,19 @@ package com.plumejade.lensouls.ability.handler;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
-import com.plumejade.lensouls.ability.util.FreezeTracker;
+import com.plumejade.lensouls.ability.util.TimeFreezeManager;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 
 /**
  * 时间定格触发（拍照触发）。
  * <p>
- * 全局 freeze 语义：不再收集视锥内实体、不做韧性拦截——冻结整个世界。
+ * 实体定身语义：只定身拍摄瞬间画面内的生物
+ * （{@code FrameAddedEvent.getEntitiesInFrame()}），玩家完全正常 tick。
  */
 public class TimeFreezeHandler {
 
@@ -24,7 +26,7 @@ public class TimeFreezeHandler {
             if (!(entity instanceof ServerPlayer player)) return;
             if (AbilityManager.getInstance().getEnabled(player) != AbilityType.TIME_STOP) return;
             if (!hasSoulPhotography(player)) return;
-            triggerTimeFreeze(player);
+            triggerTimeFreeze(player, event.getEntitiesInFrame());
         } catch (Exception ex) {
             LenSouls.LOGGER.error("[TimeFreezeHandler] error", ex);
         }
@@ -41,13 +43,14 @@ public class TimeFreezeHandler {
                 || player.getOffhandItem().getEnchantmentLevel(ench) > 0;
     }
 
-    private static void triggerTimeFreeze(ServerPlayer player) {
-        FreezeTracker tracker = FreezeTracker.getInstance();
-        if (tracker.isFrozen()) {
+    private static void triggerTimeFreeze(ServerPlayer player,
+                                          java.util.List<net.minecraft.world.entity.LivingEntity> entitiesInFrame) {
+        TimeFreezeManager manager = TimeFreezeManager.getInstance();
+        if (manager.isFrozen()) {
             showFloatingText(player, Component.translatable("message.lensouls.freeze_already_active"));
             return;
         }
-        tracker.freeze(player, 100);
+        manager.freeze(player.server, player, entitiesInFrame);
     }
 
     private static void showFloatingText(ServerPlayer player, Component text) {

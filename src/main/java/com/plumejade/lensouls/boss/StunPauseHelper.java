@@ -1,6 +1,5 @@
 package com.plumejade.lensouls.boss;
 
-import com.plumejade.lensouls.ability.util.FreezeTracker;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 
@@ -18,17 +17,18 @@ public final class StunPauseHelper {
     /**
      * 实体是否处于定身暂停（破刹或时间定格）——暂停实体刻用。
      * <p>
-     * 客户端只认破刹：时间定格（全局 freeze）期间客户端实体照常 tick
-     * （动画继续，原版 freeze 语义），渲染层由 timer 冻结 partialTicks。
+     * 客户端：破刹（韧性清空）或时停定身集（{@code ClientFreezeCache}）；
+     * 时间定格定身期间客户端实体照常 tick 会造成拉扯，同样跳过。
      */
     public static boolean isStunPaused(Entity entity) {
         if (entity.level().isClientSide) {
-            return BossToughnessClientCache.isStunned(entity.getId());
+            return BossToughnessClientCache.isStunned(entity.getId())
+                    || com.plumejade.lensouls.ability.client.ClientFreezeCache.isFrozen(entity.getId());
         }
         if (!(entity instanceof LivingEntity living)) return false;
         BossToughnessData data = BossToughnessManager.getInstance().get(living);
         if (data != null && data.isBroken()) return true;
-        return FreezeTracker.getInstance().isFrozen();
+        return com.plumejade.lensouls.ability.util.TimeFreezeManager.getInstance().isEntityFrozen(entity);
     }
 
     /**

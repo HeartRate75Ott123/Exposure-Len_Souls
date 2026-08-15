@@ -45,6 +45,6 @@ public class BossStunHurtMixin {
     private static boolean isGlobalFreeze(LivingEntity entity) {
         if (entity.level().isClientSide) return false;
         if (entity instanceof Player) return false;
-        return entity.level().tickRateManager().isFrozen();
+        return com.plumejade.lensouls.ability.util.TimeFreezeManager.getInstance().isEntityFrozen(entity);
     }
 }

@@ -99,8 +99,8 @@ CaptureState.clearFrameCaptures();
         main.bindWrite(true);
 
         var shader = goldOutlineShader;
-        // 墙钟时间驱动（时停中 tick 冻结，渐变保持流动）
-        float time = (float) (System.nanoTime() / 5.0E7) * 0.05f;
+        // 原版 tick 时间驱动（描边渐变跟随游戏时间；时停定身不冻结世界 tick）
+        float time = mc.level.getGameTime() * 0.05f;
         if (shader.getUniform("Time") != null) shader.getUniform("Time").set(time);
         if (shader.getUniform("ScreenSize") != null) shader.getUniform("ScreenSize").set((float) main.width, (float) main.height);
 

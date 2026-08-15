@@ -1,9 +1,7 @@
 package com.plumejade.lensouls.mixin.client;
 
 import com.plumejade.lensouls.ability.client.BossOutlineManager;
-import com.plumejade.lensouls.ability.client.ClientFreezeCache;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
-import io.github.mortuusars.exposure.client.camera.CameraClient;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
@@ -26,14 +24,6 @@ public class GameRendererFrameEndMixin {
         Minecraft minecraft = Minecraft.getInstance();
         var mainTarget = minecraft.getMainRenderTarget();
         if (mainTarget == null) return;
-
-        if (ClientFreezeCache.isTimeFrozen()) {
-            // 时停发动后自动关闭取景框（Exposure），避免遮挡时停画面
-            try {
-                if (CameraClient.viewfinder() != null) CameraClient.removeViewfinder();
-            } catch (Throwable ignored) {
-            }
-        }
 
         FrozenOutlineManager.compositeIfNeeded(minecraft, mainTarget);
         BossOutlineManager.composite(minecraft, mainTarget);

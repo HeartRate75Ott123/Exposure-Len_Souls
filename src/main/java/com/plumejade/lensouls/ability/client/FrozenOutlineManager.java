@@ -26,10 +26,17 @@ public class FrozenOutlineManager {
     public static ShaderInstance itemMaskShader;
 
     public static void resetFrame() {
+        compositedThisFrame = false;
     }
 
     private static boolean needsComposite = false;
     private static boolean maskClearedInFrame = false;
+    private static boolean compositedThisFrame = false;
+
+    /** 本帧是否已执行描边合成（用于帧末判断是否重绘第一人称手）。 */
+    public static boolean wasCompositedThisFrame() {
+        return compositedThisFrame;
+    }
 
     public static void bindMaskTarget() {
         if (maskTarget == null) ensureTarget();
@@ -99,7 +106,8 @@ CaptureState.clearFrameCaptures();
         main.bindWrite(true);
 
         var shader = goldOutlineShader;
-        float time = mc.level.getGameTime() * 0.05f;
+        // 墙钟时间驱动（时停中 tick 冻结，渐变保持流动）
+        float time = (float) (System.nanoTime() / 5.0E7) * 0.05f;
         if (shader.getUniform("Time") != null) shader.getUniform("Time").set(time);
         if (shader.getUniform("ScreenSize") != null) shader.getUniform("ScreenSize").set((float) main.width, (float) main.height);
 
@@ -136,6 +144,8 @@ CaptureState.clearFrameCaptures();
             RenderSystem.applyModelViewMatrix();
             RenderSystem.restoreProjectionMatrix();
         }
+
+        compositedThisFrame = true;
     }
 
     private static void ensureTarget() {

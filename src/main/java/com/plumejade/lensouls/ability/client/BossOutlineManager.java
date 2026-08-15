@@ -39,6 +39,13 @@ public class BossOutlineManager {
     /** 甯х骇鍘婚噸闆嗗悎锛堜豢 CaptureState锛?*/
     private static final IntOpenHashSet capturedThisFrame = new IntOpenHashSet();
 
+    private static boolean compositedThisFrame = false;
+
+    /** 本帧是否已执行描边合成（用于帧末判断是否重绘第一人称手）。 */
+    public static boolean wasCompositedThisFrame() {
+        return compositedThisFrame;
+    }
+
     public static boolean tryStartCapture(int entityId) {
         if (!capturedThisFrame.add(entityId)) return false;
         captureEntityId.set(entityId);
@@ -110,7 +117,10 @@ public class BossOutlineManager {
     }
 
     public static void setCompositeShader(ShaderInstance shader) {}
-    public static void beginFrame() { currentColors = null; }
+    public static void beginFrame() {
+        currentColors = null;
+        compositedThisFrame = false;
+    }
 
     // ========== 甯т簨浠?==========
 
@@ -148,10 +158,9 @@ public class BossOutlineManager {
         if (shader.getUniform("BossGlowStrength") != null) shader.getUniform("BossGlowStrength").set(currentColors.glowStrength() * 1.5f);
         if (shader.getUniform("BossOutlineWidth") != null) shader.getUniform("BossOutlineWidth").set(currentColors.outlineWidth());
         if (shader.getUniform("ScreenSize") != null) shader.getUniform("ScreenSize").set((float) main.width, (float) main.height);
-        if (shader.getUniform("Time") != null && mc.level != null) {
-            long wrapped = Math.floorMod(mc.level.getGameTime(), 240000L);
-            float partialTick = mc.getTimer().getGameTimeDeltaPartialTick(false);
-            shader.getUniform("Time").set((wrapped + partialTick) * 0.05f);
+        // 墙钟时间驱动（时停中 tick 冻结，渐变保持流动）
+        if (shader.getUniform("Time") != null) {
+            shader.getUniform("Time").set((float) (System.nanoTime() / 5.0E7) * 0.05f);
         }
 
         // 鍏ㄥ睆鍥涜竟褰互 NDC (-1..1) 鐩存帴閾烘弧灞忓箷锛屽繀椤荤敤 identity 鎶曞奖/瑙嗗浘鐭╅樀锛?        // 褰撳墠 RenderSystem 娈嬬暀涓栫晫娓叉煋鐨勭浉鏈洪€忚鐭╅樀锛屼笉閲嶇疆浼氭姇褰辨垚鍦伴潰鐭╁舰
@@ -175,5 +184,7 @@ public class BossOutlineManager {
             RenderSystem.applyModelViewMatrix();
             RenderSystem.restoreProjectionMatrix();
         }
+
+        compositedThisFrame = true;
     }
 }

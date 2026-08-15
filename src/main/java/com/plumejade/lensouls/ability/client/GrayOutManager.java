@@ -17,8 +17,7 @@ import org.joml.Matrix4f;
 /**
  * 时间定格视觉管理器。
  * <p>
- * 时停画面：全屏黑白后处理（原版 PostChain {@link GrayPostChain}）+ 黑洞星空天空球。
- * 本类只负责黑洞星空天空球的渲染。
+ * 本类只负责黑洞星空天空球的渲染（时停中保持旋转）。
  */
 @OnlyIn(Dist.CLIENT)
 public class GrayOutManager {

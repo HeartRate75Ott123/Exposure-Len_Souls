@@ -1,8 +1,6 @@
 package com.plumejade.lensouls.ability.handler;
 
 import com.plumejade.lensouls.LenSouls;
-import com.plumejade.lensouls.ability.AbilityType;
-import com.plumejade.lensouls.ability.client.ClientAbilityCache;
 import com.plumejade.lensouls.ability.gui.AbilityGuiHolder;
 import com.plumejade.lensouls.ability.network.AbilityOpenGuiPacket;
 import com.plumejade.lensouls.ability.network.SpatialWarpActivatePacket;
@@ -11,14 +9,12 @@ import com.plumejade.lensouls.ability.util.TemporalSnapshot;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIContainerMenu;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIContainerScreen;
 import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.Input;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.HitResult;
@@ -27,7 +23,6 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.MovementInputUpdateEvent;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
@@ -71,26 +66,6 @@ public class CameraInputHandler {
 
     private static final ResourceLocation CAMERA_ID = ResourceLocation.parse("exposure:camera");
     private static final ResourceLocation POLAROID_ID = ResourceLocation.parse("exposure_polaroid:instant_camera");
-
-    /**
-     * 手持相机时，当前能力常态显示在物品栏上方（actionbar）。
-     * 每 tick 刷新让提示常驻；换手/无能力时停止刷新自然淡出。
-     */
-    @SubscribeEvent
-    public static void onPlayerTick(PlayerTickEvent.Post event) {
-        if (!event.getEntity().level().isClientSide) return;
-
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
-        if (!isCamera(mc.player.getMainHandItem())) return;
-
-        AbilityType enabled = ClientAbilityCache.getEnabled();
-        if (enabled == null) return;
-
-        mc.gui.setOverlayMessage(
-                Component.translatable(enabled.getNameKey())
-                        .copy().withStyle(ChatFormatting.GREEN), false);
-    }
 
     /**
      * 能力选择 GUI 打开时仍可移动（WASD/跳跃/潜行/冲刺）。

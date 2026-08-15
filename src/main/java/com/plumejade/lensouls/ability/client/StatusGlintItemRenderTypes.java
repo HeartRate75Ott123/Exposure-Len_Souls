@@ -42,10 +42,10 @@ public class StatusGlintItemRenderTypes {
             default -> throw new IllegalStateException("NONE 涓嶅簲杩涘叆鐗╁搧 glint");
         };
 
-        var shaderState   = new RenderStateShard.ShaderStateShard(() -> itemGlintShader);
+        var shaderState   = new RenderStateShard.ShaderStateShard(() -> com.plumejade.lensouls.integration.IrisCompat.isShadersActive() ? net.minecraft.client.renderer.GameRenderer.getRendertypeGlintShader() : itemGlintShader);
         var textureState  = new RenderStateShard.TextureStateShard(glintTexture, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
-        var depthState    = RenderStateShard.LEQUAL_DEPTH_TEST;
+        var depthState    = RenderStateShard.NO_DEPTH_TEST;
         var cullState     = RenderStateShard.CULL;
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;

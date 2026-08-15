@@ -61,7 +61,20 @@ public class GrayOutManager {
         // 不要手动 set 这两个 uniform（float uniform 的 intValues 为 null，set(int,...) 会 NPE）。
         RenderSystem.setShaderGameTime((long) (System.nanoTime() / 5.0E7), 0.0F);
 
+        // Iris 光影下自定义 shader 会被禁用颜色写入（DepthColorStorage），
+        // 画前解锁恢复写入——星空才能渲染（非 Iris 反射失败忽略）。
+        unlockIrisDepthColor();
+
         drawSkySphere(modelViewMatrix);
+    }
+
+    /** Iris 光影下解锁深度/颜色写入（反射；非 Iris 或失败时静默忽略）。 */
+    private static void unlockIrisDepthColor() {
+        try {
+            Class<?> cls = Class.forName("net.irisshaders.iris.gl.blending.DepthColorStorage");
+            cls.getMethod("unlockDepthColor").invoke(null);
+        } catch (Throwable ignored) {
+        }
     }
 
     /** 画星空球（主目标）。 */

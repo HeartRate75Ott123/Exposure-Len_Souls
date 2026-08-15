@@ -31,10 +31,10 @@ public class StunGlintRenderTypes {
     }
 
     private static RenderType createBodyGlint(int textureId) {
-        var shaderState   = new RenderStateShard.ShaderStateShard(() -> CaptureState.glintEntityShader);
+        var shaderState   = new RenderStateShard.ShaderStateShard(() -> com.plumejade.lensouls.integration.IrisCompat.isShadersActive() ? net.minecraft.client.renderer.GameRenderer.getRendertypeArmorEntityGlintShader() : CaptureState.glintEntityShader);
         var textureState  = new RenderStateShard.TextureStateShard(STUN_TEXTURE, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
-        var depthState    = RenderStateShard.LEQUAL_DEPTH_TEST;
+        var depthState    = RenderStateShard.NO_DEPTH_TEST;
         var cullState     = RenderStateShard.CULL;
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;

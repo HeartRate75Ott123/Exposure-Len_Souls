@@ -57,9 +57,16 @@ public abstract class LevelRendererMixin {
         return partialTicks;
     }
 
-    /** 时停：黑洞星空替代原版天空盒（星空铺满后由地形覆盖，只显示天空区域）。 */
+    /**
+     * 时停：黑洞星空替代原版天空盒（星空铺满后由地形覆盖，只显示天空区域）。
+     * <p>
+     * 注入点选在 {@code FogRenderer.levelFogColor()} 调用之后（原版天空绘制前）。
+     */
     @Inject(method = "renderSky(Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;FLnet/minecraft/client/Camera;ZLjava/lang/Runnable;)V",
-            at = @At("HEAD"), cancellable = true, require = 1)
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/client/renderer/FogRenderer;levelFogColor()V",
+                    shift = At.Shift.AFTER),
+            cancellable = true, require = 1)
     private void lensouls$blackHoleSky(Matrix4f projectionMatrix, Matrix4f modelViewMatrix,
                                        float partialTicks, Camera camera, boolean bl,
                                        Runnable runnable, CallbackInfo ci) {

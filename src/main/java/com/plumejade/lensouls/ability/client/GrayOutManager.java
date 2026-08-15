@@ -17,7 +17,8 @@ import org.joml.Matrix4f;
 /**
  * 时间定格视觉管理器。
  * <p>
- * 本类只负责黑洞星空天空球的渲染（时停中保持旋转）。
+ * 黑洞星空天空球（renderSky 阶段绘制）：星空铺满后由地形渲染覆盖——
+ * 天然只显示天空区域。
  */
 @OnlyIn(Dist.CLIENT)
 public class GrayOutManager {
@@ -43,13 +44,9 @@ public class GrayOutManager {
     /**
      * 渲染黑洞星空天空球（时停时替代原版天空盒）。
      * <p>
-     * 球心位于相机（renderSky 的 modelView 无平移，天空场景相机在原点），
-     * 完整闭合球面 360° 覆盖屏幕；fsh 为屏幕空间星空效果，
-     * 顶点位置只负责提供片元覆盖与深度（球面深度远 → 地形近处覆盖）。
+     * 球心位于相机（renderSky 的 modelView 无平移），完整闭合球面 360° 覆盖屏幕；
+     * fsh 为屏幕空间星空效果，顶点位置只负责提供片元覆盖与深度（球面深度远 → 地形近处覆盖）。
      * 星空动画用墙钟时间驱动（时停中依然旋转）。
-     * <p>
-     * 主目标渲染（黑洞星空为彩色，PostChain 黑白滤镜处理主目标时一并灰化；
-     * 后续版本再按深度豁免恢复彩色）。
      */
     public static void renderBlackHoleSky(Matrix4f modelViewMatrix) {
         if (blackHoleShader == null) return;
@@ -58,23 +55,9 @@ public class GrayOutManager {
 
         // 墙钟时间驱动（时停中星空保持旋转）：setShader 前设置，
         // ShaderInstance.apply() 自动上传 GAME_TIME；SCREEN_SIZE 由 apply() 用窗口尺寸上传。
-        // 不要手动 set 这两个 uniform（float uniform 的 intValues 为 null，set(int,...) 会 NPE）。
         RenderSystem.setShaderGameTime((long) (System.nanoTime() / 5.0E7), 0.0F);
 
-        // Iris 光影下自定义 shader 会被禁用颜色写入（DepthColorStorage），
-        // 画前解锁恢复写入——星空才能渲染（非 Iris 反射失败忽略）。
-        unlockIrisDepthColor();
-
         drawSkySphere(modelViewMatrix);
-    }
-
-    /** Iris 光影下解锁深度/颜色写入（反射；非 Iris 或失败时静默忽略）。 */
-    private static void unlockIrisDepthColor() {
-        try {
-            Class<?> cls = Class.forName("net.irisshaders.iris.gl.blending.DepthColorStorage");
-            cls.getMethod("unlockDepthColor").invoke(null);
-        } catch (Throwable ignored) {
-        }
     }
 
     /** 画星空球（主目标）。 */

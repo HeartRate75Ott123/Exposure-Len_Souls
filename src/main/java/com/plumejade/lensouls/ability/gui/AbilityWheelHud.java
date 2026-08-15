@@ -40,8 +40,8 @@ public class AbilityWheelHud {
     private static final int WINDOW_MAX = 2;
     /** 滚动插值系数（0~1，越大跟手越快，0.2 ≈ 9 tick 滑完一格） */
     private static final float SCROLL_SPEED = 0.2f;
-    /** 每远离中心一行的透明度衰减比例 */
-    private static final float ALPHA_FALLOFF = 0.35f;
+    /** 满窗口（≥5 能力）时边缘行保留的透明度（不足 5 个时边缘淡出到底，见 onRenderGui） */
+    private static final float EDGE_ALPHA_FULL = 0.30f;
 
     private static final String KEY_HINT = "gui.lensouls.ability.hint";
     private static final String KEY_HINT_OPEN = "gui.lensouls.ability.hint_open";
@@ -65,11 +65,12 @@ public class AbilityWheelHud {
         if (!mc.options.keyShift.isDown()) return;
         if (!CameraInputHandler.isCamera(mc.player.getMainHandItem())) return;
 
-        List<AbilityType> list = getUnlockedList();
-        if (list.isEmpty()) return;
-
         double delta = event.getScrollDeltaY();
         if (delta == 0) return;
+
+        List<AbilityType> list = getUnlockedList();
+        // 仅一个能力时滚动无效，保持固定
+        if (list.size() <= 1) return;
         // 取消原版事件：阻止热栏滚动
         event.setCanceled(true);
 
@@ -157,11 +158,13 @@ public class AbilityWheelHud {
         int centerIdx = Math.floorMod((int) rounded, size);
         float slide = rounded - framePos;
 
-        for (int offset = -up; offset <= down; offset++) {
+        // 渲染范围含上下各 1 格缓冲行：滑入/滑出的行全程渲染，
+        // 透明度由 rowAlpha 连续曲线给出，窗口边界处无跳变、无残留消失
+        for (int offset = -up - 1; offset <= down + 1; offset++) {
             int idx = Math.floorMod(centerIdx + offset, size);
             float rel = offset + slide;
             AbilityType type = list.get(idx);
-            float alpha = Math.max(0f, 1f - ALPHA_FALLOFF * Math.abs(rel));
+            float alpha = rowAlpha(rel, up, down);
             int rowY = Math.round(centerY + rel * ROW_HEIGHT - ROW_HEIGHT / 2f);
 
             // 选中项高亮：白色横条，水平渐变 30%（左）→ 0%（右）
@@ -169,16 +172,35 @@ public class AbilityWheelHud {
                 drawHighlight(g, x, rowY);
             }
 
-            // 能力球图标（物品渲染，透明度随行衰减）
+            // 图标与文字用同一 setColor 控制透明度（颜色 alpha 位固定不透明），
+            // 两者必然同步渐隐——避免 drawString 颜色 alpha 位失效导致文字不透明
             g.setColor(1f, 1f, 1f, alpha);
             g.renderItem(getIcon(type), x + 5, rowY + 3);
-            g.setColor(1f, 1f, 1f, 1f);
-
-            // 中文能力名（透明度随行衰减）
-            int textColor = (((int) (alpha * 255)) << 24) | 0xFFFFFF;
             g.drawString(mc.font, Component.translatable(type.getNameKey()),
-                    x + 27, rowY + (ROW_HEIGHT - 9) / 2, textColor);
+                    x + 27, rowY + (ROW_HEIGHT - 9) / 2, 0xFFFFFFFF);
+            g.setColor(1f, 1f, 1f, 1f);
         }
+    }
+
+    /**
+     * 行的渐隐透明度（只依赖 |rel|，与槽位无关，跨槽位切换连续无跳变）：
+     * 窗口内：中心 100% → 边缘行中心 EDGE_ALPHA_FULL(30%)（up/down 各自斜率）；
+     * 窗口外缓冲段：30% → 出窗口点（+0.5 格）线性归零；
+     * 该方向无窗口行（up/down = 0，如 2 个能力的上方）：缓冲行从出窗口点 0% 渐显到中心 100%。
+     */
+    private static float rowAlpha(float rel, int up, int down) {
+        float depth = rel < 0 ? up : down;
+        float absRel = Math.abs(rel);
+        if (depth <= 0) {
+            // 无窗口行的方向：缓冲行只在滚动时短暂经过，从出窗口点(0.5格)渐显到中心
+            return Math.max(0f, 1f - 2f * absRel);
+        }
+        float inner = Math.min(absRel, depth);
+        float beyond = Math.max(0f, absRel - depth);
+        // 窗口内斜率 (1-30%)/depth，窗口外斜率 30%/0.5格
+        float alpha = 1f - (1f - EDGE_ALPHA_FULL) / depth * inner
+                - EDGE_ALPHA_FULL / 0.5f * beyond;
+        return Math.max(0f, alpha);
     }
 
     /** 白色高亮横条：3px 细段近似水平渐变，左端 30% 不透明度线性衰减到右端 0（视觉连续无台阶） */

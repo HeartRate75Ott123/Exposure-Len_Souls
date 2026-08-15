@@ -45,7 +45,7 @@ public class StatusGlintItemRenderTypes {
         var shaderState   = new RenderStateShard.ShaderStateShard(() -> itemGlintShader);
         var textureState  = new RenderStateShard.TextureStateShard(glintTexture, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
-        var depthState    = RenderStateShard.NO_DEPTH_TEST;
+        var depthState    = RenderStateShard.LEQUAL_DEPTH_TEST;
         var cullState     = RenderStateShard.CULL;
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;

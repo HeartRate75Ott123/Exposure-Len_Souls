@@ -321,6 +321,18 @@ public class BossToughnessManager {
     // ========== 事件 ==========
 
     /** 实体死亡时清理韧性数据 */
+    /** 实体加入世界即注入韧性（BOSS 判定通过才注册）——韧性条立即显示。 */
+    @SubscribeEvent
+    public void onEntityJoinLevel(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent event) {
+        if (event.getLevel().isClientSide()) return;
+        if (!(event.getEntity() instanceof LivingEntity le)) return;
+        if (le instanceof net.minecraft.world.entity.player.Player) return;
+        if (has(le)) return;
+        if (!ToughnessDamageHandler.isBoss(le)) return;
+        register(le);
+        broadcastToughness(le);
+    }
+
     @SubscribeEvent
     public void onLivingDeath(net.neoforged.neoforge.event.entity.living.LivingDeathEvent event) {
         if (event.getEntity().level().isClientSide) return;

@@ -1,10 +1,8 @@
 package com.plumejade.lensouls.mixin.client;
 
 import com.plumejade.lensouls.ability.client.ClientFreezeCache;
-import com.plumejade.lensouls.ability.client.GrayOutManager;
 import com.plumejade.lensouls.boss.StunPauseHelper;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
@@ -33,9 +31,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * <p>
  * 时停场景视觉：
  * <ul>
- *   <li>{@code renderSky} HEAD：时停期间跳过原版天空盒，改画黑洞星空球
- *       （{@link GrayOutManager#renderBlackHoleSky}）；</li>
- *   <li>{@code renderClouds} HEAD：时停期间跳过云。</li>
+ *   <li>{@code renderClouds} HEAD：时停期间跳过云；</li>
+ *   <li>黑洞星空由 {@link com.plumejade.lensouls.mixin.client.GameRendererFrameEndMixin}
+ *       帧末直接绘制（覆盖光影天空，优先于光影渲染）。</li>
  * </ul>
  */
 @OnlyIn(Dist.CLIENT)
@@ -54,17 +52,6 @@ public abstract class LevelRendererMixin {
             return 1.0F;
         }
         return partialTicks;
-    }
-
-    /** 时停：黑洞星空替代原版天空盒。 */
-    @Inject(method = "renderSky(Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;FLnet/minecraft/client/Camera;ZLjava/lang/Runnable;)V",
-            at = @At("HEAD"), cancellable = true, require = 1)
-    private void lensouls$blackHoleSky(Matrix4f projectionMatrix, Matrix4f modelViewMatrix,
-                                       float partialTicks, Camera camera, boolean bl,
-                                       Runnable runnable, CallbackInfo ci) {
-        if (!ClientFreezeCache.isTimeFrozen()) return;
-        GrayOutManager.renderBlackHoleSky(modelViewMatrix);
-        ci.cancel();
     }
 
     /** 时停：跳过云（黑洞天空完全替代）。 */

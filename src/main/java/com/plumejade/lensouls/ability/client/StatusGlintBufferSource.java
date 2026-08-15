@@ -79,9 +79,9 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         // 多纹理实体（焰魔身体+盾牌、斯库拉身体+剑）每层用自己纹理做 alpha 测试
         int textureId = CaptureState.entityTextureId(type);
         // 先取主类型：BufferSource 类型切换即 endBatch，先主后 glint = 先画主后画光效。
-        // glint 双写主目标（PostChain 黑白滤镜在 render 中段统一灰化，后续版本再恢复彩色）
+        // glint 顶点进独立收集器（帧末直接绘制，绕过 Iris 批次——光影下批次双写不渲染）
         VertexConsumer main = delegate.getBuffer(type);
-        VertexConsumer glint = delegate.getBuffer(glintType(textureId));
+        VertexConsumer glint = GlintVertexCollector.getBufferSource().getBuffer(glintType(textureId));
         if (maskActive && format == DefaultVertexFormat.NEW_ENTITY) {
             // 冰蓝描边 mask（独立 buffer，由 dispatcher RETURN 的 flushMask 提交）。
             // 只双写实体模型格式：eyes 类发光层（POSITION_COLOR_TEX_LIGHTMAP）不进 mask

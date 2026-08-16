@@ -136,7 +136,9 @@ public class DamageHandler {
         }
 
         // ── 弹射物弱点（PROJECTILE 元素，活性隐含 1.0）──
-        if (source.is(DamageTypeTags.IS_PROJECTILE)) {
+        // 次元枪子弹不再算投射物（解除 AlphaYeti 类远程免疫），但显式判定仍吃弹射物弱点
+        boolean isGunBullet = source.getDirectEntity() instanceof com.plumejade.lensouls.entity.GunBulletEntity;
+        if (source.is(DamageTypeTags.IS_PROJECTILE) || isGunBullet) {
             float projWeakness = DataPackLoader.getWeakness(entityId, ElementDamage.PROJECTILE);
             totalBonusMultiplier += projWeakness;
             if (projWeakness > 0f) emitSpiralParticle(level, target, ElementDamage.PROJECTILE);

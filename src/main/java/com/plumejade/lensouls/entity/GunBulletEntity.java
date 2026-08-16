@@ -213,7 +213,8 @@ public class GunBulletEntity extends ThrowableItemProjectile {
         if (level().isClientSide) { discard(); return; }
 
         float finalDamage = (float) damage;
-        DamageSource gunSource = gunBulletDamage(null);
+        Entity owner = getOwner();
+        DamageSource gunSource = gunBulletDamage(owner instanceof LivingEntity lo ? lo : null);
 
         // 重置部件和父实体无敌时间（PartEntity 委托到父实体 hurtServer）
         part.invulnerableTime = 0;

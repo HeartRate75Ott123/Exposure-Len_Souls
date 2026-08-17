@@ -5,14 +5,16 @@
   "refmap": "lensouls.compat.mixins.refmap.json",
   "mixins": [
     "PolaroidFixMixin",
-    "BetterCombatRangeMixin",
     "BetterCombatServerAttackMixin",
-    "IrisBufferSourceGetBufferMixin",
     "StackedPhotoStackingMixin",
     "LightroomInjectMixin",
     "PolaroidPrintMixin",
     "CataclysmDamageBucketMixin",
     "LegendaryMonstersCapMixin"
+  ],
+  "client": [
+    "IrisBufferSourceGetBufferMixin",
+    "BetterCombatRangeMixin"
   ],
   "injectors": {
     "defaultRequire": 0

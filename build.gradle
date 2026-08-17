@@ -68,6 +68,9 @@ neoForge {
             server()
             programArgument '--nogui'
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            // 服务端独立工作目录：run/mods 含纯客户端 mod（Sodium/Iris 等），
+            // 服务端加载会崩（org.lwjgl 缺失）。run-server/mods 只放双端 mod。
+            gameDirectory = project.file('run-server')
         }
 
         // This run config launches GameTestServer and runs all registered gametests, then exits.

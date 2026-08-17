@@ -6,25 +6,14 @@ import com.plumejade.lensouls.ability.client.GravityTetherRenderer;
 import com.plumejade.lensouls.ability.client.SpatialWarpOutlineRenderer;
 
 import com.plumejade.lensouls.client.screen.ScreenShakeApplier;
-import com.plumejade.lensouls.client.phantom.ClientPhantomHandler;
 import com.plumejade.lensouls.boss.ToughnessBarRenderer;
-import com.plumejade.lensouls.boss.ToughnessHitSoundPacket;
-import com.plumejade.lensouls.boss.ToughnessParticlePacket;
-import com.plumejade.lensouls.boss.ToughnessSyncPacket;
 import com.plumejade.lensouls.client.render.BossPhantomRenderer;
 import com.plumejade.lensouls.entity.ModEntities;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
 import com.plumejade.lensouls.effect.ModEffects;
-import com.plumejade.lensouls.entity.BossPhantomType;
 import com.plumejade.lensouls.gui.ConverterScreen;
 import com.plumejade.lensouls.gui.ModMenus;
 import com.plumejade.lensouls.gui.PhotoGuiScreen;
-import com.plumejade.lensouls.ability.network.AbilitySyncPacket;
-import com.plumejade.lensouls.ability.network.FreezeSyncPacket;
-import com.plumejade.lensouls.network.PhantomSkillPacket;
-import com.plumejade.lensouls.network.PhantomStartPacket;
-import com.plumejade.lensouls.network.PhantomStopPacket;
-import com.plumejade.lensouls.network.PhantomTickPacket;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceProvider;
@@ -45,16 +34,12 @@ import net.neoforged.neoforge.client.extensions.common.IClientMobEffectExtension
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import java.util.List;
 import java.util.function.Consumer;
 
 // This class will not load on dedicated servers. Accessing client side code from here is safe.
 @Mod(value = LenSouls.MODID, dist = Dist.CLIENT)
 public class LenSoulsClient {
-
-    private static final String PROTOCOL_VERSION = "1";
 
     public LenSoulsClient(IEventBus modEventBus, ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -67,7 +52,6 @@ public class LenSoulsClient {
         modEventBus.addListener(LenSoulsClient::registerLayers);
         modEventBus.addListener(LenSoulsClient::registerShaders);
         modEventBus.addListener(LenSoulsClient::registerParticleProviders);
-        modEventBus.addListener(LenSoulsClient::registerS2CPackets);
 
         // 客户端游戏事件（RenderLevelStageEvent）
         NeoForge.EVENT_BUS.register(SpatialWarpOutlineRenderer.class);
@@ -308,112 +292,6 @@ public class LenSoulsClient {
                 com.plumejade.lensouls.client.particle.SpiralParticle.ProjectileProvider::new);
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.ELEMENT_SPIRAL_WEAKNESS.get(),
                 com.plumejade.lensouls.client.particle.SpiralParticle.WeaknessLensProvider::new);
-    }
-
-    /** 注册 S2C 虚影包（仅客户端处理） */
-    private static void registerS2CPackets(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
-
-        registrar.playToClient(
-                PhantomStartPacket.TYPE,
-                PhantomStartPacket.STREAM_CODEC,
-                (packet, context) -> context.enqueueWork(() -> {
-                    BossPhantomType[] values = BossPhantomType.values();
-                    if (packet.getBossTypeOrdinal() < 0 || packet.getBossTypeOrdinal() >= values.length) return;
-                    BossPhantomType type = values[packet.getBossTypeOrdinal()];
-                    ClientPhantomHandler.getInstance().startPhantom(
-                            packet.getPlayerId(), type, packet.getLifetimeTicks(),
-                            packet.getPhantomX(), packet.getPhantomY(), packet.getPhantomZ(),
-                            packet.getPhantomYaw());
-                    ClientPhantomHandler.addPhantomEntity(packet.getPhantomEntityId());
-                })
-        );
-
-        registrar.playToClient(
-                PhantomSkillPacket.TYPE,
-                PhantomSkillPacket.STREAM_CODEC,
-                (packet, context) -> context.enqueueWork(() -> {
-                    BossPhantomType[] values = BossPhantomType.values();
-                    if (packet.getBossTypeOrdinal() < 0 || packet.getBossTypeOrdinal() >= values.length) return;
-                    BossPhantomType type = values[packet.getBossTypeOrdinal()];
-                    ClientPhantomHandler.getInstance().playSkill(type);
-                })
-        );
-
-        registrar.playToClient(
-                PhantomStopPacket.TYPE,
-                PhantomStopPacket.STREAM_CODEC,
-                (packet, context) -> context.enqueueWork(() -> {
-                    ClientPhantomHandler.getInstance().stopPhantom();
-                })
-        );
-
-        registrar.playToClient(
-                PhantomTickPacket.TYPE,
-                PhantomTickPacket.STREAM_CODEC,
-                (packet, context) -> context.enqueueWork(() -> {
-                    BossPhantomType[] values = BossPhantomType.values();
-                    if (packet.getBossTypeOrdinal() < 0 || packet.getBossTypeOrdinal() >= values.length) return;
-                    BossPhantomType type = values[packet.getBossTypeOrdinal()];
-                    ClientPhantomHandler.getInstance().playPhase(type, packet.getPhase());
-                })
-        );
-
-        // ---- 能力系统 S2C ----
-        registrar.playToClient(
-                AbilitySyncPacket.TYPE,
-                AbilitySyncPacket.STREAM_CODEC,
-                AbilitySyncPacket::handle
-        );
-
-        // ---- 冻结状态同步 S2C ----
-        registrar.playToClient(
-                FreezeSyncPacket.TYPE,
-                FreezeSyncPacket.STREAM_CODEC,
-                FreezeSyncPacket::handle
-        );
-
-        // ---- BOSS 韧性同步 S2C ----
-        registrar.playToClient(
-                ToughnessSyncPacket.TYPE,
-                ToughnessSyncPacket.STREAM_CODEC,
-                ToughnessSyncPacket::handle
-        );
-
-        // ---- BOSS 韧性削减音效 S2C ----
-        registrar.playToClient(
-                ToughnessHitSoundPacket.TYPE,
-                ToughnessHitSoundPacket.STREAM_CODEC,
-                ToughnessHitSoundPacket::handle
-        );
-
-        // ---- BOSS 韧性削减粒子 S2C ----
-        registrar.playToClient(
-                ToughnessParticlePacket.TYPE,
-                ToughnessParticlePacket.STREAM_CODEC,
-                ToughnessParticlePacket::handle
-        );
-
-        // ---- 时间定格拒绝粒子 S2C ----
-        registrar.playToClient(
-                com.plumejade.lensouls.boss.FreezeRejectParticlePacket.TYPE,
-                com.plumejade.lensouls.boss.FreezeRejectParticlePacket.STREAM_CODEC,
-                com.plumejade.lensouls.boss.FreezeRejectParticlePacket::handle
-        );
-
-        // ---- 元素弱点螺旋粒子 S2C ----
-        registrar.playToClient(
-                com.plumejade.lensouls.network.ElementSpiralPacket.TYPE,
-                com.plumejade.lensouls.network.ElementSpiralPacket.STREAM_CODEC,
-                com.plumejade.lensouls.network.ElementSpiralPacket::handle
-        );
-
-        // ---- 扭曲值同步 S2C（左侧 bar） ----
-        registrar.playToClient(
-                com.plumejade.lensouls.network.TwistSyncPacket.TYPE,
-                com.plumejade.lensouls.network.TwistSyncPacket.STREAM_CODEC,
-                com.plumejade.lensouls.network.TwistSyncPacket::handle
-        );
     }
 
     private static void onGatherEffectTooltips(GatherEffectScreenTooltipsEvent event) {

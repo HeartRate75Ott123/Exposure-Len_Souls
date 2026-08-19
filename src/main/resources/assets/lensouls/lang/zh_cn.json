@@ -63,6 +63,7 @@
   "item.lensouls.ender_bullet": "末地弹头",
   "entity.lensouls.gun_bullet": "枪弹",
   "entity.lensouls.gravity_bullet": "引力弹",
+  "entity.lensouls.twitcher": "扭曲者",
   "message.lensouls.dimensional_gun.ammo": "弹药: %s/%s",
   "message.lensouls.dimensional_gun.ammo_type": "弹药类型: %s",
   "message.lensouls.dimensional_gun.fire_mode": "射击模式: %s",

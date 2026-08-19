@@ -90,6 +90,7 @@
   "item.lensouls.ender_bullet": "Ender Bullet",
   "entity.lensouls.gun_bullet": "Gun Bullet",
   "entity.lensouls.gravity_bullet": "Gravity Bullet",
+  "entity.lensouls.twitcher": "Twitcher",
   "message.lensouls.dimensional_gun.ammo": "Ammo: %s/%s",
   "message.lensouls.dimensional_gun.ammo_type": "Ammo Type: %s",
   "message.lensouls.dimensional_gun.fire_mode": "Fire Mode: %s",

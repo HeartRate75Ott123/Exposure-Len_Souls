@@ -1,9 +1,0 @@
-{
-  "minecraft:player": {
-    "fire": 0.2,
-    "water": 0.2,
-    "earth": 0.2,
-    "ender": 0.2,
-    "projectile": 0.2
-  }
-}

@@ -1,9 +1,0 @@
-{
-  "legendary_monsters:shulker_mimic": { "element": "ender", "level": 3 },
-  "legendary_monsters:endersent": { "element": "ender", "level": 3 },
-  "legendary_monsters:annihilation_pursuer": { "element": "ender", "level": 3 },
-  "legendary_monsters:posessed_paladin": { "element": "earth", "level": 3 },
-  "legendary_monsters:cloud_golem": { "element": "water", "level": 3 },
-  "minecraft:wither": { "element": "ender", "level": 3 },
-  "minecraft:warden": { "element": "ender", "level": 3 }
-}

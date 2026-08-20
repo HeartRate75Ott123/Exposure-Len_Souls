@@ -22,6 +22,9 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 要害打击（VITAL_STRIKE）处理器。
  * <p>
@@ -57,29 +60,36 @@ public class VitalStrikeHandler {
         event.setCanceled(true);
 
         // ── 寻找瞄准的 BOSS ──
-        LivingEntity boss = findBossInSight(player);
-        if (boss == null) return;
+        List<LivingEntity> bosses = findAllBossesInSight(player);
+        if (bosses.isEmpty()) return;
 
-        // ── 镜头等级检测 ──
-        int bossTier = BossTierLoader.getTier(boss);
-        if (bossTier > 0) {
-            int lensTier = getLensTier(stack);
-            if (lensTier < bossTier) {
-                player.displayClientMessage(
-                        net.minecraft.network.chat.Component.translatable("message.lensouls.lens_tier_insufficient", bossTier),
-                        true);
-                return;
-            }
-        }
-
-        // ── 削韧 ──
+        // ── 逐个削韧（视锥内全部 BOSS 均生效） ──
         BossToughnessManager manager = BossToughnessManager.getInstance();
-        if (!manager.has(boss)) manager.register(boss);
-        var data = manager.hit(boss, player);
-        if (data != null) {
-            int interval = BossToughnessAttributes.getInvincibleTicks(boss);
-            int playerInterval = com.plumejade.lensouls.integration.TrophyModifierHandler.applyInvincibleModifier(player, interval);
-            data.setInvincibleTicks(Math.max(1, playerInterval / 2));
+        boolean tierFailedShown = false;
+        for (LivingEntity boss : bosses) {
+            // ── 镜头等级检测 ──
+            int bossTier = BossTierLoader.getTier(boss);
+            if (bossTier > 0) {
+                int lensTier = getLensTier(stack);
+                if (lensTier < bossTier) {
+                    if (!tierFailedShown) {
+                        player.displayClientMessage(
+                                net.minecraft.network.chat.Component.translatable("message.lensouls.lens_tier_insufficient", bossTier),
+                                true);
+                        tierFailedShown = true;
+                    }
+                    continue;
+                }
+            }
+
+            // ── 削韧 ──
+            if (!manager.has(boss)) manager.register(boss);
+            var data = manager.hit(boss, player);
+            if (data != null) {
+                int interval = BossToughnessAttributes.getInvincibleTicks(boss);
+                int playerInterval = com.plumejade.lensouls.integration.TrophyModifierHandler.applyInvincibleModifier(player, interval);
+                data.setInvincibleTicks(Math.max(1, playerInterval / 2));
+            }
         }
     }
 
@@ -101,14 +111,13 @@ public class VitalStrikeHandler {
         return false;
     }
 
-    private static LivingEntity findBossInSight(ServerPlayer player) {
+    private static List<LivingEntity> findAllBossesInSight(ServerPlayer player) {
         Vec3 eyePos = player.getEyePosition();
         Vec3 lookVec = player.getLookAngle();
         double maxDistSqr = MAX_RANGE * MAX_RANGE;
 
         AABB searchBox = player.getBoundingBox().inflate(MAX_RANGE);
-        LivingEntity closest = null;
-        double closestDist = Double.MAX_VALUE;
+        List<LivingEntity> result = new ArrayList<>();
 
         for (Entity entity : player.level().getEntities(player, searchBox)) {
             if (entity == player || !entity.isAlive()) continue;
@@ -121,12 +130,9 @@ public class VitalStrikeHandler {
             BossToughnessManager manager = BossToughnessManager.getInstance();
             if (!manager.has(living) && !com.plumejade.lensouls.boss.ToughnessDamageHandler.isBoss(living)) continue;
 
-            if (entity.distanceToSqr(player) < closestDist) {
-                closestDist = entity.distanceToSqr(player);
-                closest = living;
-            }
+            result.add(living);
         }
-        return closest;
+        return result;
     }
 
     private static int getLensTier(ItemStack camera) {

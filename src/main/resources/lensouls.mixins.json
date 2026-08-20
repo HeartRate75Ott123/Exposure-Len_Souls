@@ -12,6 +12,7 @@
     "PlayerDropEquipmentMixin",
     "BossStunTickMixin",
     "BossStunHurtMixin",
+    "EndermanStunProjectileMixin",
     "EntityInvulnerableTimeAccessor"
   ],
   "client": [

@@ -47,8 +47,8 @@ public class ToughnessPhotoHandler {
                 if (!inManager) continue;
 
                 int bossTier = BossTierLoader.getTier(entity);
-                if (bossTier < 1) { manager.hit(entity, hitter); break; }
-                if (lensTier >= bossTier) { manager.hit(entity, hitter); break; }
+                if (bossTier < 1) { manager.hit(entity, hitter); continue; }
+                if (lensTier >= bossTier) { manager.hit(entity, hitter); continue; }
                 if (!playedSound) failSound(entity, holder);
                 playedSound = true;
             }

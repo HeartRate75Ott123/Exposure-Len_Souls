@@ -24,7 +24,8 @@ public class EndermanStunProjectileMixin {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/damagesource/DamageSource;is(Lnet/minecraft/tags/TagKey;)Z")
     )
     private boolean lensouls$allowProjectileWhenStunned(DamageSource source, TagKey<DamageType> tag,
-                                                        EnderMan self, DamageSource damageSource, float amount) {
+                                                        DamageSource damageSource, float amount) {
+        EnderMan self = (EnderMan) (Object) this;
         if (StunPauseHelper.isStunPaused(self)) {
             return false;
         }

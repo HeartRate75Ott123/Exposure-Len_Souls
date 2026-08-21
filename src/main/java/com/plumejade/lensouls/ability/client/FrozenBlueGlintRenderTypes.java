@@ -37,9 +37,8 @@ public class FrozenBlueGlintRenderTypes {
     }
 
     private static RenderType createBodyGlint(int textureId) {
-        // 恒用自定义双采样 shader（Sampler1 实体纹理 alpha 剔除——光影下也保留，
-        // 输出目标由 GlintFrameBuffer 运行时决定：光影→自建 FBO 帧末合成，非光影→主 target）
-        var shaderState   = new RenderStateShard.ShaderStateShard(() -> CaptureState.glintEntityShader);
+        // 光影下用原版 armor entity glint shader（Iris 认识）；非光影用自定义双采样 shader
+        var shaderState   = new RenderStateShard.ShaderStateShard(() -> com.plumejade.lensouls.integration.IrisCompat.isShadersActive() ? net.minecraft.client.renderer.GameRenderer.getRendertypeArmorEntityGlintShader() : CaptureState.glintEntityShader);
         var textureState  = new RenderStateShard.TextureStateShard(FROZEN_BLUE_TEXTURE, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
         var depthState    = RenderStateShard.NO_DEPTH_TEST;
@@ -47,7 +46,7 @@ public class FrozenBlueGlintRenderTypes {
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;
         var layeringState = RenderStateShard.VIEW_OFFSET_Z_LAYERING;
-        var outputState = com.plumejade.lensouls.ability.client.GlintFrameBuffer.OUTPUT_STATE;
+        var outputState = RenderStateShard.MAIN_TARGET;
         var texturingState = RenderStateShard.ENTITY_GLINT_TEXTURING;
         var writeState    = RenderStateShard.COLOR_WRITE;
         var colorLogicState = RenderStateShard.NO_COLOR_LOGIC;
@@ -60,6 +59,8 @@ public class FrozenBlueGlintRenderTypes {
                 1536, false, false,
                 () -> {
                     textureState.setupRenderState();
+                    // 原版 glint fsh 乘 GlintAlpha（Iris glint 程序经 iris_GlintAlpha 转换）
+                    RenderSystem.setShaderGlintAlpha(1.0F);
                     shaderState.setupRenderState();
                     // Sampler1 = 本层实体纹理（alpha==0 剔除透明面；反射失败白像素兜底）
                     RenderSystem.setShaderTexture(1, textureId);

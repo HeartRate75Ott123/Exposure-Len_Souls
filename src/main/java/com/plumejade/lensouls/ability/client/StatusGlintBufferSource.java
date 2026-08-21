@@ -79,17 +79,10 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         // 多纹理实体（焰魔身体+盾牌、斯库拉身体+剑）每层用自己纹理做 alpha 测试
         int textureId = CaptureState.entityTextureId(type);
         // 先取主类型：BufferSource 类型切换即 endBatch，先主后 glint = 先画主后画光效。
-        // 顶点双写进批次（53442bf 方案）：模型适配全覆盖。
-        // glint 双路径：无光影走世界 buffer（1.4.30 验证过的路径，渲染中自动 flush 绘制）；
-        // 光影走独立 BufferSource（Iris 激活时世界 buffer 是 BufferSourceWrapper，
-        // getBuffer 会改写 RenderType——自定义 shader 与 OutputStateShard 不生效，
-        // 独立 buffer 的 endBatch 完全自控，帧末由 GlintFrameBuffer 合成）
+        // 顶点双写进批次（53442bf 方案）：模型适配全覆盖；光影下 shader 由各工厂
+        // 动态切原版 glint shader（Iris 接管渲染），非光影用自定义双采样 shader
         VertexConsumer main = delegate.getBuffer(type);
-        com.plumejade.lensouls.ability.client.GlintFrameBuffer.markGlintFrame();
-        VertexConsumer glint = com.plumejade.lensouls.integration.IrisCompat.isShadersActive()
-                ? com.plumejade.lensouls.ability.client.GlintFrameBuffer.getBufferSource()
-                        .getBuffer(glintType(textureId))
-                : delegate.getBuffer(glintType(textureId));
+        VertexConsumer glint = delegate.getBuffer(glintType(textureId));
         if (maskActive && format == DefaultVertexFormat.NEW_ENTITY) {
             // 冰蓝描边 mask（独立 buffer，由 dispatcher RETURN 的 flushMask 提交）。
             // 只双写实体模型格式：eyes 类发光层（POSITION_COLOR_TEX_LIGHTMAP）不进 mask

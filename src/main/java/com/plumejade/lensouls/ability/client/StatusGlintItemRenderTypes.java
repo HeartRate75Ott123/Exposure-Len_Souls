@@ -42,9 +42,9 @@ public class StatusGlintItemRenderTypes {
             default -> throw new IllegalStateException("NONE 涓嶅簲杩涘叆鐗╁搧 glint");
         };
 
-        // 恒用自定义双采样 shader（Sampler1 物品图集 alpha 剔除——光影下也保留，
-        // 输出目标由 GlintFrameBuffer 运行时决定：光影→自建 FBO 帧末合成，非光影→主 target）
-        var shaderState   = new RenderStateShard.ShaderStateShard(() -> itemGlintShader);
+        // 光影下用原版 glint shader（Iris 认识，自定义 shader 会被 Iris 忽略）；
+        // 非光影用自定义双采样 shader（Sampler1 物品图集 alpha 剔除，精细效果）
+        var shaderState   = new RenderStateShard.ShaderStateShard(() -> com.plumejade.lensouls.integration.IrisCompat.isShadersActive() ? net.minecraft.client.renderer.GameRenderer.getRendertypeGlintShader() : itemGlintShader);
         var textureState  = new RenderStateShard.TextureStateShard(glintTexture, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
         var depthState    = RenderStateShard.NO_DEPTH_TEST;
@@ -52,7 +52,7 @@ public class StatusGlintItemRenderTypes {
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;
         var layeringState = RenderStateShard.VIEW_OFFSET_Z_LAYERING;
-        var outputState   = com.plumejade.lensouls.ability.client.GlintFrameBuffer.OUTPUT_STATE;
+        var outputState   = RenderStateShard.MAIN_TARGET;
         var texturingState = RenderStateShard.ENTITY_GLINT_TEXTURING;
         var writeState    = RenderStateShard.COLOR_WRITE;
         var colorLogicState = RenderStateShard.NO_COLOR_LOGIC;
@@ -65,7 +65,10 @@ public class StatusGlintItemRenderTypes {
                 1536, false, false,
                 () -> {
                     textureState.setupRenderState();
-                    // Sampler1 = 鐗╁搧鍥鹃泦锛氫笌鐗╁搧妯″瀷 UV 鍚屾簮锛宎lpha 娴嬭瘯鍓旈櫎閫忔槑鍍忕礌
+                    // 原版 glint fsh 乘 GlintAlpha（Iris glint 程序经 iris_GlintAlpha 转换）——
+                    // 不设置会残留 0 导致全透明
+                    RenderSystem.setShaderGlintAlpha(1.0F);
+                    // Sampler1 = 物品图集：与物品模型 UV 同源，alpha 测试剔除透明像素
                     RenderSystem.setShaderTexture(1,
                             Minecraft.getInstance().getTextureManager()
                                     .getTexture(InventoryMenu.BLOCK_ATLAS).getId());

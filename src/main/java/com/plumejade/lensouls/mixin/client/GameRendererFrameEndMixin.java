@@ -27,8 +27,5 @@ public class GameRendererFrameEndMixin {
 
         FrozenOutlineManager.compositeIfNeeded(minecraft, mainTarget);
         BossOutlineManager.composite(minecraft, mainTarget);
-        // glint 顶点已在实体渲染 RETURN 时提交（EntityRenderDispatcherMixin），
-        // 这里只需把光影下自建 FBO 的内容合成回主画面
-        com.plumejade.lensouls.ability.client.GlintFrameBuffer.compositeIfNeeded(minecraft, mainTarget);
     }
 }

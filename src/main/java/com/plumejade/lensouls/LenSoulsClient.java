@@ -242,20 +242,6 @@ public class LenSoulsClient {
         } catch (java.io.IOException e) {
             LenSouls.LOGGER.error("[GrayOut] 黑洞星空着色器加载失败", e);
         }
-
-        // glint 合成（光影下自绘 FBO 贴回主画面）— POSITION_TEX 全屏 quad
-        try {
-            event.registerShader(
-                    new ShaderInstance(provider,
-                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "rendertype_glint_composite"),
-                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX),
-                    instance -> {
-                        com.plumejade.lensouls.ability.client.GlintFrameBuffer.glintCompositeShader = instance;
-                    }
-            );
-        } catch (java.io.IOException e) {
-            LenSouls.LOGGER.error("[Glint] 合成着色器加载失败", e);
-        }
     }
 
     /** 注册粒子提供器 */

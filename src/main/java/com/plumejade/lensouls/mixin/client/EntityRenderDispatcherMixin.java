@@ -112,8 +112,5 @@ public abstract class EntityRenderDispatcherMixin {
         // 这里兜底 flush 最后一层
         CaptureState.flushMask();
         CaptureState.endCapture();
-        // glint 顶点与描边同时机提交：此处矩阵仍是该实体渲染上下文，
-        // 延迟到帧末会变成 HUD 矩阵导致 glint 画错位置
-        com.plumejade.lensouls.ability.client.GlintFrameBuffer.endBatchGlint();
     }
 }

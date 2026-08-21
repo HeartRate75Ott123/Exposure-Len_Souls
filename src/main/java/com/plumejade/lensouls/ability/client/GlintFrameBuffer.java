@@ -4,6 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexSorting;
 import com.plumejade.lensouls.integration.IrisCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -14,6 +15,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fStack;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -123,20 +126,35 @@ public final class GlintFrameBuffer {
         if (mc.level == null) return;
         if (mc.options.hideGui || mc.screen != null) return;
 
-        main.bindWrite(true);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(() -> glintCompositeShader);
-        glintCompositeShader.setSampler("DiffuseSampler", glintTarget.getColorTextureId());
+        // 全屏四边形以 NDC (-1..1) 直接铺满屏幕，必须用 identity 投影/视图矩阵——
+        // 此刻（render RETURN）残留的是世界/HUD 矩阵，不重置会把四边形投影错位
+        RenderSystem.backupProjectionMatrix();
+        RenderSystem.setProjectionMatrix(new Matrix4f(), VertexSorting.ORTHOGRAPHIC_Z);
+        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+        modelViewStack.pushMatrix();
+        modelViewStack.identity();
+        RenderSystem.applyModelViewMatrix();
 
-        var bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
-        var consumer = bufferSource.getBuffer(CompositeRenderTypes.GLINT_COMPOSITE_QUAD);
-        consumer.addVertex(-1, -1, 0).setUv(0, 0);
-        consumer.addVertex(1, -1, 0).setUv(1, 0);
-        consumer.addVertex(1, 1, 0).setUv(1, 1);
-        consumer.addVertex(-1, 1, 0).setUv(0, 1);
-        bufferSource.endBatch(CompositeRenderTypes.GLINT_COMPOSITE_QUAD);
+        try {
+            main.bindWrite(true);
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            RenderSystem.setShader(() -> glintCompositeShader);
+            glintCompositeShader.setSampler("DiffuseSampler", glintTarget.getColorTextureId());
 
-        RenderSystem.disableBlend();
+            var bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
+            var consumer = bufferSource.getBuffer(CompositeRenderTypes.GLINT_COMPOSITE_QUAD);
+            consumer.addVertex(-1, -1, 0).setUv(0, 0);
+            consumer.addVertex(1, -1, 0).setUv(1, 0);
+            consumer.addVertex(1, 1, 0).setUv(1, 1);
+            consumer.addVertex(-1, 1, 0).setUv(0, 1);
+            bufferSource.endBatch(CompositeRenderTypes.GLINT_COMPOSITE_QUAD);
+
+            RenderSystem.disableBlend();
+        } finally {
+            modelViewStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
+            RenderSystem.restoreProjectionMatrix();
+        }
     }
 }

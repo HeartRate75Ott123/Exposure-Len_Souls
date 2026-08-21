@@ -27,8 +27,8 @@ public class GameRendererFrameEndMixin {
 
         FrozenOutlineManager.compositeIfNeeded(minecraft, mainTarget);
         BossOutlineManager.composite(minecraft, mainTarget);
-        // glint 顶点先绘制（非光影→主 target；光影→自建 FBO），再合成回主画面（仅光影）
-        com.plumejade.lensouls.ability.client.GlintFrameBuffer.endBatchGlint();
+        // glint 顶点已在实体渲染 RETURN 时提交（EntityRenderDispatcherMixin），
+        // 这里只需把光影下自建 FBO 的内容合成回主画面
         com.plumejade.lensouls.ability.client.GlintFrameBuffer.compositeIfNeeded(minecraft, mainTarget);
     }
 }

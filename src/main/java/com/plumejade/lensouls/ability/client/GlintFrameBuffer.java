@@ -6,8 +6,10 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.plumejade.lensouls.integration.IrisCompat;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.RenderStateShard;
+import net.minecraft.client.renderer.ShaderInstance;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -22,6 +24,11 @@ import org.lwjgl.opengl.GL11;
  * 网格（方片）。解法：glint 顶点画进自建 FBO（自定义双采样 shader 照常执行，
  * Iris 不拦截自定义 FBO 输出），帧末把 FBO 内容合成回主画面。
  * <p>
+ * glint 顶点写入用本类自持的独立 BufferSource（不走世界渲染的 MultiBufferSource）：
+ * Iris 激活时世界 buffer 是 BufferSourceWrapper，getBuffer 会经 typeChanger 改写
+ * RenderType——自定义 shader 与 OutputStateShard 不生效。独立 buffer 的 endBatch
+ * 完全自控（仿 CaptureState.maskBufferSource / Adorable Armory MASK_BUFFER_SOURCE）。
+ * <p>
  * 非光影路径不受影响：{@link #OUTPUT_STATE} 的绑定函数运行时判断——
  * 非光影直接绑主 target（等价原 MAIN_TARGET 语义），光影才绑 glint FBO。
  */
@@ -31,7 +38,10 @@ public final class GlintFrameBuffer {
     private static RenderTarget glintTarget;
     private static RenderTarget prevTarget;
     private static boolean glintUsedInFrame = false;
-    private static boolean needsComposite = false;
+    private static MultiBufferSource.BufferSource glintBufferSource;
+
+    /** glint FBO 合成回主画面的着色器（POSITION_TEX 全屏 quad）。 */
+    public static ShaderInstance glintCompositeShader;
 
     private GlintFrameBuffer() {}
 
@@ -42,8 +52,23 @@ public final class GlintFrameBuffer {
                     GlintFrameBuffer::setupOutput,
                     GlintFrameBuffer::restoreOutput);
 
+    /** glint 顶点写入的独立 BufferSource（绕开 Iris 的 BufferSourceWrapper）。 */
+    public static MultiBufferSource.BufferSource getBufferSource() {
+        if (glintBufferSource == null) {
+            glintBufferSource = new RenderBuffers(256).bufferSource();
+        }
+        return glintBufferSource;
+    }
+
     public static void markGlintFrame() {
         glintUsedInFrame = true;
+    }
+
+    /** 帧末把收集的 glint 顶点绘制到输出目标（非光影→主 target，光影→glint FBO）。 */
+    public static void endBatchGlint() {
+        if (glintBufferSource != null) {
+            glintBufferSource.endBatch();
+        }
     }
 
     private static void setupOutput() {
@@ -78,7 +103,6 @@ public final class GlintFrameBuffer {
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
             glintUsedInFrame = false;
-            needsComposite = false;
             if (IrisCompat.isShadersActive() && glintTarget != null) {
                 var mc = Minecraft.getInstance();
                 var main = mc.getMainRenderTarget();
@@ -87,35 +111,31 @@ public final class GlintFrameBuffer {
                 glintTarget.clear(Minecraft.ON_OSX);
                 main.bindWrite(false);
             }
-        } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
-            if (IrisCompat.isShadersActive() && glintUsedInFrame) {
-                needsComposite = true;
-            }
         }
     }
 
-    /** 帧末（GameRendererFrameEndMixin）把 glint FBO 合成回主画面。 */
+    /** 帧末（GameRendererFrameEndMixin）把 glint FBO 合成回主画面（仅光影需要）。 */
     public static void compositeIfNeeded(Minecraft mc, RenderTarget main) {
-        if (!needsComposite) return;
-        needsComposite = false;
+        if (!IrisCompat.isShadersActive() || !glintUsedInFrame) return;
+        glintUsedInFrame = false;
         if (glintTarget == null) return;
-        if (!IrisCompat.isShadersActive()) return;
+        if (glintCompositeShader == null) return;
         if (mc.level == null) return;
         if (mc.options.hideGui || mc.screen != null) return;
 
         main.bindWrite(true);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
-        RenderSystem.setShaderTexture(0, glintTarget.getColorTextureId());
+        RenderSystem.setShader(() -> glintCompositeShader);
+        glintCompositeShader.setSampler("DiffuseSampler", glintTarget.getColorTextureId());
 
         var bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
-        var consumer = bufferSource.getBuffer(CompositeRenderTypes.MAIN_QUAD);
+        var consumer = bufferSource.getBuffer(CompositeRenderTypes.GLINT_COMPOSITE_QUAD);
         consumer.addVertex(-1, -1, 0).setUv(0, 0);
         consumer.addVertex(1, -1, 0).setUv(1, 0);
         consumer.addVertex(1, 1, 0).setUv(1, 1);
         consumer.addVertex(-1, 1, 0).setUv(0, 1);
-        bufferSource.endBatch(CompositeRenderTypes.MAIN_QUAD);
+        bufferSource.endBatch(CompositeRenderTypes.GLINT_COMPOSITE_QUAD);
 
         RenderSystem.disableBlend();
     }

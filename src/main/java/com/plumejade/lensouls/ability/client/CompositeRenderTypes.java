@@ -19,6 +19,9 @@ public class CompositeRenderTypes extends RenderStateShard {
     private static final ShaderStateShard BOSS_COMPOSITE_SHADER =
             new ShaderStateShard(() -> BossOutlineManager.bossCompositeShader);
 
+    private static final ShaderStateShard GLINT_COMPOSITE_SHADER =
+            new ShaderStateShard(() -> GlintFrameBuffer.glintCompositeShader);
+
     private static final DepthTestStateShard NO_DEPTH_TEST_STATE;
 
     static {
@@ -52,6 +55,20 @@ public class CompositeRenderTypes extends RenderStateShard {
             VertexFormat.Mode.QUADS, 256, false, false,
             RenderType.CompositeState.builder()
                     .setShaderState(BOSS_COMPOSITE_SHADER)
+                    .setDepthTestState(NO_DEPTH_TEST_STATE)
+                    .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                    .setWriteMaskState(COLOR_WRITE)
+                    .setOutputState(MAIN_TARGET)
+                    .createCompositeState(false)
+    );
+
+    /** 全屏四边形 — 光影下 glint FBO 合成回主画面用（glint composite shader） */
+    public static final RenderType GLINT_COMPOSITE_QUAD = RenderType.create(
+            "lensouls_glint_composite_quad",
+            DefaultVertexFormat.POSITION_TEX,
+            VertexFormat.Mode.QUADS, 256, false, false,
+            RenderType.CompositeState.builder()
+                    .setShaderState(GLINT_COMPOSITE_SHADER)
                     .setDepthTestState(NO_DEPTH_TEST_STATE)
                     .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                     .setWriteMaskState(COLOR_WRITE)

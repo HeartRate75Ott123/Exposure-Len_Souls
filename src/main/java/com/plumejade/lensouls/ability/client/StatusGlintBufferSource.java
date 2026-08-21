@@ -79,11 +79,15 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         // 多纹理实体（焰魔身体+盾牌、斯库拉身体+剑）每层用自己纹理做 alpha 测试
         int textureId = CaptureState.entityTextureId(type);
         // 先取主类型：BufferSource 类型切换即 endBatch，先主后 glint = 先画主后画光效。
-        // 顶点双写进批次（53442bf 方案）：模型适配全覆盖；Iris 光影下 shader 动态切换
-        // 为原版 glint shader（Iris 接管渲染，见各 glint RenderType 工厂）
+        // 顶点双写进批次（53442bf 方案）：模型适配全覆盖。
+        // glint 走独立 BufferSource（GlintFrameBuffer）：Iris 激活时世界 buffer 是
+        // BufferSourceWrapper，getBuffer 会改写 RenderType（typeChanger），自定义
+        // shader 与 OutputStateShard 不生效——独立 buffer 的 endBatch 完全自控，
+        // 帧末由 GlintFrameBuffer.endBatchGlint 统一绘制（非光影→主 target，光影→自建 FBO）
         VertexConsumer main = delegate.getBuffer(type);
         com.plumejade.lensouls.ability.client.GlintFrameBuffer.markGlintFrame();
-        VertexConsumer glint = delegate.getBuffer(glintType(textureId));
+        VertexConsumer glint = com.plumejade.lensouls.ability.client.GlintFrameBuffer.getBufferSource()
+                .getBuffer(glintType(textureId));
         if (maskActive && format == DefaultVertexFormat.NEW_ENTITY) {
             // 冰蓝描边 mask（独立 buffer，由 dispatcher RETURN 的 flushMask 提交）。
             // 只双写实体模型格式：eyes 类发光层（POSITION_COLOR_TEX_LIGHTMAP）不进 mask

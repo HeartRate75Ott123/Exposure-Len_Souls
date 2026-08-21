@@ -92,8 +92,7 @@ public class StatusGlintBufferSource implements MultiBufferSource {
                     ? MaskRenderTypes.MASK_TYPE_ITEM : MaskRenderTypes.maskTypeForEntity(textureId);
             // mask 顶点颜色强制白色（仿原版 EntityOutlineGenerator：丢弃 setColor 等），
             // sobel 边缘检测只对形状边缘响应
-            VertexConsumer mask = new MaskColorConsumer(
-                    CaptureState.getMaskBufferSource().getBuffer(maskType));
+            VertexConsumer mask = new MaskColorConsumer(maskType);
             // 必须嵌套 Double：GeckoLib 只重建 VertexMultiConsumer.Double，
             // Multiple（3+ consumer）不会被重建，flush 后写入已关闭 buffer 会崩溃
             return VertexMultiConsumer.create(VertexMultiConsumer.create(main, glint), mask);
@@ -120,23 +119,23 @@ public class StatusGlintBufferSource implements MultiBufferSource {
      * addVertex 时显式置白、丢弃 setColor，保证 mask 内容 alpha 恒为 255，
      * Sobel 边缘检测只响应形状边缘。
      * <p>
-     * 注意：mask 是 {@code NEW_ENTITY} 格式，与原版 outline 的
-     * {@code POSITION_TEX_COLOR} 不同——setUv1/setUv2/setNormal 必须转发，
-     * 否则顶点元素缺失会在下一个 addVertex 时抛
-     * {@code Missing elements in vertex: UV1, UV2, Normal}。
+     * 顶点不直接写 buffer，而是收集进 {@link CaptureState}（内存收集方案）——
+     * GeckoLib 每骨骼递归会重建 VertexMultiConsumer.Double，但对未知的
+     * consumer 类型不做「buffer 已 end 则刷新」判定，直接写共享 mask buffer
+     * 会在多纹理实体（maskType 切换触发 BufferSource 自动 endBatch）时向已
+     * 关闭的 BufferBuilder 写顶点崩溃（"Not building!"）。收集后帧末统一提交。
      */
     private static final class MaskColorConsumer implements VertexConsumer {
 
-        private final VertexConsumer delegate;
+        private final RenderType maskType;
 
-        MaskColorConsumer(VertexConsumer delegate) {
-            this.delegate = delegate;
+        MaskColorConsumer(RenderType maskType) {
+            this.maskType = maskType;
         }
 
         @Override
         public VertexConsumer addVertex(float x, float y, float z) {
-            CaptureState.recordMaskVertex(x, y, z);
-            this.delegate.addVertex(x, y, z).setColor(255, 255, 255, 255);
+            CaptureState.startMaskVertex(maskType, null, x, y, z);
             return this;
         }
 
@@ -145,11 +144,7 @@ public class StatusGlintBufferSource implements MultiBufferSource {
             // 必须显式转发矩阵版：接口 default 4 参会变换后转调 3 参，
             // 而 BufferBuilder 的 3 参实现又用 RenderSystem 当前 ModelViewMat 变换一次——
             // 二次变换会让 mask 顶点依赖全局矩阵状态（Iris 下错位）
-            float x2 = matrix4f.m00() * x + matrix4f.m01() * y + matrix4f.m02() * z + matrix4f.m03();
-            float y2 = matrix4f.m10() * x + matrix4f.m11() * y + matrix4f.m12() * z + matrix4f.m13();
-            float z2 = matrix4f.m20() * x + matrix4f.m21() * y + matrix4f.m22() * z + matrix4f.m23();
-            CaptureState.recordMaskVertex(x2, y2, z2);
-            this.delegate.addVertex(matrix4f, x, y, z).setColor(255, 255, 255, 255);
+            CaptureState.startMaskVertex(maskType, matrix4f, x, y, z);
             return this;
         }
 
@@ -160,25 +155,25 @@ public class StatusGlintBufferSource implements MultiBufferSource {
 
         @Override
         public VertexConsumer setUv(float u, float v) {
-            this.delegate.setUv(u, v);
+            CaptureState.setMaskVertexUv(u, v);
             return this;
         }
 
         @Override
         public VertexConsumer setUv1(int u, int v) {
-            this.delegate.setUv1(u, v);
+            CaptureState.setMaskVertexUv1(u, v);
             return this;
         }
 
         @Override
         public VertexConsumer setUv2(int u, int v) {
-            this.delegate.setUv2(u, v);
+            CaptureState.setMaskVertexUv2(u, v);
             return this;
         }
 
         @Override
         public VertexConsumer setNormal(float normalX, float normalY, float normalZ) {
-            this.delegate.setNormal(normalX, normalY, normalZ);
+            CaptureState.setMaskVertexNormal(normalX, normalY, normalZ);
             return this;
         }
     }

@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.ability.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import net.minecraft.client.Minecraft;
@@ -10,11 +11,14 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
+import org.joml.Matrix4f;
 import org.slf4j.Logger;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -78,6 +82,106 @@ public class CaptureState {
         if (z > maskMaxZ) maskMaxZ = z;
     }
 
+    // ---- mask 顶点内存收集（GeckoLib 多部件崩溃修复） ----
+    // GeckoLib 每骨骼递归 checkAndRefreshBuffer 只认识 BufferBuilder/EntityOutlineGenerator/Double，
+    // 不认识我们的 MaskColorConsumer——多纹理实体的 maskType 切换触发 BufferSource 自动 endBatch 后，
+    // GeckoLib 仍向已关闭的 BufferBuilder 写顶点 → "Not building!" 崩溃。
+    // 改为：渲染期间只收集顶点（含 maskType/矩阵/uv/normal），帧末统一提交——写入时机完全自控。
+
+    /** 单个待提交的 mask 顶点条目。 */
+    public static final class MaskVertexEntry {
+        final RenderType maskType;
+        /** null = 3 参 addVertex（走 RenderSystem 全局矩阵）；非 null = 矩阵版（深拷贝，防渲染后矩阵被改）。 */
+        final Matrix4f matrix;
+        final float x, y, z;
+        float u, v;
+        int uv1U, uv1V;
+        int uv2U, uv2V;
+        float nx, ny, nz;
+
+        MaskVertexEntry(RenderType maskType, Matrix4f matrix, float x, float y, float z) {
+            this.maskType = maskType;
+            this.matrix = matrix != null ? new Matrix4f(matrix) : null;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+    }
+
+    private static final List<MaskVertexEntry> PENDING_MASK_VERTICES = new ArrayList<>();
+    private static MaskVertexEntry currentMaskVertex;
+
+    /** 开始一个新 mask 顶点（隐式结束上一个）。 */
+    public static void startMaskVertex(RenderType maskType, Matrix4f matrix, float x, float y, float z) {
+        endMaskVertex();
+        currentMaskVertex = new MaskVertexEntry(maskType, matrix, x, y, z);
+        recordMaskVertex(x, y, z);
+    }
+
+    public static void setMaskVertexUv(float u, float v) {
+        if (currentMaskVertex != null) {
+            currentMaskVertex.u = u;
+            currentMaskVertex.v = v;
+        }
+    }
+
+    public static void setMaskVertexUv1(int u, int v) {
+        if (currentMaskVertex != null) {
+            currentMaskVertex.uv1U = u;
+            currentMaskVertex.uv1V = v;
+        }
+    }
+
+    public static void setMaskVertexUv2(int u, int v) {
+        if (currentMaskVertex != null) {
+            currentMaskVertex.uv2U = u;
+            currentMaskVertex.uv2V = v;
+        }
+    }
+
+    public static void setMaskVertexNormal(float nx, float ny, float nz) {
+        if (currentMaskVertex != null) {
+            currentMaskVertex.nx = nx;
+            currentMaskVertex.ny = ny;
+            currentMaskVertex.nz = nz;
+        }
+    }
+
+    /** 结束当前顶点并入列（未开始则无操作）。 */
+    public static void endMaskVertex() {
+        if (currentMaskVertex != null) {
+            PENDING_MASK_VERTICES.add(currentMaskVertex);
+            currentMaskVertex = null;
+        }
+    }
+
+    /** 把收集的 mask 顶点按 maskType 分组写入 mask FBO 并清空。 */
+    private static void commitMaskVertices() {
+        if (PENDING_MASK_VERTICES.isEmpty()) return;
+        MultiBufferSource.BufferSource source = getMaskBufferSource();
+        VertexConsumer consumer = null;
+        for (MaskVertexEntry e : PENDING_MASK_VERTICES) {
+            if (consumer == null || e.maskType != consumerType) {
+                consumerType = e.maskType;
+                consumer = source.getBuffer(e.maskType);
+            }
+            if (e.matrix != null) {
+                consumer.addVertex(e.matrix, e.x, e.y, e.z);
+            } else {
+                consumer.addVertex(e.x, e.y, e.z);
+            }
+            consumer.setColor(255, 255, 255, 255);
+            consumer.setUv(e.u, e.v);
+            consumer.setUv1(e.uv1U, e.uv1V);
+            consumer.setUv2(e.uv2U, e.uv2V);
+            consumer.setNormal(e.nx, e.ny, e.nz);
+        }
+        source.endBatch();
+        PENDING_MASK_VERTICES.clear();
+    }
+
+    private static RenderType consumerType;
+
     private static void resetMaskStats() {
         maskVertexCount = 0;
         maskMinX = maskMaxX = maskMinY = maskMaxY = maskMinZ = maskMaxZ = 0;
@@ -112,9 +216,8 @@ public class CaptureState {
     }
 
     public static void flushMask() {
-        if (maskBufferSource != null) {
-            maskBufferSource.endBatch();
-        }
+        endMaskVertex();
+        commitMaskVertices();
         if (maskVertexCount > 0) {
             LOGGER.info("[FrozenMask] entity={} vertices={} AABB=({},{},{})-({},{},{})",
                     captureEntityId.get(), maskVertexCount,

@@ -40,6 +40,8 @@ public class MaskRenderTypes extends RenderStateShard {
     );
 
     // ---- 实体蒙版（无纹理，纯白） ----
+    // 对齐原版 RenderType.outline / AdorableArmory 蒙版语义：
+    // NO_CULL（多部件模型背面也画，否则描边缺部位）+ NO_DEPTH_TEST（部件间深度自遮挡会剔掉后画部件）
     public static final RenderType MASK_TYPE = RenderType.create(
             "lensouls_mask_entity",
             DefaultVertexFormat.NEW_ENTITY,
@@ -48,9 +50,9 @@ public class MaskRenderTypes extends RenderStateShard {
                     .setShaderState(MASK_SHADER)
                     .setOutputState(MASK_OUTPUT)
                     .setTransparencyState(NO_TRANSPARENCY)
-                    .setWriteMaskState(COLOR_DEPTH_WRITE)
-                    .setCullState(CULL)
-                    .setDepthTestState(LEQUAL_DEPTH_TEST)
+                    .setWriteMaskState(COLOR_WRITE)
+                    .setCullState(NO_CULL)
+                    .setDepthTestState(NO_DEPTH_TEST)
                     .createCompositeState(false)
     );
 
@@ -109,9 +111,9 @@ public class MaskRenderTypes extends RenderStateShard {
                             .setTextureState(textureState)
                             .setOutputState(MASK_OUTPUT)
                             .setTransparencyState(NO_TRANSPARENCY)
-                            .setWriteMaskState(COLOR_DEPTH_WRITE)
-                            .setCullState(CULL)
-                            .setDepthTestState(LEQUAL_DEPTH_TEST)
+                            .setWriteMaskState(COLOR_WRITE)
+                            .setCullState(NO_CULL)
+                            .setDepthTestState(NO_DEPTH_TEST)
                             .createCompositeState(false)
             );
         });

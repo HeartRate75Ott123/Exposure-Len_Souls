@@ -70,7 +70,11 @@ public final class GlintFrameBuffer {
     /** 帧末把收集的 glint 顶点绘制到输出目标（非光影→主 target，光影→glint FBO）。 */
     public static void endBatchGlint() {
         if (glintBufferSource != null) {
+            com.mojang.logging.LogUtils.getLogger().info("[GlintDebug] endBatchGlint called, irises={} used={}",
+                    IrisCompat.isShadersActive(), glintUsedInFrame);
             glintBufferSource.endBatch();
+        } else {
+            com.mojang.logging.LogUtils.getLogger().info("[GlintDebug] endBatchGlint no bufferSource");
         }
     }
 
@@ -119,6 +123,8 @@ public final class GlintFrameBuffer {
 
     /** 帧末（GameRendererFrameEndMixin）把 glint FBO 合成回主画面（仅光影需要）。 */
     public static void compositeIfNeeded(Minecraft mc, RenderTarget main) {
+        com.mojang.logging.LogUtils.getLogger().info("[GlintDebug] compositeIfNeeded: irises={} used={} target={} shader={}",
+                IrisCompat.isShadersActive(), glintUsedInFrame, glintTarget != null, glintCompositeShader != null);
         if (!IrisCompat.isShadersActive() || !glintUsedInFrame) return;
         glintUsedInFrame = false;
         if (glintTarget == null) return;

@@ -31,15 +31,16 @@ public class StunGlintRenderTypes {
     }
 
     private static RenderType createBodyGlint(int textureId) {
-        // 光影下用原版 armor entity glint shader（Iris 认识）；非光影用自定义双采样 shader
+        // 光影下用原版 armor entity glint shader（Iris 认识）；非光影用自定义双采样 shader。
+        // 对齐原版 entity glint：EQUAL 深度测试（主模型 alpha 测试透明像素不写深度，
+        // glint 只在深度相等处画 → 透明区域不发光）+ NO_CULL，无 layering（z 偏移会破坏 EQUAL）
         var shaderState   = new RenderStateShard.ShaderStateShard(() -> com.plumejade.lensouls.integration.IrisCompat.isShadersActive() ? net.minecraft.client.renderer.GameRenderer.getRendertypeArmorEntityGlintShader() : CaptureState.glintEntityShader);
         var textureState  = new RenderStateShard.TextureStateShard(STUN_TEXTURE, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
-        var depthState    = RenderStateShard.NO_DEPTH_TEST;
-        var cullState     = RenderStateShard.CULL;
+        var depthState    = RenderStateShard.EQUAL_DEPTH_TEST;
+        var cullState     = RenderStateShard.NO_CULL;
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;
-        var layeringState = RenderStateShard.VIEW_OFFSET_Z_LAYERING;
         var outputState   = RenderStateShard.MAIN_TARGET;
         var texturingState = RenderStateShard.ENTITY_GLINT_TEXTURING;
         var writeState    = RenderStateShard.COLOR_WRITE;
@@ -63,7 +64,6 @@ public class StunGlintRenderTypes {
                     cullState.setupRenderState();
                     lightmapState.setupRenderState();
                     overlayState.setupRenderState();
-                    layeringState.setupRenderState();
                     outputState.setupRenderState();
                     texturingState.setupRenderState();
                     writeState.setupRenderState();
@@ -79,7 +79,6 @@ public class StunGlintRenderTypes {
                     cullState.clearRenderState();
                     lightmapState.clearRenderState();
                     overlayState.clearRenderState();
-                    layeringState.clearRenderState();
                     outputState.clearRenderState();
                     texturingState.clearRenderState();
                     writeState.clearRenderState();

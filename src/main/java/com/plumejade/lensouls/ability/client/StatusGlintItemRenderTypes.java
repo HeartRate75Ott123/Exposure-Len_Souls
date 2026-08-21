@@ -42,18 +42,17 @@ public class StatusGlintItemRenderTypes {
             default -> throw new IllegalStateException("NONE 涓嶅簲杩涘叆鐗╁搧 glint");
         };
 
-        // 光影下用原版 glint shader（Iris 认识，自定义 shader 会被 Iris 忽略）；
-        // 非光影用自定义双采样 shader（Sampler1 物品图集 alpha 剔除，精细效果）
+        // 对齐原版 RenderType.glint()：EQUAL 深度测试（主模型 alpha 测试丢弃透明像素不写深度，
+        // glint 只在深度相等处画 → 透明区域天然不发光，不方片）+ NO_CULL + GLINT_TEXTURING
         var shaderState   = new RenderStateShard.ShaderStateShard(() -> com.plumejade.lensouls.integration.IrisCompat.isShadersActive() ? net.minecraft.client.renderer.GameRenderer.getRendertypeGlintShader() : itemGlintShader);
         var textureState  = new RenderStateShard.TextureStateShard(glintTexture, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
-        var depthState    = RenderStateShard.NO_DEPTH_TEST;
-        var cullState     = RenderStateShard.CULL;
+        var depthState    = RenderStateShard.EQUAL_DEPTH_TEST;
+        var cullState     = RenderStateShard.NO_CULL;
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;
-        var layeringState = RenderStateShard.VIEW_OFFSET_Z_LAYERING;
         var outputState   = RenderStateShard.MAIN_TARGET;
-        var texturingState = RenderStateShard.ENTITY_GLINT_TEXTURING;
+        var texturingState = RenderStateShard.GLINT_TEXTURING;
         var writeState    = RenderStateShard.COLOR_WRITE;
         var colorLogicState = RenderStateShard.NO_COLOR_LOGIC;
         var lineState     = RenderStateShard.DEFAULT_LINE;
@@ -78,7 +77,6 @@ public class StatusGlintItemRenderTypes {
                     cullState.setupRenderState();
                     lightmapState.setupRenderState();
                     overlayState.setupRenderState();
-                    layeringState.setupRenderState();
                     outputState.setupRenderState();
                     texturingState.setupRenderState();
                     writeState.setupRenderState();
@@ -94,7 +92,6 @@ public class StatusGlintItemRenderTypes {
                     cullState.clearRenderState();
                     lightmapState.clearRenderState();
                     overlayState.clearRenderState();
-                    layeringState.clearRenderState();
                     outputState.clearRenderState();
                     texturingState.clearRenderState();
                     writeState.clearRenderState();

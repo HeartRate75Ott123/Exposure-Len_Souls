@@ -80,14 +80,16 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         int textureId = CaptureState.entityTextureId(type);
         // 先取主类型：BufferSource 类型切换即 endBatch，先主后 glint = 先画主后画光效。
         // 顶点双写进批次（53442bf 方案）：模型适配全覆盖。
-        // glint 走独立 BufferSource（GlintFrameBuffer）：Iris 激活时世界 buffer 是
-        // BufferSourceWrapper，getBuffer 会改写 RenderType（typeChanger），自定义
-        // shader 与 OutputStateShard 不生效——独立 buffer 的 endBatch 完全自控，
-        // 帧末由 GlintFrameBuffer.endBatchGlint 统一绘制（非光影→主 target，光影→自建 FBO）
+        // glint 双路径：无光影走世界 buffer（1.4.30 验证过的路径，渲染中自动 flush 绘制）；
+        // 光影走独立 BufferSource（Iris 激活时世界 buffer 是 BufferSourceWrapper，
+        // getBuffer 会改写 RenderType——自定义 shader 与 OutputStateShard 不生效，
+        // 独立 buffer 的 endBatch 完全自控，帧末由 GlintFrameBuffer 合成）
         VertexConsumer main = delegate.getBuffer(type);
         com.plumejade.lensouls.ability.client.GlintFrameBuffer.markGlintFrame();
-        VertexConsumer glint = com.plumejade.lensouls.ability.client.GlintFrameBuffer.getBufferSource()
-                .getBuffer(glintType(textureId));
+        VertexConsumer glint = com.plumejade.lensouls.integration.IrisCompat.isShadersActive()
+                ? com.plumejade.lensouls.ability.client.GlintFrameBuffer.getBufferSource()
+                        .getBuffer(glintType(textureId))
+                : delegate.getBuffer(glintType(textureId));
         if (maskActive && format == DefaultVertexFormat.NEW_ENTITY) {
             // 冰蓝描边 mask（独立 buffer，由 dispatcher RETURN 的 flushMask 提交）。
             // 只双写实体模型格式：eyes 类发光层（POSITION_COLOR_TEX_LIGHTMAP）不进 mask

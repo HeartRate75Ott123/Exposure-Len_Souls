@@ -42,7 +42,9 @@ public class StatusGlintItemRenderTypes {
             default -> throw new IllegalStateException("NONE 涓嶅簲杩涘叆鐗╁搧 glint");
         };
 
-        var shaderState   = new RenderStateShard.ShaderStateShard(() -> com.plumejade.lensouls.integration.IrisCompat.isShadersActive() ? net.minecraft.client.renderer.GameRenderer.getRendertypeGlintShader() : itemGlintShader);
+        // 恒用自定义双采样 shader（Sampler1 物品图集 alpha 剔除——光影下也保留，
+        // 输出目标由 GlintFrameBuffer 运行时决定：光影→自建 FBO 帧末合成，非光影→主 target）
+        var shaderState   = new RenderStateShard.ShaderStateShard(() -> itemGlintShader);
         var textureState  = new RenderStateShard.TextureStateShard(glintTexture, true, false);
         var blendState    = RenderStateShard.GLINT_TRANSPARENCY;
         var depthState    = RenderStateShard.NO_DEPTH_TEST;
@@ -50,7 +52,7 @@ public class StatusGlintItemRenderTypes {
         var lightmapState = RenderStateShard.NO_LIGHTMAP;
         var overlayState  = RenderStateShard.NO_OVERLAY;
         var layeringState = RenderStateShard.VIEW_OFFSET_Z_LAYERING;
-        var outputState   = RenderStateShard.MAIN_TARGET;
+        var outputState   = com.plumejade.lensouls.ability.client.GlintFrameBuffer.OUTPUT_STATE;
         var texturingState = RenderStateShard.ENTITY_GLINT_TEXTURING;
         var writeState    = RenderStateShard.COLOR_WRITE;
         var colorLogicState = RenderStateShard.NO_COLOR_LOGIC;

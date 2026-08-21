@@ -27,5 +27,6 @@ public class GameRendererFrameEndMixin {
 
         FrozenOutlineManager.compositeIfNeeded(minecraft, mainTarget);
         BossOutlineManager.composite(minecraft, mainTarget);
+        com.plumejade.lensouls.ability.client.GlintFrameBuffer.compositeIfNeeded(minecraft, mainTarget);
     }
 }

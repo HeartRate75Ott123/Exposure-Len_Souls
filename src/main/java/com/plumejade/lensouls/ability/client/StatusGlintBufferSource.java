@@ -82,6 +82,7 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         // 顶点双写进批次（53442bf 方案）：模型适配全覆盖；Iris 光影下 shader 动态切换
         // 为原版 glint shader（Iris 接管渲染，见各 glint RenderType 工厂）
         VertexConsumer main = delegate.getBuffer(type);
+        com.plumejade.lensouls.ability.client.GlintFrameBuffer.markGlintFrame();
         VertexConsumer glint = delegate.getBuffer(glintType(textureId));
         if (maskActive && format == DefaultVertexFormat.NEW_ENTITY) {
             // 冰蓝描边 mask（独立 buffer，由 dispatcher RETURN 的 flushMask 提交）。

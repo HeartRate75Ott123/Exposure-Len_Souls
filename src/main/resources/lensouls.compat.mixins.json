@@ -6,6 +6,7 @@
   "mixins": [
     "PolaroidFixMixin",
     "BetterCombatServerAttackMixin",
+    "BetterCombatAttackMixin",
     "StackedPhotoStackingMixin",
     "LightroomInjectMixin",
     "PolaroidPrintMixin",

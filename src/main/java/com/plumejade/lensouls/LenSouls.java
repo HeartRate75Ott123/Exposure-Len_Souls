@@ -51,6 +51,7 @@ public class LenSouls {
         modEventBus.addListener(this::commonSetup);
 
         ModEffects.register(modEventBus);
+        com.plumejade.lensouls.attribute.ModAttributes.register(modEventBus);
         ModItems.register(modEventBus);
         ModMenus.register(modEventBus);
         ModEnchantments.register(modEventBus);

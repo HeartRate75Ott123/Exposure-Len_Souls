@@ -13,6 +13,8 @@
     "BossStunTickMixin",
     "BossStunHurtMixin",
     "EndermanStunProjectileMixin",
+    "BossProjHurtMixin",
+    "PlayerSwingMixin",
     "EntityInvulnerableTimeAccessor"
   ],
   "client": [

@@ -7,6 +7,7 @@ import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.config.ItemElementActivityLoader;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
 import com.plumejade.lensouls.entity.BossPhantomType;
+import com.plumejade.lensouls.integration.PhotoSpecialEffects;
 import com.plumejade.lensouls.network.ElementSpiralPacket;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.ParticleTypes;
@@ -14,6 +15,7 @@ import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -125,10 +127,28 @@ public class DamageHandler {
 
             if (activitySum <= 0f) continue;
 
+            // 照片元素强化（佩戴者造成）：照片 mob 的 attacker_element 等级 ×3% 追伤
+            if (isPlayer && player instanceof ServerPlayer serverPlayer) {
+                totalBonusMultiplier += PhotoSpecialEffects.getPhotoElementBonus(serverPlayer, element);
+            }
+
             // 免伤对抗：受击方药水等级 ≥ 攻击方等级 → 该元素追加完全免疫
             if (attackerLevel > 0 && getPotionLevel(target, element) >= attackerLevel) continue;
 
             float weakness = DataPackLoader.getWeakness(entityId, element);
+
+            // 照片元素弱点（佩戴者受到）：读自定义弱点属性（由 PhotoSpecialEffects 每 tick 核算）
+            if (target instanceof ServerPlayer targetPlayer) {
+                double photoWeak = switch (element) {
+                    case FIRE -> targetPlayer.getAttributeValue(com.plumejade.lensouls.attribute.ModAttributes.FIRE_WEAKNESS);
+                    case WATER -> targetPlayer.getAttributeValue(com.plumejade.lensouls.attribute.ModAttributes.WATER_WEAKNESS);
+                    case EARTH -> targetPlayer.getAttributeValue(com.plumejade.lensouls.attribute.ModAttributes.EARTH_WEAKNESS);
+                    case ENDER -> targetPlayer.getAttributeValue(com.plumejade.lensouls.attribute.ModAttributes.ENDER_WEAKNESS);
+                    default -> 0.0;
+                };
+                weakness += (float) photoWeak;
+            }
+
             if (weakness > 0f) {
                 totalBonusMultiplier += activitySum * weakness;
                 emitSpiralParticle(level, target, element);

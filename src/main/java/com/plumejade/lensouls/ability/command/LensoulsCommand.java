@@ -1,8 +1,11 @@
 package com.plumejade.lensouls.ability.command;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
@@ -16,15 +19,27 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * /lensouls skill <id> <true/false> — 修改能力的解锁状态。
@@ -206,7 +221,57 @@ public class LensoulsCommand {
                                 })
                         )
                 )
+                .then(Commands.literal("dump")
+                        .then(Commands.literal("mobs")
+                                .executes(LensoulsCommand::dumpMobs)
+                        )
+                )
         );
 
+    }
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    /**
+     * /lensouls dump mobs — 扫描实体注册表，把所有继承 {@link Mob} 的实体按 namespace
+     * 输出到游戏目录 dump/lensoulsmobdump/ 下的 <namespace>.json（如 minecraft:zombie 格式）。
+     */
+    private static int dumpMobs(CommandContext<CommandSourceStack> ctx) {
+        var source = ctx.getSource();
+        var server = source.getServer();
+        Path outDir = server.getServerDirectory().resolve("dump").resolve("lensoulsmobdump");
+
+        Map<String, List<String>> byNamespace = new TreeMap<>();
+        Registry<EntityType<?>> registry = BuiltInRegistries.ENTITY_TYPE;
+        for (EntityType<?> type : registry) {
+            ResourceLocation key = registry.getKey(type);
+            if (key == null) continue;
+            try {
+                if (type.create(server.overworld()) instanceof Mob) {
+                    byNamespace.computeIfAbsent(key.getNamespace(), k -> new ArrayList<>()).add(key.toString());
+                }
+            } catch (Exception ignored) {
+                // 个别实体无法在服务端构造，跳过
+            }
+        }
+
+        int total = 0;
+        try {
+            Files.createDirectories(outDir);
+            for (Map.Entry<String, List<String>> entry : byNamespace.entrySet()) {
+                List<String> ids = entry.getValue();
+                ids.sort(String::compareTo);
+                Files.writeString(outDir.resolve(entry.getKey() + ".json"), GSON.toJson(ids));
+                total += ids.size();
+            }
+        } catch (IOException e) {
+            source.sendFailure(Component.literal("§c写入失败: " + e.getMessage()));
+            return 0;
+        }
+
+        final int totalMobs = total;
+        source.sendSuccess(() -> Component.literal(
+                "§a已输出 §e" + totalMobs + " §a个 mob 实体到 §e" + outDir.toAbsolutePath()), false);
+        return totalMobs;
     }
 }

@@ -51,11 +51,9 @@ public class BossPhotoProjHelper {
         LAST_SWING.put(player.getUUID(), player.tickCount);
 
         List<String> gear = PhotoSpecialEffects.collectGearEntities(player);
-        com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoBoss] swing tick={} photos={}", player.tickCount, gear);
         for (String id : gear) {
             Float chance = TRIGGER.get(id);
             if (chance != null && player.getRandom().nextFloat() < chance) {
-                com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoBoss] trigger {} chance={}", id, chance);
                 fireBossSkill(player, id);
             }
         }

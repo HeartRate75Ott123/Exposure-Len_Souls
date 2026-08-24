@@ -61,6 +61,13 @@ public class PacketHandler {
                 DimensionalGunTogglePacket::handle
         );
 
+        // ---- 照片挥击信号 C2S（空手/空挥触发 Boss 弹幕） ----
+        registrar.playToServer(
+                PhotoSwingPacket.TYPE,
+                PhotoSwingPacket.STREAM_CODEC,
+                PhotoSwingPacket::handle
+        );
+
         // ---- 能力系统 C2S 包 ----
         registrar.playToServer(
                 AbilityOpenGuiPacket.TYPE,

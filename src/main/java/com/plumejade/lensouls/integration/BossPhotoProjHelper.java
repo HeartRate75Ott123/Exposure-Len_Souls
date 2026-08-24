@@ -24,7 +24,9 @@ import java.util.Map;
  */
 public class BossPhotoProjHelper {
 
-    private static final String LAST_SWING = "lensouls:last_swing_tick";
+    /** 挥击去重（内存态，不持久化——persistentData 跨会话污染会导致永不触发） */
+    private static final java.util.Map<java.util.UUID, Integer> LAST_SWING =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     /** boss 照片 id → 触发概率 */
     private static final Map<String, Float> TRIGGER = new HashMap<>();
@@ -44,14 +46,16 @@ public class BossPhotoProjHelper {
     /** 每次完整挥砍开始调用（由 Player#attack / BetterCombat handleAttackRequest mixin 触发） */
     public static void onSwing(ServerPlayer player) {
         // 去重：BetterCombat 命中时会同时走原版 attack 与 handleAttackRequest，3 tick 内只触发一次
-        int last = player.getPersistentData().getInt(LAST_SWING);
-        if (player.tickCount - last < 3) return;
-        player.getPersistentData().putInt(LAST_SWING, player.tickCount);
+        Integer last = LAST_SWING.get(player.getUUID());
+        if (last != null && player.tickCount - last < 3) return;
+        LAST_SWING.put(player.getUUID(), player.tickCount);
 
         List<String> gear = PhotoSpecialEffects.collectGearEntities(player);
+        com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoBoss] swing tick={} photos={}", player.tickCount, gear);
         for (String id : gear) {
             Float chance = TRIGGER.get(id);
             if (chance != null && player.getRandom().nextFloat() < chance) {
+                com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoBoss] trigger {} chance={}", id, chance);
                 fireBossSkill(player, id);
             }
         }
@@ -78,19 +82,44 @@ public class BossPhotoProjHelper {
         }
     }
 
-    /** 末影守卫：虚空符文（1.5s 后引爆，6 点魔法伤害） */
+    /** 末影守卫：虚空符文（1.5s 后引爆，6 点魔法伤害）——召唤在最近的非玩家生物脚下 */
     private static void spawnVoidRune(ServerPlayer player) {
         Level level = player.level();
-        Vec3 eye = player.getEyePosition();
-        Vec3 look = player.getViewVector(1.0F);
-        double px = eye.x + look.x * 4.0;
-        double pz = eye.z + look.z * 4.0;
-        double py = findGroundY(level, px, eye.y, pz);
-        if (py < level.getMinBuildHeight() + 1) return;
         float yawRad = (float) (player.getYRot() * Math.PI / 180.0);
+        double px, pz, py;
+        LivingEntity target = findNearestNonPlayer(player, 16.0);
+        if (target != null) {
+            px = target.getX();
+            pz = target.getZ();
+            py = findGroundY(level, px, target.getY(), pz);
+        } else {
+            Vec3 eye = player.getEyePosition();
+            Vec3 look = player.getViewVector(1.0F);
+            px = eye.x + look.x * 4.0;
+            pz = eye.z + look.z * 4.0;
+            py = findGroundY(level, px, eye.y, pz);
+        }
+        if (py < level.getMinBuildHeight() + 1) return;
         var rune = new com.github.L_Ender.cataclysm.entity.projectile.Void_Rune_Entity(
                 level, px, py, pz, yawRad, 30, 6.0f, player);
         markAndSpawn(rune);
+    }
+
+    /** 玩家周围指定范围内最近的非玩家 LivingEntity（排除玩家自身） */
+    private static LivingEntity findNearestNonPlayer(ServerPlayer player, double radius) {
+        LivingEntity best = null;
+        double bestDist = radius * radius;
+        for (net.minecraft.world.entity.Entity e : player.level().getEntitiesOfClass(
+                net.minecraft.world.entity.LivingEntity.class,
+                player.getBoundingBox().inflate(radius),
+                en -> !(en instanceof net.minecraft.world.entity.player.Player) && en.isAlive())) {
+            double d = player.distanceToSqr(e);
+            if (d < bestDist) {
+                bestDist = d;
+                best = (LivingEntity) e;
+            }
+        }
+        return best;
     }
 
     /** 焰魔：烈焰轰击 ×3（5+5%生命，命中施加炽焰烙印） */

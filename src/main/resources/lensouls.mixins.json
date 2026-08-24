@@ -30,7 +30,8 @@
     "client.MultiPlayerGameModeMixin",
     "client.GameRendererFrameEndMixin",
     "client.LivingEntityPhantomMixin",
-    "client.LevelRendererMixin"
+    "client.LevelRendererMixin",
+    "client.MinecraftSwingMixin"
   ],
   "injectors": {
     "defaultRequire": 1

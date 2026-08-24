@@ -22,6 +22,8 @@ public abstract class BetterCombatAttackMixin {
                                          ServerPlayer player,
                                          ServerGamePacketListenerImpl handler,
                                          CallbackInfo ci) {
+        com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoBoss] BetterCombat handleAttackRequest entities={}",
+                request.entityIds() != null ? request.entityIds().length : -1);
         BossPhotoProjHelper.onSwing(player);
     }
 }

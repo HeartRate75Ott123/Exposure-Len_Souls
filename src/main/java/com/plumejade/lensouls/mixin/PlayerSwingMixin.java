@@ -18,6 +18,7 @@ public abstract class PlayerSwingMixin {
     @Inject(method = "attack", at = @At("HEAD"))
     private void lensouls$onAttack(Entity target, CallbackInfo ci) {
         if ((Object) this instanceof ServerPlayer sp) {
+            com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoBoss] Player#attack target={}", target);
             BossPhotoProjHelper.onSwing(sp);
         }
     }

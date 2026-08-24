@@ -135,10 +135,13 @@ public class KeyBindings {
 
         int mode = getMode(mc) == MODE_FAST ? MODE_PRECISE : MODE_FAST;
         setMode(mc, mode);
+        Component keyName = CONVERTER_KEY.get().getTranslatedKeyMessage();
         mc.player.displayClientMessage(
                 Component.literal(mode == MODE_FAST
-                        ? "§a触发模式：快速（按 G 直接触发）"
-                        : "§a触发模式：精准（长按 G 呼出菜单）"),
+                        ? "§a触发模式：快速（按 "
+                        : "§a触发模式：精准（长按 ")
+                        .append(keyName)
+                        .append(mode == MODE_FAST ? " 直接触发）" : " 呼出菜单）"),
                 true);
     }
 

@@ -27,22 +27,18 @@ public record BossOutlineColors(
         float[] color3, float[] color4,
         float glowStrength, float outlineWidth) {
 
-    /** 原版 outline buffer 中的标记色（玩家 BOSS 镜魂轮廓），渐变 composite shader 据此识别并替换为四色渐变 */
-    public static final int MARKER_COLOR = 0xFE00FE;
-    public static final float[] MARKER_RGB = rgb(0xFE, 0x00, 0xFE);
+    // ============ 四元素配色（取主色做单色描边） ============
 
-    // ============ 四元素渐变配色 ============
-
-    /** 土元素 — 绿色系渐变 */
+    /** 土元素 — 绿色 */
     public static final BossOutlineColors EARTH = new BossOutlineColors(
-            rgb(0.55f, 1.0f, 0.35f),
+            rgb(0.45f, 1.0f, 0.35f),
             rgb(0.35f, 1.0f, 0.60f),
             rgb(0.75f, 1.0f, 0.25f),
             rgb(0.45f, 1.0f, 0.75f),
             1.2f, 3.0f
     );
 
-    /** 水元素 — 蓝色系渐变 */
+    /** 水元素 — 蓝色 */
     public static final BossOutlineColors WATER = new BossOutlineColors(
             rgb(0.35f, 0.85f, 1.0f),
             rgb(0.55f, 0.95f, 1.0f),
@@ -51,7 +47,7 @@ public record BossOutlineColors(
             1.2f, 3.0f
     );
 
-    /** 火元素 — 红色/橙系渐变 */
+    /** 火元素 — 红色 */
     public static final BossOutlineColors FIRE = new BossOutlineColors(
             rgb(1.0f, 0.40f, 0.30f),
             rgb(1.0f, 0.60f, 0.25f),
@@ -60,7 +56,7 @@ public record BossOutlineColors(
             1.2f, 3.0f
     );
 
-    /** 末影元素 — 紫色系渐变 */
+    /** 末影元素 — 紫色 */
     public static final BossOutlineColors ENDER = new BossOutlineColors(
             rgb(0.80f, 0.40f, 1.0f),
             rgb(0.65f, 0.45f, 1.0f),
@@ -75,8 +71,12 @@ public record BossOutlineColors(
         return new float[]{r, g, b};
     }
 
-    private static float[] rgb(int r, int g, int b) {
-        return new float[]{r / 255f, g / 255f, b / 255f};
+    /** 主色（0xRRGGBB），单色描边 / 物品发光用 */
+    public int primaryColor() {
+        int r = (int) (color1[0] * 255f) & 0xFF;
+        int g = (int) (color1[1] * 255f) & 0xFF;
+        int b = (int) (color1[2] * 255f) & 0xFF;
+        return (r << 16) | (g << 8) | b;
     }
 
     /** 从任意活跃实体的元素附魔效果检测 BOSS 类型并返回配色。颜色只按镜魂元素四套渐变，不按 BOSS/等级。 */

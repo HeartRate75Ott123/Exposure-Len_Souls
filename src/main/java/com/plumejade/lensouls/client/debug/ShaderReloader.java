@@ -3,9 +3,7 @@ package com.plumejade.lensouls.client.debug;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.plumejade.lensouls.LenSouls;
-import com.plumejade.lensouls.ability.client.BossOutlineGradientRenderer;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
-import com.plumejade.lensouls.ability.client.SoulGlowShader;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -84,22 +82,6 @@ public class ShaderReloader {
             fail++;
         }
 
-        // ── BOSS 镜魂全身描边渐变 composite（复用原版 outline） ──
-        if (reloadOne(provider, "rendertype_boss_outline_vanilla", DefaultVertexFormat.POSITION_TEX,
-                instance -> BossOutlineGradientRenderer.gradientShader = instance)) {
-            ok++;
-        } else {
-            fail++;
-        }
-
-        // ── 镜魂物品发光（SoulGlowShader） ──
-        if (reloadOne(provider, "rendertype_soul_item_glow", DefaultVertexFormat.NEW_ENTITY,
-                instance -> SoulGlowShader.setShader(instance))) {
-            ok++;
-        } else {
-            fail++;
-        }
-
         long elapsed = (Util.getNanos() - start) / 1_000_000L;
 
         if (fail > 0) {
@@ -140,8 +122,6 @@ public class ShaderReloader {
             case "rendertype_gold_outline"     -> FrozenOutlineManager.goldOutlineShader;
             case "rendertype_mask_entity"      -> FrozenOutlineManager.maskShader;
             case "rendertype_soul_glow_mask_item" -> FrozenOutlineManager.itemMaskShader;
-            case "rendertype_boss_outline_vanilla" -> BossOutlineGradientRenderer.gradientShader;
-            case "rendertype_soul_item_glow"   -> SoulGlowShader.getShader();
             default -> null;
         };
     }

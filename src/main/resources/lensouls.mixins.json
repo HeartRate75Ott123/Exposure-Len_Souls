@@ -21,11 +21,10 @@
   "client": [
     "client.EntityRenderDispatcherMixin",
     "client.EntityBossOutlineMixin",
-    "client.LevelRendererOutlineMixin",
     "client.GameRendererMixin",
+    "client.GameRendererHeldGlowMixin",
     "client.GunBowAnimationMixin",
     "client.ItemInHandRendererMixin",
-    "client.ItemRendererMixin",
     "client.ItemRendererAccessor",
     "client.ItemInHandLayerMixin",
     "client.PlayerClientMixin",

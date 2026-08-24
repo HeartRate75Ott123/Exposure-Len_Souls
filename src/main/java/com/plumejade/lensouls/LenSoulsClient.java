@@ -1,8 +1,8 @@
 package com.plumejade.lensouls;
 
-import com.plumejade.lensouls.ability.client.BossOutlineGradientRenderer;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import com.plumejade.lensouls.ability.client.GravityTetherRenderer;
+import com.plumejade.lensouls.ability.client.HeldItemGlowRenderer;
 import com.plumejade.lensouls.ability.client.SpatialWarpOutlineRenderer;
 
 import com.plumejade.lensouls.client.screen.ScreenShakeApplier;
@@ -158,32 +158,18 @@ public class LenSoulsClient {
             LenSouls.LOGGER.error("[Outline] 金边复合着色器加载失败", e);
         }
 
-        // 镜魂物品发光着色器（NEW_ENTITY 格式，物品模型兼容）— 保持注册供 mask 使用
+        // 第一人称手持物品发光 composite（POSITION_TEX 全屏 quad）
         try {
             event.registerShader(
                     new ShaderInstance(provider,
-                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "rendertype_soul_item_glow"),
-                            com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY),
-                    instance -> {
-                        com.plumejade.lensouls.ability.client.SoulGlowShader.setShader(instance);
-                    }
-            );
-        } catch (java.io.IOException e) {
-            LenSouls.LOGGER.error("[SoulGlow] 镜魂物品发光着色器加载失败", e);
-        }
-
-        // BOSS 镜魂全身描边（复用原版 outline）— 渐变 composite shader
-        try {
-            event.registerShader(
-                    new ShaderInstance(provider,
-                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "rendertype_boss_outline_vanilla"),
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "rendertype_held_item_glow"),
                             com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX),
                     instance -> {
-                        BossOutlineGradientRenderer.gradientShader = instance;
+                        HeldItemGlowRenderer.glowShader = instance;
                     }
             );
         } catch (java.io.IOException e) {
-            LenSouls.LOGGER.error("[BossGlow] 渐变 outline shader 加载失败", e);
+            LenSouls.LOGGER.error("[HeldGlow] 第一人称手持物发光着色器加载失败", e);
         }
 
         // FBO item mask 着色器 — alpha test + 纯白（手持物品用，避免透明区域方框）

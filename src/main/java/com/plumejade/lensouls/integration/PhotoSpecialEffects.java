@@ -12,6 +12,8 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -20,15 +22,19 @@ import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForgeMod;
+import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 import java.util.*;
+import java.util.Locale;
 import java.util.function.Predicate;
 
 /**
@@ -42,7 +48,6 @@ public class PhotoSpecialEffects {
             "minecraft:bat", "minecraft:ender_dragon", "minecraft:wither", "minecraft:phantom"
     );
     private static final String FLIGHT_TAG = "lensouls:flight_photo";
-    private static final String ATTR_TAG = "lensouls:attr_photos";
     private static final ResourceLocation MOD_BASE = ResourceLocation.parse("lensouls:attr_");
 
     /** 弱属性照片组 → 额外照片栏位数（越弱给越多，1~3，无上限叠加） */
@@ -72,7 +77,6 @@ public class PhotoSpecialEffects {
     }
     private static final String SLOT_MOD_ID = "lensouls:photo_slot_bonus";
     private static final String SLOT_TAG = "lensouls:extra_photo_slots";
-    private static final String WEAK_TAG = "lensouls:weak_photos";
 
     // ── 收到的伤害减免/元素弱点：kind 或 DamageType 匹配 → multiplier（>1 为弱点） ──
     private static final Map<String, List<DamageRule>> DAMAGE_RULES = new HashMap<>();
@@ -760,8 +764,6 @@ public class PhotoSpecialEffects {
             }
         }
 
-        applyAttributes(player, gearEntities);
-        applyElementWeakness(player, gearEntities);
         updatePhotoSlots(player, gearEntities);
 
         // 末影人：周围末影人不主动攻击
@@ -987,80 +989,95 @@ public class PhotoSpecialEffects {
         }
     }
 
-    private static void applyAttributes(ServerPlayer player, List<String> gearEntities) {
-        Set<String> active = new HashSet<>();
-        for (String id : gearEntities) {
-            if (ATTRIBUTES.containsKey(id)) active.add(id);
+    /**
+     * 构建某实体照片佩戴时应提供的属性修饰符（Curios 佩戴时驱动）。
+     * 标准属性按条目名派生稳定 UUID（同种实体只生效一份、不同种可叠加）；
+     * 元素弱点按（实体, 元素）派生稳定 UUID（同样去重、跨种叠加）。
+     */
+    public static Multimap<Holder<Attribute>, AttributeModifier> buildAttributeModifiers(String entityId) {
+        Multimap<Holder<Attribute>, AttributeModifier> map = HashMultimap.create();
+        List<AttributeEntry> list = ATTRIBUTES.get(entityId);
+        if (list != null) {
+            for (AttributeEntry ae : list) {
+                map.put(holder(ae.attribute()),
+                        new AttributeModifier(MOD_BASE.withPath(ae.modName()), ae.amount(), ae.operation()));
+            }
         }
-        String joined = String.join(",", active);
-        String prev = player.getPersistentData().getString(ATTR_TAG);
-        if (prev.equals(joined)) return;
+        var weak = DataPackLoader.getAllWeaknesses(ResourceLocation.parse(entityId));
+        if (weak != null) {
+            addWeakModifier(map, ModAttributes.FIRE_WEAKNESS, weak.containsKey(ElementDamage.FIRE), entityId, "fire");
+            addWeakModifier(map, ModAttributes.WATER_WEAKNESS, weak.containsKey(ElementDamage.WATER), entityId, "water");
+            addWeakModifier(map, ModAttributes.EARTH_WEAKNESS, weak.containsKey(ElementDamage.EARTH), entityId, "earth");
+            addWeakModifier(map, ModAttributes.ENDER_WEAKNESS, weak.containsKey(ElementDamage.ENDER), entityId, "ender");
+        }
+        return map;
+    }
 
-        if (!prev.isEmpty()) {
-            for (String id : prev.split(",")) {
-                if (active.contains(id)) continue;
-                List<AttributeEntry> list = ATTRIBUTES.get(id);
-                if (list == null) continue;
-                for (AttributeEntry ae : list) {
-                    AttributeInstance ai = player.getAttribute(holder(ae.attribute()));
-                    if (ai != null) ai.removeModifier(MOD_BASE.withPath(ae.modName()));
+    private static void addWeakModifier(Multimap<Holder<Attribute>, AttributeModifier> map,
+                                        DeferredHolder<Attribute, Attribute> attr, boolean present,
+                                        String entityId, String element) {
+        if (!present) return;
+        String path = "weak_" + entityId.replace(':', '_') + "_" + element;
+        map.put(attr, new AttributeModifier(MOD_BASE.withPath(path), 0.12, AttributeModifier.Operation.ADD_VALUE));
+    }
+
+    private static final Map<ElementDamage, String> ELEMENT_NAMES = Map.of(
+            ElementDamage.FIRE, "火", ElementDamage.WATER, "水",
+            ElementDamage.EARTH, "土", ElementDamage.ENDER, "末影");
+
+    /**
+     * 生成照片属性加成描述行（与 {@link #buildAttributeModifiers} 同源，tooltip 复用）。
+     * 使用属性修饰符的官方译名（跳跃力量/游泳速度…），按正负着色，逐行换行。
+     */
+    public static List<Component> describeAttributes(String entityId) {
+        return describeAttributes(entityId, null);
+    }
+
+    /**
+     * 生成照片饰品佩戴时的属性/元素弱点摘要。skipText 为非 null 时，
+     * 若静态描述已提及某属性/元素，则跳过该行，避免 tooltip 重复。
+     */
+    public static List<Component> describeAttributes(String entityId, String skipText) {
+        List<Component> lines = new ArrayList<>();
+        List<AttributeEntry> list = ATTRIBUTES.get(entityId);
+        if (list != null) {
+            for (AttributeEntry ae : list) {
+                Component nameComp = Component.translatable(ae.attribute().getDescriptionId());
+                String name = nameComp.getString();
+                if (skipText != null && skipText.contains(name)) {
+                    continue;
+                }
+                lines.add(formatAttribute(ae.attribute(), ae.amount(), ae.operation()));
+            }
+        }
+        var weak = DataPackLoader.getAllWeaknesses(ResourceLocation.parse(entityId));
+        if (weak != null) {
+            for (ElementDamage el : ElementDamage.values()) {
+                if (weak.containsKey(el)) {
+                    String elemName = ELEMENT_NAMES.getOrDefault(el, el.getSerializedName());
+                    if (skipText != null && (skipText.contains(elemName + "属性弱点")
+                            || skipText.contains(elemName + "元素") || skipText.contains("元素附加伤害"))) {
+                        continue;
+                    }
+                    lines.add(Component.literal(elemName + "属性弱点 +12%").withStyle(ChatFormatting.RED));
                 }
             }
         }
-        for (String id : active) {
-            List<AttributeEntry> list = ATTRIBUTES.get(id);
-            if (list == null) continue;
-            for (AttributeEntry ae : list) {
-                AttributeInstance ai = player.getAttribute(holder(ae.attribute()));
-                var mid = MOD_BASE.withPath(ae.modName());
-                if (ai != null && ai.getModifier(mid) == null)
-                    ai.addTransientModifier(new AttributeModifier(mid, ae.amount(), ae.operation()));
-            }
-        }
-        player.getPersistentData().putString(ATTR_TAG, joined);
+        return lines;
     }
 
-    /** 元素弱点（佩戴照片提供）→ 挂到自定义属性，受伤时由 DamageHandler 只读属性核算 */
-    private static void applyElementWeakness(ServerPlayer player, List<String> gearEntities) {
-        float fire = 0, water = 0, earth = 0, ender = 0;
-        for (String id : gearEntities) {
-            var weak = DataPackLoader.getAllWeaknesses(ResourceLocation.parse(id));
-            if (weak == null) continue;
-            if (weak.containsKey(ElementDamage.FIRE)) fire += 0.12f;
-            if (weak.containsKey(ElementDamage.WATER)) water += 0.12f;
-            if (weak.containsKey(ElementDamage.EARTH)) earth += 0.12f;
-            if (weak.containsKey(ElementDamage.ENDER)) ender += 0.12f;
+    private static Component formatAttribute(Attribute attribute, double amount, AttributeModifier.Operation op) {
+        Component name = Component.translatable(attribute.getDescriptionId());
+        String value;
+        if (op == AttributeModifier.Operation.ADD_VALUE) {
+            value = (amount == Math.floor(amount) && !Double.isInfinite(amount))
+                    ? String.format(Locale.ROOT, "%+.0f", amount)
+                    : String.format(Locale.ROOT, "%+.2f", amount);
+        } else {
+            value = String.format(Locale.ROOT, "%+.0f%%", amount * 100);
         }
-        String joined = fmt(fire) + "," + fmt(water) + "," + fmt(earth) + "," + fmt(ender);
-        String prev = player.getPersistentData().getString(WEAK_TAG);
-        if (prev.equals(joined)) return;
-
-        if (!prev.isEmpty()) clearWeakModifiers(player);
-        addWeakModifier(player, ModAttributes.FIRE_WEAKNESS, fire);
-        addWeakModifier(player, ModAttributes.WATER_WEAKNESS, water);
-        addWeakModifier(player, ModAttributes.EARTH_WEAKNESS, earth);
-        addWeakModifier(player, ModAttributes.ENDER_WEAKNESS, ender);
-        player.getPersistentData().putString(WEAK_TAG, joined);
-    }
-
-    private static String fmt(float v) { return String.format(java.util.Locale.ROOT, "%.3f", v); }
-
-    private static void addWeakModifier(ServerPlayer player,
-                                        net.neoforged.neoforge.registries.DeferredHolder<Attribute, Attribute> attr,
-                                        float value) {
-        AttributeInstance ai = player.getAttribute(attr);
-        if (ai == null) return;
-        var mid = MOD_BASE.withPath("weak_" + attr.getId().getPath());
-        if (ai.getModifier(mid) == null)
-            ai.addTransientModifier(new AttributeModifier(mid, value, AttributeModifier.Operation.ADD_VALUE));
-    }
-
-    private static void clearWeakModifiers(ServerPlayer player) {
-        for (var attr : java.util.List.of(ModAttributes.FIRE_WEAKNESS, ModAttributes.WATER_WEAKNESS,
-                ModAttributes.EARTH_WEAKNESS, ModAttributes.ENDER_WEAKNESS)) {
-            AttributeInstance ai = player.getAttribute(attr);
-            if (ai != null) ai.removeModifier(MOD_BASE.withPath("weak_" + attr.getId().getPath()));
-        }
+        ChatFormatting color = amount >= 0 ? ChatFormatting.GREEN : ChatFormatting.RED;
+        return Component.literal("").append(name).append(Component.literal(" " + value)).withStyle(color);
     }
 
     public static boolean hasEntityInGear(ServerPlayer player, Predicate<String> predicate) {

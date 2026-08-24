@@ -3,6 +3,7 @@ package com.plumejade.lensouls.entity;
 import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
+import com.plumejade.lensouls.integration.BossPhotoProjHelper;
 import com.plumejade.lensouls.network.PhantomStartPacket;
 import com.plumejade.lensouls.network.PhantomStopPacket;
 import com.plumejade.lensouls.network.PhantomSkillPacket;
@@ -910,6 +911,8 @@ public class BossPhantomManager {
         if (event.getEntity() instanceof ServerPlayer player) {
             // 清除残留的幻灵数据
             getInstance().clearPlayer(player.getUUID());
+            // 清除上一会话残留的挥击去重记录（跨档 tick 残留会导致 boss 弹幕被卡死）
+            BossPhotoProjHelper.clearSwing(player.getUUID());
             // 清除上一会话残留的元素附魔数据（自定义名称、减速标记）
             ElementInfusionEffect.cleanupPlayer(player);
             // 清除残留的定身效果（幻灵期间 Slowness 255 + Resistance 255）

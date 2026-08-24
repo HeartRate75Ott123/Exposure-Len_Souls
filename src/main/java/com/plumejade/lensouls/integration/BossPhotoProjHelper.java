@@ -43,6 +43,11 @@ public class BossPhotoProjHelper {
         TRIGGER.put("legendary_monsters:cloud_golem", 0.10f);
     }
 
+    /** 清理指定玩家的挥击去重记录（切档/登出时调用，避免跨会话 tick 残留导致 boss 弹幕被卡死） */
+    public static void clearSwing(java.util.UUID uuid) {
+        LAST_SWING.remove(uuid);
+    }
+
     /** 每次完整挥砍开始调用（由 Player#attack / BetterCombat handleAttackRequest mixin 触发） */
     public static void onSwing(ServerPlayer player) {
         // 去重：BetterCombat 命中时会同时走原版 attack 与 handleAttackRequest，3 tick 内只触发一次

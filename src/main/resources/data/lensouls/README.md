@@ -8,12 +8,52 @@ data/lensouls/
 ├── item_element_activity/     ← [武器] 元素活性等级
 ├── damage_type_element/       ← [伤害类型] → 元素映射
 ├── attacker_element/          ← [攻击者实体] → 元素映射
+├── copysoul_filter/           ← [复制之魂] 掉落黑白名单
 ├── damage_type/               ← 自定义伤害类型定义
 ├── recipe/                    ← 合成配方
 └── loot_tables/               ← 战利品表
 ```
 
 所有 JSON 除 `damage_type/` 外均支持 `/reload` 热重载。
+
+---
+
+## copysoul_filter —— 复制之魂掉落 / 复制黑白名单
+
+**路径：** `data/lensouls/copysoul_filter/` 下四个文件，均为实体/物品 ID 的 JSON 数组（也支持对象，键为 ID），支持 `/reload` 热重载：
+
+| 文件 | 作用 |
+|------|------|
+| `drop_whitelist.json` | 哪些实体死亡掉落复制之魂（白名单） |
+| `drop_blacklist.json` | 哪些实体永不掉落（黑名单） |
+| `copy_whitelist.json` | 哪些物品可被复制之魂复制（白名单） |
+| `copy_blacklist.json` | 哪些物品不可被复制（黑名单） |
+
+字符串 `"all"` 表示全部。通配语义（任一组）：
+- **黑名单含 `"all"`**：默认全禁，仅白名单中列出的 ID 回加（即“只有这些可以”）；
+- **白名单含 `"all"`**：默认全许，仅黑名单中列出的 ID 排除（即“只有这些不行”）；
+- 两者均无 `"all"`：白名单非空则仅白名单可，否则仅排除黑名单。
+
+掉落基础判定：实体最大生命值 **≥ 200**（不再检测 BOSS 血条）。复制之魂本身默认不可复制（硬编码拒绝，名单无法覆盖）。
+
+```json
+// drop_whitelist.json（默认）
+["all"]
+// drop_blacklist.json（默认）
+[]
+// copy_whitelist.json（默认）
+["all"]
+// copy_blacklist.json（默认）
+[]
+
+// 示例：仅灾变/传奇怪物 BOSS 可掉，末影龙除外
+// drop_whitelist.json
+[ "cataclysm:ignis", "legendary_monsters:posessed_paladin" ]
+// drop_blacklist.json
+[ "minecraft:ender_dragon" ]
+```
+
+可用 ID 为各模组注册名（命名空间:路径），例如原版 `minecraft:wither`、灾变 `cataclysm:ignis`、传奇怪物 `legendary_monsters:posessed_paladin`、物品 `minecraft:netherite_block`。
 
 ---
 

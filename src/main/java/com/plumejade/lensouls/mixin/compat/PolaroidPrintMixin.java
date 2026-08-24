@@ -16,6 +16,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -111,11 +112,14 @@ public class PolaroidPrintMixin {
 
             switch (ability) {
                 case SPATIAL_WARP -> {
-                    CompoundTag posTag = new CompoundTag();
-                    posTag.putDouble("x", player.getX());
-                    posTag.putDouble("y", player.getY());
-                    posTag.putDouble("z", player.getZ());
-                    tag.put("lensouls:spatial_warp_pos", posTag);
+                    Vec3 pos = frame.extraData().get(Frame.POSITION).orElse(null);
+                    if (pos != null) {
+                        CompoundTag posTag = new CompoundTag();
+                        posTag.putDouble("x", pos.x);
+                        posTag.putDouble("y", pos.y);
+                        posTag.putDouble("z", pos.z);
+                        tag.put("lensouls:spatial_warp_pos", posTag);
+                    }
                 }
                 case TEMPORAL_RECALL -> {
                     if (player instanceof net.minecraft.server.level.ServerPlayer sp) {

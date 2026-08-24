@@ -123,6 +123,13 @@ config="${mod_id}.compat.mixins.json"
     ordering="NONE"
     side="BOTH"
 
+# ---- 前置：Curios 饰品栏（照片饰品佩戴与属性修饰符驱动） ----
+[[dependencies.${mod_id}]]
+    modId="curios"
+    type="required"
+    ordering="NONE"
+    side="BOTH"
+
 # ---- 可选前置：L_Ender's Cataclysm（灾变）BOSS 实体 ----
 # 安装后 BOSS 镜魂激活时渲染对应的幻灵模型和技能特效
 [[dependencies.${mod_id}]]

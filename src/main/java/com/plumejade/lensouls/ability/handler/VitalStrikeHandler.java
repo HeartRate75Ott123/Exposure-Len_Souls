@@ -112,10 +112,6 @@ public class VitalStrikeHandler {
     }
 
     private static List<LivingEntity> findAllBossesInSight(ServerPlayer player) {
-        Vec3 eyePos = player.getEyePosition();
-        Vec3 lookVec = player.getLookAngle();
-        double maxDistSqr = MAX_RANGE * MAX_RANGE;
-
         AABB searchBox = player.getBoundingBox().inflate(MAX_RANGE);
         List<LivingEntity> result = new ArrayList<>();
 
@@ -123,9 +119,8 @@ public class VitalStrikeHandler {
             if (entity == player || !entity.isAlive()) continue;
             if (!(entity instanceof LivingEntity living)) continue;
 
-            Vec3 toTarget = living.position().subtract(eyePos).normalize();
-            if (lookVec.dot(toTarget) < Math.cos(Math.toRadians(30.0))) continue;
-            if (entity.distanceToSqr(player) > maxDistSqr) continue;
+            // 锥角 + 射程判定，支持子部件（娜迦尾巴/九头蛇头等）追溯到本体
+            if (!com.plumejade.lensouls.util.AimTargetUtil.isAimedAt(player, living, MAX_RANGE, 30.0)) continue;
 
             BossToughnessManager manager = BossToughnessManager.getInstance();
             if (!manager.has(living) && !com.plumejade.lensouls.boss.ToughnessDamageHandler.isBoss(living)) continue;

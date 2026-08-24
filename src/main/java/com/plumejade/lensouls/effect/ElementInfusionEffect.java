@@ -102,8 +102,10 @@ public class ElementInfusionEffect extends MobEffect {
         saveCustomNames(player);
     }
 
-    /** 获取该玩家指定元素的自定义名称（如 item.lensouls.ignis_soul），没有则返回 null */
-    public static String getPlayerCustomName(Player player, ElementDamage element) {
+    /** 获取该实体指定元素的自定义名称（如 item.lensouls.ignis_soul），没有则返回 null。
+     *  非玩家实体（如被外部赋予活性效果的生物）无自定义名，直接回退到元素通用名。 */
+    public static String getPlayerCustomName(LivingEntity entity, ElementDamage element) {
+        if (!(entity instanceof Player player)) return null;
         UUID uuid = player.getUUID();
         Map<ElementDamage, String> map = playerCustomNames.get(uuid);
         String name = map != null ? map.get(element) : null;

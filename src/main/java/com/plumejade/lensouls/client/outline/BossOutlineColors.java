@@ -89,8 +89,7 @@ public record BossOutlineColors(
         for (MobEffectInstance inst : entity.getActiveEffects()) {
             if (inst.getEffect().value() instanceof ElementInfusionEffect effect) {
                 ElementDamage element = effect.getElement();
-                String descId = ElementInfusionEffect.getPlayerCustomName(
-                        (entity instanceof Player p) ? p : null, element);
+                String descId = ElementInfusionEffect.getPlayerCustomName(entity, element);
                 if (descId != null && !descId.isEmpty()) {
                     BossPhantomType matched = BossPhantomType.fromDescriptionId(descId);
                     if (matched != null) {

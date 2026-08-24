@@ -96,17 +96,13 @@ public class SoulSeverHandler {
     }
 
     private static LivingEntity findTarget(ServerPlayer player) {
-        Vec3 eye = player.getEyePosition();
-        Vec3 look = player.getLookAngle();
-        double maxDistSqr = MAX_RANGE * MAX_RANGE;
         AABB box = player.getBoundingBox().inflate(MAX_RANGE);
         LivingEntity closest = null;
         double closestDist = Double.MAX_VALUE;
         for (Entity e : player.level().getEntities(player, box)) {
             if (e == player || !e.isAlive() || !(e instanceof LivingEntity living)) continue;
-            Vec3 dir = living.position().subtract(eye).normalize();
-            if (look.dot(dir) < Math.cos(Math.toRadians(30.0))) continue;
-            if (e.distanceToSqr(player) > maxDistSqr) continue;
+            // 锥角 + 射程判定，支持子部件（娜迦尾巴/九头蛇头等）追溯到本体
+            if (!com.plumejade.lensouls.util.AimTargetUtil.isAimedAt(player, living, MAX_RANGE, 30.0)) continue;
             double d = e.distanceToSqr(player);
             if (d < closestDist) { closestDist = d; closest = living; }
         }

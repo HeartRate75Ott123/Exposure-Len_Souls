@@ -145,6 +145,7 @@ public class LenSouls {
         event.addListener(new com.plumejade.lensouls.config.ItemElementActivityLoader());
         event.addListener(new com.plumejade.lensouls.config.DamageTypeElementLoader());
         event.addListener(new com.plumejade.lensouls.config.AttackerElementLoader());
+        event.addListener(new com.plumejade.lensouls.config.CopySoulFilter());
     }
 
     /**

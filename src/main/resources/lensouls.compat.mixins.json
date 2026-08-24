@@ -14,7 +14,6 @@
     "LegendaryMonstersCapMixin"
   ],
   "client": [
-    "IrisBufferSourceGetBufferMixin",
     "BetterCombatRangeMixin"
   ],
   "injectors": {

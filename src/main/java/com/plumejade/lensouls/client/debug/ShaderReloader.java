@@ -3,7 +3,7 @@ package com.plumejade.lensouls.client.debug;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.plumejade.lensouls.LenSouls;
-import com.plumejade.lensouls.ability.client.BossOutlineManager;
+import com.plumejade.lensouls.ability.client.BossOutlineGradientRenderer;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import com.plumejade.lensouls.ability.client.SoulGlowShader;
 import net.minecraft.Util;
@@ -84,9 +84,9 @@ public class ShaderReloader {
             fail++;
         }
 
-        // ── BOSS 镜魂 distance field composite ──
-        if (reloadOne(provider, "boss_outline_composite", DefaultVertexFormat.POSITION_TEX,
-                instance -> BossOutlineManager.bossCompositeShader = instance)) {
+        // ── BOSS 镜魂全身描边渐变 composite（复用原版 outline） ──
+        if (reloadOne(provider, "rendertype_boss_outline_vanilla", DefaultVertexFormat.POSITION_TEX,
+                instance -> BossOutlineGradientRenderer.gradientShader = instance)) {
             ok++;
         } else {
             fail++;
@@ -140,7 +140,7 @@ public class ShaderReloader {
             case "rendertype_gold_outline"     -> FrozenOutlineManager.goldOutlineShader;
             case "rendertype_mask_entity"      -> FrozenOutlineManager.maskShader;
             case "rendertype_soul_glow_mask_item" -> FrozenOutlineManager.itemMaskShader;
-            case "boss_outline_composite"      -> BossOutlineManager.bossCompositeShader;
+            case "rendertype_boss_outline_vanilla" -> BossOutlineGradientRenderer.gradientShader;
             case "rendertype_soul_item_glow"   -> SoulGlowShader.getShader();
             default -> null;
         };

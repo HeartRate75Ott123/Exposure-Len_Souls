@@ -1,0 +1,24 @@
+{
+    "blend": {
+        "func": "add",
+        "srcrgb": "srcalpha",
+        "dstrgb": "1-srcalpha",
+        "srcalpha": "zero",
+        "dstalpha": "one"
+    },
+    "vertex": "rendertype_boss_outline_vanilla",
+    "fragment": "rendertype_boss_outline_vanilla",
+    "attributes": [ "Position", "UV0" ],
+    "samplers": [
+        { "name": "DiffuseSampler" }
+    ],
+    "uniforms": [
+        { "name": "Time", "type": "float", "count": 1, "values": [ 0 ] },
+        { "name": "BossColor1", "type": "float", "count": 4, "values": [ 1, 1, 1, 1 ] },
+        { "name": "BossColor2", "type": "float", "count": 4, "values": [ 1, 1, 1, 1 ] },
+        { "name": "BossColor3", "type": "float", "count": 4, "values": [ 1, 1, 1, 1 ] },
+        { "name": "BossColor4", "type": "float", "count": 4, "values": [ 1, 1, 1, 1 ] },
+        { "name": "MarkerColor", "type": "float", "count": 4, "values": [ 1, 0, 1, 1 ] },
+        { "name": "BossGlowStrength", "type": "float", "count": 1, "values": [ 1.2 ] }
+    ]
+}

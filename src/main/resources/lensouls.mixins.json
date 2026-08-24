@@ -20,7 +20,8 @@
   ],
   "client": [
     "client.EntityRenderDispatcherMixin",
-    "client.BossBufferSourceMixin",
+    "client.EntityBossOutlineMixin",
+    "client.LevelRendererOutlineMixin",
     "client.GameRendererMixin",
     "client.GunBowAnimationMixin",
     "client.ItemInHandRendererMixin",

@@ -1,6 +1,5 @@
 package com.plumejade.lensouls.mixin.client;
 
-import com.plumejade.lensouls.ability.client.BossOutlineManager;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
@@ -16,7 +15,6 @@ public class GameRendererFrameEndMixin {
     @Inject(method = "render", at = @At("HEAD"), require = 1)
     private void lensouls$beginFrame(DeltaTracker deltaTracker, boolean renderLevel, CallbackInfo ci) {
         FrozenOutlineManager.resetFrame();
-        BossOutlineManager.beginFrame();
     }
 
     @Inject(method = "render", at = @At("RETURN"), require = 1)
@@ -26,6 +24,5 @@ public class GameRendererFrameEndMixin {
         if (mainTarget == null) return;
 
         FrozenOutlineManager.compositeIfNeeded(minecraft, mainTarget);
-        BossOutlineManager.composite(minecraft, mainTarget);
     }
 }

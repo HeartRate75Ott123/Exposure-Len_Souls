@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.mixin.client;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.plumejade.lensouls.client.PhotoBadgeIcon;
 import net.minecraft.client.Minecraft;
@@ -28,10 +29,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ItemRendererMixin {
 
     private static final String STOLEN_KEY = "lensouls:stolen_entity";
-    // 角标在 GUI 物品模型空间（约 16 单位）的偏移与缩放，需 runClient 实测微调
-    private static final float BADGE_SCALE = 0.4f;
-    private static final double BADGE_X = 0.5;
-    private static final double BADGE_Y = 0.5;
+    // 角标缩放与位置：GUI 上下文自带正向朝向与全亮光照；BADGE_X/Y 为栏位内微调旋钮
+    private static final float BADGE_SCALE = 0.6f;
+    private static final double BADGE_X = -0.25;
+    private static final double BADGE_Y = 0.2;
     private static boolean rendering = false;
 
     @Inject(method = "render", at = @At("TAIL"))
@@ -56,9 +57,17 @@ public abstract class ItemRendererMixin {
             ItemRenderer ir = mc.getItemRenderer();
             BakedModel eggModel = ir.getModel(egg, mc.level, null, 0);
             poseStackIn.pushPose();
-            poseStackIn.translate(BADGE_X, BADGE_Y, 0);
+            poseStackIn.translate(BADGE_X, BADGE_Y, 0.1);
             poseStackIn.scale(BADGE_SCALE, BADGE_SCALE, BADGE_SCALE);
-            ir.render(egg, ItemDisplayContext.GUI, leftHand, poseStackIn, bufferIn, combinedLightIn, combinedOverlayIn, eggModel);
+            // GUI 上下文保证正向朝上；显式 FULL_BRIGHT(0xF000F0) 避免被环境光压暗（前置光照）
+            // 关闭深度测试，使角标始终绘制在照片之上（z 在前、不被照片深度遮挡）
+            RenderSystem.disableDepthTest();
+            try {
+                ir.render(egg, ItemDisplayContext.GUI, leftHand, poseStackIn, bufferIn,
+                        0xF000F0, combinedOverlayIn, eggModel);
+            } finally {
+                RenderSystem.enableDepthTest();
+            }
             poseStackIn.popPose();
         } finally {
             rendering = false;

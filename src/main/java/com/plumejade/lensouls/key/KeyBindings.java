@@ -95,31 +95,32 @@ public class KeyBindings {
                     // 快速触发：按下即按顺序尝试
                     PacketDistributor.sendToServer(new ConverterTriggerPacket());
                 } else {
-                    // 精准触发：请求转换器内容
+                    // 精准触发：请求服务端打开选择容器
                     PacketDistributor.sendToServer(new ConverterMenuRequestPacket());
                 }
             } else if (event.getAction() == GLFW.GLFW_RELEASE) {
                 converterKeyHeld = false;
-                if (getMode(mc) == MODE_PRECISE && SoulSelectOverlay.isOpen()) {
-                    if (SoulSelectOverlay.hasHovered()) {
-                        PacketDistributor.sendToServer(
-                                new ConverterMenuActivatePacket(SoulSelectOverlay.getHoveredSlot()));
+                if (getMode(mc) == MODE_PRECISE && mc.screen instanceof SoulSelectOverlay overlay) {
+                    int slot = overlay.getHoveredSlot();
+                    if (slot >= 0 && overlay.isSlotReady(slot)) {
+                        PacketDistributor.sendToServer(new ConverterMenuActivatePacket(slot));
                     }
-                    SoulSelectOverlay.close(mc);
+                    mc.player.closeContainer();
                 }
             }
         }
     }
 
-    /** 精准模式：长按超阈值 → 打开菜单（屏幕固定，不重建） */
+    /** 精准模式：长按超阈值时确保容器菜单已打开（RequestPacket 异步到达，无需本地重建） */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         if (getMode(mc) != MODE_PRECISE) return;
-        if (converterKeyHeld && !SoulSelectOverlay.isOpen()
+        if (converterKeyHeld && !(mc.screen instanceof SoulSelectOverlay)
                 && System.nanoTime() - pressStartNanos >= HOLD_THRESHOLD_NS) {
-            SoulSelectOverlay.open(mc);
+            // 按下时已发 RequestPacket，若尚未显示则重发（极端丢包/延迟场景）
+            PacketDistributor.sendToServer(new ConverterMenuRequestPacket());
         }
     }
 

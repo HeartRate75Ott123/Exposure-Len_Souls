@@ -12,6 +12,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
@@ -33,7 +34,11 @@ public class ConverterMenu extends AbstractContainerMenu {
     private final SimpleContainer soulContainer;
 
     public ConverterMenu(int id, Inventory playerInventory, ItemStack converterStack) {
-        super(ModMenus.CONVERTER.get(), id);
+        this(ModMenus.CONVERTER.get(), id, playerInventory, converterStack);
+    }
+
+    protected ConverterMenu(MenuType<?> type, int id, Inventory playerInventory, ItemStack converterStack) {
+        super(type, id);
         this.player = playerInventory.player;
         this.converterStack = converterStack;
         this.isServer = !player.level().isClientSide();

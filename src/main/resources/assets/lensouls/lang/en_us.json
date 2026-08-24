@@ -49,6 +49,7 @@
   "message.lensouls.skill_ball.tooltip": "Right-click to unlock: %s",
   "message.lensouls.skill_ball.tooltip_random": "Right-click for a random ability",
   "container.lensouls.converter": "Converter",
+  "gui.lensouls.soul_select_hint": "Release over a soul (no left-click needed) to activate it; move off the souls to close the screen",
   "key.category.lensouls": "Len Souls",
   "key.lensouls.converter": "Activate Converter (G)",
   "message.lensouls.ability.unlocked": "§aUnlocked ability: §f%s",

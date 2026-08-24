@@ -43,6 +43,7 @@
   "message.lensouls.skill_ball.tooltip_random": "右键获得随机能力",
   "message.lensouls.ability.unlocked": "§a已解锁能力：§f%s",
   "container.lensouls.converter": "转换器",
+  "gui.lensouls.soul_select_hint": "悬停到镜魂上释放（无需左键）以激活该镜魂，移到非镜魂位置关闭屏幕",
   "key.category.lensouls": "镜魂",
   "key.lensouls.converter": "激活转换器 (G)",
   "message.lensouls.soul_activated": "%s 已激活！",

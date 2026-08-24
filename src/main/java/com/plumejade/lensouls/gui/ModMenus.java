@@ -26,6 +26,10 @@ public class ModMenus {
                 return new ConverterMenu(id, inv, stack);
             }));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<ConverterSelectMenu>> CONVERTER_SELECT =
+            MENUS.register("converter_select", () -> IMenuTypeExtension.create(
+                    (IContainerFactory<ConverterSelectMenu>) (id, inv, buf) -> new ConverterSelectMenu(id, inv, findConverter(inv.player))));
+
     public static final DeferredHolder<MenuType<?>, MenuType<PhotoGuiMenu>> PHOTO_GUI =
             MENUS.register("photo_gui", () -> IMenuTypeExtension.create(
                     (IContainerFactory<PhotoGuiMenu>) (id, inv, buf) -> new PhotoGuiMenu(id, inv)));

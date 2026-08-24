@@ -14,6 +14,7 @@ import com.plumejade.lensouls.effect.ModEffects;
 import com.plumejade.lensouls.gui.ConverterScreen;
 import com.plumejade.lensouls.gui.ModMenus;
 import com.plumejade.lensouls.gui.PhotoGuiScreen;
+import com.plumejade.lensouls.gui.SoulSelectOverlay;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceProvider;
@@ -77,6 +78,7 @@ public class LenSoulsClient {
     /** 注册菜单界面到 RegisterMenuScreensEvent */
     private static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.CONVERTER.get(), ConverterScreen::new);
+        event.register(ModMenus.CONVERTER_SELECT.get(), SoulSelectOverlay::new);
         event.register(ModMenus.PHOTO_GUI.get(), PhotoGuiScreen::new);
     }
 

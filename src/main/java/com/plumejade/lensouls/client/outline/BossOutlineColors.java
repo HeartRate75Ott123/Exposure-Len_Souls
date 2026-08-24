@@ -26,6 +26,44 @@ public record BossOutlineColors(
         float[] color3, float[] color4,
         float glowStrength, float outlineWidth) {
 
+    // ============ 四元素渐变配色（大众审美、绚丽、不深色） ============
+
+    /** 土元素 — 绿色系渐变 */
+    public static final BossOutlineColors EARTH = new BossOutlineColors(
+            rgb(0.55f, 1.0f, 0.35f),
+            rgb(0.35f, 1.0f, 0.60f),
+            rgb(0.75f, 1.0f, 0.25f),
+            rgb(0.45f, 1.0f, 0.75f),
+            1.2f, 3.0f
+    );
+
+    /** 水元素 — 蓝色系渐变 */
+    public static final BossOutlineColors WATER = new BossOutlineColors(
+            rgb(0.35f, 0.85f, 1.0f),
+            rgb(0.55f, 0.95f, 1.0f),
+            rgb(0.30f, 0.70f, 1.0f),
+            rgb(0.45f, 1.0f, 1.0f),
+            1.2f, 3.0f
+    );
+
+    /** 火元素 — 红色/橙系渐变 */
+    public static final BossOutlineColors FIRE = new BossOutlineColors(
+            rgb(1.0f, 0.40f, 0.30f),
+            rgb(1.0f, 0.60f, 0.25f),
+            rgb(1.0f, 0.30f, 0.45f),
+            rgb(1.0f, 0.75f, 0.30f),
+            1.2f, 3.0f
+    );
+
+    /** 末影元素 — 紫色系渐变 */
+    public static final BossOutlineColors ENDER = new BossOutlineColors(
+            rgb(0.80f, 0.40f, 1.0f),
+            rgb(0.65f, 0.45f, 1.0f),
+            rgb(0.95f, 0.50f, 1.0f),
+            rgb(0.75f, 0.55f, 1.0f),
+            1.2f, 3.0f
+    );
+
     // ============ BOSS 配色方案 ============
 
     /** 焰魔 — 烈焰 */
@@ -181,10 +219,11 @@ public record BossOutlineColors(
      * <p>
      * 使用 descriptionId 精确匹配（如 "item.lensouls.ignis_soul"），
      * 而非 element+multiplier 近似匹配，避免多 BOSS 共享相同元素/倍率时的歧义。
-     * 适用于 {@link SoulGlowLayer} 对任意 {@link LivingEntity} 的描边检测。
+     * 颜色只按镜魂元素返回四套渐变（土绿/水蓝/火红/末影紫），不按 BOSS/等级。
      */
     public static BossOutlineColors fromEntity(LivingEntity entity) {
         BossPhantomType bestType = null;
+        ElementDamage bestElement = null;
         int bestDuration = -1;
 
         for (MobEffectInstance inst : entity.getActiveEffects()) {
@@ -200,6 +239,7 @@ public record BossOutlineColors(
                         if (dur > bestDuration) {
                             bestDuration = dur;
                             bestType = matched;
+                            bestElement = element;
                         }
                     }
                 }
@@ -207,9 +247,20 @@ public record BossOutlineColors(
         }
 
         if (bestType != null) {
-            return fromBossType(bestType);
+            return bestElement != null ? fromElement(bestElement) : null;
         }
         return null;
+    }
+
+    /** 按元素返回四套渐变描边（土绿/水蓝/火红/末影紫） */
+    public static BossOutlineColors fromElement(ElementDamage element) {
+        return switch (element) {
+            case EARTH -> EARTH;
+            case WATER -> WATER;
+            case FIRE -> FIRE;
+            case ENDER -> ENDER;
+            default -> null;
+        };
     }
 
     public static BossOutlineColors fromBossType(BossPhantomType type) {

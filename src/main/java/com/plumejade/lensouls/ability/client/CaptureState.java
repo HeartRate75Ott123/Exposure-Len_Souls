@@ -310,4 +310,88 @@ public class CaptureState {
         }
         return whitePixelTexture.getId();
     }
+
+    // ---- 实体纹理 ResourceLocation 提取（虚灵半透明用） ----
+
+    private static final Map<RenderType, ResourceLocation> TEXTURE_LOC_CACHE = new IdentityHashMap<>();
+
+    /** 提取渲染类型对应的实体纹理 ResourceLocation（失败返回 null）。 */
+    public static ResourceLocation entityTextureLocation(RenderType type) {
+        return TEXTURE_LOC_CACHE.computeIfAbsent(type, CaptureState::extractTextureLocation);
+    }
+
+    private static ResourceLocation extractTextureLocation(RenderType type) {
+        try {
+            Method stateMethod = findDeclaredMethod(type.getClass(), "state");
+            Object state = stateMethod != null ? stateMethod.invoke(type) : null;
+            if (state == null) return null;
+            Field textureStateField = findDeclaredField(state.getClass(), "textureState");
+            Object textureState = textureStateField != null ? textureStateField.get(state) : null;
+            if (textureState == null) return null;
+            Method cutoutMethod = findDeclaredMethod(textureState.getClass(), "cutoutTexture");
+            Object loc = cutoutMethod != null ? cutoutMethod.invoke(textureState) : null;
+            if (loc instanceof Optional<?> opt && opt.isPresent()
+                    && opt.get() instanceof ResourceLocation rl) {
+                return rl;
+            }
+            return null;
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    // ---- 通用 mask 顶点收集 consumer（冻结 / BOSS 描边共用；GeckoLib 安全） ----
+    // 顶点颜色强制白色（仿原版 EntityOutlineGenerator），Sobel/distance-field 只响应形状边缘。
+    // 顶点不直接写 buffer，而是收集进 CaptureState —— 规避 GeckoLib 对未知 consumer
+    // 不做「buffer 已 end 则刷新」判定导致写已关闭 buffer 崩溃（"Not building!"）。
+
+    public static final class MaskColorConsumer implements VertexConsumer {
+
+        private final RenderType maskType;
+
+        public MaskColorConsumer(RenderType maskType) {
+            this.maskType = maskType;
+        }
+
+        @Override
+        public VertexConsumer addVertex(float x, float y, float z) {
+            CaptureState.startMaskVertex(maskType, null, x, y, z);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer addVertex(Matrix4f matrix4f, float x, float y, float z) {
+            CaptureState.startMaskVertex(maskType, matrix4f, x, y, z);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setColor(int red, int green, int blue, int alpha) {
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv(float u, float v) {
+            CaptureState.setMaskVertexUv(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv1(int u, int v) {
+            CaptureState.setMaskVertexUv1(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv2(int u, int v) {
+            CaptureState.setMaskVertexUv2(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setNormal(float normalX, float normalY, float normalZ) {
+            CaptureState.setMaskVertexNormal(normalX, normalY, normalZ);
+            return this;
+        }
+    }
 }

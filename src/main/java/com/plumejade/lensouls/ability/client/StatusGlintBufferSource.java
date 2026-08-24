@@ -92,7 +92,7 @@ public class StatusGlintBufferSource implements MultiBufferSource {
                     ? MaskRenderTypes.MASK_TYPE_ITEM : MaskRenderTypes.maskTypeForEntity(textureId);
             // mask 顶点颜色强制白色（仿原版 EntityOutlineGenerator：丢弃 setColor 等），
             // sobel 边缘检测只对形状边缘响应
-            VertexConsumer mask = new MaskColorConsumer(maskType);
+            VertexConsumer mask = new CaptureState.MaskColorConsumer(maskType);
             // 必须嵌套 Double：GeckoLib 只重建 VertexMultiConsumer.Double，
             // Multiple（3+ consumer）不会被重建，flush 后写入已关闭 buffer 会崩溃
             return VertexMultiConsumer.create(VertexMultiConsumer.create(main, glint), mask);
@@ -112,69 +112,5 @@ public class StatusGlintBufferSource implements MultiBufferSource {
             case FROZEN -> FrozenBlueGlintRenderTypes.bodyGlint(textureId);
             default -> throw new IllegalStateException("NONE 已在 getBuffer 提前返回");
         };
-    }
-
-    /**
-     * mask 顶点颜色强制白色（仿原版 {@code EntityOutlineGenerator}）：
-     * addVertex 时显式置白、丢弃 setColor，保证 mask 内容 alpha 恒为 255，
-     * Sobel 边缘检测只响应形状边缘。
-     * <p>
-     * 顶点不直接写 buffer，而是收集进 {@link CaptureState}（内存收集方案）——
-     * GeckoLib 每骨骼递归会重建 VertexMultiConsumer.Double，但对未知的
-     * consumer 类型不做「buffer 已 end 则刷新」判定，直接写共享 mask buffer
-     * 会在多纹理实体（maskType 切换触发 BufferSource 自动 endBatch）时向已
-     * 关闭的 BufferBuilder 写顶点崩溃（"Not building!"）。收集后帧末统一提交。
-     */
-    private static final class MaskColorConsumer implements VertexConsumer {
-
-        private final RenderType maskType;
-
-        MaskColorConsumer(RenderType maskType) {
-            this.maskType = maskType;
-        }
-
-        @Override
-        public VertexConsumer addVertex(float x, float y, float z) {
-            CaptureState.startMaskVertex(maskType, null, x, y, z);
-            return this;
-        }
-
-        @Override
-        public VertexConsumer addVertex(Matrix4f matrix4f, float x, float y, float z) {
-            // 必须显式转发矩阵版：接口 default 4 参会变换后转调 3 参，
-            // 而 BufferBuilder 的 3 参实现又用 RenderSystem 当前 ModelViewMat 变换一次——
-            // 二次变换会让 mask 顶点依赖全局矩阵状态（Iris 下错位）
-            CaptureState.startMaskVertex(maskType, matrix4f, x, y, z);
-            return this;
-        }
-
-        @Override
-        public VertexConsumer setColor(int red, int green, int blue, int alpha) {
-            return this;
-        }
-
-        @Override
-        public VertexConsumer setUv(float u, float v) {
-            CaptureState.setMaskVertexUv(u, v);
-            return this;
-        }
-
-        @Override
-        public VertexConsumer setUv1(int u, int v) {
-            CaptureState.setMaskVertexUv1(u, v);
-            return this;
-        }
-
-        @Override
-        public VertexConsumer setUv2(int u, int v) {
-            CaptureState.setMaskVertexUv2(u, v);
-            return this;
-        }
-
-        @Override
-        public VertexConsumer setNormal(float normalX, float normalY, float normalZ) {
-            CaptureState.setMaskVertexNormal(normalX, normalY, normalZ);
-            return this;
-        }
     }
 }

@@ -20,13 +20,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(targets = "net/minecraft/client/renderer/MultiBufferSource$BufferSource", remap = false)
 public abstract class BossBufferSourceMixin {
 
-    @Unique private static boolean lensouls$bossVerified = false;
-
     @Inject(method = "getBuffer", at = @At("RETURN"), cancellable = true, require = 0)
     private void lensouls$wrapForBoss(RenderType renderType, CallbackInfoReturnable<VertexConsumer> ci) {
-        if (!lensouls$bossVerified) {
-            lensouls$bossVerified = true;
-        }
+        // 第三人称实体描边由 dispatcher 层 BossOutlineBufferSource 双写处理；
+        // 此 getBuffer 拦截仅补第一人称手部物品（不走 dispatcher）的 mask 写入通道
+        if (!ItemRenderTracker.isRenderingItem()) return;
 
         if (BossOutlineManager.isInMaskWrite()) return;
 
@@ -39,8 +37,7 @@ public abstract class BossBufferSourceMixin {
         if (renderType.format() != DefaultVertexFormat.NEW_ENTITY) return;
 
 
-        RenderType maskType = ItemRenderTracker.isRenderingItem()
-                ? BossMaskRenderTypes.MASK_TYPE_ITEM : BossMaskRenderTypes.MASK_TYPE;
+        RenderType maskType = BossMaskRenderTypes.MASK_TYPE_ITEM;
 
         BossOutlineManager.setInMaskWrite(true);
         try {

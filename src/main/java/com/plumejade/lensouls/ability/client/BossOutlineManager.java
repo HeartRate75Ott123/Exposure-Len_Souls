@@ -109,7 +109,7 @@ public class BossOutlineManager {
         if (main != null) main.bindWrite(false);
     }
 
-    public static void setCompositeShader(ShaderInstance shader) {}
+    public static void setCompositeShader(ShaderInstance shader) { bossCompositeShader = shader; }
     public static void beginFrame() { currentColors = null; }
 
     // ========== 甯т簨浠?==========
@@ -128,7 +128,7 @@ public class BossOutlineManager {
 
     public static void composite(Minecraft mc, RenderTarget main) {
         if (currentColors == null) return;
-        var shader = FrozenOutlineManager.goldOutlineShader;
+        var shader = bossCompositeShader;
         if (shader == null || maskTarget == null) return;
         if (mc.options.hideGui || mc.screen != null) return;
 
@@ -165,12 +165,12 @@ public class BossOutlineManager {
 
         try {
             var bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
-            var consumer = bufferSource.getBuffer(CompositeRenderTypes.MAIN_QUAD);
+            var consumer = bufferSource.getBuffer(CompositeRenderTypes.BOSS_COMPOSITE_QUAD);
             consumer.addVertex(-1, -1, 0).setUv(0, 0);
             consumer.addVertex( 1, -1, 0).setUv(1, 0);
             consumer.addVertex( 1,  1, 0).setUv(1, 1);
             consumer.addVertex(-1,  1, 0).setUv(0, 1);
-            bufferSource.endBatch(CompositeRenderTypes.MAIN_QUAD);
+            bufferSource.endBatch(CompositeRenderTypes.BOSS_COMPOSITE_QUAD);
         } finally {
             modelViewStack.popMatrix();
             RenderSystem.applyModelViewMatrix();

@@ -2,15 +2,22 @@ package com.plumejade.lensouls.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.logging.LogUtils;
+import com.plumejade.lensouls.ability.client.BossOutlineBufferSource;
+import com.plumejade.lensouls.ability.client.BossOutlineManager;
 import com.plumejade.lensouls.ability.client.CaptureState;
 import com.plumejade.lensouls.ability.client.ClientFreezeCache;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import com.plumejade.lensouls.ability.client.ItemRenderTracker;
 import com.plumejade.lensouls.ability.client.StatusGlintBufferSource;
+import com.plumejade.lensouls.client.outline.BossOutlineColors;
+import com.plumejade.lensouls.client.phantom.ClientPhantomHandler;
+import com.plumejade.lensouls.client.phantom.PhantomBufferSource;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.entity.PartEntity;
@@ -93,6 +100,23 @@ public abstract class EntityRenderDispatcherMixin {
         }
         StatusGlintBufferSource.State state = StatusGlintBufferSource.resolveState(root);
         if (state == StatusGlintBufferSource.State.NONE) {
+            // 虚灵：统一半透明（原色 + 0.5 alpha），覆盖多部件/GeckoLib
+            if (ClientPhantomHandler.isPhantomEntity(root.getId())) {
+                renderer.render(entity, rotationYaw, partialTicks, poseStack,
+                        new PhantomBufferSource(buffer), packedLight);
+                return;
+            }
+            // 玩家 BOSS 镜魂：描边（dispatcher 层双写 mask，与时间定格同构）
+            if (entity instanceof Player player
+                    && Minecraft.getInstance().screen == null) {
+                BossOutlineColors colors = BossOutlineColors.fromEntity(player);
+                if (colors != null && BossOutlineManager.tryStartCapture(player.getId())) {
+                    BossOutlineManager.setColors(colors);
+                    renderer.render(entity, rotationYaw, partialTicks, poseStack,
+                            new BossOutlineBufferSource(buffer), packedLight);
+                    return;
+                }
+            }
             // 玩家/普通实体：照常渲染（彩色）
             renderer.render(entity, rotationYaw, partialTicks, poseStack, buffer, packedLight);
             return;
@@ -109,8 +133,11 @@ public abstract class EntityRenderDispatcherMixin {
                                      PoseStack poseStack, MultiBufferSource buffer,
                                      int packedLight, CallbackInfo ci) {
         // mask 顶点已按 per-纹理类型写入（层切换即 flush，每层绑自己纹理），
-        // 这里兜底 flush 最后一层
+        // 这里兜底 flush 最后一层（含冻结 + BOSS 描边收集的顶点）
         CaptureState.flushMask();
         CaptureState.endCapture();
+        if (BossOutlineManager.isCapturing()) {
+            BossOutlineManager.endCapture();
+        }
     }
 }

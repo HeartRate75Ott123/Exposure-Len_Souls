@@ -15,11 +15,12 @@
     "EndermanStunProjectileMixin",
     "BossProjHurtMixin",
     "PlayerSwingMixin",
+    "EntitiesInFrameMixin",
     "EntityInvulnerableTimeAccessor"
   ],
   "client": [
     "client.EntityRenderDispatcherMixin",
-    "client.BossEntityRenderMixin",
+    "client.BossBufferSourceMixin",
     "client.GameRendererMixin",
     "client.GunBowAnimationMixin",
     "client.ItemInHandRendererMixin",
@@ -29,7 +30,6 @@
     "client.PlayerClientMixin",
     "client.MultiPlayerGameModeMixin",
     "client.GameRendererFrameEndMixin",
-    "client.LivingEntityPhantomMixin",
     "client.LevelRendererMixin",
     "client.MinecraftSwingMixin"
   ],

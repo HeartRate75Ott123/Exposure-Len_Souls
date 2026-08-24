@@ -295,7 +295,12 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
 
     @Override public boolean isNoGravity() { return true; }
     @Override public boolean shouldRender(double x, double y, double z) { return !entityData.get(DATA_HAS_HIT) && super.shouldRender(x, y, z); }
-    @Override protected boolean canHitEntity(Entity target) { return target instanceof LivingEntity && !target.equals(getOwner()); }
+    @Override protected boolean canHitEntity(Entity target) {
+        if (target.equals(getOwner())) return false;
+        // 多部件子体（娜迦身子/九头蛇头等 PartEntity，非 LivingEntity）：NeoForge getEntities 会返回它们，需放行
+        if (target instanceof PartEntity<?>) return target.isAlive();
+        return target instanceof LivingEntity;
+    }
     /** PartEntity 优先检测，有 Parts 绝不回退父 AABB */
     @Nullable
     private EntityHitResult findClosestHit(Entity target, Vec3 origin, Vec3 vel) {

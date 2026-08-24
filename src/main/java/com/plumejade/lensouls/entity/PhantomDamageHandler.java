@@ -2,44 +2,67 @@ package com.plumejade.lensouls.entity;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.damagesource.DamageSource;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 
 /**
- * 幻灵穿透伤害 — 幻灵每次命中覆盖为固定穿透伤害。
+ * 幻灵防误伤 + 穿透伤害。
  * <p>
- * 按镜魂等级（SoulLevel 1-5）取值：10 / 18 / 21 / 35 / 37，
- * 无视护甲、无视伤害桶、无视单次伤害上限（setNewDamage 在事件阶段直接替换最终伤害）。
+ * 防误伤：幻灵来源（借体 BOSS 本体、其召唤物、或其弹幕 owner）对玩家不造成任何伤害——
+ * 在 LivingIncomingDamageEvent 阶段直接取消（含近战/接触/弹幕/召唤物），真正免伤且含击退。
+ * 召唤者处于旁观者模式已天然免疫，此处额外拦截以防队友/敌队被借体 BOSS 及其召唤物波及。
  * <p>
- * 防误伤：幻灵来源（借体 BOSS 本体或其弹幕 owner）对玩家不造成任何伤害——
- * 召唤者处于旁观者模式已天然免疫，此处额外拦截以防队友/敌队被借体 BOSS 的近战/弹幕波及。
+ * 穿透伤害：仅借体 BOSS 本体每次命中非玩家时覆盖为固定穿透伤害
+ * （按镜魂等级 1-5：10 / 18 / 21 / 35 / 37，无视护甲/伤害桶/单次上限）。
  */
 public class PhantomDamageHandler {
 
     private static final int[] PEN_DAMAGE = {10, 18, 21, 35, 37};
 
-    /** 防误伤：幻灵来源对玩家不造成任何伤害（真正免伤，含击退）。 */
+    /** 递归判定实体是否属幻灵来源：本体 / 召唤物 / 弹幕 owner */
+    private static boolean isPhantomSource(Entity e) {
+        if (e == null) return false;
+        if (e.getPersistentData().getBoolean("lensouls:phantom")) return true;
+        if (e.getPersistentData().getBoolean("lensouls:phantom_minion")) return true;
+        if (e instanceof Projectile proj) {
+            return isPhantomSource(proj.getOwner());
+        }
+        return false;
+    }
+
+    /** 防误伤：幻灵来源（直接来源或真实攻击者，含弹幕 owner）对玩家不造成任何伤害（真正免伤，含击退）。 */
     @SubscribeEvent
     public static void onIncomingDamage(LivingIncomingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
         if (event.getAmount() <= 0f) return;
         if (!(event.getEntity() instanceof Player)) return;
-
-        Entity attacker = event.getSource().getDirectEntity();
-        if (attacker == null) return;
-
-        // 解析"幻灵来源实体"：借体 BOSS 本体，或弹幕的 owner
-        boolean isPhantom = attacker.getPersistentData().getBoolean("lensouls:phantom");
-        if (!isPhantom && attacker instanceof Projectile proj) {
-            Entity owner = proj.getOwner();
-            if (owner != null && owner.getPersistentData().getBoolean("lensouls:phantom")) {
-                isPhantom = true;
-            }
+        if (isPhantomDamageSource(event.getSource())) {
+            event.setCanceled(true);
         }
-        if (isPhantom) event.setCanceled(true);
+    }
+
+    /** 递归判定伤害来源是否属幻灵：同时查直接来源与真实攻击者（getEntity），覆盖水花/弹幕 attrib 到 boss 的情形 */
+    private static boolean isPhantomDamageSource(DamageSource src) {
+        return isPhantomSource(src.getDirectEntity()) || isPhantomSource(src.getEntity());
+    }
+
+    /** Goety 式：幻灵/召唤物永不把玩家设为目标（硬拦截 AI 锁玩家，根治“虚灵打我”） */
+    @SubscribeEvent
+    public static void onTargetChange(LivingChangeTargetEvent event) {
+        LivingEntity entity = event.getEntity();
+        if (entity.level().isClientSide) return;
+        if (!(entity instanceof Mob mob)) return;
+        if (!mob.getPersistentData().getBoolean("lensouls:phantom")
+                && !mob.getPersistentData().getBoolean("lensouls:phantom_minion")) return;
+        if (event.getNewAboutToBeSetTarget() instanceof Player) {
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent
@@ -50,23 +73,13 @@ public class PhantomDamageHandler {
         Entity attacker = event.getSource().getDirectEntity();
         if (attacker == null) return;
 
-        // 解析"幻灵来源实体"：借体 BOSS 本体，或弹幕的 owner
-        Entity phantomEntity = attacker;
-        boolean isPhantom = attacker.getPersistentData().getBoolean("lensouls:phantom");
-        if (!isPhantom && attacker instanceof Projectile proj) {
-            Entity owner = proj.getOwner();
-            if (owner != null && owner.getPersistentData().getBoolean("lensouls:phantom")) {
-                isPhantom = true;
-                phantomEntity = owner;
-            }
-        }
-        if (!isPhantom) return;
+        // 仅借体 BOSS 本体穿透；召唤物按正常伤害结算
+        if (!attacker.getPersistentData().getBoolean("lensouls:phantom")) return;
 
         // 玩家已在 LivingIncomingDamageEvent 拦截，此处仅处理非玩家
         if (event.getEntity() instanceof Player) return;
 
-        // 命中非玩家 → 覆盖为固定穿透伤害（按镜魂等级 1-5；等级存于幻灵来源实体上）
-        int level = phantomEntity.getPersistentData().getInt("lensouls:phantom_level");
+        int level = attacker.getPersistentData().getInt("lensouls:phantom_level");
         if (level < 1 || level > 5) level = 1;
         event.setNewDamage(PEN_DAMAGE[level - 1]);
     }

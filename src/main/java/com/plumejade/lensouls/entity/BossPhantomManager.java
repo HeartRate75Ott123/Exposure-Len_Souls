@@ -20,6 +20,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -45,6 +46,8 @@ public class BossPhantomManager {
 
     private static final BossPhantomManager INSTANCE = new BossPhantomManager();
     public static final int PHANTOM_TOTAL_TICKS = 200;
+    /** 借体 boss 周边新生成实体被打标为召唤物的半径 */
+    private static final double MINION_TAG_RADIUS = 32.0;
 
     private final Map<UUID, BossPhantomData> activePhantoms = new ConcurrentHashMap<>();
     /** 幻灵期间玩家原始游戏模式（用于旁观者模式恢复） */
@@ -173,6 +176,8 @@ public class BossPhantomManager {
             entity.getPersistentData().putBoolean("lensouls:phantom", true);
             // 记录镜魂等级（1-5），供穿透伤害按等级取值
             entity.getPersistentData().putInt("lensouls:phantom_level", amplifier + 1);
+            // 记录归属玩家（Goety 式 owner，供友伤/瞄准逻辑识别主人）
+            entity.getPersistentData().putUUID("lensouls:phantom_owner", player.getUUID());
             entity.setCustomName(Component.translatable("entity.lensouls.boss_phantom." + type.name().toLowerCase()));
             entity.setCustomNameVisible(false);
             // 持久化保存玩家原始游戏模式（对抗断线丢失）
@@ -278,6 +283,38 @@ public class BossPhantomManager {
             if (d < nearestDist) { nearestDist = d; nearest = e; }
         }
         return nearest;
+    }
+
+    /**
+     * Goety 式盟友瞄准（复刻 IOwned.ownedTick）：幻灵（借体 boss 本体 + 召唤物）每 tick
+     * 锁定附近敌对生物、绝不瞄准玩家。无敌人时静默待机（target=null），绝不回退到锁玩家。
+     */
+    private static void applyPhantomAlly(Entity boss, ServerPlayer caster) {
+        // 借体 boss 本体（当前 target 是玩家时清空，避免“虚灵打我”）
+        if (boss instanceof Mob bossMob) {
+            LivingEntity target = bossMob.getTarget();
+            if (target != null && target instanceof Player) {
+                bossMob.setTarget(null);
+            }
+            if (bossMob.getTarget() == null || !bossMob.getTarget().isAlive()) {
+                bossMob.setTarget(findNearestEnemy((ServerLevel) boss.level(), boss.getX(), boss.getY(), boss.getZ()));
+            }
+        }
+        // 召唤物
+        double r = 48.0;
+        AABB box = new AABB(boss.getX() - r, boss.getY() - r, boss.getZ() - r,
+                boss.getX() + r, boss.getY() + r, boss.getZ() + r);
+        for (Entity e : boss.level().getEntities(boss, box)) {
+            if (!(e instanceof Mob mob)) continue;
+            if (!mob.getPersistentData().getBoolean("lensouls:phantom_minion")) continue;
+            LivingEntity mt = mob.getTarget();
+            if (mt != null && mt instanceof Player) {
+                mob.setTarget(null);
+            }
+            if (mob.getTarget() == null || !mob.getTarget().isAlive()) {
+                mob.setTarget(findNearestEnemy((ServerLevel) boss.level(), mob.getX(), mob.getY(), mob.getZ()));
+            }
+        }
     }
 
     /** 跨所有已加载维度按 network ID 查找实体（主线程安全） */
@@ -483,6 +520,8 @@ public class BossPhantomManager {
                     endPhantom(p, d, true);
                     continue;
                 }
+                // 召唤物 + 本体重定向：锁定主人敌人、绝不瞄准玩家（Goety 式）
+                applyPhantomAlly(ie, p);
             } else {
                 // ===== 旧版 BossPhantomEntity 模式：传送观察位 + 阶段包 =====
                 p.teleportTo(d.watchX(), d.watchY(), d.watchZ());
@@ -916,9 +955,41 @@ public class BossPhantomManager {
 
         boolean belongsToActive = getInstance().activePhantoms.values().stream()
                 .anyMatch(d -> d.phantomEntityId() == entity.getId());
-
         if (!belongsToActive) {
             event.setCanceled(true);
         }
     }
+
+    /**
+     * 借体 boss 演出期间，将其周边新生成的生物/弹射物标记为召唤物
+     * （lensouls:phantom_minion + 继承等级 + 施法玩家 owner）。
+     * <p>
+     * 标记后玩家受伤会被 PhantomDamageHandler 兜底取消（真·不误伤），
+     * 且每 tick 由 retargetMinions 把目标为玩家的召唤物重定向到敌对生物。
+     * 仅处理新加入世界的实体（!loadedFromDisk），真实 boss（高血量）不标记以防误标世界里的真 boss。
+     */
+    @SubscribeEvent
+    public static void onEntityJoinLevelTagging(EntityJoinLevelEvent event) {
+        if (event.getLevel().isClientSide()) return;
+        if (event.loadedFromDisk()) return;
+        Entity ent = event.getEntity();
+        if (ent instanceof Player) return;
+        if (ent.getPersistentData().getBoolean("lensouls:phantom")) return;
+        if (!(ent instanceof Mob || ent instanceof Projectile)) return;
+
+        for (BossPhantomData d : getInstance().activePhantoms.values()) {
+            Entity boss = event.getLevel().getEntity(d.phantomEntityId());
+            if (boss == null) continue;
+            if (boss.position().distanceToSqr(ent.position()) > MINION_TAG_RADIUS * MINION_TAG_RADIUS) continue;
+            // 真实 boss（高血量）不标为召唤物
+            if (ent instanceof Mob mob && mob.getMaxHealth() > 200) continue;
+
+            ent.getPersistentData().putBoolean("lensouls:phantom_minion", true);
+            ent.getPersistentData().putInt("lensouls:phantom_level",
+                    boss.getPersistentData().getInt("lensouls:phantom_level"));
+            ent.getPersistentData().putUUID("lensouls:phantom_owner", d.playerId());
+            break;
+        }
+    }
+
 }

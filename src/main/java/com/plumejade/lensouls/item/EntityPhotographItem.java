@@ -8,10 +8,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 
-import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
-
 import java.util.List;
-import java.util.function.Consumer;
 
 /**
  * 实体照片饰品物品。
@@ -22,19 +19,6 @@ public class EntityPhotographItem extends Item {
 
     public EntityPhotographItem(Properties properties) {
         super(properties);
-    }
-
-    @Override
-    public void initializeClient(Consumer<IClientItemExtensions> consumer) {
-        consumer.accept(new IClientItemExtensions() {
-            private final net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer renderer =
-                    new com.plumejade.lensouls.client.EntityPhotoEggRenderer();
-
-            @Override
-            public net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer getCustomRenderer() {
-                return renderer;
-            }
-        });
     }
 
     public static ItemStack create(String entityId) {

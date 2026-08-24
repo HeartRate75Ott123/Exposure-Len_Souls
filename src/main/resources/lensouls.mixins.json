@@ -18,7 +18,8 @@
     "EntitiesInFrameMixin",
     "EntityInvulnerableTimeAccessor"
   ],
-  "client": [
+    "client": [
+    "client.ItemRendererMixin",
     "client.EntityRenderDispatcherMixin",
     "client.EntityBossOutlineMixin",
     "client.BossBufferSourceMixin",

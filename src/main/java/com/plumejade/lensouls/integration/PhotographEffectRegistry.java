@@ -544,6 +544,12 @@ public class PhotographEffectRegistry {
             event.getToolTip().add(Component.literal("§7无特殊效果").withStyle(ChatFormatting.GRAY));
         }
 
+        // 弱属性照片组：额外照片栏位提示
+        int slotBonus = PhotoSpecialEffects.getWeakSlotBonus(entityId);
+        if (slotBonus > 0) {
+            event.getToolTip().add(Component.literal("§a佩戴时额外获得 " + slotBonus + " 个照片饰品栏位"));
+        }
+
         // 动态元素活性 + 元素弱点：等级随数据包变化，tooltip 实时跟随
         try {
             var id = ResourceLocation.parse(entityId);

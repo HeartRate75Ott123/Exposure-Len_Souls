@@ -45,12 +45,31 @@ public class PhotoSpecialEffects {
     private static final String ATTR_TAG = "lensouls:attr_photos";
     private static final ResourceLocation MOD_BASE = ResourceLocation.parse("lensouls:attr_");
 
-    /** 弱属性照片组：佩戴时额外照片栏位（叠加至上限 2） */
-    private static final Set<String> WEAK_SLOT_PHOTOS = Set.of(
-            "minecraft:chicken", "minecraft:sheep", "minecraft:rabbit", "minecraft:bat", "minecraft:bee",
-            "minecraft:parrot", "minecraft:ocelot", "minecraft:squid", "minecraft:glow_squid",
-            "minecraft:cod", "minecraft:salmon", "minecraft:tropical_fish", "minecraft:tadpole", "minecraft:frog"
+    /** 弱属性照片组 → 额外照片栏位数（越弱给越多，1~3，无上限叠加） */
+    public static final Map<String, Integer> WEAK_SLOT_BONUS = Map.ofEntries(
+            Map.entry("minecraft:chicken", 3),
+            Map.entry("minecraft:sheep", 3),
+            Map.entry("minecraft:bat", 3),
+            Map.entry("minecraft:cod", 3),
+            Map.entry("minecraft:salmon", 3),
+            Map.entry("minecraft:tropical_fish", 3),
+            Map.entry("minecraft:tadpole", 3),
+            Map.entry("minecraft:squid", 2),
+            Map.entry("minecraft:glow_squid", 2),
+            Map.entry("minecraft:frog", 2),
+            Map.entry("minecraft:bee", 2),
+            Map.entry("minecraft:rabbit", 1),
+            Map.entry("minecraft:parrot", 1),
+            Map.entry("minecraft:ocelot", 1)
     );
+
+    public static boolean isWeakSlotPhoto(String entityId) {
+        return WEAK_SLOT_BONUS.containsKey(entityId);
+    }
+
+    public static int getWeakSlotBonus(String entityId) {
+        return WEAK_SLOT_BONUS.getOrDefault(entityId, 0);
+    }
     private static final String SLOT_MOD_ID = "lensouls:photo_slot_bonus";
     private static final String SLOT_TAG = "lensouls:extra_photo_slots";
     private static final String WEAK_TAG = "lensouls:weak_photos";
@@ -789,15 +808,13 @@ public class PhotoSpecialEffects {
         }
     }
 
-    /** Curios 照片槽位扩展：vindicator 恒定 +1，弱照片组叠加至上限 +2 */
+    /** Curios 照片槽位扩展：vindicator 恒定 +1，弱照片组按各自分配值累加（无上限） */
     private static void updatePhotoSlots(ServerPlayer player, List<String> gearEntities) {
         int extra = 0;
         if (gearEntities.contains("minecraft:vindicator")) extra += 1;
-        int weakCount = 0;
         for (String id : gearEntities) {
-            if (WEAK_SLOT_PHOTOS.contains(id)) weakCount++;
+            extra += WEAK_SLOT_BONUS.getOrDefault(id, 0);
         }
-        extra += Math.min(weakCount, 2);
 
         int cur = player.getPersistentData().getInt(SLOT_TAG);
         if (cur == extra) return;

@@ -235,7 +235,7 @@ public class BossPhantomManager {
         }
     }
 
-    /** 召唤瞬间径向 AOE（排除幻灵自身） */
+    /** 召唤瞬间径向 AOE（排除幻灵自身；对所有玩家免疫以防误伤队友） */
     private static void dealSpawnAOE(ServerLevel level, BossPhantomType type,
                                       double cx, double cy, double cz, Entity self) {
         double range = type == BossPhantomType.OBLITERATOR ? 30.0 : 10.0;

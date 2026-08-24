@@ -16,6 +16,9 @@ public class CompositeRenderTypes extends RenderStateShard {
     private static final ShaderStateShard GOLD_OUTLINE_SHADER =
             new ShaderStateShard(() -> FrozenOutlineManager.goldOutlineShader);
 
+    private static final ShaderStateShard BOSS_COMPOSITE_SHADER =
+            new ShaderStateShard(() -> BossOutlineManager.bossCompositeShader);
+
     private static final DepthTestStateShard NO_DEPTH_TEST_STATE;
 
     static {
@@ -35,6 +38,20 @@ public class CompositeRenderTypes extends RenderStateShard {
             VertexFormat.Mode.QUADS, 256, false, false,
             RenderType.CompositeState.builder()
                     .setShaderState(GOLD_OUTLINE_SHADER)
+                    .setDepthTestState(NO_DEPTH_TEST_STATE)
+                    .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                    .setWriteMaskState(COLOR_WRITE)
+                    .setOutputState(MAIN_TARGET)
+                    .createCompositeState(false)
+    );
+
+    /** 全屏四边形 — BOSS 描边用（bossOutlineComposite，distance field 搜索，无噪点） */
+    public static final RenderType BOSS_COMPOSITE_QUAD = RenderType.create(
+            "lensouls_boss_composite_quad",
+            DefaultVertexFormat.POSITION_TEX,
+            VertexFormat.Mode.QUADS, 256, false, false,
+            RenderType.CompositeState.builder()
+                    .setShaderState(BOSS_COMPOSITE_SHADER)
                     .setDepthTestState(NO_DEPTH_TEST_STATE)
                     .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                     .setWriteMaskState(COLOR_WRITE)

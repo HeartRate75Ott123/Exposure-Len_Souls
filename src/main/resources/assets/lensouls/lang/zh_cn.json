@@ -25,7 +25,7 @@
   "element.lensouls.projectile.short": "弹射物",
   "item.lensouls.soul.boss_hint": "同时激活特殊效果",
   "item.lensouls.converter": "镜魂转换器",
-  "item.lensouls.converter.tooltip": "右键：打开界面，按 §e%s§7：激活镜魂",
+  "item.lensouls.converter.tooltip": "右键打开容器；长按 §e%s§7 呼出镜魂菜单，鼠标移到要激活的镜魂上松开即可激活；手持左键空气切换触发模式",
   "item.lensouls.ignis_soul": "焰魔镜魂（火）",
   "item.lensouls.cloud_golem_soul": "云筑魔像镜魂（冰）",
   "item.lensouls.possessed_paladin_soul": "堕落圣骑镜魂（土）",

@@ -21,8 +21,8 @@
   "client": [
     "client.EntityRenderDispatcherMixin",
     "client.EntityBossOutlineMixin",
+    "client.BossBufferSourceMixin",
     "client.GameRendererMixin",
-    "client.GameRendererHeldGlowMixin",
     "client.GunBowAnimationMixin",
     "client.ItemInHandRendererMixin",
     "client.ItemRendererAccessor",

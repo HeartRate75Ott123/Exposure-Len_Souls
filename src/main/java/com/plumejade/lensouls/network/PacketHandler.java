@@ -68,6 +68,25 @@ public class PacketHandler {
                 PhotoSwingPacket::handle
         );
 
+        // ---- 转换器镜魂选择菜单 C2S ----
+        registrar.playToServer(
+                ConverterMenuRequestPacket.TYPE,
+                ConverterMenuRequestPacket.STREAM_CODEC,
+                ConverterMenuRequestPacket::handle
+        );
+        registrar.playToServer(
+                ConverterMenuActivatePacket.TYPE,
+                ConverterMenuActivatePacket.STREAM_CODEC,
+                ConverterMenuActivatePacket::handle
+        );
+
+        // ---- 转换器镜魂选择菜单 S2C ----
+        registrar.playToClient(
+                ConverterMenuSyncPacket.TYPE,
+                ConverterMenuSyncPacket.STREAM_CODEC,
+                ConverterMenuSyncPacket::handle
+        );
+
         // ---- 能力系统 C2S 包 ----
         registrar.playToServer(
                 AbilityOpenGuiPacket.TYPE,

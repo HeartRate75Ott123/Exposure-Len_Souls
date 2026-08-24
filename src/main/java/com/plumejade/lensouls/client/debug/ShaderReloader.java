@@ -3,6 +3,7 @@ package com.plumejade.lensouls.client.debug;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.ability.client.BossOutlineManager;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -82,6 +83,14 @@ public class ShaderReloader {
             fail++;
         }
 
+        // ── BOSS 镜魂描边 composite（第一人称手部 mask） ──
+        if (reloadOne(provider, "boss_outline_composite", DefaultVertexFormat.POSITION_TEX,
+                instance -> BossOutlineManager.bossCompositeShader = instance)) {
+            ok++;
+        } else {
+            fail++;
+        }
+
         long elapsed = (Util.getNanos() - start) / 1_000_000L;
 
         if (fail > 0) {
@@ -122,6 +131,7 @@ public class ShaderReloader {
             case "rendertype_gold_outline"     -> FrozenOutlineManager.goldOutlineShader;
             case "rendertype_mask_entity"      -> FrozenOutlineManager.maskShader;
             case "rendertype_soul_glow_mask_item" -> FrozenOutlineManager.itemMaskShader;
+            case "boss_outline_composite"      -> BossOutlineManager.bossCompositeShader;
             default -> null;
         };
     }

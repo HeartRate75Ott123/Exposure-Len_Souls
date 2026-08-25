@@ -270,6 +270,6 @@
   "tooltip.lensouls.weakness.water": "你受到的水流元素附加伤害 +12%",
   "tooltip.lensouls.weakness.earth": "你受到的大地元素附加伤害 +12%",
   "tooltip.lensouls.weakness.ender": "你受到的末影元素附加伤害 +12%",
-  "tooltip.lensouls.weakness.projectile": "你受到的弹射物元素附加伤害 +12%",
+  "tooltip.lensouls.weakness.projectile": "你受到的弹射物附加伤害 +12%",
   "element.lensouls.projectile": "弹射物"
 }

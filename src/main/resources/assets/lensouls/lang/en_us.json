@@ -271,6 +271,6 @@
   "tooltip.lensouls.weakness.water": "Water Element Bonus Damage Taken +12%",
   "tooltip.lensouls.weakness.earth": "Earth Element Bonus Damage Taken +12%",
   "tooltip.lensouls.weakness.ender": "Ender Element Bonus Damage Taken +12%",
-  "tooltip.lensouls.weakness.projectile": "Projectile Element Bonus Damage Taken +12%",
+  "tooltip.lensouls.weakness.projectile": "Projectile Bonus Damage Taken +12%",
   "element.lensouls.projectile": "Projectile"
 }

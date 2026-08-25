@@ -3,14 +3,12 @@ package com.plumejade.lensouls.config;
 import com.google.gson.*;
 import com.plumejade.lensouls.LenSouls;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
-import java.io.Reader;
 import java.util.*;
 
 /**
@@ -93,30 +91,22 @@ public class CopySoulFilter extends SimpleJsonResourceReloadListener {
         Set<ResourceLocation> cWl = new HashSet<>(), cBl = new HashSet<>();
         boolean[] dWlAll = {false}, dBlAll = {false}, cWlAll = {false}, cBlAll = {false};
 
-        for (ResourceLocation loc : entries.keySet()) {
-            String path = loc.getPath(); // e.g. copysoul_filter/drop_whitelist.json
+        for (Map.Entry<ResourceLocation, JsonElement> entry : entries.entrySet()) {
+            ResourceLocation loc = entry.getKey();
+            String path = loc.getPath(); // NeoForge 已剥离文件夹前缀与 .json 后缀，实际为裸名如 "copy_blacklist"
             Set<ResourceLocation> set;
             boolean[] allFlag;
-            if (path.endsWith("drop_whitelist.json")) { set = dWl; allFlag = dWlAll; }
-            else if (path.endsWith("drop_blacklist.json")) { set = dBl; allFlag = dBlAll; }
-            else if (path.endsWith("copy_whitelist.json")) { set = cWl; allFlag = cWlAll; }
-            else if (path.endsWith("copy_blacklist.json")) { set = cBl; allFlag = cBlAll; }
+            if (path.endsWith("drop_whitelist")) { set = dWl; allFlag = dWlAll; }
+            else if (path.endsWith("drop_blacklist")) { set = dBl; allFlag = dBlAll; }
+            else if (path.endsWith("copy_whitelist")) { set = cWl; allFlag = cWlAll; }
+            else if (path.endsWith("copy_blacklist")) { set = cBl; allFlag = cBlAll; }
             else {
-                LOGGER.warn("复制之魂过滤忽略未知文件（仅支持 drop_/copy_ 前缀的 whitelist/blacklist.json）: {}", loc);
+                LOGGER.warn("复制之魂过滤忽略未知文件（仅支持 drop_/copy_whitelist.json 与 drop_/copy_blacklist.json）: {}", loc);
                 continue;
             }
-            // 跨所有数据包层级合并：同名文件在 mod 与 datapack 中同时提供时，
-            // SimpleJsonResourceReloadListener 交给 apply 的 Map 仅保留单值（高优先级胜出），
-            // 可能导致低优先级的空表覆盖数据包。此处对每个位置取回全部 pack 的版本并 union，
-            // 保证 mod 的 [] 与数据包的 [id...] 正确累加。
-            for (Resource resource : manager.getResourceStack(loc)) {
-                try (Reader reader = resource.openAsReader()) {
-                    JsonElement json = GSON.fromJson(reader, JsonElement.class);
-                    parseList(json, set, allFlag, loc);
-                } catch (Exception e) {
-                    LOGGER.warn("复制之魂过滤读取失败 (文件: {}): {}", loc, e.getMessage());
-                }
-            }
+            // 与其他数据驱动加载器一致：直接解析 entry 内容（已是最高优先级 pack 的 JSON，
+            // 数据包覆盖模组时即为数据包内容），按命名空间不同的同名文件各自累加。
+            parseList(entry.getValue(), set, allFlag, loc);
         }
 
         dropWhitelist = Set.copyOf(dWl);

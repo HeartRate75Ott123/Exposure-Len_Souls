@@ -265,5 +265,11 @@
   "ability.lensouls.vital_strike.detail": "手持已附魔§b摄魂术§r的相机拍照\n拍摄时§c不消耗胶卷或相纸完成一次韧性伤害§r\n并且§a这次的白霸体时长缩短50%§r\n白霸体也就是韧性无法削减的时期，较短暂",
   "ability.lensouls.soul_sever.detail": "手持已附魔§b摄魂术§r的相机拍照\n拍摄时§c不消耗胶卷或相纸进入一次判定§r\n§a有30%概率对该目标§r\n§a造成当前生命值10%到20%的魔法伤害§r\n判定成功冷却10s，判定失败冷却0.5s",
   "ability.lensouls.ability_steal.detail": "手持已附魔§b摄魂术§r的相机（建议使用拍立得）拍照\n拍摄时需要能力保持在§a能力窃取§r上\n会选中最近的实体记录数据到照片中\n当你得到具有§a能力窃取§r性质的照片\n§d如果适配了该实体，就会显示佩戴效果\n§b可以装备在饰品栏的照片槽位§r§r\n支持JEI搜索@lensouls，来查看支持的实体",
-  "jade.lensouls.toughness": "生物韧性：%s/%s"
+  "jade.lensouls.toughness": "生物韧性：%s/%s",
+  "tooltip.lensouls.weakness.fire": "你受到的火焰元素附加伤害 +12%",
+  "tooltip.lensouls.weakness.water": "你受到的水流元素附加伤害 +12%",
+  "tooltip.lensouls.weakness.earth": "你受到的大地元素附加伤害 +12%",
+  "tooltip.lensouls.weakness.ender": "你受到的末影元素附加伤害 +12%",
+  "tooltip.lensouls.weakness.projectile": "你受到的弹射物元素附加伤害 +12%",
+  "element.lensouls.projectile": "弹射物"
 }

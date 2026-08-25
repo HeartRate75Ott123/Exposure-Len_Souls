@@ -14,6 +14,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -1006,10 +1007,6 @@ public class PhotoSpecialEffects {
         map.put(attr, new AttributeModifier(MOD_BASE.withPath(path), 0.12, AttributeModifier.Operation.ADD_VALUE));
     }
 
-    private static final Map<ElementDamage, String> ELEMENT_NAMES = Map.of(
-            ElementDamage.FIRE, "火", ElementDamage.WATER, "水",
-            ElementDamage.EARTH, "土", ElementDamage.ENDER, "末影");
-
     /**
      * 生成照片属性加成描述行（与 {@link #buildAttributeModifiers} 同源，tooltip 复用）。
      * 使用属性修饰符的官方译名（跳跃力量/游泳速度…），按正负着色，逐行换行。
@@ -1039,12 +1036,11 @@ public class PhotoSpecialEffects {
         if (weak != null) {
             for (ElementDamage el : ElementDamage.values()) {
                 if (weak.containsKey(el)) {
-                    String elemName = ELEMENT_NAMES.getOrDefault(el, el.getSerializedName());
-                    if (skipText != null && (skipText.contains(elemName + "属性弱点")
-                            || skipText.contains(elemName + "元素") || skipText.contains("元素附加伤害"))) {
+                    MutableComponent text = Component.translatable("tooltip.lensouls.weakness." + el.getSerializedName());
+                    if (skipText != null && skipText.contains(text.getString())) {
                         continue;
                     }
-                    lines.add(Component.literal(elemName + "属性弱点 +12%").withStyle(ChatFormatting.RED));
+                    lines.add(text.withStyle(ChatFormatting.RED));
                 }
             }
         }

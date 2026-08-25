@@ -20,6 +20,7 @@
   ],
     "client": [
     "client.ItemRendererMixin",
+    "client.SoulLevelOverlayMixin",
     "client.EntityRenderDispatcherMixin",
     "client.EntityBossOutlineMixin",
     "client.BossBufferSourceMixin",

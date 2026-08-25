@@ -266,5 +266,11 @@
   "ability.lensouls.vital_strike.detail": "Hold a camera enchanted with §bSoul Photography§r and take a photo\n§cDeals one toughness damage without consuming film or paper§r\nAnd §athis white hyper-armor duration is shortened by 50%§r\nWhite hyper-armor is the brief period during which toughness cannot be reduced",
   "ability.lensouls.soul_sever.detail": "Hold a camera enchanted with §bSoul Photography§r and take a photo\n§cEnters one judgement without consuming film or paper§r\n§aHas a 30% chance to deal§r\n§a10% to 20% of the target's current HP as magic damage§r\n10s cooldown on success, 0.5s on failure",
   "ability.lensouls.ability_steal.detail": "Hold a camera enchanted with §bSoul Photography§r (Polaroid recommended) and take a photo\nKeep the §aAbility Steal§r ability active while shooting\nSelects the nearest entity and records its data into the photo\nOnce you have an §aAbility Steal§r photo\n§dIf it matches the entity, the equip effect is displayed\n§bIt can be equipped in the Photo slot of the curio inventory§r§r\nSearch @lensouls in JEI to see supported entities",
-  "jade.lensouls.toughness": "Toughness: %s/%s"
+  "jade.lensouls.toughness": "Toughness: %s/%s",
+  "tooltip.lensouls.weakness.fire": "Fire Element Bonus Damage Taken +12%",
+  "tooltip.lensouls.weakness.water": "Water Element Bonus Damage Taken +12%",
+  "tooltip.lensouls.weakness.earth": "Earth Element Bonus Damage Taken +12%",
+  "tooltip.lensouls.weakness.ender": "Ender Element Bonus Damage Taken +12%",
+  "tooltip.lensouls.weakness.projectile": "Projectile Element Bonus Damage Taken +12%",
+  "element.lensouls.projectile": "Projectile"
 }

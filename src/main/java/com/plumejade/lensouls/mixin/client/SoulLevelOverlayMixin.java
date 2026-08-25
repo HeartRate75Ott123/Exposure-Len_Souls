@@ -33,7 +33,7 @@ public abstract class SoulLevelOverlayMixin {
 
         GuiGraphics gui = (GuiGraphics) (Object) this;
         gui.pose().pushPose();
-        gui.pose().translate(0.0, 0.0, 0.1);
+        gui.pose().translate(0.0, 0.0, 200.0);
         gui.drawString(font, String.valueOf(level), x + 1, y + 1, LEVEL_GREEN, true);
         gui.pose().popPose();
     }

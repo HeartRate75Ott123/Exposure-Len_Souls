@@ -32,7 +32,7 @@
   "message.lensouls.lens_tier_insufficient": "§cInsufficient tier! Cannot deal toughness damage. Install Soul Upgrade %s",
   "lensouls.photograph.entity_name": "§7Entity: %s",
   "item.lensouls.converter": "Element Converter",
-  "item.lensouls.converter.tooltip": "§aRight-click: open container. Left-click air: switch trigger mode. §rPress §e%s§7 to open soul menu",
+  "item.lensouls.converter.tooltip": "§aRight-click: open container. Left-click air: switch trigger mode.",
   "item.lensouls.ignis_soul": "Ignis Soul",
   "item.lensouls.cloud_golem_soul": "Cloud Golem Soul",
   "item.lensouls.possessed_paladin_soul": "Possessed Paladin Soul",

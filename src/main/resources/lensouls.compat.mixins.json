@@ -11,7 +11,8 @@
     "LightroomInjectMixin",
     "PolaroidPrintMixin",
     "CataclysmDamageBucketMixin",
-    "LegendaryMonstersCapMixin"
+    "LegendaryMonstersCapMixin",
+    "IgnisFireballBrandMixin"
   ],
   "client": [
     "BetterCombatRangeMixin"

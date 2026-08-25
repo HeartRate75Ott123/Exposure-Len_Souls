@@ -892,25 +892,10 @@ public class PhotoSpecialEffects {
                     if (mult != 1.0f) event.setNewDamage(event.getNewDamage() * mult);
                 }
             }
-            // 焰魔：炽焰烙印
+            // 焰魔：炽焰烙印（自有减甲减韧，绕过灾变效果，可叠加）
             if (gear.contains("cataclysm:ignis") && player.getRandom().nextFloat() < 0.2f) {
-                applyBlazingBrand(event.getEntity(), 0);
+                com.plumejade.lensouls.handler.IgnisBrandHandler.applyIgnisArmorBreak(event.getEntity());
             }
-        }
-    }
-
-    /** 施加灾变炽焰烙印（反射，-20% 护甲/韧性） */
-    public static void applyBlazingBrand(LivingEntity target, int amplifier) {
-        try {
-            Class<?> mc = Class.forName("com.github.L_Ender.cataclysm.init.ModEffect");
-            var f = mc.getDeclaredField("EFFECTBLAZING_BRAND");
-            var d = f.get(null);
-            var h = (Holder<net.minecraft.world.effect.MobEffect>) d.getClass().getMethod("get").invoke(d);
-            var ex = target.getEffect(h);
-            int a = ex != null ? Math.min(ex.getAmplifier() + amplifier + 1, 2) : amplifier;
-            target.addEffect(new net.minecraft.world.effect.MobEffectInstance(h, 200, a));
-        } catch (Exception ex) {
-            com.plumejade.lensouls.LenSouls.LOGGER.warn("[Photo] 炽焰烙印失效", ex);
         }
     }
 

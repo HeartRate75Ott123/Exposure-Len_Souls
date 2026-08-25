@@ -92,6 +92,7 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotographEffectRegistry.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.TrophyModifierHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotoSpecialEffects.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.IgnisBrandHandler.class);
 
         // Curios 照片饰品槽（运行时检测）
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.CuriosIntegration.class);

@@ -13,9 +13,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * 镜魂等级叠加：在 GUI 渲染镜魂物品时，于左上角叠加绿色阿拉伯数字表示该镜魂等级。
  * <p>
- * 原版物品上的数字（堆叠数量）在 {@link GuiGraphics#renderItemDecorations} 绘制，该处文本
- * 着色器/混合状态就绪，文本渲染可靠。与此同源，避免使用 ItemRenderer.render 的 TAIL 注入
- * （那里文本状态未就绪，font.drawInBatch 不显示）。
+ * 原版画堆叠数量（如 "64"）在 {@code GuiGraphics.renderItemDecorations} 的 5-arg 重载中，
+ * 通过 {@link GuiGraphics#drawString} 绘制（文本状态正确）。物品栏/容器/快捷栏槽位由屏幕直接
+ * 调用该 5-arg 重载，故 hook 它即可在所有 GUI 槽位生效（4-arg 重载内部亦委托此 5-arg，单次触发）。
  * 等级读取 {@link AnvilUpgradeHandler#getSoulLevel}（含默认等级 1）。
  */
 @Mixin(GuiGraphics.class)
@@ -23,17 +23,18 @@ public abstract class SoulLevelOverlayMixin {
 
     private static final int LEVEL_GREEN = 0x33FF33;
 
-    @Inject(method = "renderItemDecorations(Lnet/minecraft/client/gui/Font;Lnet/minecraft/world/item/ItemStack;II)V",
+    @Inject(method = "renderItemDecorations(Lnet/minecraft/client/gui/Font;Lnet/minecraft/world/item/ItemStack;IILjava/lang/String;)V",
             at = @At("TAIL"))
-    private void lensouls$overlaySoulLevel(Font font, ItemStack stack, int x, int y, CallbackInfo ci) {
+    private void lensouls$overlaySoulLevel(Font font, ItemStack stack, int x, int y, String countText, CallbackInfo ci) {
         if (!(stack.getItem() instanceof LensoulItem)) return;
 
         int level = AnvilUpgradeHandler.getSoulLevel(stack);
         if (level <= 0) return;
 
         GuiGraphics gui = (GuiGraphics) (Object) this;
-        font.drawInBatch(String.valueOf(level), x + 1, y + 1, LEVEL_GREEN, true,
-                gui.pose().last().pose(), gui.bufferSource(),
-                Font.DisplayMode.NORMAL, 0, 0xF000F0);
+        gui.pose().pushPose();
+        gui.pose().translate(0.0, 0.0, 0.1);
+        gui.drawString(font, String.valueOf(level), x + 1, y + 1, LEVEL_GREEN, true);
+        gui.pose().popPose();
     }
 }

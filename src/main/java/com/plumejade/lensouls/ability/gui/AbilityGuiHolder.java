@@ -75,15 +75,17 @@ public class AbilityGuiHolder {
         final UIElement card;
         final UIElement selectArea;
         final Button selectBtn;
+        final Button detailBtn;
         final boolean unlocked;
         boolean inUse;
 
         CardRef(AbilityType type, UIElement card, UIElement selectArea, Button selectBtn,
-                boolean unlocked, boolean inUse) {
+                Button detailBtn, boolean unlocked, boolean inUse) {
             this.type = type;
             this.card = card;
             this.selectArea = selectArea;
             this.selectBtn = selectBtn;
+            this.detailBtn = detailBtn;
             this.unlocked = unlocked;
             this.inUse = inUse;
         }
@@ -203,15 +205,22 @@ public class AbilityGuiHolder {
             row.addChild(ref.card);
             col = (col + 1) % 2;
         }
-        // 选择回调：选择区域内任意点击（背景 / 图标 / 选择按钮）均触发，
-        // 仅一个客户端监听 + 一个服务端监听，避免按钮子元素点击时双 RPC 导致选中又取消。
+        // 选择回调：选择区域内任意点击（背景 / 图标 / 选择按钮）均触发切换，
+        // 服务端监听挂在选择按钮上（分发器自动发送），图标/名称区域手动补发，
+        // 详情按钮点击被排除，绝不触发选中。整体仍只有一个服务端 RPC。
         for (CardRef ref : cardRefs) {
             if (!ref.unlocked) continue;
             ref.selectArea.addEventListener(UIEvents.MOUSE_DOWN, event -> {
+                if (isWithin(event.target, ref.detailBtn)) return;  // 详情按钮不触发选中
                 updateSelection(ref, cardRefs);
+                if (!isWithin(event.target, ref.selectBtn)) {
+                    // 图标 / 名称 / 背景：手动补发服务端 RPC（选择按钮自身由分发器自动发送）
+                    var rpc = ref.selectBtn.getBaubleServerEvent(UIEvents.MOUSE_DOWN);
+                    if (rpc != null) ref.selectBtn.sendEvent(rpc, event);
+                }
                 event.stopPropagation();
             });
-            ref.selectArea.addServerEventListener(UIEvents.MOUSE_DOWN, event -> doSelectServer(ref, player));
+            ref.selectBtn.addServerEventListener(UIEvents.MOUSE_DOWN, event -> doSelectServer(ref, player));
         }
         panel.addChild(scroller);
         return panel;
@@ -286,7 +295,7 @@ public class AbilityGuiHolder {
                         .adaptiveHeight(true))
                 .layout(layout -> layout.width(CARD_WIDTH - 12)));
 
-        // 按钮行
+        // 按钮行：选择按钮（左）与详情按钮（右）同行
         UIElement buttonRow = new UIElement()
                 .layout(layout -> layout.flexDirection(FlexDirection.ROW)
                         .gapAll(4).justifyContent(AlignContent.CENTER));
@@ -303,18 +312,18 @@ public class AbilityGuiHolder {
         selectBtn.setActive(unlocked);
         buttonRow.addChild(selectBtn);
 
-        card.addChild(selectArea);
-
-        // 详情按钮：与选择区域平级，点击只弹详情，不触发选中
+        // 详情按钮：与选择按钮同行，点击只弹详情，不触发选中
         Button detailBtn = new Button()
                 .setText(Component.translatable(KEY_DETAIL))
                 .textStyle(style -> style.fontSize(9)
                         .textAlignHorizontal(Horizontal.CENTER)
                         .adaptiveHeight(true));
         detailBtn.setOnClick(event -> openDetailOverlay(player, rootOf(card), type, overlayRef));
-        card.addChild(detailBtn);
+        buttonRow.addChild(detailBtn);
 
-        return new CardRef(type, card, selectArea, selectBtn, unlocked, inUse);
+        card.addChild(selectArea);
+
+        return new CardRef(type, card, selectArea, selectBtn, detailBtn, unlocked, inUse);
     }
 
     // ========== 详情弹层 ==========
@@ -413,6 +422,16 @@ public class AbilityGuiHolder {
             if (parent == null) return current;
             current = parent;
         }
+    }
+
+    /** 判断 target 是否位于 ancestor 子树内（含自身）。用于区分详情按钮与选择区域。 */
+    private static boolean isWithin(UIElement target, UIElement ancestor) {
+        UIElement cur = target;
+        while (cur != null) {
+            if (cur == ancestor) return true;
+            cur = cur.getParent();
+        }
+        return false;
     }
 
     // ========== 状态查询（两端各自查询，服务端权威） ==========

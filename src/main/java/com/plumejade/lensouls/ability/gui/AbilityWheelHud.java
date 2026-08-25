@@ -2,9 +2,12 @@ package com.plumejade.lensouls.ability.gui;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.ability.client.ClientAbilityCache;
 import com.plumejade.lensouls.ability.handler.CameraInputHandler;
 import com.plumejade.lensouls.ability.network.AbilitySelectPacket;
+import io.github.mortuusars.exposure.Exposure;
+import io.github.mortuusars.exposure.world.camera.CameraId;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -55,6 +58,8 @@ public class AbilityWheelHud {
     private static float scrollPos = 0f;
     /** 上一 tick 的滚动位置（渲染时在 prev→curr 之间补间，避免回跳振荡） */
     private static float prevScrollPos = 0f;
+    /** 上一帧手持相机的 camera_id（用于换机时本地播种选中镜像，无网络延迟） */
+    private static java.util.UUID lastHeldCameraId = null;
 
     // ========== 输入 ==========
 
@@ -87,6 +92,23 @@ public class AbilityWheelHud {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+
+        // 换机播种：手持相机变更时本地读取其选中项，即时更新镜像（不依赖滞后 NBT 同步）
+        ItemStack held = mc.player.getMainHandItem();
+        if (CameraInputHandler.isCamera(held)) {
+            CameraId cid = held.get(Exposure.DataComponents.CAMERA_ID);
+            java.util.UUID id = cid != null ? cid.uuid() : null;
+            if (id == null || !id.equals(lastHeldCameraId)) {
+                lastHeldCameraId = id;
+                AbilityType sel = CameraAbilityStore.getSelectedType(held);
+                ClientAbilityCache.setHeldCameraSelected(sel != null ? sel.ordinal() : -1);
+            }
+        } else {
+            lastHeldCameraId = null;
+        }
+
         List<AbilityType> list = getUnlockedList();
         if (list.isEmpty()) {
             physicalTarget = 0;
@@ -167,8 +189,9 @@ public class AbilityWheelHud {
             float alpha = rowAlpha(rel, up, down);
             int rowY = Math.round(centerY + rel * ROW_HEIGHT - ROW_HEIGHT / 2f);
 
-            // 选中项高亮：白色横条，水平渐变 30%（左）→ 0%（右）
-            if (Math.abs(rel) <= 0.5f) {
+            // 选中项高亮：白色横条，水平渐变 30%（左）→ 0%（右）。
+            // 仅在手持相机确有选中能力时绘制——取消选择后白框不渲染，潜行滚动选定后自动浮现。
+            if (Math.abs(rel) <= 0.5f && ClientAbilityCache.getEnabled() != null) {
                 drawHighlight(g, x, rowY);
             }
 

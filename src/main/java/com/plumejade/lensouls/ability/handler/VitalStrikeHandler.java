@@ -3,6 +3,7 @@ package com.plumejade.lensouls.ability.handler;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.boss.BossTierLoader;
 import com.plumejade.lensouls.boss.BossToughnessAttributes;
 import com.plumejade.lensouls.boss.BossToughnessManager;
@@ -47,8 +48,8 @@ public class VitalStrikeHandler {
         ItemStack stack = event.getItemStack();
         if (!isCamera(stack)) return;
 
-        // ── 检查当前能力 ──
-        if (AbilityManager.getInstance().getEnabled(player) != AbilityType.VITAL_STRIKE) return;
+        // ── 检查当前能力（手持相机） ──
+        if (CameraAbilityStore.getSelected(player) != AbilityType.VITAL_STRIKE) return;
 
         // ── 检查附魔 ──
         if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), stack) <= 0) return;

@@ -3,6 +3,7 @@ package com.plumejade.lensouls.ability.handler;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.ability.util.TimeFreezeManager;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
 import net.minecraft.network.chat.Component;
@@ -24,7 +25,7 @@ public class TimeFreezeHandler {
         try {
             Entity entity = event.getCameraHolderEntity();
             if (!(entity instanceof ServerPlayer player)) return;
-            if (AbilityManager.getInstance().getEnabled(player) != AbilityType.TIME_STOP) return;
+            if (CameraAbilityStore.getSelected(player) != AbilityType.TIME_STOP) return;
             if (!hasSoulPhotography(player)) return;
             triggerTimeFreeze(player, event.getEntitiesInFrame());
         } catch (Exception ex) {

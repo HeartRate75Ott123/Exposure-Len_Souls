@@ -2,6 +2,7 @@ package com.plumejade.lensouls.mixin.compat;
 
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
 import io.github.mortuusars.exposure.world.entity.CameraHolder;
 import io.github.mortuusars.exposure.world.item.camera.CameraItem;
@@ -32,7 +33,7 @@ public abstract class VitalStrikeNoFilmConsumeMixin {
         Entity entity = holder.asHolderEntity();
         if (!(entity instanceof Player player)) return;
 
-        if (AbilityManager.getInstance().getEnabled(player) != AbilityType.VITAL_STRIKE) return;
+        if (CameraAbilityStore.getSelected(player) != AbilityType.VITAL_STRIKE) return;
 
         if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), stack) <= 0) return;
 

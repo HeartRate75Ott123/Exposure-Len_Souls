@@ -3,6 +3,7 @@ package com.plumejade.lensouls.network;
 import com.plumejade.lensouls.ability.network.AbilityOpenGuiPacket;
 import com.plumejade.lensouls.ability.network.AbilitySelectPacket;
 import com.plumejade.lensouls.ability.network.AbilitySyncPacket;
+import com.plumejade.lensouls.ability.network.CameraAbilitySyncPacket;
 import com.plumejade.lensouls.ability.network.FreezeSyncPacket;
 import com.plumejade.lensouls.ability.network.SpatialWarpActivatePacket;
 import com.plumejade.lensouls.ability.network.TemporalRecallTriggerPacket;
@@ -161,6 +162,13 @@ public class PacketHandler {
                 AbilitySyncPacket.TYPE,
                 AbilitySyncPacket.STREAM_CODEC,
                 AbilitySyncPacket::handle
+        );
+
+        // 手持相机选中能力变更回声（即时更新客户端镜像，避免滚动回拉）
+        registrar.playToClient(
+                CameraAbilitySyncPacket.TYPE,
+                CameraAbilitySyncPacket.STREAM_CODEC,
+                CameraAbilitySyncPacket::handle
         );
 
         // ---- 冻结状态同步 S2C ----

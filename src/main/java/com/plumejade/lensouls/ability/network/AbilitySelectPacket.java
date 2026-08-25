@@ -3,8 +3,12 @@ package com.plumejade.lensouls.ability.network;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.ability.CameraAbilityStore;
+import com.plumejade.lensouls.ability.handler.CameraInputHandler;
+import com.plumejade.lensouls.ability.network.CameraAbilitySyncPacket;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -42,11 +46,21 @@ public class AbilitySelectPacket implements CustomPacketPayload {
 
     public static void handle(AbilitySelectPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (context.player() instanceof ServerPlayer sp) {
-                AbilityType[] values = AbilityType.values();
-                if (packet.ordinal < 0 || packet.ordinal >= values.length) return;
-                AbilityManager.getInstance().setEnabled(sp, values[packet.ordinal]);
+            if (!(context.player() instanceof ServerPlayer sp)) return;
+            ItemStack cam = sp.getMainHandItem();
+            if (!CameraInputHandler.isCamera(cam)) return;
+            // -1 = 取消选中
+            if (packet.ordinal == -1) {
+                CameraAbilityStore.clearSelected(cam);
+                CameraAbilitySyncPacket.send(sp, -1);
+                return;
             }
+            AbilityType[] values = AbilityType.values();
+            if (packet.ordinal < 0 || packet.ordinal >= values.length) return;
+            AbilityType type = values[packet.ordinal];
+            if (!AbilityManager.getInstance().isUnlocked(sp, type)) return;
+            CameraAbilityStore.setSelected(cam, type, sp);
+            CameraAbilitySyncPacket.send(sp, packet.ordinal);
         });
     }
 }

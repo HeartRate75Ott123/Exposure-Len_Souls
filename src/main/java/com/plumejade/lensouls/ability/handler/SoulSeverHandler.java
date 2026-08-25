@@ -2,6 +2,7 @@ package com.plumejade.lensouls.ability.handler;
 
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
 import com.plumejade.lensouls.sound.ModSounds;
 import net.minecraft.core.particles.ParticleTypes;
@@ -33,7 +34,7 @@ public class SoulSeverHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         ItemStack stack = event.getItemStack();
         if (!isCamera(stack)) return;
-        if (AbilityManager.getInstance().getEnabled(player) != AbilityType.SOUL_SEVER) return;
+        if (CameraAbilityStore.getSelected(player) != AbilityType.SOUL_SEVER) return;
         if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), stack) <= 0) return;
         if (!isViewfinderOpen(stack)) return;
 

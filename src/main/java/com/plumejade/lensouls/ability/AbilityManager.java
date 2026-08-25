@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.ability;
 
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.ability.network.AbilitySyncPacket;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -11,6 +12,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 // PlayerRespawnEvent is used as PlayerEvent.PlayerRespawnEvent (inner class of PlayerEvent)
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -170,7 +172,6 @@ public class AbilityManager {
 
     public void syncToClient(ServerPlayer player) {
         PlayerAbilityData data = get(player);
-        AbilityType enabled = data.getEnabled();
         long unlockedMask = 0L;
         AbilityType[] values = AbilityType.values();
         for (int i = 0; i < values.length; i++) {
@@ -191,8 +192,7 @@ public class AbilityManager {
             wDim = data.getWarpDimension();
         }
         PacketDistributor.sendToPlayer(player,
-                new AbilitySyncPacket(enabled != null ? enabled.ordinal() : -1,
-                        unlockedMask, unlockOrder, swActive, wx, wy, wz, wDim));
+                new AbilitySyncPacket(unlockedMask, unlockOrder, swActive, wx, wy, wz, wDim));
     }
 
     // ========== 持久化 ==========
@@ -280,5 +280,16 @@ public class AbilityManager {
         if (event.getEntity() instanceof ServerPlayer sp) {
             getInstance().syncToClient(sp);
         }
+    }
+
+    /**
+     * 持有相机时定期校验所选能力是否仍被该玩家解锁（跨玩家净化），
+     * 并去重相机唯一标识（复制之魂副本冲突修复）。每 20 tick 一次。
+     */
+    @SubscribeEvent
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
+        if (!(event.getEntity() instanceof ServerPlayer sp)) return;
+        if (sp.tickCount % 20 != 0) return;
+        CameraAbilityStore.validateAll(sp);
     }
 }

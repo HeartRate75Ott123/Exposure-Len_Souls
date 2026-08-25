@@ -1,8 +1,8 @@
 package com.plumejade.lensouls.ability.handler;
 
 import com.plumejade.lensouls.LenSouls;
-import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
 import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
@@ -52,8 +52,7 @@ public class PhotoInjectionHandler {
                 return;
             }
 
-            AbilityManager am = AbilityManager.getInstance();
-            AbilityType ability = am.getEnabled(player);
+            AbilityType ability = CameraAbilityStore.getSelected(player);
             if (ability == null) return;
             if (ability == AbilityType.TIME_STOP || ability == AbilityType.VITAL_STRIKE || ability == AbilityType.SOUL_SEVER) return;
 

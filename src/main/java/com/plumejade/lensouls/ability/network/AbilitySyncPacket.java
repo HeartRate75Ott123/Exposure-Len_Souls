@@ -22,7 +22,6 @@ public class AbilitySyncPacket implements CustomPacketPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, AbilitySyncPacket> STREAM_CODEC =
             StreamCodec.ofMember(AbilitySyncPacket::encode, AbilitySyncPacket::new);
 
-    private final int enabledOrdinal;
     /** 解锁位图：第 N 位 = AbilityType.values()[N] 是否解锁 */
     private final long unlockedMask;
     /** 解锁顺序（旧→新，最近解锁在尾部），GUI 排序用 */
@@ -31,10 +30,9 @@ public class AbilitySyncPacket implements CustomPacketPayload {
     private final double warpX, warpY, warpZ;
     private final String warpDimension;
 
-    public AbilitySyncPacket(int enabledOrdinal, long unlockedMask, int[] unlockOrder,
+    public AbilitySyncPacket(long unlockedMask, int[] unlockOrder,
                              boolean spatialWarpActive,
                              double warpX, double warpY, double warpZ, String warpDimension) {
-        this.enabledOrdinal = enabledOrdinal;
         this.unlockedMask = unlockedMask;
         this.unlockOrder = unlockOrder;
         this.spatialWarpActive = spatialWarpActive;
@@ -45,7 +43,6 @@ public class AbilitySyncPacket implements CustomPacketPayload {
     }
 
     private AbilitySyncPacket(RegistryFriendlyByteBuf buf) {
-        this.enabledOrdinal = buf.readInt();
         this.unlockedMask = buf.readLong();
         int orderLen = buf.readVarInt();
         this.unlockOrder = new int[orderLen];
@@ -65,7 +62,6 @@ public class AbilitySyncPacket implements CustomPacketPayload {
     }
 
     private void encode(RegistryFriendlyByteBuf buf) {
-        buf.writeInt(enabledOrdinal);
         buf.writeLong(unlockedMask);
         buf.writeVarInt(unlockOrder.length);
         for (int ordinal : unlockOrder) {
@@ -88,7 +84,7 @@ public class AbilitySyncPacket implements CustomPacketPayload {
 
     public static void handle(AbilitySyncPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
-            ClientAbilityCache.set(packet.enabledOrdinal, packet.unlockedMask, packet.unlockOrder,
+            ClientAbilityCache.set(packet.unlockedMask, packet.unlockOrder,
                     packet.spatialWarpActive, packet.warpX, packet.warpY, packet.warpZ, packet.warpDimension);
         });
     }

@@ -19,7 +19,10 @@ import com.lowdragmc.lowdraglib2.gui.ui.styletemplate.Sprites;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityManager;
 import com.plumejade.lensouls.ability.AbilityType;
+import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.ability.client.ClientAbilityCache;
+import com.plumejade.lensouls.ability.handler.CameraInputHandler;
+import com.plumejade.lensouls.ability.network.CameraAbilitySyncPacket;
 import dev.vfyjxf.taffy.style.AlignContent;
 import dev.vfyjxf.taffy.style.AlignItems;
 import dev.vfyjxf.taffy.style.FlexDirection;
@@ -40,9 +43,10 @@ import java.util.List;
  * <p>
  * 服务端与客户端各自构建 UI 树：
  * <ul>
- *   <li>「选择」按钮：{@code setOnServerClick} 服务端校验解锁后切换（RPC），
- *       {@code setOnClick} 客户端乐观更新本端卡片状态（实时反馈）；</li>
- *   <li>「详情」按钮是纯客户端行为，弹出介绍框（带滚动条，点空白返回一级菜单）；</li>
+ *   <li>每张卡片分为「选择区域」（图标 / 名称 / 选择按钮，整块可点击）与「详情」按钮（平级），
+ *       点击选择区域 → 单个客户端监听做乐观更新 + 单个服务端监听做切换 RPC，
+ *       详情按钮仅弹介绍框、绝不触发选中；</li>
+ *   <li>选择区域点击为「切换式」：点已选中的卡取消、点其他卡选中（服务端权威，回声包同步 HUD）；</li>
  *   <li>点击一级菜单空白区域关闭整个菜单。</li>
  * </ul>
  * 卡片按 {@link AbilityType#values()} 枚举顺序自动收纳，新增能力无需改动本类。
@@ -69,14 +73,16 @@ public class AbilityGuiHolder {
     private static class CardRef {
         final AbilityType type;
         final UIElement card;
+        final UIElement selectArea;
         final Button selectBtn;
         final boolean unlocked;
         boolean inUse;
 
-        CardRef(AbilityType type, UIElement card, Button selectBtn,
+        CardRef(AbilityType type, UIElement card, UIElement selectArea, Button selectBtn,
                 boolean unlocked, boolean inUse) {
             this.type = type;
             this.card = card;
+            this.selectArea = selectArea;
             this.selectBtn = selectBtn;
             this.unlocked = unlocked;
             this.inUse = inUse;
@@ -86,7 +92,8 @@ public class AbilityGuiHolder {
             inUse = value;
             selectBtn.setText(Component.translatable(value ? KEY_IN_USE : KEY_SELECT));
             selectBtn.textStyle(style -> style.textColor(value ? 0xFF55FF55 : 0xFFFFFFFF));
-            selectBtn.setActive(unlocked && !value);
+            // 解锁后按钮常驻可点（含使用中）：点击可切换取消选中
+            selectBtn.setActive(unlocked);
         }
     }
 
@@ -196,61 +203,49 @@ public class AbilityGuiHolder {
             row.addChild(ref.card);
             col = (col + 1) % 2;
         }
-        // 选择回调：按钮与卡片背景均可触发；客户端乐观更新 + 服务端 RPC 缺一不可
+        // 选择回调：选择区域内任意点击（背景 / 图标 / 选择按钮）均触发，
+        // 仅一个客户端监听 + 一个服务端监听，避免按钮子元素点击时双 RPC 导致选中又取消。
         for (CardRef ref : cardRefs) {
             if (!ref.unlocked) continue;
-            registerSelect(ref, cardRefs, player);
-            // 卡片背景（含图标等直接子元素，排除按钮）：乐观更新；
-            // 子元素点击时 target 不是卡片，自动 RPC 不会发送，需手动补发
-            ref.card.addEventListener(UIEvents.MOUSE_DOWN, event -> {
-                UIElement t = event.target;
-                boolean background = t == ref.card;
-                boolean childArea = !background && t != null
-                        && t.getParent() == ref.card && !(t instanceof Button);
-                if (background) {
-                    // 背景：乐观更新，冒泡继续 → AT_TARGET 自动发送服务端 RPC
-                    updateSelection(ref, cardRefs);
-                } else if (childArea) {
-                    // 图标等直接子元素：乐观更新 + 手动补发 RPC，阻断冒泡避免重复
-                    updateSelection(ref, cardRefs);
-                    var rpc = ref.card.getBaubleServerEvent(UIEvents.MOUSE_DOWN);
-                    if (rpc != null) ref.card.sendEvent(rpc, event);
-                    event.stopPropagation();
-                } else {
-                    // 按钮点击：阻断冒泡，避免误触发卡片选择
-                    event.stopPropagation();
-                }
+            ref.selectArea.addEventListener(UIEvents.MOUSE_DOWN, event -> {
+                updateSelection(ref, cardRefs);
+                event.stopPropagation();
             });
-            // 服务端 RPC：UIEvent 序列化不含 target，服务端无法检查命中元素，
-            // 依赖上面的冒泡阻断来保证只有卡片区域点击才会走到这里
-            ref.card.addServerEventListener(UIEvents.MOUSE_DOWN, event -> doSelectServer(ref, player));
+            ref.selectArea.addServerEventListener(UIEvents.MOUSE_DOWN, event -> doSelectServer(ref, player));
         }
         panel.addChild(scroller);
         return panel;
     }
 
-    /** 选择回调：按钮走服务端 RPC + 客户端乐观更新 */
-    private static void registerSelect(CardRef ref, List<CardRef> cardRefs, Player player) {
-        ref.selectBtn.setOnServerClick(event -> doSelectServer(ref, player));
-        ref.selectBtn.setOnClick(event -> updateSelection(ref, cardRefs));
-    }
-
     private static void doSelectServer(CardRef ref, Player player) {
         if (player instanceof ServerPlayer sp) {
-            AbilityManager.getInstance().setEnabled(sp, ref.type);
+            ItemStack cam = sp.getMainHandItem();
+            if (!CameraInputHandler.isCamera(cam)) return;
+            // 切换式：点已选中的卡 → 取消；点其他卡 → 选中
+            AbilityType current = CameraAbilityStore.getSelectedType(cam);
+            if (current == ref.type) {
+                CameraAbilityStore.clearSelected(cam);
+                CameraAbilitySyncPacket.send(sp, -1);
+            } else {
+                if (!AbilityManager.getInstance().isUnlocked(sp, ref.type)) return;
+                CameraAbilityStore.setSelected(cam, ref.type, sp);
+                CameraAbilitySyncPacket.send(sp, ref.type.ordinal());
+            }
         }
     }
 
-    /** 客户端乐观更新：把「使用中」标记转移到新卡片 */
+    /** 客户端乐观更新：切换式——点已「使用中」的卡取消，点其他卡选中 */
     private static void updateSelection(CardRef selected, List<CardRef> cardRefs) {
+        if (selected.inUse) {
+            selected.setInUse(false);
+            return;
+        }
         for (CardRef ref : cardRefs) {
             if (ref.inUse && ref != selected) {
                 ref.setInUse(false);
             }
         }
-        if (!selected.inUse) {
-            selected.setInUse(true);
-        }
+        selected.setInUse(true);
     }
 
     // ========== 能力卡片 ==========
@@ -259,6 +254,7 @@ public class AbilityGuiHolder {
         boolean unlocked = isUnlocked(player, type);
         boolean inUse = isEnabled(player, type);
 
+        // 整张卡片容器
         UIElement card = new UIElement()
                 .layout(layout -> layout.width(CARD_WIDTH)
                         .paddingAll(6).gapAll(3)
@@ -267,15 +263,21 @@ public class AbilityGuiHolder {
                 .style(style -> style.backgroundTexture(Sprites.RECT_RD))
                 .style(style -> style.tooltips(Component.translatable(type.getNameKey())));
 
+        // 选择区域：图标 + 名称 + 选择按钮，整块可点击切换选中
+        UIElement selectArea = new UIElement()
+                .layout(layout -> layout.width(CARD_WIDTH - 12)
+                        .flexDirection(FlexDirection.COLUMN)
+                        .alignItems(AlignItems.CENTER).gapAll(3));
+
         // 图标（能力球占位）
         ItemStack iconStack = new ItemStack(
                 BuiltInRegistries.ITEM.get(type.getIconItemId()));
-        card.addChild(new UIElement()
+        selectArea.addChild(new UIElement()
                 .layout(layout -> layout.width(20).height(20))
                 .style(style -> style.backgroundTexture(new ItemStackTexture(iconStack))));
 
-        // 名称（整行宽单行显示，水平居中，与图标对齐）
-        card.addChild(new TextElement()
+        // 名称
+        selectArea.addChild(new TextElement()
                 .setText(Component.translatable(type.getNameKey()))
                 .textStyle(style -> style.fontSize(10)
                         .textColor(0xFFFFFFFF)
@@ -288,9 +290,9 @@ public class AbilityGuiHolder {
         UIElement buttonRow = new UIElement()
                 .layout(layout -> layout.flexDirection(FlexDirection.ROW)
                         .gapAll(4).justifyContent(AlignContent.CENTER));
-        card.addChild(buttonRow);
+        selectArea.addChild(buttonRow);
 
-        // 选择按钮：选中后变为绿色「使用中」（禁用），未解锁显示红色「未解锁」
+        // 选择按钮：选中后变绿「使用中」，未解锁显示红「未解锁」；常驻可点，点击切换取消
         Button selectBtn = new Button()
                 .setText(Component.translatable(
                         inUse ? KEY_IN_USE : (unlocked ? KEY_SELECT : KEY_LOCKED)))
@@ -298,18 +300,21 @@ public class AbilityGuiHolder {
                         .textAlignHorizontal(Horizontal.CENTER)
                         .adaptiveHeight(true)
                         .textColor(inUse ? 0xFF55FF55 : (unlocked ? 0xFFFFFFFF : 0xFFFF5555)));
-        selectBtn.setActive(unlocked && !inUse);
+        selectBtn.setActive(unlocked);
         buttonRow.addChild(selectBtn);
 
+        card.addChild(selectArea);
+
+        // 详情按钮：与选择区域平级，点击只弹详情，不触发选中
         Button detailBtn = new Button()
                 .setText(Component.translatable(KEY_DETAIL))
                 .textStyle(style -> style.fontSize(9)
                         .textAlignHorizontal(Horizontal.CENTER)
                         .adaptiveHeight(true));
-        detailBtn.setOnClick(event -> openDetailOverlay(player, rootOf(buttonRow), type, overlayRef));
-        buttonRow.addChild(detailBtn);
+        detailBtn.setOnClick(event -> openDetailOverlay(player, rootOf(card), type, overlayRef));
+        card.addChild(detailBtn);
 
-        return new CardRef(type, card, selectBtn, unlocked, inUse);
+        return new CardRef(type, card, selectArea, selectBtn, unlocked, inUse);
     }
 
     // ========== 详情弹层 ==========
@@ -428,9 +433,11 @@ public class AbilityGuiHolder {
     }
 
     private static boolean isEnabled(Player player, AbilityType type) {
-        if (player instanceof ServerPlayer) {
-            return AbilityManager.getInstance().getEnabled(player) == type;
+        if (player instanceof ServerPlayer sp) {
+            AbilityType sel = CameraAbilityStore.getSelectedType(sp.getMainHandItem());
+            return sel == type && AbilityManager.getInstance().isUnlocked(sp, type);
         }
-        return ClientAbilityCache.getEnabled() == type;
+        AbilityType sel = ClientAbilityCache.getEnabled();
+        return sel == type && ClientAbilityCache.isUnlocked(type);
     }
 }

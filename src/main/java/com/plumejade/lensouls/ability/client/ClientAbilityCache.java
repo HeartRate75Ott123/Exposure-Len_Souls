@@ -23,19 +23,9 @@ public class ClientAbilityCache {
     private static Vec3 warpCenter = Vec3.ZERO;
     private static String warpDimension = "";
 
-    public static void set(int enabledOrdinal, long unlockedMask, int[] unlockOrder, boolean swActive,
-                           double warpX, double warpY, double warpZ, String warpDimension) {
+    public static void set(long unlockedMask, int[] unlockOrder, boolean swActive,
+                            double warpX, double warpY, double warpZ, String warpDimension) {
         AbilityType[] values = AbilityType.values();
-        if (enabledOrdinal == -1) {
-            // 无启用能力（新档全锁）：必须清空残留，否则跨存档污染
-            currentEnabled = null;
-        } else if (enabledOrdinal >= 0 && enabledOrdinal < values.length) {
-            currentEnabled = values[enabledOrdinal];
-        } else {
-            LenSouls.LOGGER.warn("[ClientAbilityCache] 无效 ordinal: {}", enabledOrdinal);
-        }
-        if (swActive != spatialWarpActive) {
-        }
         spatialWarpActive = swActive;
         ClientAbilityCache.unlockedMask = unlockedMask;
         ClientAbilityCache.unlockOrder = new java.util.ArrayList<>();
@@ -46,6 +36,21 @@ public class ClientAbilityCache {
         }
         warpCenter = new Vec3(warpX, warpY, warpZ);
         ClientAbilityCache.warpDimension = warpDimension == null ? "" : warpDimension;
+    }
+
+    /**
+     * 设置「当前手持相机的选中能力」镜像（S2C {@link com.plumejade.lensouls.ability.network.CameraAbilitySyncPacket}
+     * 或客户端换机时本地播种）。-1 表示未选中。
+     */
+    public static void setHeldCameraSelected(int ordinal) {
+        AbilityType[] values = AbilityType.values();
+        if (ordinal == -1) {
+            currentEnabled = null;
+        } else if (ordinal >= 0 && ordinal < values.length) {
+            currentEnabled = values[ordinal];
+        } else {
+            LenSouls.LOGGER.warn("[ClientAbilityCache] 无效 ordinal: {}", ordinal);
+        }
     }
 
     // ========== 状态查询 ==========

@@ -19,6 +19,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -86,6 +87,18 @@ public class AbilityWheelHud {
         physicalTarget += dir;
         PacketDistributor.sendToServer(
                 new AbilitySelectPacket(list.get(Math.floorMod(physicalTarget, size)).ordinal()));
+    }
+
+    // ========== 生命周期 ==========
+
+    /**
+     * 客户端登出（退到标题/切档）时重置手持相机标记。
+     * 否则同 JVM 内重进同一存档时 CAMERA_ID 不变，会跳过 onClientTick 的换机播种，
+     * 导致 ClientAbilityCache.currentEnabled 停留在登出时的 null，HUD 误显「未选中」。
+     */
+    @SubscribeEvent
+    public static void onClientLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        lastHeldCameraId = null;
     }
 
     // ========== 动画 ==========

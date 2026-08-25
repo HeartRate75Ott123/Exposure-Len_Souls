@@ -456,7 +456,7 @@ public class AbilityGuiHolder {
             AbilityType sel = CameraAbilityStore.getSelectedType(sp.getMainHandItem());
             return sel == type && AbilityManager.getInstance().isUnlocked(sp, type);
         }
-        AbilityType sel = ClientAbilityCache.getEnabled();
+        AbilityType sel = CameraAbilityStore.getSelectedType(player.getMainHandItem());
         return sel == type && ClientAbilityCache.isUnlocked(type);
     }
 }

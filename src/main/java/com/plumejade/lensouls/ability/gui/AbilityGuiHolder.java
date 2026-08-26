@@ -228,8 +228,8 @@ public class AbilityGuiHolder {
 
     private static void doSelectServer(CardRef ref, Player player) {
         if (player instanceof ServerPlayer sp) {
-            ItemStack cam = sp.getMainHandItem();
-            if (!CameraInputHandler.isCamera(cam)) return;
+            ItemStack cam = CameraInputHandler.getWieldedCamera(sp);
+            if (cam.isEmpty()) return;
             // 切换式：点已选中的卡 → 取消；点其他卡 → 选中
             AbilityType current = CameraAbilityStore.getSelectedType(cam);
             if (current == ref.type) {
@@ -453,10 +453,10 @@ public class AbilityGuiHolder {
 
     private static boolean isEnabled(Player player, AbilityType type) {
         if (player instanceof ServerPlayer sp) {
-            AbilityType sel = CameraAbilityStore.getSelectedType(sp.getMainHandItem());
+            AbilityType sel = CameraAbilityStore.getSelectedType(CameraInputHandler.getWieldedCamera(sp));
             return sel == type && AbilityManager.getInstance().isUnlocked(sp, type);
         }
-        AbilityType sel = CameraAbilityStore.getSelectedType(player.getMainHandItem());
+        AbilityType sel = CameraAbilityStore.getSelectedType(CameraInputHandler.getWieldedCamera(player));
         return sel == type && ClientAbilityCache.isUnlocked(type);
     }
 }

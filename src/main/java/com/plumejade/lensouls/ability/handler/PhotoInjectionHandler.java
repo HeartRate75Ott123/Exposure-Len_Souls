@@ -56,7 +56,7 @@ public class PhotoInjectionHandler {
             if (ability == null) return;
             if (ability == AbilityType.TIME_STOP || ability == AbilityType.VITAL_STRIKE || ability == AbilityType.SOUL_SEVER) return;
 
-            ItemStack hand = player.getMainHandItem();
+            ItemStack hand = CameraInputHandler.getWieldedCamera(player);
             if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), hand) <= 0) return;
 
             // 按帧 ID 存储能力，后续切换能力不影响已拍帧

@@ -49,9 +49,9 @@ public final class CameraAbilityStore {
         return AbilityType.values()[ord];
     }
 
-    /** 读取玩家主手持相机的选中能力（校验解锁，未解锁/非相机返回 null）。服务端激活消费用。 */
+    /** 读取玩家手持相机（主手优先，其次副手）的选中能力（校验解锁，未解锁/非相机返回 null）。服务端激活消费用。 */
     public static AbilityType getSelected(Player player) {
-        return getSelected(player.getMainHandItem(), player);
+        return getSelected(CameraInputHandler.getWieldedCamera(player), player);
     }
 
     public static AbilityType getSelected(ItemStack cam, Player player) {

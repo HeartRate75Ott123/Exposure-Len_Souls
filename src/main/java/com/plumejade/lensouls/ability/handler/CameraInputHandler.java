@@ -16,6 +16,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
@@ -115,6 +116,15 @@ public class CameraInputHandler {
     public static boolean isCamera(ItemStack stack) {
         ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return CAMERA_ID.equals(id) || POLAROID_ID.equals(id);
+    }
+
+    /** 返回玩家当前手持相机（主手优先，其次副手）；无则空栈。HUD/滚动/服务端激活统一复用。 */
+    public static ItemStack getWieldedCamera(Player player) {
+        ItemStack main = player.getMainHandItem();
+        if (isCamera(main)) return main;
+        ItemStack off = player.getOffhandItem();
+        if (isCamera(off)) return off;
+        return ItemStack.EMPTY;
     }
 
     private static boolean hasSpatialWarpData(ItemStack stack) {

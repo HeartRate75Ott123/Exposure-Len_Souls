@@ -69,7 +69,7 @@ public class AbilityWheelHud {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null) return;
         if (!mc.options.keyShift.isDown()) return;
-        if (!CameraInputHandler.isCamera(mc.player.getMainHandItem())) return;
+        if (CameraInputHandler.getWieldedCamera(mc.player).isEmpty()) return;
 
         double delta = event.getScrollDeltaY();
         if (delta == 0) return;
@@ -109,8 +109,8 @@ public class AbilityWheelHud {
         if (mc.player == null) return;
 
         // 换机播种：手持相机变更时本地读取其选中项，即时更新镜像（不依赖滞后 NBT 同步）
-        ItemStack held = mc.player.getMainHandItem();
-        if (CameraInputHandler.isCamera(held)) {
+        ItemStack held = CameraInputHandler.getWieldedCamera(mc.player);
+        if (!held.isEmpty()) {
             CameraId cid = held.get(Exposure.DataComponents.CAMERA_ID);
             java.util.UUID id = cid != null ? cid.uuid() : null;
             if (id == null || !id.equals(lastHeldCameraId)) {
@@ -161,7 +161,7 @@ public class AbilityWheelHud {
     public static void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.options.hideGui) return;
-        if (!CameraInputHandler.isCamera(mc.player.getMainHandItem())) return;
+        if (CameraInputHandler.getWieldedCamera(mc.player).isEmpty()) return;
 
         List<AbilityType> list = getUnlockedList();
         if (list.isEmpty()) return;

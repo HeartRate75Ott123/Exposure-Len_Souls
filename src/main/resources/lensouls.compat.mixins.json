@@ -10,6 +10,7 @@
     "StackedPhotoStackingMixin",
     "LightroomInjectMixin",
     "PolaroidPrintMixin",
+    "PhotographCurioMixin",
     "CataclysmDamageBucketMixin",
     "LegendaryMonstersCapMixin",
     "IgnisFireballBrandMixin"

@@ -844,7 +844,7 @@ public class PhotoSpecialEffects {
                     ItemStack stack = stackHandler.getStackInSlot(i);
                     if (stack.isEmpty()) continue;
                     String stolen = PhotographEffectRegistry.getStolenEntity(stack);
-                    if (stolen != null) ids.add(stolen);
+                    if (stolen != null && !ids.contains(stolen)) ids.add(stolen);
                 }
             }
         });

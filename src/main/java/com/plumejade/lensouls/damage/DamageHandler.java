@@ -20,9 +20,12 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+
+import java.util.Map;
 
 /**
  * 元素追加伤害处理器（统一公式）。
@@ -40,7 +43,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  */
 public class DamageHandler {
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDamagePre(LivingDamageEvent.Pre event) {
         LivingEntity target = event.getEntity();
         DamageSource source = event.getSource();
@@ -159,6 +162,29 @@ public class DamageHandler {
         if (!level.isClientSide && totalBonusMultiplier > 0f) {
             float current = event.getNewDamage();
             event.setNewDamage(current + current * totalBonusMultiplier);
+        }
+
+        // 弱点武器匹配：目标有弱点但玩家武器元素（item_activity / 次元枪子弹元素）不匹配任一弱点
+        // → 最终伤害拦截为原始的 10%（空手 / 普通无元素武器同样拦截）
+        if (!level.isClientSide && isPlayer) {
+            Map<ElementDamage, Float> weaknesses = DataPackLoader.getAllWeaknesses(entityId);
+            if (!weaknesses.isEmpty()) {
+                boolean matches = false;
+                for (ElementDamage weakElem : weaknesses.keySet()) {
+                    if (weaponId != null && ItemElementActivityLoader.getLevel(weaponId, weakElem) > 0) {
+                        matches = true;
+                        break;
+                    }
+                    if (bulletElement == weakElem) {
+                        matches = true;
+                        break;
+                    }
+                }
+                if (!matches) {
+                    float cap = event.getOriginalDamage() * 0.1f;
+                    if (event.getNewDamage() > cap) event.setNewDamage(cap);
+                }
+            }
         }
     }
 

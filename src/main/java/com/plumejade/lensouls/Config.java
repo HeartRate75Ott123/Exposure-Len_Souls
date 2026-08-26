@@ -114,8 +114,8 @@ public class Config {
     static { BUILDER.push("toughness"); }
 
     public static final ModConfigSpec.DoubleValue TOUGH_DAMAGE_REDUCTION = BUILDER
-            .comment("Boss damage reduction when fully shielded (0-1, 0.8 = 80%)")
-            .defineInRange("toughDamageReduction", 0.8, 0.0, 0.99);
+            .comment("Boss damage reduction when fully shielded (0-1, 1.0 = 100% immune)")
+            .defineInRange("toughDamageReduction", 1.0, 0.0, 1.0);
 
     public static final ModConfigSpec.IntValue TOUGH_RECOVERY_SECONDS = BUILDER
             .comment("Seconds for toughness to fully recover after being chipped")
@@ -204,8 +204,9 @@ public class Config {
 
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> TOUGHNESS_WHITELIST = BUILDER
             .comment("Entities that ALWAYS trigger toughness. Format: \"modid:entityid\"",
-                    "Example: \"cataclysm:ignis\" (Ignis always has toughness); \"legendary_monsters:the_obliterator\" (Obliterator always has toughness)")
-            .defineListAllowEmpty("toughnessWhitelist", java.util.List.of(), () -> "", o -> o instanceof String);
+                    "Special value \"all\" enables toughness for every entity except the blacklist.",
+                    "Example: \"cataclysm:ignis\" (Ignis always has toughness); \"all\" (everything except blacklist)")
+            .defineListAllowEmpty("toughnessWhitelist", java.util.List.of("all"), () -> "", o -> o instanceof String);
 
     static { BUILDER.pop(); }
 

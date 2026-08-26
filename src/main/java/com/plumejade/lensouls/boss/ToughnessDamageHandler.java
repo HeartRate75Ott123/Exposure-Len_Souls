@@ -26,7 +26,7 @@ public class ToughnessDamageHandler {
     /** BOSS 通用判定阈值：超过此血量的实体自动注册韧性 */
     private static final double GENERIC_BOSS_HP_THRESHOLD = 200.0;
 
-    @SubscribeEvent(priority = EventPriority.LOW)
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDamagePre(LivingDamageEvent.Pre event) {
         if (event.getEntity().level().isClientSide) return;
         if (!(event.getEntity() instanceof LivingEntity target)) return;
@@ -66,7 +66,8 @@ public class ToughnessDamageHandler {
             return false;
         }
 
-        // 1. 配置白名单：始终触发韧性
+        // 1. 配置白名单：始终触发韧性（含通配 "all" → 除黑名单外全部触发）
+        if (Config.TOUGHNESS_WHITELIST.get().contains("all")) return true;
         if (Config.TOUGHNESS_WHITELIST.get().contains(id.toString())) {
             return true;
         }

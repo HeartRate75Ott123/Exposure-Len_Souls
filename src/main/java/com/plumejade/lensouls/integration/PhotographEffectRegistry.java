@@ -69,7 +69,7 @@ public class PhotographEffectRegistry {
         // ── Boss 十连（弹幕 + 被动） ──
         add("cataclysm:ender_guardian",
                 "§a挥击时 15% 概率在视线前方地面升起 虚空符文",
-                "§a虚空符文：1.5 秒后引爆；对范围内目标造成 6 点魔法伤害",
+                "§a虚空符文：1.5 秒后引爆；对范围内目标造成 等同攻击面板 的魔法伤害",
                 "§a佩戴时受到的所有来源伤害 -15%");
         add("cataclysm:ignis",
                 "§a挥击时 15% 概率连发 3 颗 烈焰轰击（不破坏方块）",
@@ -79,43 +79,43 @@ public class PhotographEffectRegistry {
                 "§a佩戴时赋予 火焰免疫 效果");
         add("cataclysm:netherite_monstrosity",
                 "§a挥击时 12% 概率从目标头顶降下 3 块落石",
-                "§a落石：落地造成 5 点伤害并小幅击飞目标",
+                "§a落石：落地造成 等同攻击面板 的伤害并小幅击飞目标",
                 "§a佩戴时受到的近战伤害 -12%");
         add("cataclysm:the_harbinger",
                 "§a挥击时 12% 概率向视线方向发射 凋零激光束",
-                "§a凋零激光束：命中造成 4 点伤害并点燃目标 5 秒",
+                "§a凋零激光束：命中造成 等同攻击面板 的伤害并点燃目标 5 秒",
                 "§a佩戴时受到的凋零伤害 -50%",
                 "§a佩戴时远程攻击伤害 +12%",
                 "§c佩戴时近战伤害 -12%");
         add("cataclysm:the_leviathan",
                 "§a挥击时 10% 概率在视线前方地面裂开 深渊裂缝",
-                "§a深渊裂缝：2 秒后射出激光柱；造成 8 点 + 目标最大生命 5% 的魔法伤害",
+                "§a深渊裂缝：2 秒后射出激光柱；造成 等同攻击面板 + 目标最大生命 5% 的魔法伤害",
                 "§a佩戴时赋予 水下呼吸 效果",
                 "§a被命中时 20% 概率获得 海豚恩惠3 效果（持续 5 秒）",
                 "");
         add("cataclysm:ancient_remnant",
                 "§a挥击时 12% 概率在目标脚下升起 岩碑阵（3 根；一字排开）",
-                "§a岩碑：1.5 秒后炸裂；对范围内目标造成 8 点魔法伤害",
+                "§a岩碑：1.5 秒后炸裂；对范围内目标造成 等同攻击面板 的魔法伤害",
                 "§a佩戴时受到的近战伤害 -12%");
         add("cataclysm:maledictus",
                 "§a挥击时 15% 概率朝视线方向散射 3 支 追踪灵魂箭",
-                "§a灵魂箭：追踪目标；每支造成 3.5 点幽灵伤害",
+                "§a灵魂箭：追踪目标；每支造成 等同攻击面板 的幽灵伤害",
                 "§a佩戴时免疫 灾变/传奇怪物 的诅咒类减益效果",
                 "§a佩戴时受到的魔法伤害 -12%");
         add("cataclysm:scylla",
                 "§a挥击时 15% 概率掀起 3 道水波（扇形扩散）",
-                "§a水波：命中造成 6 点伤害、赋予 湿润1 效果并扑灭目标身上的火",
+                "§a水波：命中造成 等同攻击面板 的伤害、赋予 湿润1 效果并扑灭目标身上的火",
                 "§a佩戴时受到的魔法伤害 -12%",
                 "");
         add("legendary_monsters:posessed_paladin",
                 "§a挥击时 15% 概率在目标脚下逐排升起 3 根灵魂尖刺",
-                "§a灵魂尖刺：命中造成 6 点 + 目标最大生命 3% 的幽灵伤害",
+                "§a灵魂尖刺：命中造成 等同攻击面板 + 目标最大生命 3% 的幽灵伤害",
                 "§a灵魂尖刺命中时赋予目标 灵魂碎裂 效果（持续 4 秒）",
                 "§a佩戴时赋予 抗性提升1 效果",
                 "§c佩戴时近战伤害 -12%");
         add("legendary_monsters:cloud_golem",
                 "§a挥击时 10% 概率从胸口射出 天穹激光",
-                "§a天穹激光：贯穿视线方向 30 格；每 0.25 秒造成 3 点 + 目标最大生命 1% 的伤害",
+                "§a天穹激光：贯穿视线方向 30 格；每 0.25 秒造成 等同攻击面板 + 目标最大生命 1% 的伤害",
                 "§a佩戴时免疫 摔落 伤害",
                 "§a佩戴时赋予 跳跃提升2 效果",
                 "§c佩戴时受到的所有来源伤害 +12%");
@@ -124,7 +124,7 @@ public class PhotographEffectRegistry {
         add("minecraft:zombie", "", "");
         add("minecraft:husk", "§a免疫 饥饿 效果", "");
         add("minecraft:drowned", "§a赋予 水下呼吸 效果；§a水下攻击 +10%", "");
-        add("minecraft:skeleton", "§a远程攻击 +10%", "");
+        add("minecraft:skeleton", "§a远程攻击 +10%", "§a挥击时 15% 概率朝视线方向射出 3 支弓箭", "§a弓箭：每支造成 等同攻击面板 的伤害");
         add("minecraft:stray", "§a免疫 冰冻 伤害；§a远程攻击 +10%", "");
         add("minecraft:bogged", "§a免疫 中毒 效果；§a远程攻击 +10%", "");
         add("minecraft:creeper", "§a免疫 爆炸 伤害；§a受到所有来源伤害 -10%", "");
@@ -152,7 +152,7 @@ public class PhotographEffectRegistry {
         add("minecraft:ravager", "§a近战攻击 +15%", "");
         add("minecraft:vindicator", "§a佩戴时额外获得 1 个照片饰品栏位", "");
         add("minecraft:illusioner", "§a移动 +15%；§a远程攻击 +15%", "");
-        add("minecraft:evoker", "§a魔法攻击 +15%；§a你受到的魔法伤害 -12%", "§c近战伤害 -12%");
+        add("minecraft:evoker", "§a魔法攻击 +15%；§a你受到的魔法伤害 -12%", "§c近战伤害 -12%", "§a挥击时 15% 概率在视线前方钻出 一排尖牙", "§a尖牙：对范围内目标造成 魔法伤害（原版固定值）");
         add("minecraft:pillager", "§a远程攻击 +10%", "");
         add("minecraft:vex", "§a移动 +15%", "");
         add("minecraft:shulker", "", "");
@@ -301,7 +301,7 @@ public class PhotographEffectRegistry {
         add("legendary_monsters:lava_eater", "§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
         add("legendary_monsters:overgrown_colossus", "§a赋予 再生1 效果", "");
         add("legendary_monsters:endersent", "§a你受到的魔法伤害 -12%", "§c近战伤害 -5%");
-        add("legendary_monsters:the_obliterator", "§a你受到的所有来源伤害 -10%", "");
+        add("legendary_monsters:the_obliterator", "§a你受到的所有来源伤害 -10%", "§a挥击时 15% 概率向视线方向发射 湮灭激光", "§a湮灭激光：贯穿视线方向；命中造成 等同攻击面板 + 目标最大生命 5% 的伤害");
         add("legendary_monsters:frostbitten_golem", "§a免疫 冰冻 伤害", "§c你受到的 火 伤害 +12%");
         add("legendary_monsters:withered_abomination", "§a免疫 凋零 效果；§a近战攻击 +10%", "§c你受到的治疗量 -10%");
         add("legendary_monsters:skeletosaurus", "§a免疫 箭矢/弹射物 伤害", "");

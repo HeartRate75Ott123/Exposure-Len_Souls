@@ -6,6 +6,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.entity.projectile.EvokerFangs;
+import net.minecraft.world.entity.projectile.Arrow;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -41,6 +45,9 @@ public class BossPhotoProjHelper {
         TRIGGER.put("cataclysm:scylla", 0.15f);
         TRIGGER.put("legendary_monsters:posessed_paladin", 0.15f);
         TRIGGER.put("legendary_monsters:cloud_golem", 0.10f);
+        TRIGGER.put("legendary_monsters:the_obliterator", 0.15f);
+        TRIGGER.put("minecraft:evoker", 0.15f);
+        TRIGGER.put("minecraft:skeleton", 0.15f);
     }
 
     /** 清理指定玩家的挥击去重记录（切档/登出时调用，避免跨会话 tick 残留导致 boss 弹幕被卡死） */
@@ -79,6 +86,9 @@ public class BossPhotoProjHelper {
                 case "cataclysm:scylla" -> spawnWaves(player);
                 case "legendary_monsters:posessed_paladin" -> spawnSoulPillars(player);
                 case "legendary_monsters:cloud_golem" -> spawnEnergyBeam(player);
+                case "legendary_monsters:the_obliterator" -> spawnAnnihilationLaser(player);
+                case "minecraft:evoker" -> spawnEvokerFangs(player);
+                case "minecraft:skeleton" -> spawnSkeletonArrows(player);
             }
         } catch (Exception e) {
             com.plumejade.lensouls.LenSouls.LOGGER.warn("[PhotoBoss] 弹幕触发失败: " + bossId, e);
@@ -103,8 +113,9 @@ public class BossPhotoProjHelper {
             py = findGroundY(level, px, eye.y, pz);
         }
         if (py < level.getMinBuildHeight() + 1) return;
+        float dmg = playerFinalDamage(player);
         var rune = new com.github.L_Ender.cataclysm.entity.projectile.Void_Rune_Entity(
-                level, px, py, pz, yawRad, 30, 6.0f, player);
+                level, px, py, pz, yawRad, 30, dmg, player);
         markAndSpawn(rune);
     }
 
@@ -163,7 +174,7 @@ public class BossPhotoProjHelper {
     private static void spawnLaserBeam(ServerPlayer player) {
         Level level = player.level();
         Vec3 look = player.getViewVector(1.0F);
-        var beam = new com.github.L_Ender.cataclysm.entity.projectile.Laser_Beam_Entity(player, look, level, 4.0f);
+        var beam = new com.github.L_Ender.cataclysm.entity.projectile.Laser_Beam_Entity(player, look, level, playerFinalDamage(player));
         beam.setPos(player.getX(), player.getEyeY(), player.getZ());
         markAndSpawn(beam);
     }
@@ -179,7 +190,7 @@ public class BossPhotoProjHelper {
         if (py < level.getMinBuildHeight() + 1) return;
         float yaw = (float) (player.getYRot() * Math.PI / 180.0);
         var blast = new com.github.L_Ender.cataclysm.entity.AnimationMonster.BossMonsters.The_Leviathan.Abyss_Blast_Portal_Entity(
-                level, px, py, pz, yaw, 40, 8.0f, 0.05f, player);
+                level, px, py, pz, yaw, 40, playerFinalDamage(player), 0.05f, player);
         markAndSpawn(blast);
     }
 
@@ -196,7 +207,7 @@ public class BossPhotoProjHelper {
             double py = findGroundY(level, px, eye.y, pz);
             if (py < level.getMinBuildHeight() + 1) continue;
             var stele = new com.github.L_Ender.cataclysm.entity.projectile.Ancient_Desert_Stele_Entity(
-                    level, px, py, pz, yawRad, 30, 8.0f, player);
+                    level, px, py, pz, yawRad, 30, playerFinalDamage(player), player);
             markAndSpawn(stele);
         }
     }
@@ -208,7 +219,7 @@ public class BossPhotoProjHelper {
         LivingEntity target = player.getLastHurtMob();
         for (int i = 0; i < 3; i++) {
             var arrow = new com.github.L_Ender.cataclysm.entity.projectile.Phantom_Arrow_Entity(level, player, target);
-            arrow.setBaseDamage(3.5f);
+            arrow.setBaseDamage(playerFinalDamage(player));
             double spread = (i - 1) * (6.0 * Math.PI / 180.0);
             Vec3 dir = look.yRot((float) spread);
             arrow.shoot(dir.x, dir.y, dir.z, 1.8f, 1.0f);
@@ -221,7 +232,7 @@ public class BossPhotoProjHelper {
     private static void spawnWaves(ServerPlayer player) {
         Level level = player.level();
         for (int i = 0; i < 3; i++) {
-            var wave = new com.github.L_Ender.cataclysm.entity.effect.Wave_Entity(level, player, 60, 6.0f);
+            var wave = new com.github.L_Ender.cataclysm.entity.effect.Wave_Entity(level, player, 60, playerFinalDamage(player));
             wave.setPos(player.getX(), player.getY() + 0.5, player.getZ());
             wave.setState(1);
             float yaw = player.getYRot() + (i - 1) * 25.0f;
@@ -230,20 +241,33 @@ public class BossPhotoProjHelper {
         }
     }
 
-    /** 堕落圣骑：灵魂尖刺 ×3（6+3%生命，幽灵伤害） */
+    /** 堕落圣骑：灵魂尖刺 ×3（等同攻击面板 + 目标最大生命 3% 的幽灵伤害）
+     *  追踪最近生物，在其脚下升起；找不到则退回玩家视线前方 */
     private static void spawnSoulPillars(ServerPlayer player) {
         Level level = player.level();
-        Vec3 eye = player.getEyePosition();
         Vec3 look = player.getViewVector(1.0F);
         float yawRad = (float) (player.getYRot() * Math.PI / 180.0);
+        double bx, bz, by;
+        LivingEntity target = findNearestNonPlayer(player, 16.0);
+        if (target != null) {
+            bx = target.getX();
+            bz = target.getZ();
+            by = findGroundY(level, bx, target.getY(), bz);
+        } else {
+            Vec3 eye = player.getEyePosition();
+            bx = eye.x + look.x * 4.0;
+            bz = eye.z + look.z * 4.0;
+            by = findGroundY(level, bx, eye.y, bz);
+        }
+        if (by < level.getMinBuildHeight() + 1) return;
+        float dmg = playerFinalDamage(player);
         for (int i = 0; i < 3; i++) {
             double side = (i - 1) * 1.25;
-            double px = eye.x + look.x * 4.0 - look.z * side;
-            double pz = eye.z + look.z * 4.0 + look.x * side;
-            double py = findGroundY(level, px, eye.y, pz);
-            if (py < level.getMinBuildHeight() + 1) continue;
+            double px = bx - look.z * side;
+            double pz = bz + look.x * side;
+            double py = by + 0.1;
             var pillar = new net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.SoulPillarEntity(
-                    level, px, py, pz, yawRad, 20, player, 20, 6.0f, false);
+                    level, px, py, pz, yawRad, 20, player, 20, dmg, false);
             markAndSpawn(pillar);
         }
     }
@@ -261,8 +285,67 @@ public class BossPhotoProjHelper {
         var beam = new net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.EnergyBeamEntity(
                 (EntityType<? extends net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.EnergyBeamEntity>) beamType,
                 level, player, player.getX(), player.getY() + 1.0, player.getZ(),
-                yaw, pitch, 40, 3.0f, 0.0f);
+                yaw, pitch, 40, playerFinalDamage(player), 0.0f);
         markAndSpawn(beam);
+    }
+
+    /** 弹幕基础伤害 = 玩家攻击面板（ATTACK_DAMAGE 属性值，已含力量/武器等加成） */
+    private static float playerFinalDamage(ServerPlayer player) {
+        return (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+    }
+
+    /** 湮灭构造体：湮灭激光（等同攻击面板 + 目标最大生命 5%，贯穿视线方向） */
+    private static void spawnAnnihilationLaser(ServerPlayer player) {
+        if (!com.plumejade.lensouls.entity.BossPhantomType.OBLITERATOR.isModLoaded()) return;
+        Level level = player.level();
+        EntityType<?> beamType = net.miauczel.legendary_monsters.entity.ModEntities.ANNIHILATION_BEAM.get();
+        float yaw = (float) ((player.getYRot() + 90.0) * Math.PI / 180.0);
+        float pitch = (float) (-player.getXRot() * Math.PI / 180.0);
+        float dmg = playerFinalDamage(player);
+        var beam = new net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.AnnihilationBeamEntity(
+                (EntityType<? extends net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.AnnihilationBeamEntity>) beamType,
+                level, player, player.getX(), player.getEyeY(), player.getZ(),
+                yaw, pitch, 40, dmg, 5.0f, 1, false, 0.0f, 0.0f, 0.0f, false, 3.0f);
+        markAndSpawn(beam);
+    }
+
+    /** 唤魔者：尖牙一排（从玩家视线前方地面钻出；群伤，伤害为原版固定值——Minecraft 未暴露 setter，无法挂面板） */
+    private static void spawnEvokerFangs(ServerPlayer player) {
+        Level level = player.level();
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getViewVector(1.0F).normalize();
+        float yawRad = (float) (player.getYRot() * Math.PI / 180.0);
+        for (int i = 1; i <= 5; i++) {
+            double dx = eye.x + look.x * i;
+            double dz = eye.z + look.z * i;
+            double dy = findGroundY(level, dx, eye.y, dz);
+            if (dy < level.getMinBuildHeight() + 1) continue;
+            EvokerFangs fang = new EvokerFangs(level, dx, dy, dz, yawRad, 6, player);
+            markAndSpawn(fang);
+        }
+    }
+
+    /** 骷髅：弓箭 ×3（朝最近生物；伤害等同攻击面板） */
+    private static void spawnSkeletonArrows(ServerPlayer player) {
+        Level level = player.level();
+        float dmg = playerFinalDamage(player);
+        LivingEntity target = findNearestNonPlayer(player, 16.0);
+        Vec3 from = new Vec3(player.getX(), player.getEyeY(), player.getZ());
+        Vec3 dir = target != null
+                ? new Vec3(target.getX(), target.getEyeY(), target.getZ()).subtract(from).normalize()
+                : player.getViewVector(1.0F);
+        for (int i = 0; i < 3; i++) {
+            Arrow arrow = new Arrow(EntityType.ARROW, level);
+            arrow.setOwner(player);
+            arrow.setPos(from.x, from.y, from.z);
+            double spread = (i - 1) * (6.0 * Math.PI / 180.0);
+            Vec3 d = dir.yRot((float) spread);
+            arrow.shoot(d.x, d.y, d.z, 1.6f, 1.0f);
+            arrow.setBaseDamage(dmg);
+            arrow.setCritArrow(false);
+            arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
+            markAndSpawn(arrow);
+        }
     }
 
     /** 从 y 向下扫描，返回地面稳固方块上方 1 格（找不到返回极小值） */

@@ -23,7 +23,7 @@ import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
  */
 public class PhantomDamageHandler {
 
-    private static final int[] PEN_DAMAGE = {10, 18, 21, 35, 37};
+    private static final int[] PEN_DAMAGE = {20, 36, 42, 70, 74};
 
     /** 递归判定实体是否属幻灵来源：本体 / 召唤物 / 弹幕 owner */
     private static boolean isPhantomSource(Entity e) {

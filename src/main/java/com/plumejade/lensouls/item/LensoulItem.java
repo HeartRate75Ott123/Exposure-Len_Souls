@@ -147,11 +147,6 @@ public class LensoulItem extends Item {
 
         // ---- 启动冷却（独立于效果，低级启用后也进入冷却） ----
         // BOSS 镜魂：已有活跃幻灵时直接跳过，不进冷却
-        BossPhantomType checkType = BossPhantomType.fromDescriptionId(stack.getDescriptionId());
-        if (checkType != null && checkType.isModLoaded() && player instanceof ServerPlayer sp
-                && BossPhantomManager.getInstance().hasActivePhantom(sp.getUUID())) {
-            return InteractionResultHolder.pass(stack);
-        }
         int cooldownTicks = getCooldownTicks();
         timer.start(playerId, cooldownId, cooldownTicks);
         long endTime = level.getGameTime() + cooldownTicks;

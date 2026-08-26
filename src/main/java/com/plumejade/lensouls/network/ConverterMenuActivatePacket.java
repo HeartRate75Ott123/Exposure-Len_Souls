@@ -109,13 +109,6 @@ public class ConverterMenuActivatePacket implements CustomPacketPayload {
             var element = soulItem.getElement();
             String descId = soulStack.getDescriptionId();
             BossPhantomType phantomType = BossPhantomType.fromDescriptionId(descId);
-            if (phantomType != null && phantomType.isModLoaded()
-                    && BossPhantomManager.getInstance().hasActivePhantom(playerId)) {
-                player.displayClientMessage(
-                        Component.translatable("message.lensouls.converter_phantom_active")
-                                .copy().withStyle(net.minecraft.ChatFormatting.WHITE), true);
-                return false;
-            }
 
             // 启动冷却
             int itemCooldownTicks = soulItem.getCooldownTicks();

@@ -15,7 +15,8 @@ public record BossPhantomData(
         int amplifier,
         double originX, double originY, double originZ,
         float originYRot, float originXRot,
-        double watchX, double watchY, double watchZ
+        double watchX, double watchY, double watchZ,
+        boolean spectatorRestored
 ) {
 
     public boolean isSkillTick() {
@@ -29,6 +30,12 @@ public record BossPhantomData(
     public BossPhantomData tick() {
         return new BossPhantomData(type, playerId, totalTicks, remainingTicks - 1,
                 descId, phantomEntityId, amplifier, originX, originY, originZ, originYRot, originXRot,
-                watchX, watchY, watchZ);
+                watchX, watchY, watchZ, spectatorRestored);
+    }
+
+    public BossPhantomData withSpectatorRestored(boolean value) {
+        return new BossPhantomData(type, playerId, totalTicks, remainingTicks,
+                descId, phantomEntityId, amplifier, originX, originY, originZ, originYRot, originXRot,
+                watchX, watchY, watchZ, value);
     }
 }

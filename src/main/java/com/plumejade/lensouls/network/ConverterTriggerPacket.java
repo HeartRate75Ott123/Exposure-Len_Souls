@@ -127,11 +127,6 @@ public class ConverterTriggerPacket implements CustomPacketPayload {
                 var element = soulItem.getElement();
                 String descId = soulStack.getDescriptionId();
                 BossPhantomType phantomType = BossPhantomType.fromDescriptionId(descId);
-                if (phantomType != null && phantomType.isModLoaded() && player instanceof ServerPlayer serverPlayer
-                        && BossPhantomManager.getInstance().hasActivePhantom(serverPlayer.getUUID())) {
-                    phantomActiveSkipped = true;
-                    continue;
-                }
 
                 // ---- 启动冷却（独立于效果，低级启用后也进入冷却） ----
                 int itemCooldownTicks = soulItem.getCooldownTicks();

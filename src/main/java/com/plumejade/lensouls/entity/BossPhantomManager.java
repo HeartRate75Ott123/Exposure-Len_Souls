@@ -46,11 +46,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BossPhantomManager {
 
     private static final BossPhantomManager INSTANCE = new BossPhantomManager();
-    public static final int PHANTOM_TOTAL_TICKS = 200;
+    /** 召唤（虚影表演）总时长：30s */
+    public static final int PHANTOM_TOTAL_TICKS = 600;
+    /** 旁观者锁定时长：2s（之后玩家恢复游戏模式、可自由行动，虚影继续表演） */
+    private static final int SPECTATOR_TICKS = 40;
     /** 借体 boss 周边新生成实体被打标为召唤物的半径 */
     private static final double MINION_TAG_RADIUS = 32.0;
 
-    private final Map<UUID, BossPhantomData> activePhantoms = new ConcurrentHashMap<>();
+    private final Map<Integer, BossPhantomData> activePhantoms = new ConcurrentHashMap<>();
     /** 幻灵期间玩家原始游戏模式（用于旁观者模式恢复） */
     private final Map<UUID, net.minecraft.world.level.GameType> originalGameTypes = new ConcurrentHashMap<>();
 
@@ -58,23 +61,14 @@ public class BossPhantomManager {
 
     /** 通过幻灵实体 ID 反查玩家 */
     public ServerPlayer findPlayerByPhantomEntityId(int phantomEntityId) {
-        for (var entry : activePhantoms.entrySet()) {
-            if (entry.getValue().phantomEntityId() == phantomEntityId) {
-                return findPlayer(entry.getKey());
-            }
-        }
-        return null;
+        BossPhantomData d = activePhantoms.get(phantomEntityId);
+        return d != null ? findPlayer(d.playerId()) : null;
     }
 
     // ========== 启动 ==========
 
     public void startPhantom(ServerPlayer player, BossPhantomType type, String descId, int amplifier) {
         UUID pid = player.getUUID();
-
-        if (activePhantoms.containsKey(pid)) {
-            LenSouls.LOGGER.warn("[幻灵] 玩家 {} 已有幻灵，忽略", player.getName().getString());
-            return;
-        }
 
         double ox = player.getX(), oy = player.getY(), oz = player.getZ();
         float oyaw = player.getYRot(), opitch = player.getXRot();
@@ -87,11 +81,13 @@ public class BossPhantomManager {
         player.sendSystemMessage(Component.translatable("message.lensouls.soul_activated",
                 Component.translatable(descId)));
 
-        // 旁观者模式（不移动玩家位置，不施加效果）
-        originalGameTypes.put(player.getUUID(), player.gameMode.getGameModeForPlayer());
-        player.getPersistentData().putInt("lensouls:originalGameType",
-                player.gameMode.getGameModeForPlayer().getId());
-        player.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
+        // 旁观者模式（仅当玩家当前非旁观时进入，并发释放不覆盖原记录）
+        if (player.gameMode.getGameModeForPlayer() != net.minecraft.world.level.GameType.SPECTATOR) {
+            originalGameTypes.put(player.getUUID(), player.gameMode.getGameModeForPlayer());
+            player.getPersistentData().putInt("lensouls:originalGameType",
+                    player.gameMode.getGameModeForPlayer().getId());
+            player.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
+        }
 
         // 借真身驱动（模组加载 + className 非空时借用真实 BOSS 实体）
         if (!type.getClassName().isEmpty() && type.isModLoaded()) {
@@ -118,24 +114,32 @@ public class BossPhantomManager {
         // 入场：传送门浮现粒子（灾变系：END_PORTAL 椭圆传送门）
         spawnEntryPortal(player.serverLevel(), type, ox, py, oz);
 
-        activePhantoms.put(pid, new BossPhantomData(
+        activePhantoms.put(phantom.getId(), new BossPhantomData(
                 type, pid, PHANTOM_TOTAL_TICKS, PHANTOM_TOTAL_TICKS, descId,
-                phantom.getId(), amplifier, ox, oy, oz, oyaw, opitch, ox, oy, oz));
+                phantom.getId(), amplifier, ox, oy, oz, oyaw, opitch, ox, oy, oz, false));
 
-    }
-
-    /** 玩家当前是否有活跃的幻灵表演 */
-    public boolean hasActivePhantom(UUID playerId) {
-        return activePhantoms.containsKey(playerId);
     }
 
     public void cancelPhantom(ServerPlayer player) {
-        BossPhantomData d = activePhantoms.get(player.getUUID());
-        if (d != null) endPhantom(player, d, false);
+        UUID pid = player.getUUID();
+        java.util.List<Integer> ids = activePhantoms.entrySet().stream()
+                .filter(e -> e.getValue().playerId().equals(pid))
+                .map(java.util.Map.Entry::getKey).toList();
+        for (Integer id : ids) {
+            BossPhantomData d = activePhantoms.remove(id);
+            if (d != null) endPhantom(player, d, false);
+        }
+        if (!activePhantoms.values().stream().anyMatch(x -> x.playerId().equals(pid))
+                && originalGameTypes.containsKey(pid)) {
+            restoreSpectatorGameMode(player);
+        }
     }
 
     public void clearPlayer(UUID pid) {
-        activePhantoms.remove(pid);
+        java.util.List<Integer> ids = activePhantoms.entrySet().stream()
+                .filter(e -> e.getValue().playerId().equals(pid))
+                .map(java.util.Map.Entry::getKey).toList();
+        ids.forEach(activePhantoms::remove);
     }
 
     // ========== 借真身驱动（泛化版本） ==========
@@ -223,9 +227,9 @@ public class BossPhantomManager {
                     PHANTOM_TOTAL_TICKS, entity.getId(), ox, py, oz, oyaw));
             spawnEntryPortal(level, type, ox, py, oz);
 
-            activePhantoms.put(player.getUUID(), new BossPhantomData(
+            activePhantoms.put(entity.getId(), new BossPhantomData(
                     type, player.getUUID(), PHANTOM_TOTAL_TICKS, PHANTOM_TOTAL_TICKS, descId,
-                    entity.getId(), amplifier, ox, oy, oz, oyaw, opitch, ox, oy, oz));
+                    entity.getId(), amplifier, ox, oy, oz, oyaw, opitch, ox, oy, oz, false));
 
 
         } catch (Throwable t) {
@@ -465,9 +469,9 @@ public class BossPhantomManager {
     public void tick() {
         if (activePhantoms.isEmpty()) return;
 
-        Iterator<Map.Entry<UUID, BossPhantomData>> it = activePhantoms.entrySet().iterator();
+        Iterator<Map.Entry<Integer, BossPhantomData>> it = activePhantoms.entrySet().iterator();
         while (it.hasNext()) {
-            Map.Entry<UUID, BossPhantomData> entry = it.next();
+            Map.Entry<Integer, BossPhantomData> entry = it.next();
             BossPhantomData d = entry.getValue();
             ServerPlayer p = findPlayer(d.playerId());
             if (p == null) {
@@ -477,6 +481,13 @@ public class BossPhantomManager {
 
             boolean isBorrowed = d.type().isModLoaded();
             int remaining = d.remainingTicks();
+            int elapsed = d.totalTicks() - remaining;
+
+            // 旁观者锁定仅持续 SPECTATOR_TICKS；到期恢复玩家原游戏模式（虚影继续表演）
+            if (elapsed >= SPECTATOR_TICKS && !d.spectatorRestored()) {
+                restoreSpectatorGameMode(p);
+                d = d.withSpectatorRestored(true);
+            }
 
             if (isBorrowed) {
                 // ===== 借体模式：幻灵自由移动，玩家在旁观者模式自由视角 =====
@@ -524,8 +535,10 @@ public class BossPhantomManager {
                 // 召唤物 + 本体重定向：锁定主人敌人、绝不瞄准玩家（Goety 式）
                 applyPhantomAlly(ie, p);
             } else {
-                // ===== 旧版 BossPhantomEntity 模式：传送观察位 + 阶段包 =====
-                p.teleportTo(d.watchX(), d.watchY(), d.watchZ());
+                // ===== 旧版 BossPhantomEntity 模式：仅在旁观期间锁定观察位，之后玩家自由行动 =====
+                if (elapsed < SPECTATOR_TICKS) {
+                    p.teleportTo(d.watchX(), d.watchY(), d.watchZ());
+                }
                 int skillTick = d.type().getSkillTick();
 
                 if (remaining == skillTick + 10) {
@@ -650,18 +663,18 @@ public class BossPhantomManager {
 
     // ========== 结束 ==========
 
-    void endPhantom(ServerPlayer p, BossPhantomData d, boolean apply) {
-        // 恢复游戏模式（旁观者 → 原模式）
+    /** 中途恢复玩家原游戏模式（旁观到期后调用，幂等：对应记录已移除则无操作） */
+    private void restoreSpectatorGameMode(ServerPlayer p) {
         net.minecraft.world.level.GameType original = originalGameTypes.remove(p.getUUID());
         if (original != null) p.setGameMode(original);
-        // 清理持久化 NBT 标记
+        p.getPersistentData().remove("lensouls:originalGameType");
+    }
+
+    void endPhantom(ServerPlayer p, BossPhantomData d, boolean apply) {
+        // 游戏模式恢复交由 tick 的旁观恢复逻辑统一处理（避免并发虚影下提前踢出另一条的旁观）
         p.getPersistentData().remove("lensouls:originalGameType");
 
         p.setNoGravity(false);
-        p.teleportTo(d.originX(), d.originY(), d.originZ());
-        p.setYRot(d.originYRot());
-        p.setXRot(d.originXRot());
-        p.setCamera(p);
         removeStunEffects(p);
 
         Entity phantom = p.level().getEntity(d.phantomEntityId());
@@ -685,8 +698,6 @@ public class BossPhantomManager {
                 p.addEffect(new MobEffectInstance(t.getEffectHolder(),
                         Config.DEFAULT_DURATION.get() * 20, d.amplifier(), false, false, false));
                 ElementInfusionEffect.setPlayerData(p, t.getElement(), t.shouldApplySlowness(), d.descId());
-                p.sendSystemMessage(Component.translatable("message.lensouls.soul_activated",
-                        Component.translatable(d.descId())));
             }
         }
 
@@ -860,12 +871,15 @@ public class BossPhantomManager {
     public static void onPlayerDeath(LivingDeathEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             BossPhantomManager mgr = getInstance();
-            BossPhantomData d = mgr.activePhantoms.get(player.getUUID());
-            if (d != null) {
-                mgr.endPhantom(player, d, false);
-                mgr.activePhantoms.remove(player.getUUID());
-                mgr.originalGameTypes.remove(player.getUUID());
+            UUID pid = player.getUUID();
+            java.util.List<Integer> ids = mgr.activePhantoms.entrySet().stream()
+                    .filter(e -> e.getValue().playerId().equals(pid))
+                    .map(java.util.Map.Entry::getKey).toList();
+            for (Integer id : ids) {
+                BossPhantomData d = mgr.activePhantoms.remove(id);
+                if (d != null) mgr.endPhantom(player, d, false);
             }
+            mgr.restoreSpectatorGameMode(player);
         }
     }
 
@@ -879,26 +893,31 @@ public class BossPhantomManager {
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             BossPhantomManager mgr = getInstance();
-            BossPhantomData d = mgr.activePhantoms.get(player.getUUID());
-            if (d != null) {
-                // 将原始游戏模式持久化到 NBT（对抗断线丢失）
-                net.minecraft.world.level.GameType original = mgr.originalGameTypes.get(player.getUUID());
-                if (original != null) {
-                    player.getPersistentData().putInt("lensouls:originalGameType", original.getId());
+            UUID pid = player.getUUID();
+            java.util.List<Integer> ids = mgr.activePhantoms.entrySet().stream()
+                    .filter(e -> e.getValue().playerId().equals(pid))
+                    .map(java.util.Map.Entry::getKey).toList();
+            for (Integer id : ids) {
+                BossPhantomData d = mgr.activePhantoms.remove(id);
+                if (d != null) {
+                    // 将原始游戏模式持久化到 NBT（对抗断线丢失）
+                    net.minecraft.world.level.GameType original = mgr.originalGameTypes.get(pid);
+                    if (original != null) {
+                        player.getPersistentData().putInt("lensouls:originalGameType", original.getId());
+                    }
+                    Entity e = player.level().getEntity(d.phantomEntityId());
+                    if (e == null) {
+                        e = findEntityAcrossDimensions(d.phantomEntityId());
+                    }
+                    if (e != null) {
+                        e.discard();
+                    } else {
+                        LenSouls.LOGGER.warn("[幻灵] 断线清理找不到实体 id={}，留待区块加载时拦截",
+                                d.phantomEntityId());
+                    }
                 }
-                Entity e = player.level().getEntity(d.phantomEntityId());
-                if (e == null) {
-                    e = findEntityAcrossDimensions(d.phantomEntityId());
-                }
-                if (e != null) {
-                    e.discard();
-                } else {
-                    LenSouls.LOGGER.warn("[幻灵] 断线清理找不到实体 id={}，留待区块加载时拦截",
-                            d.phantomEntityId());
-                }
-                mgr.activePhantoms.remove(player.getUUID());
-                mgr.originalGameTypes.remove(player.getUUID());
             }
+            mgr.originalGameTypes.remove(pid);
         }
     }
 

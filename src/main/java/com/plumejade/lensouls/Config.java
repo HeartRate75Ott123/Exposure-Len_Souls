@@ -185,7 +185,8 @@ public class Config {
 
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> TOUGHNESS_BLACKLIST = BUILDER
             .comment("Entities that NEVER trigger toughness. Format: \"modid:entityid\"",
-                    "Example: \"minecraft:iron_golem\" (Iron Golem excluded); \"minecraft:snow_golem\" (Snow Golem excluded)")
+                    "Special value \"all\" excludes every entity by default (whitelist entries then re-include).",
+                    "Example: \"minecraft:iron_golem\" (Iron Golem excluded); \"all\" (everything excluded except whitelist)")
             .defineListAllowEmpty("toughnessBlacklist", java.util.List.of(
                     "block_factorys_bosses:kraken",
                     "block_factorys_bosses:underworld_knight",
@@ -204,9 +205,10 @@ public class Config {
 
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> TOUGHNESS_WHITELIST = BUILDER
             .comment("Entities that ALWAYS trigger toughness. Format: \"modid:entityid\"",
-                    "Special value \"all\" enables toughness for every entity except the blacklist.",
+                    "Special value \"all\" includes every entity by default (blacklist entries then exclude).",
+                    "When neither list contains \"all\", toughness triggers by the 200-health threshold.",
                     "Example: \"cataclysm:ignis\" (Ignis always has toughness); \"all\" (everything except blacklist)")
-            .defineListAllowEmpty("toughnessWhitelist", java.util.List.of("all"), () -> "", o -> o instanceof String);
+            .defineListAllowEmpty("toughnessWhitelist", java.util.List.of(), () -> "", o -> o instanceof String);
 
     static { BUILDER.pop(); }
 

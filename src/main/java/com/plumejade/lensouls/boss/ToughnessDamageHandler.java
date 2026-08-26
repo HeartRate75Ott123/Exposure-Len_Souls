@@ -50,33 +50,35 @@ public class ToughnessDamageHandler {
     }
 
     /**
-     * 判断实体是否为 BOSS。
+     * 判断实体是否触发韧性。
      * <p>
-     * 检测层级：
-     * <ol>
-     *   <li>配置黑名单（toughnessBlacklist）—— 永不触发韧性</li>
-     *   <li>配置白名单（toughnessWhitelist）—— 始终触发韧性</li>
-     *   <li>通用血量阈值（maxHealth ≥ {@link #GENERIC_BOSS_HP_THRESHOLD}）</li>
-     * </ol>
+     * 白名单 / 黑名单均支持通配 {@code "all"}，语义对称：
+     * <ul>
+     *   <li>两表都不含 {@code all} → 默认按通用血量阈值（maxHealth ≥ {@link #GENERIC_BOSS_HP_THRESHOLD}）判定；</li>
+     *   <li>白名单含 {@code all} → 默认全包含；黑名单含 {@code all} → 默认全排除；
+     *       两者皆含 {@code all} 时黑名单优先（全排除）；</li>
+     *   <li>具体条目（非 {@code all}）作为例外覆盖默认方向，且黑名单优先于白名单。</li>
+     * </ul>
+     * 例：白名单=all + 黑名单=[x] → 除 x 外全部触发；黑名单=all + 白名单=[x] → 仅 x 触发。
      */
     public static boolean isBoss(LivingEntity entity) {
-        // 0. 配置黑名单：永不触发韧性
         ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
-        if (Config.TOUGHNESS_BLACKLIST.get().contains(id.toString())) {
-            return false;
-        }
+        String idStr = id.toString();
+        var wl = Config.TOUGHNESS_WHITELIST.get();
+        var bl = Config.TOUGHNESS_BLACKLIST.get();
+        boolean hasAllWL = wl.contains("all");
+        boolean hasAllBL = bl.contains("all");
 
-        // 1. 配置白名单：始终触发韧性（含通配 "all" → 除黑名单外全部触发）
-        if (Config.TOUGHNESS_WHITELIST.get().contains("all")) return true;
-        if (Config.TOUGHNESS_WHITELIST.get().contains(id.toString())) {
-            return true;
-        }
+        // 默认基准：白名单 all → 全包含；黑名单 all → 全排除；否则按 200 血阈值
+        boolean result;
+        if (hasAllWL && hasAllBL) result = false;       // 冲突：黑名单 all 优先（全排除）
+        else if (hasAllWL) result = true;               // 默认全包含
+        else if (hasAllBL) result = false;              // 默认全排除
+        else result = entity.getMaxHealth() >= GENERIC_BOSS_HP_THRESHOLD;
 
-        // 2. 通用 BOSS 判定：高血量
-        if (entity.getMaxHealth() >= GENERIC_BOSS_HP_THRESHOLD) {
-            return true;
-        }
-
-        return false;
+        // 具体条目覆盖（黑名单优先于白名单）
+        if (wl.contains(idStr)) result = true;
+        if (bl.contains(idStr)) result = false;
+        return result;
     }
 }

@@ -1,6 +1,6 @@
 {
   "values": [
-    "#minecraft:enchantable/sword",
+    "#minecraft:enchantable",
     "#lensouls:enchantable/cameras"
   ]
 }

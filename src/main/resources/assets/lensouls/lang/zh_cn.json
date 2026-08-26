@@ -95,7 +95,7 @@
   "element.lensouls.earth": "大地镜魂",
   "element.lensouls.ender": "末影镜魂",
   "enchantment.lensouls.soul_photography": "摄魂术",
-  "enchantment.lensouls.soul_photography.desc": "使用相机能力的关键；给剑类武器附魔可搭配弱点透镜能力增伤",
+  "enchantment.lensouls.soul_photography.desc": "使用相机能力的关键；可附魔到任意装备，搭配弱点透镜照片可增伤",
   "container.lensouls.photo_gui": "请放入§a弱点透镜§r性质的照片",
   "key.lensouls.photo_gui": "打开弱点透镜剑槽 GUI",
   "lensouls.configuration.souls": "镜魂",

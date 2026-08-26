@@ -29,6 +29,7 @@ import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import top.theillusivec4.curios.api.CuriosApi;
@@ -36,6 +37,7 @@ import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 import java.util.*;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 /**
@@ -50,6 +52,8 @@ public class PhotoSpecialEffects {
     );
     private static final String FLIGHT_TAG = "lensouls:flight_photo";
     private static final ResourceLocation MOD_BASE = ResourceLocation.parse("lensouls:attr_");
+    /** 玩家已集中施加的照片属性修饰符（按 UUID 追踪，用于精准回收） */
+    private static final Map<UUID, Multimap<Holder<Attribute>, AttributeModifier>> APPLIED_ATTRS = new ConcurrentHashMap<>();
 
     /** 弱属性照片组 → 额外照片栏位数（越弱给越多，1~3，无上限叠加） */
     public static final Map<String, Integer> WEAK_SLOT_BONUS = Map.ofEntries(
@@ -747,6 +751,7 @@ public class PhotoSpecialEffects {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         List<String> gearEntities = collectGearEntities(player);
+        reconcilePhotoAttributes(player, gearEntities);
 
         boolean hasFlightPhoto = false;
         for (String id : gearEntities) {
@@ -977,7 +982,7 @@ public class PhotoSpecialEffects {
 
     /**
      * 构建某实体照片佩戴时应提供的属性修饰符（Curios 佩戴时驱动）。
-     * 标准属性按条目名派生稳定 UUID（同种实体只生效一份、不同种可叠加）；
+     * 标准属性按（实体, 条目名）派生稳定 UUID（同种实体只生效一份、不同种可叠加）；
      * 元素弱点按（实体, 元素）派生稳定 UUID（同样去重、跨种叠加）。
      */
     public static Multimap<Holder<Attribute>, AttributeModifier> buildAttributeModifiers(String entityId) {
@@ -986,7 +991,7 @@ public class PhotoSpecialEffects {
         if (list != null) {
             for (AttributeEntry ae : list) {
                 map.put(holder(ae.attribute()),
-                        new AttributeModifier(MOD_BASE.withPath(ae.modName()), ae.amount(), ae.operation()));
+                        new AttributeModifier(MOD_BASE.withPath(entityId.replace(':', '_') + "_" + ae.modName()), ae.amount(), ae.operation()));
             }
         }
         var weak = DataPackLoader.getAllWeaknesses(ResourceLocation.parse(entityId));
@@ -1077,5 +1082,39 @@ public class PhotoSpecialEffects {
             if (lvl > 0) bonus += lvl * 0.03f;
         }
         return bonus;
+    }
+
+    // ========== 属性集中对账（按去重实体集合统一施加/回收，避免 Curios 按共享 UUID 在部分移除时误删）==========
+
+    private static void reconcilePhotoAttributes(ServerPlayer player, List<String> gear) {
+        Multimap<Holder<Attribute>, AttributeModifier> desired = HashMultimap.create();
+        for (String id : gear) desired.putAll(buildAttributeModifiers(id));
+
+        Multimap<Holder<Attribute>, AttributeModifier> prev =
+                APPLIED_ATTRS.getOrDefault(player.getUUID(), HashMultimap.create());
+
+        for (var e : desired.entries()) {
+            AttributeInstance inst = player.getAttribute(e.getKey());
+            if (inst != null && inst.getModifier(e.getValue().id()) == null) inst.addTransientModifier(e.getValue());
+        }
+        for (var e : prev.entries()) {
+            if (!desired.containsEntry(e.getKey(), e.getValue())) {
+                AttributeInstance inst = player.getAttribute(e.getKey());
+                if (inst != null) inst.removeModifier(e.getValue().id());
+            }
+        }
+        APPLIED_ATTRS.put(player.getUUID(), desired);
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        Multimap<Holder<Attribute>, AttributeModifier> prev = APPLIED_ATTRS.remove(player.getUUID());
+        if (prev != null) {
+            for (var e : prev.entries()) {
+                AttributeInstance inst = player.getAttribute(e.getKey());
+                if (inst != null) inst.removeModifier(e.getValue().id());
+            }
+        }
     }
 }

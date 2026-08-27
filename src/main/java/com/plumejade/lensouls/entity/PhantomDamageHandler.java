@@ -25,23 +25,30 @@ public class PhantomDamageHandler {
 
     private static final int[] PEN_DAMAGE = {20, 36, 42, 70, 74};
 
+    /** 实体本身是否是幻灵（借体 boss 本体 / 召唤物），用于幻灵之间不互殴的隔离判断 */
+    public static boolean isPhantomEntity(Entity e) {
+        if (e == null) return false;
+        return e.getPersistentData().getBoolean("lensouls:phantom")
+                || e.getPersistentData().getBoolean("lensouls:phantom_minion");
+    }
+
     /** 递归判定实体是否属幻灵来源：本体 / 召唤物 / 弹幕 owner */
     private static boolean isPhantomSource(Entity e) {
         if (e == null) return false;
-        if (e.getPersistentData().getBoolean("lensouls:phantom")) return true;
-        if (e.getPersistentData().getBoolean("lensouls:phantom_minion")) return true;
+        if (isPhantomEntity(e)) return true;
         if (e instanceof Projectile proj) {
             return isPhantomSource(proj.getOwner());
         }
         return false;
     }
 
-    /** 防误伤：幻灵来源（直接来源或真实攻击者，含弹幕 owner）对玩家不造成任何伤害（真正免伤，含击退）。 */
+    /** 防误伤：幻灵来源（直接来源或真实攻击者，含弹幕 owner）对玩家全免；幻灵之间也不互殴（幻灵来源同样不可伤其他幻灵）。 */
     @SubscribeEvent
     public static void onIncomingDamage(LivingIncomingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
         if (event.getAmount() <= 0f) return;
-        if (!(event.getEntity() instanceof Player)) return;
+        boolean receiverProtected = event.getEntity() instanceof Player || isPhantomEntity(event.getEntity());
+        if (!receiverProtected) return;
         if (isPhantomDamageSource(event.getSource())) {
             event.setCanceled(true);
         }
@@ -52,15 +59,16 @@ public class PhantomDamageHandler {
         return isPhantomSource(src.getDirectEntity()) || isPhantomSource(src.getEntity());
     }
 
-    /** Goety 式：幻灵/召唤物永不把玩家设为目标（硬拦截 AI 锁玩家，根治“虚灵打我”） */
+    /** Goety 式：幻灵/召唤物永不把玩家或另一只幻灵设为目标（硬拦截 AI 锁目标，根治“虚灵打我”与虚灵互殴） */
     @SubscribeEvent
     public static void onTargetChange(LivingChangeTargetEvent event) {
         LivingEntity entity = event.getEntity();
         if (entity.level().isClientSide) return;
         if (!(entity instanceof Mob mob)) return;
-        if (!mob.getPersistentData().getBoolean("lensouls:phantom")
-                && !mob.getPersistentData().getBoolean("lensouls:phantom_minion")) return;
-        if (event.getNewAboutToBeSetTarget() instanceof Player) {
+        if (!isPhantomEntity(mob)) return;
+        LivingEntity newTarget = event.getNewAboutToBeSetTarget();
+        if (newTarget == null) return;
+        if (newTarget instanceof Player || isPhantomEntity(newTarget)) {
             event.setCanceled(true);
         }
     }

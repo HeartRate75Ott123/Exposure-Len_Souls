@@ -256,6 +256,7 @@ public class BossPhantomManager {
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, aabb)) {
             if (e instanceof Player || !e.isAlive()) continue;
             if (e == self) continue; // 不伤害幻灵自身
+            if (PhantomDamageHandler.isPhantomEntity(e)) continue; // 幻灵之间不互殴
             if (e.distanceToSqr(cx, cy, cz) > range * range) continue;
             e.hurt(piercing, 50.0f + type.getSkillDamage());
             count++;
@@ -266,17 +267,19 @@ public class BossPhantomManager {
     private static LivingEntity findNearestEnemy(ServerLevel level, double x, double y, double z) {
         AABB box = new AABB(x - 20, y - 10, z - 20, x + 20, y + 10, z + 20);
         List<LivingEntity> candidates = level.getEntitiesOfClass(LivingEntity.class, box);
-
         // 第一轮：找 BOSS 级目标（血量 > 200）
         LivingEntity boss = null;
         double bossDist = Double.MAX_VALUE;
         for (LivingEntity e : candidates) {
             if (e instanceof Player || !e.isAlive()) continue;
+            // 幻灵之间不互殴：排除其他幻灵及其召唤物
+            if (PhantomDamageHandler.isPhantomEntity(e)) continue;
             if (e.getMaxHealth() > 200) {
                 double d = e.distanceToSqr(x, y, z);
                 if (d < bossDist) { bossDist = d; boss = e; }
             }
         }
+
         if (boss != null) return boss;
 
         // 第二轮：普通敌对（无玩家）
@@ -284,6 +287,8 @@ public class BossPhantomManager {
         double nearestDist = Double.MAX_VALUE;
         for (LivingEntity e : candidates) {
             if (e instanceof Player || !e.isAlive()) continue;
+            // 幻灵之间不互殴：排除其他幻灵及其召唤物
+            if (PhantomDamageHandler.isPhantomEntity(e)) continue;
             double d = e.distanceToSqr(x, y, z);
             if (d < nearestDist) { nearestDist = d; nearest = e; }
         }
@@ -596,6 +601,7 @@ public class BossPhantomManager {
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, aabb)) {
             if (target instanceof Player) continue;
             if (!target.isAlive()) continue;
+            if (PhantomDamageHandler.isPhantomEntity(target)) continue; // 幻灵之间不互殴
             double dist = target.distanceToSqr(cx, cy, cz);
             if (dist > range * range) continue;
 
@@ -623,6 +629,7 @@ public class BossPhantomManager {
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, beamBox)) {
             if (target instanceof Player || !target.isAlive()) continue;
+            if (PhantomDamageHandler.isPhantomEntity(target)) continue; // 幻灵之间不互殴
             double distSq = target.distanceToSqr(cx, cy, cz);
             if (distSq > beamRange * beamRange) continue;
 
@@ -650,6 +657,7 @@ public class BossPhantomManager {
                 cx + pullRange, cy + pullRange, cz + pullRange);
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, pullBox)) {
             if (target instanceof Player || !target.isAlive()) continue;
+            if (PhantomDamageHandler.isPhantomEntity(target)) continue; // 幻灵之间不互殴（不互相牵引）
             double distSq = target.distanceToSqr(cx, cy, cz);
             if (distSq > pullRange * pullRange) continue;
             // 已到达中心附近 → 停止吸引

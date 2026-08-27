@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.item;
 
+import com.plumejade.lensouls.handler.FeatherAbyssHandler;
 import com.plumejade.lensouls.handler.FeatherElementRiseHandler;
 import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import net.minecraft.ChatFormatting;
@@ -39,7 +40,8 @@ public class FeatherTwitcherItem extends Item implements ICurioItem {
     public boolean canEquip(SlotContext slotContext, ItemStack stack) {
         if (slotContext.entity() instanceof Player player) {
             return !FeatherElementRiseHandler.hasFeather(player)
-                    && !FeatherHardmanHandler.hasHardman(player);
+                    && !FeatherHardmanHandler.hasHardman(player)
+                    && !FeatherAbyssHandler.hasAbyss(player);
         }
         return true;
     }

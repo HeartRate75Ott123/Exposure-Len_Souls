@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.item;
 
+import com.plumejade.lensouls.handler.FeatherAbyssHandler;
 import com.plumejade.lensouls.handler.FeatherElementRiseHandler;
 import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import com.plumejade.lensouls.handler.FeatherTwitcherHandler;
@@ -42,7 +43,8 @@ public class FeatherHardmanItem extends Item implements ICurioItem {
         if (slotContext.entity() instanceof Player player) {
             return !FeatherElementRiseHandler.hasFeather(player)
                     && !FeatherTwitcherHandler.hasTwitcher(player)
-                    && !FeatherHardmanHandler.hasHardman(player);
+                    && !FeatherHardmanHandler.hasHardman(player)
+                    && !FeatherAbyssHandler.hasAbyss(player);
         }
         return true;
     }

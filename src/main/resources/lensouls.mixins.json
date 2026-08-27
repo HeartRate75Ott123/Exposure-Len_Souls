@@ -16,7 +16,8 @@
     "BossProjHurtMixin",
     "PlayerSwingMixin",
     "EntitiesInFrameMixin",
-    "EntityInvulnerableTimeAccessor"
+    "EntityInvulnerableTimeAccessor",
+    "FoodDataMixin"
   ],
     "client": [
     "client.ItemRendererMixin",

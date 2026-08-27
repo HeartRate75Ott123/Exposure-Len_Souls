@@ -105,6 +105,9 @@ public class ModCreativeTabs {
                         // ---- 羽·荒厄遗咒 ----
                         output.accept(ModItems.FEATHER_HARDMAN.get());
 
+                        // ---- 羽·折翼沉渊 ----
+                        output.accept(ModItems.FEATHER_ABYSS.get());
+
                         // 摄魂术附魔书（通过参数查找注册表避免闪退）
                         var enchants = params.holders()
                                 .lookupOrThrow(Registries.ENCHANTMENT);

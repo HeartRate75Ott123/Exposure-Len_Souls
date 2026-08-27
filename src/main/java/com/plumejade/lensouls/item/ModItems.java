@@ -148,6 +148,10 @@ ITEMS.register("feather_twitcher", () -> new FeatherTwitcherItem(new Item.Proper
 public static final DeferredItem<FeatherHardmanItem> FEATHER_HARDMAN =
 ITEMS.register("feather_hardman", () -> new FeatherHardmanItem(new Item.Properties()));
 
+    // ---- 羽·折翼沉渊（Curios 任意槽位饰品，与其他羽毛互斥） ----
+public static final DeferredItem<FeatherAbyssItem> FEATHER_ABYSS =
+ITEMS.register("feather_abyss", () -> new FeatherAbyssItem(new Item.Properties()));
+
     // ---- 子弹物品（仅用于渲染弹射物模型） ----
     public static final DeferredItem<Item> OVERWORLD_BULLET = ITEMS.register("overworld_bullet",
             () -> new Item(new Item.Properties()));

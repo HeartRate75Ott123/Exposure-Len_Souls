@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.client;
 
+import com.plumejade.lensouls.handler.FeatherAbyssHandler;
 import com.plumejade.lensouls.handler.FeatherTwitcherHandler;
 import com.plumejade.lensouls.LenSouls;
 import net.minecraft.client.Minecraft;
@@ -31,7 +32,8 @@ public class SanBarOverlay {
     public static void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.options.hideGui) return;
-        if (!FeatherTwitcherHandler.hasTwitcher(mc.player)) return;
+        // 扭曲羽毛 / 折翼沉渊 均可显示（值按各自上限等比例换算，扭曲 0-100，沉渊 0-200 发来的是 /2）
+        if (!FeatherTwitcherHandler.hasTwitcher(mc.player) && !FeatherAbyssHandler.hasAbyss(mc.player)) return;
 
         GuiGraphics g = event.getGuiGraphics();
         // 用 round 保证 34px 纹理完整映射（int 截断会裁掉底部像素并压缩比例）

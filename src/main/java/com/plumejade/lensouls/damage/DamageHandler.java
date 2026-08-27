@@ -6,6 +6,7 @@ import com.plumejade.lensouls.config.DamageTypeElementLoader;
 import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.config.ItemElementActivityLoader;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
+import com.plumejade.lensouls.handler.FeatherAbyssHandler;
 import com.plumejade.lensouls.integration.PhotoSpecialEffects;
 import com.plumejade.lensouls.network.ElementSpiralPacket;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -156,6 +157,11 @@ public class DamageHandler {
             float projWeakness = DataPackLoader.getWeakness(entityId, ElementDamage.PROJECTILE);
             totalBonusMultiplier += projWeakness;
             if (projWeakness > 0f) emitSpiralParticle(level, target, ElementDamage.PROJECTILE);
+        }
+
+        // 恶意：折翼沉渊佩戴者受到的元素附加伤害 +12%（相对增幅）
+        if (target instanceof ServerPlayer targetPlayer && FeatherAbyssHandler.hasAbyss(targetPlayer)) {
+            totalBonusMultiplier *= 1.12f;
         }
 
         // 追加叠加在护甲后伤害上（护甲仍然有效）

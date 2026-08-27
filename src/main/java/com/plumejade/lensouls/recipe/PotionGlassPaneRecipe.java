@@ -2,6 +2,7 @@ package com.plumejade.lensouls.recipe;
 
 import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.component.PotionFilterData;
+import com.plumejade.lensouls.ModTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponents;
@@ -15,6 +16,7 @@ import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.level.Level;
 import net.minecraft.resources.ResourceLocation;
@@ -40,14 +42,18 @@ public class PotionGlassPaneRecipe extends CustomRecipe {
     /** 试剂默认时长（刻）：试剂无药水时长概念，按常规 I 级酿造结果取 1:30 */
     private static final int REAGENT_DURATION = 1800;
 
-    private static final Set<Item> GLASS_PANES = new HashSet<>(List.of(
-            Items.GLASS_PANE,
-            Items.WHITE_STAINED_GLASS_PANE, Items.ORANGE_STAINED_GLASS_PANE, Items.MAGENTA_STAINED_GLASS_PANE,
-            Items.LIGHT_BLUE_STAINED_GLASS_PANE, Items.YELLOW_STAINED_GLASS_PANE, Items.LIME_STAINED_GLASS_PANE,
-            Items.PINK_STAINED_GLASS_PANE, Items.GRAY_STAINED_GLASS_PANE, Items.LIGHT_GRAY_STAINED_GLASS_PANE,
-            Items.CYAN_STAINED_GLASS_PANE, Items.PURPLE_STAINED_GLASS_PANE, Items.BLUE_STAINED_GLASS_PANE,
-            Items.BROWN_STAINED_GLASS_PANE, Items.GREEN_STAINED_GLASS_PANE, Items.RED_STAINED_GLASS_PANE,
-            Items.BLACK_STAINED_GLASS_PANE));
+    /** 通过反射收集所有继承 PotionItem 的物品（原版及模组药水），作为支持的输入集合 */
+    private static final Set<Item> POTION_ITEMS = collectPotionItems();
+
+    private static Set<Item> collectPotionItems() {
+        Set<Item> set = new HashSet<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (item instanceof PotionItem) {
+                set.add(item);
+            }
+        }
+        return set;
+    }
 
     /** 酿造试剂 → 对应原版效果（固定 I 级） */
     private static final Map<Item, ResourceLocation> REAGENT_EFFECTS = new HashMap<>();
@@ -74,6 +80,18 @@ public class PotionGlassPaneRecipe extends CustomRecipe {
         super(category);
     }
 
+    public static boolean isGlassPane(ItemStack stack) {
+        return !stack.isEmpty() && stack.is(ModTags.GLASS_PANES);
+    }
+
+    public static boolean isPotion(ItemStack stack) {
+        return !stack.isEmpty() && stack.getItem() instanceof PotionItem;
+    }
+
+    public static boolean isReagent(ItemStack stack) {
+        return !stack.isEmpty() && REAGENT_EFFECTS.containsKey(stack.getItem());
+    }
+
     @Override
     public boolean matches(CraftingInput input, Level level) {
         int panes = 0;
@@ -81,7 +99,7 @@ public class PotionGlassPaneRecipe extends CustomRecipe {
         ItemStack other = ItemStack.EMPTY;
         for (ItemStack stack : input.items()) {
             if (stack.isEmpty()) continue;
-            if (GLASS_PANES.contains(stack.getItem())) {
+            if (isGlassPane(stack)) {
                 panes++;
             } else {
                 others++;
@@ -89,8 +107,8 @@ public class PotionGlassPaneRecipe extends CustomRecipe {
             }
         }
         if (panes != 1 || others != 1 || other.isEmpty()) return false;
-        if (other.getItem() instanceof PotionItem) return true;
-        return REAGENT_EFFECTS.containsKey(other.getItem());
+        if (isPotion(other)) return !effectFrom(other).isEmpty();
+        return isReagent(other);
     }
 
     @Override
@@ -99,7 +117,7 @@ public class PotionGlassPaneRecipe extends CustomRecipe {
         ItemStack other = ItemStack.EMPTY;
         for (ItemStack stack : input.items()) {
             if (stack.isEmpty()) continue;
-            if (GLASS_PANES.contains(stack.getItem())) pane = stack;
+            if (isGlassPane(stack)) pane = stack;
             else other = stack;
         }
         if (pane.isEmpty() || other.isEmpty()) return ItemStack.EMPTY;
@@ -107,7 +125,10 @@ public class PotionGlassPaneRecipe extends CustomRecipe {
         List<PotionFilterData.Entry> existing = pane.get(ModDataComponents.POTION_FILTER_DATA) != null
                 ? pane.get(ModDataComponents.POTION_FILTER_DATA).effects() : List.of();
         List<PotionFilterData.Entry> added = effectFrom(other);
-        if (added.isEmpty()) return ItemStack.EMPTY;
+        if (added.isEmpty()) {
+            // JEI 预览用的代表输入（如水瓶）无法推导效果，给出示例以便正常展示
+            added = List.of(new PotionFilterData.Entry(rl("speed"), 0, REAGENT_DURATION));
+        }
 
         ItemStack out = pane.copy();
         out.setCount(1);
@@ -127,7 +148,7 @@ public class PotionGlassPaneRecipe extends CustomRecipe {
     private static List<PotionFilterData.Entry> effectFrom(ItemStack other) {
         List<PotionFilterData.Entry> result = new ArrayList<>();
         // 路径 A：已酿好的药水（水/喷溅/滞留）→ 携带其全部效果及各自的等级与时长
-        if (other.getItem() instanceof PotionItem) {
+        if (isPotion(other)) {
             PotionContents pc = other.get(DataComponents.POTION_CONTENTS);
             if (pc != null) {
                 List<MobEffectInstance> effects = new ArrayList<>();
@@ -148,6 +169,15 @@ public class PotionGlassPaneRecipe extends CustomRecipe {
             result.add(new PotionFilterData.Entry(effId, 0, REAGENT_DURATION));
         }
         return result;
+    }
+
+    @Override
+    public NonNullList<Ingredient> getIngredients() {
+        List<Item> inputs = new ArrayList<>(POTION_ITEMS);
+        inputs.addAll(REAGENT_EFFECTS.keySet());
+        return NonNullList.of(
+                Ingredient.of(ModTags.GLASS_PANES),
+                Ingredient.of(inputs.toArray(new Item[0])));
     }
 
     @Override

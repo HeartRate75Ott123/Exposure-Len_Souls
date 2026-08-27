@@ -322,7 +322,7 @@
   "effect.lensouls.filter_spider.description": "§aTarget becomes Vulnerable: +35% damage taken, 20s duration",
   "effect.lensouls.filter_spider.desc": "§aTarget becomes Vulnerable: +35% damage taken, 20s duration",
   "tooltip.lensouls.filter.intro": "§dThis is a camera attachment. Hold a film camera, §dSneak + Right-Click§r to place it in the filter slot at the bottom-right of the container panel",
-  "tooltip.lensouls.filter.intro_enemy": "§dThis is a camera attachment. Hold a film camera, §dSneak + Right-Click§r to place it in the filter slot at the bottom-right of the container panel (this one is special, for enemies)",
+  "tooltip.lensouls.filter.intro_enemy": "§dThis is a camera attachment. Hold a film camera, §dSneak + Right-Click§r to place it in the filter slot at the bottom-right of the container panel",
   "tooltip.lensouls.filter.activate": "§bAfter installing the filter, switch to third-person front view while holding the camera and photograph yourself; on success enters a 30s cooldown",
   "tooltip.lensouls.filter.activate_enemy": "§bAfter installing the filter, photograph an enemy while holding the camera; on success enters a 30s cooldown",
   "tooltip.lensouls.filter.antialias": "§aAt full health, +10 base damage, 20s duration",
@@ -342,5 +342,8 @@
   "tooltip.lensouls.filter.spider": "§aTarget becomes Vulnerable: +35% damage taken, 20s duration",
   "tooltip.lensouls.filter.wobble": "§aRegeneration III while on fire, 20s duration",
   "tooltip.lensouls.potion_glass.effects": "§dInfused potion effects:",
-  "jei.lensouls.potion_glass.desc": "§7Effect depends on the input potion/reagent; craft repeatedly to stack multiple effects"
+  "tooltip.lensouls.potion_glass.input.potion": "§dCan be combined with a glass pane to infuse potion effects",
+  "tooltip.lensouls.potion_glass.input.reagent": "§dCan be combined with a glass pane to infuse potion effects",
+  "tooltip.lensouls.potion_glass.input.camera": "After the glass pane is infused with potion effects, it becomes a camera accessory installed in the filter slot; photograph a creature to inject effects, or switch to third-person front view for a selfie",
+  "tooltip.lensouls.potion_glass.usage": "Can be installed as a camera accessory in the filter slot; photograph a creature to inject effects, or switch to third-person front view for a selfie"
 }

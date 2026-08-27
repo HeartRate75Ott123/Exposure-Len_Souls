@@ -321,7 +321,7 @@
   "effect.lensouls.filter_spider.description": "§a使目标陷入易伤，受到伤害 +35%，有效期20s",
   "effect.lensouls.filter_spider.desc": "§a使目标陷入易伤，受到伤害 +35%，有效期20s",
   "tooltip.lensouls.filter.intro": "§d此为相机配件，需要手持胶卷相机§d潜行+右键§r放在容器面板右下角的滤镜槽位",
-  "tooltip.lensouls.filter.intro_enemy": "§d此为相机配件，需要手持胶卷相机§d潜行+右键§r放在容器面板右下角的滤镜槽位（这个给敌人用的比较特殊）",
+  "tooltip.lensouls.filter.intro_enemy": "§d此为相机配件，需要手持胶卷相机§d潜行+右键§r放在容器面板右下角的滤镜槽位",
   "tooltip.lensouls.filter.activate": "§b安装滤镜后需要手持相机时切换到第三人称前视角，对自己拍摄，触发成功后进入30s冷却",
   "tooltip.lensouls.filter.activate_enemy": "§b安装滤镜后需要手持相机拍摄敌人，触发成功后进入30s冷却",
   "tooltip.lensouls.filter.antialias": "§a生命全满时，基础伤害 +10，有效期20s",
@@ -341,5 +341,8 @@
   "tooltip.lensouls.filter.spider": "§a使目标陷入易伤，受到伤害 +35%，有效期20s",
   "tooltip.lensouls.filter.wobble": "§a处于火焰中时，生命恢复 III，有效期20s",
   "tooltip.lensouls.potion_glass.effects": "§d已注入药水效果：",
-  "jei.lensouls.potion_glass.desc": "§7效果由输入的药水/药材决定，可多次合成叠加多种效果"
+  "tooltip.lensouls.potion_glass.input.potion": "§d支持与玻璃板合成注入药水效果",
+  "tooltip.lensouls.potion_glass.input.reagent": "§d可以与玻璃板合成注入药水效果",
+  "tooltip.lensouls.potion_glass.input.camera": "玻璃板注入药水效果后，作为相机配件，安装在滤镜槽位，拍摄生物即可注入效果，可以切到第三人称前视角自拍",
+  "tooltip.lensouls.potion_glass.usage": "可作为相机配件，安装在滤镜槽位，拍摄生物即可注入效果，可以切到第三人称前视角自拍"
 }

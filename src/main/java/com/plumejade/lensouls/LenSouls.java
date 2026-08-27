@@ -60,6 +60,7 @@ public class LenSouls {
         ModEntities.register(modEventBus);
         com.plumejade.lensouls.recipe.DimensionalGunRecipes.register(modEventBus);
         com.plumejade.lensouls.recipe.CopySoulRecipes.register(modEventBus);
+        com.plumejade.lensouls.recipe.PotionGlassPaneRecipes.register(modEventBus);
         com.plumejade.lensouls.particle.ModParticleTypes.register(modEventBus);
         com.plumejade.lensouls.sound.ModSounds.register(modEventBus);
         PacketHandler.register(modEventBus);

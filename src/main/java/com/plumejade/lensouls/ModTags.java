@@ -23,4 +23,11 @@ public class ModTags {
      */
     public static final TagKey<Item> SOUL_PHOTOGRAPHY_ENCHANTABLE =
             ItemTags.create(ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "enchantable/soul_photography"));
+
+    /**
+     * 所有玻璃板（无色 + 16 种染色），由 {@code data/lensouls/tags/item/glass_panes.json} 定义。
+     * 用作药水玻璃板配方的输入与 JEI 代表性原料。
+     */
+    public static final TagKey<Item> GLASS_PANES =
+            ItemTags.create(ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "glass_panes"));
 }

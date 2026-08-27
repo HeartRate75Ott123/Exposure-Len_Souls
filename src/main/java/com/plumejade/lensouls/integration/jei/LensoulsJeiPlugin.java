@@ -2,13 +2,10 @@ package com.plumejade.lensouls.integration.jei;
 
 import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
-import com.plumejade.lensouls.component.ModDataComponents;
-import com.plumejade.lensouls.component.PotionFilterData;
 import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import com.plumejade.lensouls.item.ModItems;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
-import mezz.jei.api.constants.RecipeTypes;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.registration.ISubtypeRegistration;
 import mezz.jei.api.registration.IRecipeRegistration;
@@ -16,16 +13,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.core.NonNullList;
-import net.minecraft.world.item.crafting.CraftingBookCategory;
-import net.minecraft.world.item.crafting.CraftingRecipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.ShapelessRecipe;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * JEI 兼容插件。
@@ -136,9 +123,6 @@ public class LensoulsJeiPlugin implements IModPlugin {
         addSingleInfo(registration, ModItems.CONVERTER.get().getDefaultInstance(),
                 Component.translatable("jei.lensouls.converter"));
 
-        // ---- 药水玻璃板（工作台） ----
-        addPotionGlassPaneRecipes(registration);
-
         // ---- 能力窃取实体照片（可搜索，不加入创造选项卡） ----
         for (String entityId : PhotographEffectRegistry.getAllEntityIds()) {
             ItemStack photo = com.plumejade.lensouls.item.EntityPhotographItem.create(entityId);
@@ -168,42 +152,5 @@ public class LensoulsJeiPlugin implements IModPlugin {
     /** 为能力球等单行物品添加提示 */
     private static void addSingleInfo(IRecipeRegistration registration, ItemStack stack, Component description) {
         addInfo(registration, stack, description);
-    }
-
-    /**
-     * 药水玻璃板：在工作台页面显示两条代表性配方。
-     * 实际合成动态（输出效果由输入药水/药材决定），此处仅作入口示意：
-     * ① 任意玻璃板 + 任意药水 → 药水玻璃板；② 任意玻璃板 + 酿造药材 → 药水玻璃板。
-     */
-    private static void addPotionGlassPaneRecipes(IRecipeRegistration registration) {
-        ResourceLocation speed = ResourceLocation.fromNamespaceAndPath("minecraft", "speed");
-        ItemStack sample = new ItemStack(Items.GLASS_PANE);
-        sample.set(ModDataComponents.POTION_FILTER_DATA,
-                new PotionFilterData(List.of(new PotionFilterData.Entry(speed, 0, 1800))));
-
-        Ingredient glassPanes = Ingredient.of(
-                Items.GLASS_PANE, Items.WHITE_STAINED_GLASS_PANE, Items.ORANGE_STAINED_GLASS_PANE,
-                Items.MAGENTA_STAINED_GLASS_PANE, Items.LIGHT_BLUE_STAINED_GLASS_PANE, Items.YELLOW_STAINED_GLASS_PANE,
-                Items.LIME_STAINED_GLASS_PANE, Items.PINK_STAINED_GLASS_PANE, Items.GRAY_STAINED_GLASS_PANE,
-                Items.LIGHT_GRAY_STAINED_GLASS_PANE, Items.CYAN_STAINED_GLASS_PANE, Items.PURPLE_STAINED_GLASS_PANE,
-                Items.BLUE_STAINED_GLASS_PANE, Items.BROWN_STAINED_GLASS_PANE, Items.GREEN_STAINED_GLASS_PANE,
-                Items.RED_STAINED_GLASS_PANE, Items.BLACK_STAINED_GLASS_PANE);
-
-        ItemStack speedPotion = new ItemStack(Items.POTION);
-
-        CraftingRecipe potionRecipe = new ShapelessRecipe("",
-                CraftingBookCategory.MISC, sample.copy(),
-                NonNullList.of(glassPanes, Ingredient.of(speedPotion)));
-        CraftingRecipe reagentRecipe = new ShapelessRecipe("",
-                CraftingBookCategory.MISC, sample.copy(),
-                NonNullList.of(glassPanes, Ingredient.of(Items.SUGAR)));
-
-        List<RecipeHolder<CraftingRecipe>> recipes = new ArrayList<>();
-        recipes.add(new RecipeHolder<>(ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "jei_potion_glass_pane_potion"), potionRecipe));
-        recipes.add(new RecipeHolder<>(ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "jei_potion_glass_pane_reagent"), reagentRecipe));
-        registration.addRecipes(RecipeTypes.CRAFTING, recipes);
-
-        registration.addIngredientInfo(sample.copy(), VanillaTypes.ITEM_STACK,
-                Component.translatable("jei.lensouls.potion_glass.desc"));
     }
 }

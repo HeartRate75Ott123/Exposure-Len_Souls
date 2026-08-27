@@ -340,5 +340,6 @@
   "tooltip.lensouls.filter.scan_pincushion": "§a+10% damage per negative effect, 20s duration",
   "tooltip.lensouls.filter.sobel": "§aDamage × (current speed ÷ base speed); faster movement = higher damage, 20s duration",
   "tooltip.lensouls.filter.spider": "§aTarget becomes Vulnerable: +35% damage taken, 20s duration",
-  "tooltip.lensouls.filter.wobble": "§aRegeneration III while on fire, 20s duration"
+  "tooltip.lensouls.filter.wobble": "§aRegeneration III while on fire, 20s duration",
+  "tooltip.lensouls.potion_glass.effects": "§dInfused potion effects:"
 }

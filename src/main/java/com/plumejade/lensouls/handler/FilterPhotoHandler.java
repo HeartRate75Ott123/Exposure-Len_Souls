@@ -139,21 +139,25 @@ public class FilterPhotoHandler {
     }
 
     /**
-     * 药水玻璃板：施加携带的原版药水效果 30s（600 刻）。
+     * 药水玻璃板：施加携带的全部原版药水效果（各自等级与时长，按注入药水迁移）。
      * 自拍 → 施加给自己；否则 → 施加给入镜首个非自己且存活的实体。
      */
     private static void applyPotionFilter(ServerPlayer player, ItemStack hand, PotionFilterData data,
                                           boolean selfie, FrameAddedEvent event, long now) {
-        ResourceKey<MobEffect> key = ResourceKey.create(Registries.MOB_EFFECT, data.effect());
-        Holder<MobEffect> effect = BuiltInRegistries.MOB_EFFECT.getHolder(key).orElse(null);
-        if (effect == null) return;
-        MobEffectInstance inst = new MobEffectInstance(effect, 600, data.amplifier());
+        List<MobEffectInstance> instances = new ArrayList<>();
+        for (var e : data.effects()) {
+            ResourceKey<MobEffect> key = ResourceKey.create(Registries.MOB_EFFECT, e.effect());
+            var effect = BuiltInRegistries.MOB_EFFECT.getHolder(key).orElse(null);
+            if (effect == null) continue;
+            instances.add(new MobEffectInstance(effect, e.duration(), e.amplifier()));
+        }
+        if (instances.isEmpty()) return;
         if (selfie) {
-            player.addEffect(inst);
+            instances.forEach(player::addEffect);
         } else {
-            for (LivingEntity e : event.getEntitiesInFrame()) {
-                if (e != player && e.isAlive()) {
-                    e.addEffect(inst);
+            for (LivingEntity ent : event.getEntitiesInFrame()) {
+                if (ent != player && ent.isAlive()) {
+                    instances.forEach(ent::addEffect);
                     break;
                 }
             }

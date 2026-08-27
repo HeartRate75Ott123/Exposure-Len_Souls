@@ -1,25 +1,19 @@
 package com.plumejade.lensouls.enchantment;
 
 import com.plumejade.lensouls.LenSouls;
-import com.plumejade.lensouls.ModTags;
-import net.minecraft.core.HolderSet;
-import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.DeferredRegister;
-
-import java.util.List;
-import java.util.Optional;
 
 /**
- * 模组附魔注册表。
+ * 模组附魔：摄魂术。
+ * <p>
+ * 1.21.1 起附魔由数据包 JSON 定义（{@code data/lensouls/enchantment/soul_photography.json}），
+ * 其 {@code supported_items} 标签由数据包加载器正确绑定，可在铁砧/附魔台正常附到任意装备。
+ * 此类仅持有资源键与持有方，供其他系统按附魔等级查询。
  */
 public class ModEnchantments {
 
@@ -27,30 +21,8 @@ public class ModEnchantments {
             ResourceKey.create(Registries.ENCHANTMENT,
                     ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "soul_photography"));
 
-    private static final DeferredRegister<Enchantment> ENCHANTMENTS =
-            DeferredRegister.create(Registries.ENCHANTMENT, LenSouls.MODID);
-
     public static final DeferredHolder<Enchantment, Enchantment> SOUL_PHOTOGRAPHY =
-            ENCHANTMENTS.register("soul_photography", () -> {
-                // 使用合并标签（剑 + 相机），由 data/lensouls/tags/item/enchantable/soul_photography.json 定义
-                var supportedItems = BuiltInRegistries.ITEM.getOrCreateTag(ModTags.SOUL_PHOTOGRAPHY_ENCHANTABLE);
-
-                var def = new Enchantment.EnchantmentDefinition(
-                        supportedItems,
-                        Optional.empty(),
-                        5, 1,
-                        new Enchantment.Cost(5, 8),
-                        new Enchantment.Cost(25, 8),
-                        4,
-                        List.of(EquipmentSlotGroup.MAINHAND)
-                );
-                return new Enchantment(
-                        Component.translatable("enchantment.lensouls.soul_photography"),
-                        def,
-                        HolderSet.empty(),
-                        DataComponentMap.EMPTY
-                );
-            });
+            DeferredHolder.create(SOUL_PHOTOGRAPHY_KEY);
 
     public static int getSoulPhotographyLevel(net.minecraft.core.RegistryAccess registry, net.minecraft.world.item.ItemStack stack) {
         var registryOrThrow = registry.registryOrThrow(Registries.ENCHANTMENT);
@@ -63,6 +35,5 @@ public class ModEnchantments {
     }
 
     public static void register(IEventBus modEventBus) {
-        ENCHANTMENTS.register(modEventBus);
     }
 }

@@ -4,6 +4,7 @@ import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.damage.ElementDamage;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectCategory;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -41,6 +42,56 @@ public class ModEffects {
 
     public static final DeferredHolder<MobEffect, MobEffect> ENDER_INFUSION =
             register("ender_infusion", () -> new ElementInfusionEffect(ElementDamage.ENDER, 0x9933CC));
+
+    // ========== 相机滤镜效果（exposure:expanded 16 滤镜 → 16 效果 + 敌人易伤） ==========
+    /** #1 护甲转伤害·失甲 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_BLOBS =
+            register("filter_blobs", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_blobs"));
+    /** #3 血量转攻速·留20血 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_COLOR_CONVOLVE =
+            register("filter_color_convolve", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_color_convolve"));
+    /** #2 移速比率×伤害 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_SOBEL =
+            register("filter_sobel", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_sobel"));
+    /** #5 每失10%血 -7%移速+25%伤 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_PENCIL =
+            register("filter_pencil", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_pencil"));
+    /** #6 满血+10基础伤 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_ANTIALIAS =
+            register("filter_antialias", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_antialias"));
+    /** #7 随机4正面buff */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_ART =
+            register("filter_art", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_art"));
+    /** #8 +10甲 -50%移速 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_BUMPY =
+            register("filter_bumpy", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_bumpy"));
+    /** #9 +8韧 -50%移速 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_FLIP =
+            register("filter_flip", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_flip"));
+    /** #10 水中175%伤 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_NTSC =
+            register("filter_ntsc", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_ntsc"));
+    /** #11 火中回血3 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_WOBBLE =
+            register("filter_wobble", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_wobble"));
+    /** #12 每debuff+10%伤 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_SCAN_PINCUSHION =
+            register("filter_scan_pincushion", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_scan_pincushion"));
+    /** #14 每debuff+1韧 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_DESATURATE =
+            register("filter_desaturate", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_desaturate"));
+    /** #13 每64复制之魂+3伤 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_BITS =
+            register("filter_bits", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_bits"));
+    /** #16 跳跃高度每格+5伤 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_DECONVERGE =
+            register("filter_deconverge", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_deconverge"));
+    /** #4 空手无甲+70伤 */
+    public static final DeferredHolder<MobEffect, MobEffect> FILTER_BLUR =
+            register("filter_blur", () -> new FilterEffect(MobEffectCategory.BENEFICIAL, 0, "filter_blur"));
+    /** #15 敌人易伤（施加在敌人身上） */
+    public static final DeferredHolder<MobEffect, MobEffect> VULNERABILITY =
+            register("vulnerability", () -> new FilterEffect(MobEffectCategory.HARMFUL, 0, "vulnerability"));
 
     private static DeferredHolder<MobEffect, MobEffect> register(String name, Supplier<MobEffect> effect) {
         return EFFECTS.register(name, effect);

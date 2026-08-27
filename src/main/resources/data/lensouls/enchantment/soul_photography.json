@@ -1,20 +1,21 @@
 {
-  "anvil_cost": 4,
   "description": {
     "translate": "enchantment.lensouls.soul_photography"
   },
-  "max_cost": {
-    "base": 25,
-    "per_level_above_first": 8
-  },
+  "supported_items": "#lensouls:enchantable/soul_photography",
+  "weight": 5,
   "max_level": 1,
   "min_cost": {
     "base": 5,
     "per_level_above_first": 8
   },
+  "max_cost": {
+    "base": 25,
+    "per_level_above_first": 8
+  },
+  "anvil_cost": 4,
   "slots": [
-    "mainhand"
+    "any"
   ],
-  "supported_items": "#lensouls:enchantable/soul_photography",
-  "weight": 5
+  "effects": {}
 }

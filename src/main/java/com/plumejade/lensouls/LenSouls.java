@@ -82,6 +82,9 @@ public class LenSouls {
         // ---- 能力系统 ----
         NeoForge.EVENT_BUS.register(AbilityManager.class);
         NeoForge.EVENT_BUS.register(PhotoInjectionHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FilterPhotoHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.damage.FilterDamageHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FilterTickHandler.class);
         NeoForge.EVENT_BUS.register(SpatialWarpHandler.class);
         NeoForge.EVENT_BUS.register(TemporalRecallHandler.class);
         NeoForge.EVENT_BUS.register(FreezeCleanupHandler.class);

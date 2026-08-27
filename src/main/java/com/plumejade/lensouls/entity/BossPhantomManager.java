@@ -870,6 +870,8 @@ public class BossPhantomManager {
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            // 死亡重生后是新实体（tickCount 归零），清掉挥击去重避免 boss 弹幕被卡死
+            BossPhotoProjHelper.clearSwing(player.getUUID());
             BossPhantomManager mgr = getInstance();
             UUID pid = player.getUUID();
             java.util.List<Integer> ids = mgr.activePhantoms.entrySet().stream()

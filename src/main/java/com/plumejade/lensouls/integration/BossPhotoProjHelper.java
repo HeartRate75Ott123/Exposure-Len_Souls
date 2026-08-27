@@ -28,8 +28,12 @@ import java.util.Map;
  */
 public class BossPhotoProjHelper {
 
-    /** 挥击去重（内存态，不持久化——persistentData 跨会话污染会导致永不触发） */
-    private static final java.util.Map<java.util.UUID, Integer> LAST_SWING =
+    /**
+     * 挥击去重（内存态，不持久化——persistentData 跨会话污染会导致永不触发）。
+     * 时钟用世界游戏时间而非实体 tickCount：玩家死亡重生后是新实体，tickCount 会归零，
+     * 若存旧实体的 tickCount 会算出负数差值导致弹幕永久卡死。
+     */
+    private static final java.util.Map<java.util.UUID, Long> LAST_SWING =
             new java.util.concurrent.ConcurrentHashMap<>();
 
     /** boss 照片 id → 触发概率 */
@@ -58,9 +62,9 @@ public class BossPhotoProjHelper {
     /** 每次完整挥砍开始调用（由 Player#attack / BetterCombat handleAttackRequest mixin 触发） */
     public static void onSwing(ServerPlayer player) {
         // 去重：BetterCombat 命中时会同时走原版 attack 与 handleAttackRequest，3 tick 内只触发一次
-        Integer last = LAST_SWING.get(player.getUUID());
-        if (last != null && player.tickCount - last < 3) return;
-        LAST_SWING.put(player.getUUID(), player.tickCount);
+        Long last = LAST_SWING.get(player.getUUID());
+        if (last != null && player.level().getGameTime() - last < 3) return;
+        LAST_SWING.put(player.getUUID(), player.level().getGameTime());
 
         List<String> gear = PhotoSpecialEffects.collectGearEntities(player);
         for (String id : gear) {

@@ -15,8 +15,8 @@ import mezz.jei.api.registration.IRecipeRegistration;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
@@ -177,18 +177,26 @@ public class LensoulsJeiPlugin implements IModPlugin {
      */
     private static void addPotionGlassPaneRecipes(IRecipeRegistration registration) {
         ResourceLocation speed = ResourceLocation.fromNamespaceAndPath("minecraft", "speed");
-        ItemStack sample = new ItemStack(net.minecraft.world.item.Items.GLASS_PANE);
+        ItemStack sample = new ItemStack(Items.GLASS_PANE);
         sample.set(ModDataComponents.POTION_FILTER_DATA,
                 new PotionFilterData(List.of(new PotionFilterData.Entry(speed, 0, 1800))));
 
-        ItemStack speedPotion = new ItemStack(net.minecraft.world.item.Items.POTION);
+        Ingredient glassPanes = Ingredient.of(
+                Items.GLASS_PANE, Items.WHITE_STAINED_GLASS_PANE, Items.ORANGE_STAINED_GLASS_PANE,
+                Items.MAGENTA_STAINED_GLASS_PANE, Items.LIGHT_BLUE_STAINED_GLASS_PANE, Items.YELLOW_STAINED_GLASS_PANE,
+                Items.LIME_STAINED_GLASS_PANE, Items.PINK_STAINED_GLASS_PANE, Items.GRAY_STAINED_GLASS_PANE,
+                Items.LIGHT_GRAY_STAINED_GLASS_PANE, Items.CYAN_STAINED_GLASS_PANE, Items.PURPLE_STAINED_GLASS_PANE,
+                Items.BLUE_STAINED_GLASS_PANE, Items.BROWN_STAINED_GLASS_PANE, Items.GREEN_STAINED_GLASS_PANE,
+                Items.RED_STAINED_GLASS_PANE, Items.BLACK_STAINED_GLASS_PANE);
+
+        ItemStack speedPotion = new ItemStack(Items.POTION);
 
         CraftingRecipe potionRecipe = new ShapelessRecipe("",
                 CraftingBookCategory.MISC, sample.copy(),
-                NonNullList.of(Ingredient.of(ItemTags.create(ResourceLocation.fromNamespaceAndPath("minecraft", "glass_panes"))), Ingredient.of(speedPotion)));
+                NonNullList.of(glassPanes, Ingredient.of(speedPotion)));
         CraftingRecipe reagentRecipe = new ShapelessRecipe("",
                 CraftingBookCategory.MISC, sample.copy(),
-                NonNullList.of(Ingredient.of(ItemTags.create(ResourceLocation.fromNamespaceAndPath("minecraft", "glass_panes"))), Ingredient.of(net.minecraft.world.item.Items.SUGAR)));
+                NonNullList.of(glassPanes, Ingredient.of(Items.SUGAR)));
 
         List<RecipeHolder<CraftingRecipe>> recipes = new ArrayList<>();
         recipes.add(new RecipeHolder<>(ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "jei_potion_glass_pane_potion"), potionRecipe));

@@ -340,5 +340,6 @@
   "tooltip.lensouls.filter.sobel": "§a伤害x （当前移速 ÷ 初始移速），跑得越快伤害越高，有效期20s",
   "tooltip.lensouls.filter.spider": "§a使目标陷入易伤，受到伤害 +35%，有效期20s",
   "tooltip.lensouls.filter.wobble": "§a处于火焰中时，生命恢复 III，有效期20s",
-  "tooltip.lensouls.potion_glass.effects": "§d已注入药水效果："
+  "tooltip.lensouls.potion_glass.effects": "§d已注入药水效果：",
+  "jei.lensouls.potion_glass.desc": "§7效果由输入的药水/药材决定，可多次合成叠加多种效果"
 }

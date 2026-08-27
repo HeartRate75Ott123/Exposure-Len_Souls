@@ -35,6 +35,12 @@ public class ModDataComponents {
                     .persistent(GunKillData.CODEC)
                     .networkSynchronized(GunKillData.STREAM_CODEC));
 
+    /** 药水滤镜数据：携带的原版药水效果与等级 */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<PotionFilterData>> POTION_FILTER_DATA =
+            register("potion_filter_data", builder -> builder
+                    .persistent(PotionFilterData.CODEC)
+                    .networkSynchronized(PotionFilterData.STREAM_CODEC));
+
     private static <T> DeferredHolder<DataComponentType<?>, DataComponentType<T>> register(
             String name, UnaryOperator<DataComponentType.Builder<T>> builder) {
         return COMPONENTS.register(name, () -> builder.apply(DataComponentType.builder()).build());

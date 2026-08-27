@@ -2,13 +2,18 @@ package com.plumejade.lensouls.handler;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.handler.CameraInputHandler;
+import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.effect.ModEffects;
 import com.plumejade.lensouls.handler.FeatherHardmanHandler;
+import io.github.mortuusars.exposure.Exposure;
 import io.github.mortuusars.exposure.data.Filters;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
 import io.github.mortuusars.exposure.world.camera.frame.Frame;
 import io.github.mortuusars.exposure.world.item.camera.CameraItem;
 import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
@@ -38,6 +43,8 @@ public class FilterPhotoHandler {
     private static final Map<ResourceLocation, Holder<MobEffect>> SELF_EFFECTS = new HashMap<>();
     /** 敌人易伤滤镜（仅非自拍、画面内有敌人时生效） */
     private static final ResourceLocation ENEMY_FILTER = ResourceLocation.fromNamespaceAndPath("exposure_expanded", "spider");
+    /** 药水滤镜（lensouls 自注册，酿造台合成，携带原版药水效果） */
+    private static final ResourceLocation POTION_FILTER = ResourceLocation.fromNamespaceAndPath("lensouls", "potion_filter");
     /** 每玩家滤镜拍摄冷却闸门（游戏刻）；保证 30s 内不重复触发，防御 Exposure 覆盖 MC 冷却。 */
     private static final Map<UUID, Long> lastFilterShot = new ConcurrentHashMap<>();
 
@@ -85,6 +92,12 @@ public class FilterPhotoHandler {
             long now = player.level().getGameTime();
             if (now < lastFilterShot.getOrDefault(player.getUUID(), Long.MIN_VALUE) + 600) return;
 
+            // 药水滤镜：携带原版药水效果，对自拍目标或入镜生物施加 30s（600 刻）
+            if (filter.equals(POTION_FILTER)) {
+                applyPotionFilter(player, hand, selfie, event, now);
+                return;
+            }
+
             // 敌人易伤：仅拍敌人（非自拍）时对其上易伤
             if (filter.equals(ENEMY_FILTER)) {
                 if (!selfie) {
@@ -119,6 +132,35 @@ public class FilterPhotoHandler {
     /** 相机快门关闭时会把自己的冷却覆盖为 2 tick（在 FrameAddedEvent 之后执行），故延后一 tick 写入 600，确保后写生效。 */
     private static void scheduleCooldown(ServerPlayer player, Item cooldownItem) {
         player.server.execute(() -> player.getCooldowns().addCooldown(cooldownItem, 600));
+    }
+
+    /**
+     * 药水滤镜：从已安装滤镜物品读回携带的原版药水效果，施加 30s（600 刻）。
+     * 自拍 → 施加给自己；否则 → 施加给入镜首个非自己且存活的实体。
+     */
+    private static void applyPotionFilter(ServerPlayer player, ItemStack hand, boolean selfie,
+                                          FrameAddedEvent event, long now) {
+        var stored = hand.get(Exposure.DataComponents.FILTER);
+        if (stored == null || stored.isEmpty()) return;
+        ItemStack filterStack = stored.getForReading();
+        var data = filterStack.get(ModDataComponents.POTION_FILTER_DATA);
+        if (data == null) return;
+        ResourceKey<MobEffect> key = ResourceKey.create(Registries.MOB_EFFECT, data.effect());
+        Holder<MobEffect> effect = BuiltInRegistries.MOB_EFFECT.getHolder(key).orElse(null);
+        if (effect == null) return;
+        MobEffectInstance inst = new MobEffectInstance(effect, 600, data.amplifier());
+        if (selfie) {
+            player.addEffect(inst);
+        } else {
+            for (LivingEntity e : event.getEntitiesInFrame()) {
+                if (e != player && e.isAlive()) {
+                    e.addEffect(inst);
+                    break;
+                }
+            }
+        }
+        scheduleCooldown(player, hand.getItem());
+        lastFilterShot.put(player.getUUID(), now);
     }
 
     /** #7 万象加持：随机 4 个原版正面效果，等级 2~3，持续 20s */

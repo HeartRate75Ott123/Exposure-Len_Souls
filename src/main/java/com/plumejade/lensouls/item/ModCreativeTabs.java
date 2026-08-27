@@ -93,6 +93,9 @@ public class ModCreativeTabs {
                         // ---- 回复药水 ----
                         output.accept(ModItems.HEAL_POTION.get());
 
+                        // ---- 药水滤镜 ----
+                        output.accept(ModItems.POTION_FILTER.get());
+
                         // ---- 复制之魂 ----
                         output.accept(ModItems.COPY_SOUL.get());
 

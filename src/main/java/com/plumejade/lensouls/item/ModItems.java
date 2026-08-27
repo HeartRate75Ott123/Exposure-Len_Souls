@@ -134,6 +134,10 @@ public class ModItems {
     public static final DeferredItem<HealPotionItem> HEAL_POTION = ITEMS.register("heal_potion",
             () -> new HealPotionItem(new Item.Properties()));
 
+    // ---- 药水滤镜（相机配件，酿造台合成） ----
+    public static final DeferredItem<PotionFilterItem> POTION_FILTER = ITEMS.register("potion_filter",
+            () -> new PotionFilterItem(new Item.Properties().stacksTo(1)));
+
     // ---- 复制之魂 ----
     public static final DeferredItem<CopySoulItem> COPY_SOUL = ITEMS.register("copy_soul",
             () -> new CopySoulItem(new Item.Properties()));

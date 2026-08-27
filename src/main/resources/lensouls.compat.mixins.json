@@ -13,7 +13,9 @@
     "PhotographCurioMixin",
     "CataclysmDamageBucketMixin",
     "LegendaryMonstersCapMixin",
-    "IgnisFireballBrandMixin"
+    "LegendaryMonstersVanillaDamageMixin",
+    "IgnisFireballBrandMixin",
+    "GatekeeperStunBlockMixin"
   ],
   "client": [
     "BetterCombatRangeMixin"

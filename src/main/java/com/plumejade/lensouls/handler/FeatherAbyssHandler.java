@@ -8,6 +8,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
@@ -39,6 +40,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerXpEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 
 import java.util.ArrayList;
@@ -71,6 +73,8 @@ import java.util.UUID;
  */
 public class FeatherAbyssHandler {
 
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("lensouls.abyss");
+
     public static final String KEY_TWIST = "lensouls:abyss_twist";
     public static final String KEY_GM_BEFORE = "lensouls:abyss_gm_before";
     private static final String KEY_DOOM_TIMER = "lensouls:abyss_doom_timer";
@@ -79,8 +83,8 @@ public class FeatherAbyssHandler {
 
     /** 疯狂：扭曲值上限 200 */
     public static final int MAX_TWIST = 200;
-    /** 安魂曲：全局受伤倍率 */
-    public static final float REQUIEM_TAKEN = 1.33f;
+    /** 安魂曲：每过一天受到的伤害 +13%（按天累加） */
+    public static final float REQUIEM_TAKEN_PER_DAY = 0.13f;
     /** 厄运：挖方块触发概率（0.8%） */
     public static final float DOOM_CHANCE = 0.008f;
     /** 厄运：每分钟 debuff 间隔（1200 tick） */
@@ -154,13 +158,17 @@ public class FeatherAbyssHandler {
         boolean has = hasAbyss(player);
         // 创造模式切换：每 tick 响应（手持判定开销小）
         updateAutoCreative(player, has);
-        if (player.tickCount % 20 != 0) return;
+        // 安魂曲：每 tick 实时读取天数并应用（内部仅变化时更新，开销小）
         if (has) {
             applyRequiem(player);
+        } else {
+            removeRequiem(player);
+        }
+        if (player.tickCount % 20 != 0) return;
+        if (has) {
             refreshStackModifiers(player);
             advanceTimers(player);
         } else {
-            removeRequiem(player);
             removeStackModifiers(player);
             resetTimers(player);
         }
@@ -197,23 +205,58 @@ public class FeatherAbyssHandler {
         }
     }
 
-    // ========== 安魂曲：maxHealth -1/存档游戏天 + 全局受伤 +33% ==========
+    // ========== 安魂曲：maxHealth -1/天（下限1） + 受到的伤害每天 +33% ==========
+
+    /** 安魂曲天数：镜像 InControl——主世界昼夜转换计数（SavedData 持久化，睡一觉 +1） */
+    private static int getSaveDays(ServerPlayer player) {
+        MinecraftServer server = player.getServer();
+        if (server == null) return 0;
+        return FeatherAbyssDayData.getData(server).getDaycounter();
+    }
+
+    /** 每 tick 推进安魂曲天数计数（主世界昼夜转换，睡一觉/过一夜 +1） */
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+        MinecraftServer server = event.getServer();
+        if (server == null) return;
+        ServerLevel overworld = server.getLevel(Level.OVERWORLD);
+        if (overworld == null) return;
+        FeatherAbyssDayData.getData(server).tick(overworld);
+    }
 
     private static void applyRequiem(ServerPlayer player) {
-        // 存档的游戏天数（世界累计 dayTime/24000，睡一觉 +1 天）
-        int days = (int) (player.level().getDayTime() / 24000L);
+        long rawDayTime = player.level().getDayTime();
+        int days = getSaveDays(player);
         AttributeInstance max = player.getAttribute(Attributes.MAX_HEALTH);
-        if (max == null) return;
-        if (days <= 0) {
-            max.removeModifier(REQUIEM_MODIFIER);
+        if (max == null) {
+            LOGGER.info("[AbyssRequiem] maxHealth attribute null");
             return;
         }
-        double want = -days;
+        double before = max.getValue();
+        // 自然上限（去掉本修饰符）→ 保证最终上限 ≥ 1：penalty = min(days, natural - 1)
+        double natural = before + days;
+        int penalty = (int) Math.max(0, Math.min(days, Math.floor(natural - 1.0)));
+        if (penalty <= 0) {
+            if (max.getModifier(REQUIEM_MODIFIER) != null) {
+                max.removeModifier(REQUIEM_MODIFIER);
+                LOGGER.info("[AbyssRequiem] removed: getDayTime={} days={}", rawDayTime, days);
+            }
+            return;
+        }
+        double want = -penalty;
         AttributeModifier mod = max.getModifier(REQUIEM_MODIFIER);
-        if (mod == null || Math.abs(mod.amount() - want) > 0.001) {
+        boolean changed = mod == null || Math.abs(mod.amount() - want) > 0.001;
+        if (changed) {
             max.removeModifier(REQUIEM_MODIFIER);
             max.addTransientModifier(
                     new AttributeModifier(REQUIEM_MODIFIER, want, AttributeModifier.Operation.ADD_VALUE));
+            double after = max.getValue();
+            // 让扣上限立刻反映到血条
+            if (player.getHealth() > player.getMaxHealth()) {
+                player.setHealth(player.getMaxHealth());
+            }
+            LOGGER.info("[AbyssRequiem] apply getDayTime={} days={} natural={} penalty={} maxBefore={} maxAfter={}",
+                    rawDayTime, days, natural, penalty, before, after);
         }
     }
 
@@ -289,7 +332,9 @@ public class FeatherAbyssHandler {
 
         // 玩家受击
         if (event.getEntity() instanceof ServerPlayer player && hasAbyss(player)) {
-            event.setNewDamage(event.getNewDamage() * REQUIEM_TAKEN);
+            // 安魂曲：受到的伤害按天累加 ×(1 + 0.33×天)
+            int saveDays = getSaveDays(player);
+            event.setNewDamage(event.getNewDamage() * (1.0f + REQUIEM_TAKEN_PER_DAY * saveDays));
             int twist = getTwist(player);
             if (twist > 0) {
                 event.setNewDamage(event.getNewDamage() * (1.0f + twist * 0.002f));
@@ -468,13 +513,31 @@ public class FeatherAbyssHandler {
         }
     }
 
-    /** 登录：疯狂值同步 + 清残留内存层（崩溃/断线兜底） */
+    /**
+     * 死亡重生：立即重挂安魂曲修饰符。
+     * <p>
+     * {@code restoreFrom} 只复制属性基础值（assignBaseValues），修饰符一律丢失——
+     * 无论 transient 还是 permanent。这里在重生实体创建瞬间重挂，消除重生间隙。
+     * Clone 时新实体 curio 可能未就绪，用旧实体佩戴状态作主判据。
+     */
+    @SubscribeEvent
+    public static void onClone(PlayerEvent.Clone event) {
+        if (!(event.getEntity() instanceof ServerPlayer newPlayer)) return;
+        if (!event.isWasDeath()) return;
+        Player oldPlayer = event.getOriginal();
+        if (hasAbyss(oldPlayer) || hasAbyss(newPlayer)) {
+            applyRequiem(newPlayer);
+        }
+    }
+
+    /** 登录：疯狂值同步 + 清残留内存层 + 安魂曲即时重挂（崩溃/断线兜底） */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         clearStackState(player.getUUID());
         if (hasAbyss(player)) {
             TwistSyncPacket.send(player, Math.round(getTwist(player) / 2.0f));
+            applyRequiem(player);
         }
         // 卡创造兜底：下一 tick 的 updateAutoCreative 会按当前手持状态自愈
     }

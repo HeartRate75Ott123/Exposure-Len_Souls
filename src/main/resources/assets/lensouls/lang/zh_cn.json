@@ -254,7 +254,7 @@
   "item.lensouls.feather_abyss.desc2": "§e佩戴在饰品栏任意槽位上即可生效，戴上后无法取下",
   "item.lensouls.feather_abyss.desc3": "§e虚无的承诺：手持§a终末立方体§r§e时自动切为创造",
   "item.lensouls.feather_abyss.desc4": "§c神秘雪球：怪物对你造成伤害时，会以自身为中心，发射一圈雪球（共8个），雪球附带3点魔法伤害",
-  "item.lensouls.feather_abyss.desc5": "§c安魂曲：每过一天，最大生命上限-1，全局受伤+33%",
+  "item.lensouls.feather_abyss.desc5": "§c安魂曲：每过一天，最大生命上限-1（最低1），受到的伤害+13%",
   "item.lensouls.feather_abyss.desc6": "§c愚钝：获取的经验减半",
   "item.lensouls.feather_abyss.desc7": "§c自闭：16格内每有一个生物加入世界，你受到0.5魔法伤害，自身护甲值x75%，每层持续3s",
   "item.lensouls.feather_abyss.desc8": "§c厄运：挖掘方块有0.8%概率在方块破坏位置生成15只蠹虫，每分钟从饥饿，失明，迟缓，挖掘疲劳，中毒，虚弱，漂浮中抽取两个（不重复），时长20s，等级在3到20中随机",

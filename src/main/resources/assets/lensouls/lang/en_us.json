@@ -255,7 +255,7 @@
   "item.lensouls.feather_abyss.desc2": "§eWorks when worn in any trinket slot, cannot be removed once equipped",
   "item.lensouls.feather_abyss.desc3": "§eNihil Promise: automatically switch to Creative while holding the §aTesseract§r§e",
   "item.lensouls.feather_abyss.desc4": "§cMystic Snowballs: when a monster damages you, launch a ring of 8 snowballs (3 magic damage each)",
-  "item.lensouls.feather_abyss.desc5": "§cRequiem: every day, max health -1 and global damage taken +33%",
+  "item.lensouls.feather_abyss.desc5": "§cRequiem: every day, max health -1 (min 1) and damage taken +13%",
   "item.lensouls.feather_abyss.desc6": "§cObtuse: experience gained is halved",
   "item.lensouls.feather_abyss.desc7": "§cSeclusion: each creature joining within 16 blocks deals 0.5 magic damage and reduces your armor ×75% (3s per stack)",
   "item.lensouls.feather_abyss.desc8": "§cDoom: 0.8% chance per mined block to spawn 15 silverfish; every minute, draw 2 (unique) from hunger/blindness/slowness/mining fatigue/poison/weakness/levitation, 20s, level 3-20",

@@ -10,6 +10,7 @@ import com.plumejade.lensouls.boss.ToughnessBarRenderer;
 import com.plumejade.lensouls.client.render.BossPhantomRenderer;
 import com.plumejade.lensouls.entity.ModEntities;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
+import com.plumejade.lensouls.effect.FilterEffect;
 import com.plumejade.lensouls.effect.ModEffects;
 import com.plumejade.lensouls.gui.ConverterScreen;
 import com.plumejade.lensouls.gui.ModMenus;
@@ -19,6 +20,7 @@ import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -280,11 +282,17 @@ public class LenSoulsClient {
                 com.plumejade.lensouls.client.particle.SpiralParticle.ProjectileProvider::new);
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.ELEMENT_SPIRAL_WEAKNESS.get(),
                 com.plumejade.lensouls.client.particle.SpiralParticle.WeaknessLensProvider::new);
+
+        // 滤镜效果隐藏粒子：客户端不生成任何粒子（provider 返回 null），既满足「非 null 可被编码」又实现隐藏
+        event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.FILTER_HIDDEN.get(),
+                (net.minecraft.client.particle.SpriteSet sprites) ->
+                        (type, level, x, y, z, vx, vy, vz) -> null);
     }
 
     private static void onGatherEffectTooltips(GatherEffectScreenTooltipsEvent event) {
         MobEffectInstance inst = event.getEffectInstance();
-        if (!(inst.getEffect().value() instanceof ElementInfusionEffect)) return;
+        MobEffect effect = inst.getEffect().value();
+        if (!(effect instanceof ElementInfusionEffect) && !(effect instanceof FilterEffect)) return;
         Component desc = Component.translatable(inst.getDescriptionId() + ".description");
         String raw = desc.getString();
         if (raw.isEmpty() || raw.equals(inst.getDescriptionId() + ".description")) return;
@@ -314,7 +322,7 @@ public class LenSoulsClient {
                 try {
                     Object mobEffectInst = getEffectInstance.invoke(getContext.invoke(event));
                     Object effect = holderValue.invoke(getEffect.invoke(mobEffectInst));
-                    if (!(effect instanceof ElementInfusionEffect)) return;
+                    if (!(effect instanceof ElementInfusionEffect) && !(effect instanceof FilterEffect)) return;
                     List<Component> tooltip = (List<Component>) getTooltipLines.invoke(event);
                     String descKey = (String) getDescriptionId.invoke(mobEffectInst);
                     Component desc = Component.translatable(descKey + ".description");

@@ -12,6 +12,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
@@ -24,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 相机滤镜触发：手持已挂滤镜的相机自拍（或拍敌人）→ 施加对应滤镜效果 20s，相机进入 30s 冷却。
@@ -35,6 +38,8 @@ public class FilterPhotoHandler {
     private static final Map<ResourceLocation, Holder<MobEffect>> SELF_EFFECTS = new HashMap<>();
     /** 敌人易伤滤镜（仅非自拍、画面内有敌人时生效） */
     private static final ResourceLocation ENEMY_FILTER = ResourceLocation.fromNamespaceAndPath("exposure_expanded", "spider");
+    /** 每玩家滤镜拍摄冷却闸门（游戏刻）；保证 30s 内不重复触发，防御 Exposure 覆盖 MC 冷却。 */
+    private static final Map<UUID, Long> lastFilterShot = new ConcurrentHashMap<>();
 
     private static void reg(String filter, Holder<MobEffect> effect) {
         SELF_EFFECTS.put(ResourceLocation.fromNamespaceAndPath("exposure_expanded", filter), effect);
@@ -77,6 +82,9 @@ public class FilterPhotoHandler {
             if (filterOpt.isEmpty()) return;
             ResourceLocation filter = filterOpt.get();
 
+            long now = player.level().getGameTime();
+            if (now < lastFilterShot.getOrDefault(player.getUUID(), Long.MIN_VALUE) + 600) return;
+
             // 敌人易伤：仅拍敌人（非自拍）时对其上易伤
             if (filter.equals(ENEMY_FILTER)) {
                 if (!selfie) {
@@ -86,7 +94,8 @@ public class FilterPhotoHandler {
                             break;
                         }
                     }
-                    player.getCooldowns().addCooldown(hand.getItem(), 600);
+                    scheduleCooldown(player, hand.getItem());
+                    lastFilterShot.put(player.getUUID(), now);
                 }
                 return;
             }
@@ -100,10 +109,16 @@ public class FilterPhotoHandler {
             } else {
                 player.addEffect(new MobEffectInstance(effect, 400));
             }
-            player.getCooldowns().addCooldown(hand.getItem(), 600);
+            scheduleCooldown(player, hand.getItem());
+            lastFilterShot.put(player.getUUID(), now);
         } catch (Exception e) {
             LenSouls.LOGGER.error("[FilterPhoto] fail", e);
         }
+    }
+
+    /** 相机快门关闭时会把自己的冷却覆盖为 2 tick（在 FrameAddedEvent 之后执行），故延后一 tick 写入 600，确保后写生效。 */
+    private static void scheduleCooldown(ServerPlayer player, Item cooldownItem) {
+        player.server.execute(() -> player.getCooldowns().addCooldown(cooldownItem, 600));
     }
 
     /** #7 万象加持：随机 4 个原版正面效果，等级 2~3，持续 20s */

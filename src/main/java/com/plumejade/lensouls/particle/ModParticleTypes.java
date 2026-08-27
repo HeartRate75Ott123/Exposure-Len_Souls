@@ -84,6 +84,10 @@ public class ModParticleTypes {
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> ELEMENT_SPIRAL_WEAKNESS =
             PARTICLE_TYPES.register("element_spiral_weakness", () -> new SimpleParticleType(false));
 
+    /** 滤镜效果隐藏粒子：客户端不渲染任何粒子（provider 返回 null），用于替代返回 null 导致的效果包编码崩溃 */
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> FILTER_HIDDEN =
+            PARTICLE_TYPES.register("filter_hidden", () -> new SimpleParticleType(false));
+
     public static void register(IEventBus modEventBus) {
         PARTICLE_TYPES.register(modEventBus);
     }

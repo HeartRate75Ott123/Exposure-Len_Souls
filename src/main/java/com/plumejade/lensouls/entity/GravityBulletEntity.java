@@ -297,8 +297,10 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
     @Override public boolean shouldRender(double x, double y, double z) { return !entityData.get(DATA_HAS_HIT) && super.shouldRender(x, y, z); }
     @Override protected boolean canHitEntity(Entity target) {
         if (target.equals(getOwner())) return false;
+        // 尸体（已死实体）不拦截子弹，让其穿过继续飞行
+        if (!target.isAlive()) return false;
         // 多部件子体（娜迦身子/九头蛇头等 PartEntity，非 LivingEntity）：NeoForge getEntities 会返回它们，需放行
-        if (target instanceof PartEntity<?>) return target.isAlive();
+        if (target instanceof PartEntity<?>) return true;
         return target instanceof LivingEntity;
     }
     /** PartEntity 优先检测，有 Parts 绝不回退父 AABB */

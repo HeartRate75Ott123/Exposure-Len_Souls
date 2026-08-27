@@ -257,10 +257,12 @@ public class GunBulletEntity extends ThrowableItemProjectile {
     @Override public boolean isNoGravity() { return true; }
     @Override protected boolean canHitEntity(Entity target) {
         if (target.equals(getOwner())) return false;
+        // 尸体（已死实体）不拦截子弹，让其穿过继续飞行
+        if (!target.isAlive()) return false;
         // 多部件子体（娜迦身子 NagaSegment、九头蛇头 HydraHead 等 PartEntity，非 LivingEntity）：
         // NeoForge 的 Level.getEntities 会返回它们，必须放行，否则子弹穿过身子打不到
         if (target instanceof PartEntity<?>) {
-            return target.isAlive() && !isFriendlyTarget(target, getOwner());
+            return !isFriendlyTarget(target, getOwner());
         }
         if (!(target instanceof LivingEntity)) return false;
         return !isFriendlyTarget(target, getOwner());

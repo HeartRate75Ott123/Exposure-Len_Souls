@@ -1,6 +1,0 @@
-{
-  "predicate": {
-    "items": "lensouls:potion_filter"
-  },
-  "shader": "minecraft:shaders/post/desaturate.json"
-}

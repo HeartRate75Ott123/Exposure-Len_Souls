@@ -3,6 +3,7 @@ package com.plumejade.lensouls.handler;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.handler.CameraInputHandler;
 import com.plumejade.lensouls.component.ModDataComponents;
+import com.plumejade.lensouls.component.PotionFilterData;
 import com.plumejade.lensouls.effect.ModEffects;
 import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import io.github.mortuusars.exposure.Exposure;
@@ -43,8 +44,6 @@ public class FilterPhotoHandler {
     private static final Map<ResourceLocation, Holder<MobEffect>> SELF_EFFECTS = new HashMap<>();
     /** 敌人易伤滤镜（仅非自拍、画面内有敌人时生效） */
     private static final ResourceLocation ENEMY_FILTER = ResourceLocation.fromNamespaceAndPath("exposure_expanded", "spider");
-    /** 药水滤镜（lensouls 自注册，酿造台合成，携带原版药水效果） */
-    private static final ResourceLocation POTION_FILTER = ResourceLocation.fromNamespaceAndPath("lensouls", "potion_filter");
     /** 每玩家滤镜拍摄冷却闸门（游戏刻）；保证 30s 内不重复触发，防御 Exposure 覆盖 MC 冷却。 */
     private static final Map<UUID, Long> lastFilterShot = new ConcurrentHashMap<>();
 
@@ -92,10 +91,15 @@ public class FilterPhotoHandler {
             long now = player.level().getGameTime();
             if (now < lastFilterShot.getOrDefault(player.getUUID(), Long.MIN_VALUE) + 600) return;
 
-            // 药水滤镜：携带原版药水效果，对自拍目标或入镜生物施加 30s（600 刻）
-            if (filter.equals(POTION_FILTER)) {
-                applyPotionFilter(player, hand, selfie, event, now);
-                return;
+            // 药水玻璃板：玻璃板本身已是相机滤镜，若其携带 POTION_FILTER_DATA 组件，
+            // 则对自拍目标或入镜生物施加对应原版药水效果 30s（600 刻）
+            var stored = hand.get(Exposure.DataComponents.FILTER);
+            if (stored != null && !stored.isEmpty()) {
+                var pdata = stored.getForReading().get(ModDataComponents.POTION_FILTER_DATA);
+                if (pdata != null) {
+                    applyPotionFilter(player, hand, pdata, selfie, event, now);
+                    return;
+                }
             }
 
             // 敌人易伤：仅拍敌人（非自拍）时对其上易伤
@@ -135,16 +139,11 @@ public class FilterPhotoHandler {
     }
 
     /**
-     * 药水滤镜：从已安装滤镜物品读回携带的原版药水效果，施加 30s（600 刻）。
+     * 药水玻璃板：施加携带的原版药水效果 30s（600 刻）。
      * 自拍 → 施加给自己；否则 → 施加给入镜首个非自己且存活的实体。
      */
-    private static void applyPotionFilter(ServerPlayer player, ItemStack hand, boolean selfie,
-                                          FrameAddedEvent event, long now) {
-        var stored = hand.get(Exposure.DataComponents.FILTER);
-        if (stored == null || stored.isEmpty()) return;
-        ItemStack filterStack = stored.getForReading();
-        var data = filterStack.get(ModDataComponents.POTION_FILTER_DATA);
-        if (data == null) return;
+    private static void applyPotionFilter(ServerPlayer player, ItemStack hand, PotionFilterData data,
+                                          boolean selfie, FrameAddedEvent event, long now) {
         ResourceKey<MobEffect> key = ResourceKey.create(Registries.MOB_EFFECT, data.effect());
         Holder<MobEffect> effect = BuiltInRegistries.MOB_EFFECT.getHolder(key).orElse(null);
         if (effect == null) return;

@@ -82,7 +82,7 @@ public class FilterPhotoHandler {
                 if (!selfie) {
                     for (LivingEntity e : event.getEntitiesInFrame()) {
                         if (e != player && e.isAlive()) {
-                            e.addEffect(new MobEffectInstance(ModEffects.VULNERABILITY, 400));
+                            e.addEffect(new MobEffectInstance(ModEffects.FILTER_SPIDER, 400));
                             break;
                         }
                     }

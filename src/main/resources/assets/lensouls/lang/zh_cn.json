@@ -287,7 +287,7 @@
   "effect.lensouls.filter_bits": "复刻增幅",
   "effect.lensouls.filter_deconverge": "腾跃之势",
   "effect.lensouls.filter_blur": "赤手空拳",
-  "effect.lensouls.vulnerability": "易伤",
+  "effect.lensouls.filter_spider": "易伤",
   "tooltip.lensouls.filter.intro": "§d此为相机配件，需要手持胶卷相机§d潜行+右键§r放在容器面板右下角的滤镜槽位",
   "tooltip.lensouls.filter.intro_enemy": "§d此为相机配件，需要手持胶卷相机§d潜行+右键§r放在容器面板右下角的滤镜槽位（这个给敌人用的比较特殊）",
   "tooltip.lensouls.filter.activate": "§b安装滤镜后需要手持相机时切换到第三人称前视角，对自己拍摄，触发成功后进入30s冷却",

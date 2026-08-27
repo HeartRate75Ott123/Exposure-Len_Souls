@@ -288,7 +288,7 @@
   "effect.lensouls.filter_bits": "Duplicate Boost",
   "effect.lensouls.filter_deconverge": "Leap Momentum",
   "effect.lensouls.filter_blur": "Bare Fists",
-  "effect.lensouls.vulnerability": "Vulnerable",
+  "effect.lensouls.filter_spider": "Vulnerable",
   "tooltip.lensouls.filter.intro": "§dThis is a camera attachment. Hold a film camera, §dSneak + Right-Click§r to place it in the filter slot at the bottom-right of the container panel",
   "tooltip.lensouls.filter.intro_enemy": "§dThis is a camera attachment. Hold a film camera, §dSneak + Right-Click§r to place it in the filter slot at the bottom-right of the container panel (this one is special, for enemies)",
   "tooltip.lensouls.filter.activate": "§bAfter installing the filter, switch to third-person front view while holding the camera and photograph yourself; on success enters a 30s cooldown",

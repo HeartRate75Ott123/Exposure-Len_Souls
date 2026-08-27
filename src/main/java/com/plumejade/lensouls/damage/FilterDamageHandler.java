@@ -24,7 +24,7 @@ public class FilterDamageHandler {
         if (victim.level().isClientSide()) return;
 
         // 受害者侧：敌人易伤 +35%
-        if (victim.hasEffect(ModEffects.VULNERABILITY)) {
+        if (victim.hasEffect(ModEffects.FILTER_SPIDER)) {
             event.setNewDamage(event.getNewDamage() * 1.35f);
         }
 

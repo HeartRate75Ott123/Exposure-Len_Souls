@@ -151,14 +151,12 @@ public class PhotographEffectRegistry {
         add("minecraft:strider", "§a赋予 火焰免疫 效果；§a免疫 熔岩 伤害；§a移动 +5%", "");
         add("minecraft:ravager", "§a近战攻击 +15%", "");
         add("minecraft:vindicator", "§a佩戴时额外获得 1 个照片饰品栏位", "");
-        add("minecraft:illusioner", "§a移动 +15%；§a远程攻击 +15%", "");
         add("minecraft:evoker", "§a魔法攻击 +15%；§a你受到的魔法伤害 -12%", "§c近战伤害 -12%", "§a挥击时 15% 概率在视线前方钻出 一排尖牙", "§a尖牙：对范围内目标造成 魔法伤害（原版固定值）");
         add("minecraft:pillager", "§a远程攻击 +10%", "");
         add("minecraft:vex", "§a移动 +15%", "");
         add("minecraft:shulker", "", "");
         add("minecraft:guardian", "§a赋予 水下呼吸 效果", "");
         add("minecraft:elder_guardian", "§a赋予 海豚恩惠3 效果；§a游泳 +30%", "");
-        add("minecraft:giant", "§a近战攻击 +15%", "");
 
         // ── 原版 动物/中立 ──
         add("minecraft:pig", "§a每秒恢复 0.5 点 饥饿值", "");
@@ -218,7 +216,6 @@ public class PhotographEffectRegistry {
         add("twilightforest:armored_giant", "", "");
         add("twilightforest:death_tome", "§a魔法攻击 +10%", "");
         add("twilightforest:minoshroom", "§a近战攻击 +15%", "");
-        add("twilightforest:roving_cube", "", "");
         add("twilightforest:helmet_crab", "", "");
         add("twilightforest:quest_ram", "", "");
         add("twilightforest:squirrel", "", "");
@@ -254,7 +251,6 @@ public class PhotographEffectRegistry {
         add("twilightforest:deer", "§a移动 +10%", "");
         add("twilightforest:dwarf_rabbit", "", "");
         add("twilightforest:giant_miner", "", "");
-        add("twilightforest:harbinger_cube", "§a免疫 摔落 伤害", "");
         add("twilightforest:lich_minion", "§a魔法攻击 +5%", "");
         add("twilightforest:loyal_zombie", "", "");
         add("twilightforest:mosquito_swarm", "§a移动 +10%", "");

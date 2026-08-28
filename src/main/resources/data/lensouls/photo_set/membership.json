@@ -204,7 +204,8 @@
     "forest_spirit"
   ],
   "twilightforest:knight_phantom": [
-    "castle_guard"
+    "castle_guard",
+    "wraith_veil"
   ],
   "twilightforest:redcap": [
     "castle_guard"
@@ -228,12 +229,6 @@
     "maze_lurker"
   ],
   "twilightforest:wraith": [
-    "wraith_veil"
-  ],
-  "twilightforest:harbinger_cube": [
-    "wraith_veil"
-  ],
-  "twilightforest:roving_cube": [
     "wraith_veil"
   ],
   "eternal_starlight:aurora_deer": [
@@ -452,9 +447,6 @@
     "ravager_charge"
   ],
   "minecraft:vindicator": [
-    "ravager_charge"
-  ],
-  "minecraft:illusioner": [
     "ravager_charge"
   ],
   "twilightforest:yeti": [

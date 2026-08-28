@@ -304,10 +304,10 @@
     ]
   },
   "wraith_veil": {
-    "name": "幽魂纱影",
+    "name": "幻影骑士",
     "tiers": [
       {
-        "count": 3,
+        "count": 2,
         "effects": [
           "env:dark_invis",
           "cond:night|speed:0.15"
@@ -619,7 +619,7 @@
     "name": "蛮力冲锋",
     "tiers": [
       {
-        "count": 4,
+        "count": 3,
         "effects": [
           "kb_resist:0.25",
           "dmg_mod:ravager_charge:1.1"

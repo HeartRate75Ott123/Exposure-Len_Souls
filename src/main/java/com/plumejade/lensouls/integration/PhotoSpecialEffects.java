@@ -156,7 +156,6 @@ public class PhotoSpecialEffects {
         addRule("twilightforest:snow_queen", new DamageRule(e -> e.getSource().is(DamageTypes.IN_FIRE) || e.getSource().is(DamageTypes.ON_FIRE) || e.getSource().is(DamageTypes.LAVA) || e.getSource().is(DamageTypes.FIREBALL), 1.12f));
         addRule("twilightforest:fire_beetle", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 1.12f));
         addRule("twilightforest:maze_slime", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
-        addRule("twilightforest:harbinger_cube", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
         addRule("twilightforest:carminite_broodling", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
         addRule("twilightforest:carminite_ghastling", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
         addRule("twilightforest:tiny_bird", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
@@ -298,8 +297,6 @@ public class PhotoSpecialEffects {
         attr("minecraft:ravager", Attributes.ATTACK_KNOCKBACK.value(), "ravager_knock", 1.0, AttributeModifier.Operation.ADD_VALUE);
         attr("minecraft:ravager", Attributes.MOVEMENT_SPEED.value(), "ravager_spd", -0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("minecraft:ravager", Attributes.JUMP_STRENGTH.value(), "ravager_jump", -0.2, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("minecraft:illusioner", Attributes.MOVEMENT_SPEED.value(), "illu_spd", 0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("minecraft:illusioner", Attributes.MAX_HEALTH.value(), "illu_hp", -2.0, AttributeModifier.Operation.ADD_VALUE);
         attr("minecraft:pillager", Attributes.MAX_HEALTH.value(), "pillager_hp", -2.0, AttributeModifier.Operation.ADD_VALUE);
         attr("minecraft:vex", Attributes.MOVEMENT_SPEED.value(), "vex_spd", 0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("minecraft:vex", Attributes.ATTACK_DAMAGE.value(), "vex_atk", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
@@ -313,12 +310,6 @@ public class PhotoSpecialEffects {
         attr("minecraft:shulker", Attributes.BLOCK_INTERACTION_RANGE.value(), "shulker_block", -0.5, AttributeModifier.Operation.ADD_VALUE);
         attr("minecraft:shulker", Attributes.ENTITY_INTERACTION_RANGE.value(), "shulker_entity", -0.5, AttributeModifier.Operation.ADD_VALUE);
         attr("minecraft:elder_guardian", Attributes.MOVEMENT_SPEED.value(), "eg2_spd", -0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("minecraft:giant", Attributes.ATTACK_DAMAGE.value(), "giant_atk", 0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("minecraft:giant", Attributes.KNOCKBACK_RESISTANCE.value(), "giant_kb", 0.6, AttributeModifier.Operation.ADD_VALUE);
-        attr("minecraft:giant", Attributes.ATTACK_KNOCKBACK.value(), "giant_knock", 0.5, AttributeModifier.Operation.ADD_VALUE);
-        attr("minecraft:giant", Attributes.MOVEMENT_SPEED.value(), "giant_spd", -0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("minecraft:giant", Attributes.JUMP_STRENGTH.value(), "giant_jump", -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("minecraft:giant", Attributes.ENTITY_INTERACTION_RANGE.value(), "giant_range", -0.5, AttributeModifier.Operation.ADD_VALUE);
 
         // ── 原版 动物/中立 ──
         attr("minecraft:pig", Attributes.ATTACK_KNOCKBACK.value(), "pig_knock", 0.5, AttributeModifier.Operation.ADD_VALUE);
@@ -449,10 +440,6 @@ public class PhotoSpecialEffects {
         attr("twilightforest:armored_giant", Attributes.KNOCKBACK_RESISTANCE.value(), "ag_kb", 0.6, AttributeModifier.Operation.ADD_VALUE);
         attr("twilightforest:armored_giant", Attributes.MOVEMENT_SPEED.value(), "ag_spd", -0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("twilightforest:armored_giant", Attributes.JUMP_STRENGTH.value(), "ag_jump", -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("twilightforest:roving_cube", Attributes.ARMOR.value(), "rc_armor", 3.0, AttributeModifier.Operation.ADD_VALUE);
-        attr("twilightforest:roving_cube", Attributes.KNOCKBACK_RESISTANCE.value(), "rc_kb", 0.5, AttributeModifier.Operation.ADD_VALUE);
-        attr("twilightforest:roving_cube", Attributes.MOVEMENT_SPEED.value(), "rc_spd", -0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("twilightforest:roving_cube", Attributes.JUMP_STRENGTH.value(), "rc_jump", -0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("twilightforest:helmet_crab", Attributes.ARMOR.value(), "hc_armor", 3.0, AttributeModifier.Operation.ADD_VALUE);
         attr("twilightforest:helmet_crab", Attributes.KNOCKBACK_RESISTANCE.value(), "hc_kb", 0.3, AttributeModifier.Operation.ADD_VALUE);
         attr("twilightforest:helmet_crab", Attributes.MOVEMENT_SPEED.value(), "hc_spd", -0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
@@ -505,8 +492,6 @@ public class PhotoSpecialEffects {
         attr("twilightforest:dwarf_rabbit", Attributes.MAX_HEALTH.value(), "dr_hp", -2.0, AttributeModifier.Operation.ADD_VALUE);
         attr("twilightforest:giant_miner", Attributes.BLOCK_BREAK_SPEED.value(), "gm_break", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("twilightforest:giant_miner", Attributes.MOVEMENT_SPEED.value(), "gm_spd", -0.08, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("twilightforest:harbinger_cube", Attributes.JUMP_STRENGTH.value(), "hbc_jump", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("twilightforest:harbinger_cube", Attributes.KNOCKBACK_RESISTANCE.value(), "hbc_kb", -0.2, AttributeModifier.Operation.ADD_VALUE);
         attr("twilightforest:loyal_zombie", Attributes.MAX_HEALTH.value(), "lz_hp", 4.0, AttributeModifier.Operation.ADD_VALUE);
         attr("twilightforest:loyal_zombie", Attributes.MOVEMENT_SPEED.value(), "lz_spd", -0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("twilightforest:mosquito_swarm", Attributes.MOVEMENT_SPEED.value(), "ms_spd", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
@@ -732,7 +717,6 @@ public class PhotoSpecialEffects {
         ATTACK_KIND_BONUS.put("minecraft:bogged", new float[]{1.0f, 1.1f, 1.0f});
         ATTACK_KIND_BONUS.put("minecraft:wither", new float[]{1.0f, 1.1f, 1.0f});
         ATTACK_KIND_BONUS.put("minecraft:pillager", new float[]{1.0f, 1.1f, 1.0f});
-        ATTACK_KIND_BONUS.put("minecraft:illusioner", new float[]{1.0f, 1.15f, 1.0f});
         ATTACK_KIND_BONUS.put("minecraft:evoker", new float[]{0.88f, 1.0f, 1.15f});
         ATTACK_KIND_BONUS.put("cataclysm:the_watcher", new float[]{0.88f, 1.15f, 1.0f});
         ATTACK_KIND_BONUS.put("legendary_monsters:wandering_eye", new float[]{1.0f, 1.1f, 1.0f});

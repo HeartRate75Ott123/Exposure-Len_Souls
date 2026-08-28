@@ -75,6 +75,17 @@ public class ModItems {
     public static final DeferredItem<Item> CONVERTER = ITEMS.register("converter",
             () -> new ConverterItem(new Item.Properties().stacksTo(1)));
 
+    // ---- 饰品相册（9 格照片容器） ----
+    public static final DeferredItem<Item> PHOTO_ALBUM = ITEMS.register("photo_album", () -> {
+        net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+        tag.putBoolean("lensouls:photograph_curio", true);
+        return new PhotoAlbumItem(new Item.Properties().stacksTo(1)
+                .component(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
+                        net.minecraft.world.item.component.CustomData.of(tag))
+                .component(net.minecraft.core.component.DataComponents.CONTAINER,
+                        net.minecraft.world.item.component.ItemContainerContents.EMPTY));
+    });
+
     // ---- 能力球 ----
     /** 随机能力球：右键获得随机能力 */
     public static final DeferredItem<Item> SKILL_BALL = ITEMS.register("skill_ball",

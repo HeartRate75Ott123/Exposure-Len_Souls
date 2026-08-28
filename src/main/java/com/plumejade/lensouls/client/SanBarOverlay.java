@@ -5,6 +5,7 @@ import com.plumejade.lensouls.handler.FeatherTwitcherHandler;
 import com.plumejade.lensouls.LenSouls;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
@@ -59,6 +60,14 @@ public class SanBarOverlay {
             g.blit(BAR, X, barBottomY - drawHpx, drawW, drawHpx,
                     0, vStart, FRAME_WIDTH, (int) Math.ceil(fillPx),
                     FRAME_WIDTH, FRAME_COUNT * FRAME_HEIGHT);
+        }
+
+        // 祸之可能性倒计时：物品栏上方红字数字
+        if (AbyssCountdownClient.isActive()) {
+            int sec = AbyssCountdownClient.remainingSeconds();
+            int cx = g.guiWidth() / 2;
+            int cy = g.guiHeight() - 60;
+            g.drawCenteredString(mc.font, Component.literal("§c" + sec), cx, cy, 0xFF3333);
         }
     }
 }

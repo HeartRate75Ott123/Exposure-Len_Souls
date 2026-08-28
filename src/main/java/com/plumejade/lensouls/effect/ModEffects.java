@@ -47,6 +47,16 @@ public class ModEffects {
     public static final DeferredHolder<MobEffect, MobEffect> ENDER_INFUSION =
             register("ender_infusion", () -> new ElementInfusionEffect(ElementDamage.ENDER, 0x9933CC));
 
+    // ========== 元素抑制效果（压制同元素活性，无粒子，HARMFUL） ==========
+    public static final DeferredHolder<MobEffect, MobEffect> SUPPRESS_WATER =
+            register("suppress_water", () -> new FilterEffect(MobEffectCategory.HARMFUL, 0x1E90FF));
+    public static final DeferredHolder<MobEffect, MobEffect> SUPPRESS_EARTH =
+            register("suppress_earth", () -> new FilterEffect(MobEffectCategory.HARMFUL, 0x8B4513));
+    public static final DeferredHolder<MobEffect, MobEffect> SUPPRESS_FIRE =
+            register("suppress_fire", () -> new FilterEffect(MobEffectCategory.HARMFUL, 0xFF4500));
+    public static final DeferredHolder<MobEffect, MobEffect> SUPPRESS_ENDER =
+            register("suppress_ender", () -> new FilterEffect(MobEffectCategory.HARMFUL, 0x9933CC));
+
     // ========== 相机滤镜效果（exposure:expanded 16 滤镜 → 16 效果，一一对应） ==========
     /** #1 护甲转伤害·失甲 */
     public static final DeferredHolder<MobEffect, MobEffect> FILTER_BLOBS =

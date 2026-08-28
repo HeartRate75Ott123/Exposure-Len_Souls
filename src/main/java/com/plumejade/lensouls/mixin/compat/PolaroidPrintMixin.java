@@ -96,6 +96,8 @@ public class PolaroidPrintMixin {
                 tag.putBoolean("lensouls:ability_steal", true);
                 tag.putString("lensouls:stolen_entity", entityId);
                 tag.putBoolean("lensouls:photograph_curio", true);
+                Boolean isBoss = PhotoInjectionHandler.pollBoss(exposureId);
+                if (isBoss != null && isBoss) tag.putBoolean("lensouls:is_boss", true);
             }
         }
 

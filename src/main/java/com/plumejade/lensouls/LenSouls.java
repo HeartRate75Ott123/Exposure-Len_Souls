@@ -96,6 +96,8 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotographEffectRegistry.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.TrophyModifierHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotoSpecialEffects.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotoSetEffects.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.SuppressHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.IgnisBrandHandler.class);
 
         // Curios 照片饰品槽（运行时检测）
@@ -152,6 +154,8 @@ public class LenSouls {
         event.addListener(new com.plumejade.lensouls.config.DamageTypeElementLoader());
         event.addListener(new com.plumejade.lensouls.config.AttackerElementLoader());
         event.addListener(new com.plumejade.lensouls.config.CopySoulFilter());
+        event.addListener(new com.plumejade.lensouls.config.PhotoSetLoader());
+        event.addListener(new com.plumejade.lensouls.config.PhotoSetDefs());
     }
 
     /**

@@ -20,6 +20,11 @@ public class CuriosIntegration {
         if (stack.is(ModItems.FEATHER_TWITCHER.get()) || stack.is(ModItems.FEATHER_ELEMENTRISE.get())) {
             return;
         }
+        // 相册：允许直接佩戴进照片栏
+        if (stack.is(ModItems.PHOTO_ALBUM.get())) {
+            event.setEquipResult(TriState.TRUE);
+            return;
+        }
 
         boolean hasTag = false;
         if (stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA) != null) {

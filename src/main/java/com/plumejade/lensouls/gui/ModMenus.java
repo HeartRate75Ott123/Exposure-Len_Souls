@@ -2,6 +2,7 @@ package com.plumejade.lensouls.gui;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.item.ConverterItem;
+import com.plumejade.lensouls.item.PhotoAlbumItem;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
@@ -34,12 +35,31 @@ public class ModMenus {
             MENUS.register("photo_gui", () -> IMenuTypeExtension.create(
                     (IContainerFactory<PhotoGuiMenu>) (id, inv, buf) -> new PhotoGuiMenu(id, inv)));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<AlbumMenu>> PHOTO_ALBUM =
+            MENUS.register("photo_album", () -> IMenuTypeExtension.create(
+                    (IContainerFactory<AlbumMenu>) (id, inv, buf) -> new AlbumMenu(id, inv, findAlbum(inv.player))));
+
     /**
      * 在玩家背包中查找第一个转换器物品。
      */
     public static ItemStack findConverter(Player player) {
         for (ItemStack stack : player.getInventory().items) {
             if (stack.getItem() instanceof ConverterItem) {
+                return stack;
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /** 在玩家背包（主槽 + 副手）中查找第一个相册物品。 */
+    public static ItemStack findAlbum(Player player) {
+        for (ItemStack stack : player.getInventory().items) {
+            if (stack.getItem() instanceof PhotoAlbumItem) {
+                return stack;
+            }
+        }
+        for (ItemStack stack : player.getInventory().offhand) {
+            if (stack.getItem() instanceof PhotoAlbumItem) {
                 return stack;
             }
         }

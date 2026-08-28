@@ -3,7 +3,9 @@ package com.plumejade.lensouls.integration;
 import com.plumejade.lensouls.attribute.ModAttributes;
 import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.damage.ElementDamage;
+import com.plumejade.lensouls.item.PhotoAlbumItem;
 import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,6 +23,10 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForgeMod;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -839,7 +845,7 @@ public class PhotoSpecialEffects {
         player.getPersistentData().putInt(SLOT_TAG, extra);
     }
 
-    /** 收集佩戴的照片实体 ID（非照片槽物品自动忽略） */
+    /** 收集佩戴的照片实体 ID（仅照片栏位内物品生效；相册展开其内照片，背包中的相册不生效） */
     public static List<String> collectGearEntities(ServerPlayer player) {
         List<String> ids = new ArrayList<>();
         CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
@@ -848,12 +854,45 @@ public class PhotoSpecialEffects {
                 for (int i = 0; i < stackHandler.getSlots(); i++) {
                     ItemStack stack = stackHandler.getStackInSlot(i);
                     if (stack.isEmpty()) continue;
+                    if (stack.getItem() instanceof PhotoAlbumItem) {
+                        // 相册：等效装备其内全部照片（去重 + 边界安全）
+                        ItemContainerContents contents = stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
+                        for (ItemStack photo : contents.nonEmptyItems()) {
+                            String stolen = PhotographEffectRegistry.getStolenEntity(photo);
+                            if (stolen != null && !ids.contains(stolen)) ids.add(stolen);
+                        }
+                        continue;
+                    }
                     String stolen = PhotographEffectRegistry.getStolenEntity(stack);
                     if (stolen != null && !ids.contains(stolen)) ids.add(stolen);
                 }
             }
         });
         return ids;
+    }
+
+    /** 已装备照片中，主体为 Boss（拥有 Boss 血条）的数量（仅照片栏位；含栏位内相册的照片） */
+    public static int countBossPhotos(ServerPlayer player) {
+        int n = 0;
+        var handlerOpt = CuriosApi.getCuriosInventory(player);
+        if (handlerOpt.isPresent()) {
+            for (var sh : handlerOpt.get().getCurios().values()) {
+                var stacks = sh.getStacks();
+                for (int i = 0; i < stacks.getSlots(); i++) {
+                    ItemStack stack = stacks.getStackInSlot(i);
+                    if (stack.isEmpty()) continue;
+                    if (stack.getItem() instanceof PhotoAlbumItem) {
+                        ItemContainerContents contents = stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
+                        for (ItemStack photo : contents.nonEmptyItems()) {
+                            if (PhotographEffectRegistry.isBossPhoto(photo)) n++;
+                        }
+                    } else if (PhotographEffectRegistry.isBossPhoto(stack)) {
+                        n++;
+                    }
+                }
+            }
+        }
+        return n;
     }
 
     @SubscribeEvent

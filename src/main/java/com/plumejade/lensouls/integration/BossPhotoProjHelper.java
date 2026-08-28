@@ -2,6 +2,7 @@ package com.plumejade.lensouls.integration;
 
 import com.mojang.math.Axis;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
@@ -66,11 +67,21 @@ public class BossPhotoProjHelper {
         if (last != null && player.level().getGameTime() - last < 3) return;
         LAST_SWING.put(player.getUUID(), player.level().getGameTime());
 
+        // 套装弹幕钩子：从玩家 persistent 读取 barrage_trigger / barrage_dmg
+        CompoundTag setFlags = player.getPersistentData().getCompound("lensouls:set_flags");
+        int barrageExtra = setFlags.getInt("barrage_trigger");
+        float barrageDmg = setFlags.getFloat("barrage_dmg");
+
         List<String> gear = PhotoSpecialEffects.collectGearEntities(player);
         for (String id : gear) {
             Float chance = TRIGGER.get(id);
             if (chance != null && player.getRandom().nextFloat() < chance) {
                 fireBossSkill(player, id);
+                for (int k = 0; k < barrageExtra; k++) {
+                    player.getPersistentData().putFloat("lensouls:barrage_dmg_mult", barrageDmg);
+                    fireBossSkill(player, id);
+                }
+                if (barrageExtra > 0) player.getPersistentData().remove("lensouls:barrage_dmg_mult");
             }
         }
     }
@@ -293,9 +304,11 @@ public class BossPhotoProjHelper {
         markAndSpawn(beam);
     }
 
-    /** 弹幕基础伤害 = 玩家攻击面板（ATTACK_DAMAGE 属性值，已含力量/武器等加成） */
+    /** 弹幕基础伤害 = 玩家攻击面板（ATTACK_DAMAGE 属性值，已含力量/武器等加成）；受 barrage_dmg 倍率影响 */
     private static float playerFinalDamage(ServerPlayer player) {
-        return (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+        float base = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+        float m = player.getPersistentData().getFloat("lensouls:barrage_dmg_mult");
+        return m > 0 ? base * m : base;
     }
 
     /** 湮灭构造体：湮灭激光（等同攻击面板 + 目标最大生命 5%，贯穿视线方向） */

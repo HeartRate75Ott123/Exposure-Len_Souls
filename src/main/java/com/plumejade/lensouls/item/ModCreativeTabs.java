@@ -36,6 +36,7 @@ public class ModCreativeTabs {
                         output.accept(ModItems.EARTH_SOUL.get());
                         output.accept(ModItems.ENDER_SOUL.get());
                         output.accept(ModItems.CONVERTER.get());
+                        output.accept(ModItems.PHOTO_ALBUM.get());
 
                         // ---- 能力球 ----
                         output.accept(ModItems.SKILL_BALL.get());

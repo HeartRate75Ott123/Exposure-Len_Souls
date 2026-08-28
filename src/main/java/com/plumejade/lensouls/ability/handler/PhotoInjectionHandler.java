@@ -3,6 +3,7 @@ package com.plumejade.lensouls.ability.handler;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.ability.CameraAbilityStore;
+import com.plumejade.lensouls.boss.ToughnessDamageHandler;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
 import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
@@ -22,6 +23,11 @@ public class PhotoInjectionHandler {
     /** 帧标识符 → 拍摄时的能力（独立存储，互不覆盖） */
     private static final Map<String, AbilityType> pendingAbilities = new ConcurrentHashMap<>();
     private static final Map<String, String> stolenEntityCache = new ConcurrentHashMap<>();
+    private static final Map<String, Boolean> bossFlagCache = new ConcurrentHashMap<>();
+
+    public static Boolean pollBoss(String exposureId) {
+        return exposureId != null ? bossFlagCache.remove(exposureId) : null;
+    }
 
     public static void cacheStolenEntity(String exposureId, String entityId) {
         if (exposureId != null && !exposureId.isEmpty()) stolenEntityCache.put(exposureId, entityId);
@@ -70,6 +76,7 @@ public class PhotoInjectionHandler {
                     LivingEntity first = frameEntities.get(0);
                     String stolenId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(first.getType()).toString();
                     cacheStolenEntity(exposureId, stolenId);
+                    bossFlagCache.put(exposureId, ToughnessDamageHandler.isBoss(first));
                 }
             }
         } catch (Exception e) {

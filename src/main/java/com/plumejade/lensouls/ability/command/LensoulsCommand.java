@@ -221,6 +221,15 @@ public class LensoulsCommand {
                                 })
                         )
                 )
+                .then(Commands.literal("abyss_calamity_test")
+                        .executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            com.plumejade.lensouls.handler.FeatherAbyssHandler.triggerTestCalamity(player);
+                            ctx.getSource().sendSuccess(
+                                    () -> Component.literal("§a已触发祸之可能性（测试，不污染计时器）"), true);
+                            return 1;
+                        })
+                )
                 .then(Commands.literal("dump")
                         .then(Commands.literal("mobs")
                                 .executes(LensoulsCommand::dumpMobs)

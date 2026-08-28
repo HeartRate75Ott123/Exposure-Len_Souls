@@ -2,7 +2,9 @@ package com.plumejade.lensouls.handler;
 
 import com.plumejade.lensouls.item.ModItems;
 import com.plumejade.lensouls.mixin.EntityInvulnerableTimeAccessor;
+import com.plumejade.lensouls.network.AbyssCountdownPacket;
 import com.plumejade.lensouls.network.TwistSyncPacket;
+import com.plumejade.lensouls.particle.ModParticleTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -11,6 +13,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -21,6 +25,7 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.projectile.Snowball;
@@ -28,6 +33,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -45,6 +51,7 @@ import top.theillusivec4.curios.api.CuriosApi;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -61,11 +68,11 @@ import java.util.UUID;
  *   <li>愚钝：经验减半</li>
  *   <li>自闭：16 格内生物加入世界 → 0.5 魔法伤害 + 护甲层(×0.75/层, 3s)</li>
  *   <li>厄运：挖方块 0.8% 生成 15 蠹虫；每分钟 2 个不重复 debuff（20s, 等级3-20）</li>
- *   <li>祸之可能性：每 30s 生成 5 只随机敌对生物</li>
+ *   <li>祸之可能性：充能 15min（扭曲值越高越短，下限 2min），充能完毕且身边 7 格内 5+ 怪物时引动末影龙之吼 + 3s 倒计时，随后召唤 5 只（僵尸/骷髅/洞穴蜘蛛其一）</li>
  *   <li>挫败：受击攻击面板 ×0.94/层（5s）</li>
  *   <li>食之无味：由 FoodDataMixin 阻断食物回血</li>
  *   <li>失忆：由 CraftingMenuMixin 禁复制之魂合成（掉落保留）</li>
- *   <li>疯狂：合成 +1 扭曲值（上限 200），受击 +0.2%/点、造成 +1%/点，死亡归零</li>
+ *   <li>疯狂：合成 +1 扭曲值（上限 200），受击 +0.2%/点、造成 +1%/点，死亡归零，击杀怪物 3% 降 1</li>
  *   <li>恶意：元素附加伤害 +12%（DamageHandler 内应用）</li>
  * </ul>
  * 生命周期防护：登录同步/清残留、登出恢复创造并清内存层、死亡清层+扭曲归零，
@@ -78,7 +85,9 @@ public class FeatherAbyssHandler {
     public static final String KEY_TWIST = "lensouls:abyss_twist";
     public static final String KEY_GM_BEFORE = "lensouls:abyss_gm_before";
     private static final String KEY_DOOM_TIMER = "lensouls:abyss_doom_timer";
-    private static final String KEY_SPAWN_TIMER = "lensouls:abyss_spawn_timer";
+    private static final String KEY_CHARGE_STATE = "lensouls:abyss_charge_state"; // 0 充能中 1 已充能待触发 2 倒计时中
+    private static final String KEY_CHARGE_NEXT = "lensouls:abyss_charge_next";    // 充能完成 gameTime
+    private static final String KEY_COUNTDOWN_NEXT = "lensouls:abyss_countdown_next";
     private static final String SNOWBALL_TAG = "lensouls:feather_snowball";
 
     /** 疯狂：扭曲值上限 200 */
@@ -91,8 +100,16 @@ public class FeatherAbyssHandler {
     public static final int DOOM_INTERVAL = 1200;
     /** 厄运：debuff 时长 20s */
     public static final int DOOM_DURATION = 400;
-    /** 祸之可能性：30s 生成间隔 */
-    public static final int SPAWN_INTERVAL = 600;
+    /** 祸之可能性：充能基础间隔 15min（扭曲值越高越短，下限 2min） */
+    public static final int CHARGE_INTERVAL_BASE = 18000;
+    /** 祸之可能性：充能最短间隔 2min */
+    public static final int CHARGE_INTERVAL_MIN = 2400;
+    /** 祸之可能性：充能完毕到生成的 3s 倒计时 */
+    public static final int COUNTDOWN_TICKS = 60;
+    /** 祸之可能性：召唤落点方形半边长（以玩家为中心 ±4 格） */
+    public static final double SUMMON_HALF = 4.0;
+    /** 祸之可能性：粒子显形后延迟 1s 于落点生成怪物 */
+    public static final int SUMMON_DELAY_TICKS = 20;
     /** 自闭：护甲层时长 3s */
     private static final long ARMOR_STACK_TICKS = 60L;
     /** 挫败：攻击层时长 5s */
@@ -222,6 +239,7 @@ public class FeatherAbyssHandler {
         ServerLevel overworld = server.getLevel(Level.OVERWORLD);
         if (overworld == null) return;
         FeatherAbyssDayData.getData(server).tick(overworld);
+        processSummonScheduler();
     }
 
     private static void applyRequiem(ServerPlayer player) {
@@ -439,20 +457,109 @@ public class FeatherAbyssHandler {
         player.addEffect(new MobEffectInstance(DOOM_DEBUFFS[i2], DOOM_DURATION, amp2));
     }
 
-    // ========== 祸之可能性：30s 生成 5 只 ==========
+    // ========== 祸之可能性：充能 → 触发 → 召唤 ==========
 
-    private static void spawnDisasterMobs(ServerPlayer player) {
+    /** 单次召唤计划：粒子已显，延迟后于落点生成怪物 */
+    private static final class SummonPlan {
+        final long time;
+        final ServerLevel level;
+        final List<Vec3> positions;
+        final EntityType<?> type;
+
+        SummonPlan(long time, ServerLevel level, List<Vec3> positions, EntityType<?> type) {
+            this.time = time;
+            this.level = level;
+            this.positions = positions;
+            this.type = type;
+        }
+    }
+
+    /** 测试指令用：延迟触发一次完整召唤（不污染充能计时器） */
+    private static final class DelayedSummon {
+        final long time;
+        final ServerPlayer player;
+
+        DelayedSummon(long time, ServerPlayer player) {
+            this.time = time;
+            this.player = player;
+        }
+    }
+
+    private static final List<SummonPlan> PENDING_SUMMONS = new ArrayList<>();
+    private static final List<DelayedSummon> DELAYED_SUMMONS = new ArrayList<>();
+
+    /** 充能间隔（tick）：扭曲值越高越短，下限 2min */
+    private static int chargeInterval(int twist) {
+        float t = Math.max(0, Math.min(MAX_TWIST, twist)) / (float) MAX_TWIST;
+        int interval = (int) (CHARGE_INTERVAL_BASE - t * (CHARGE_INTERVAL_BASE - CHARGE_INTERVAL_MIN));
+        return Math.max(CHARGE_INTERVAL_MIN, interval);
+    }
+
+    /** 身边 radius 格内是否存在不少于 min 只怪物 */
+    private static boolean hasEnoughNearbyMobs(ServerPlayer player, double radius, int min) {
+        AABB box = new AABB(player.blockPosition()).inflate(radius);
+        return player.level().getEntitiesOfClass(Monster.class, box).size() >= min;
+    }
+
+    /** 执行一次召唤：生成 5 个精灵粒子落点，1s 后于落点生成 5 只怪物（其一类型） */
+    private static void performSummon(ServerPlayer player) {
         EntityType<?> type = DISASTER_TYPES[player.getRandom().nextInt(DISASTER_TYPES.length)];
         ServerLevel level = player.serverLevel();
+        double py = player.getY() + 2.0;
+        List<Vec3> positions = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            double angle = player.getRandom().nextDouble() * Math.PI * 2;
-            double dist = 3 + player.getRandom().nextDouble() * 5;
-            double x = player.getX() + Math.cos(angle) * dist;
-            double z = player.getZ() + Math.sin(angle) * dist;
-            Entity e = type.create(level);
+            double x = player.getX() + (player.getRandom().nextDouble() * 2 - 1) * SUMMON_HALF;
+            double z = player.getZ() + (player.getRandom().nextDouble() * 2 - 1) * SUMMON_HALF;
+            Vec3 p = new Vec3(x, py, z);
+            positions.add(p);
+            level.sendParticles(ModParticleTypes.ABYSS_SUMMON.get(), x, py, z, 1, 0, 0, 0, 0);
+        }
+        PENDING_SUMMONS.add(new SummonPlan(level.getGameTime() + SUMMON_DELAY_TICKS, level, positions, type));
+    }
+
+    private static void spawnAtPositions(SummonPlan plan) {
+        for (Vec3 p : plan.positions) {
+            Entity e = plan.type.create(plan.level);
             if (e == null) continue;
-            e.setPos(x, player.getY(), z);
-            level.addFreshEntity(e);
+            e.setPos(p.x, p.y, p.z);
+            plan.level.addFreshEntity(e);
+        }
+    }
+
+    /** 测试指令：直接从「触发倒计时」阶段开始（龙吼 + 3s 倒计时 + 召唤），不污染充能计时器 */
+    public static void triggerTestCalamity(ServerPlayer player) {
+        if (!hasAbyss(player)) return;
+        player.playSound(SoundEvents.ENDER_DRAGON_AMBIENT, 1.0f, 1.0f);
+        AbyssCountdownPacket.send(player);
+        DELAYED_SUMMONS.add(new DelayedSummon(player.level().getGameTime() + COUNTDOWN_TICKS, player));
+    }
+
+    /** 每服务器刻推进延迟召唤与测试召唤队列 */
+    private static void processSummonScheduler() {
+        if (!PENDING_SUMMONS.isEmpty()) {
+            Iterator<SummonPlan> it = PENDING_SUMMONS.iterator();
+            while (it.hasNext()) {
+                SummonPlan plan = it.next();
+                if (plan.level.getGameTime() >= plan.time) {
+                    spawnAtPositions(plan);
+                    it.remove();
+                }
+            }
+        }
+        if (!DELAYED_SUMMONS.isEmpty()) {
+            Iterator<DelayedSummon> it = DELAYED_SUMMONS.iterator();
+            while (it.hasNext()) {
+                DelayedSummon d = it.next();
+                ServerPlayer p = d.player;
+                if (p == null || !p.isAlive() || !hasAbyss(p)) {
+                    it.remove();
+                    continue;
+                }
+                if (p.level().getGameTime() >= d.time) {
+                    performSummon(p);
+                    it.remove();
+                }
+            }
         }
     }
 
@@ -471,14 +578,34 @@ public class FeatherAbyssHandler {
             tag.putLong(KEY_DOOM_TIMER, now + DOOM_INTERVAL);
             dirty = true;
         }
-        long spawnNext = tag.getLong(KEY_SPAWN_TIMER);
-        if (spawnNext <= 0L) {
-            tag.putLong(KEY_SPAWN_TIMER, now + SPAWN_INTERVAL);
-            dirty = true;
-        } else if (now >= spawnNext) {
-            spawnDisasterMobs(player);
-            tag.putLong(KEY_SPAWN_TIMER, now + SPAWN_INTERVAL);
-            dirty = true;
+
+        // 祸之可能性 状态机：0 充能中 → 1 已充能待触发 → 2 倒计时中
+        int state = tag.getInt(KEY_CHARGE_STATE);
+        if (state == 0) {
+            long chargeNext = tag.getLong(KEY_CHARGE_NEXT);
+            if (chargeNext <= 0L) {
+                tag.putLong(KEY_CHARGE_NEXT, now + chargeInterval(getTwist(player)));
+                dirty = true;
+            } else if (now >= chargeNext) {
+                tag.putInt(KEY_CHARGE_STATE, 1);
+                dirty = true;
+            }
+        } else if (state == 1) {
+            if (hasEnoughNearbyMobs(player, 7.0, 5)) {
+                player.playSound(SoundEvents.ENDER_DRAGON_AMBIENT, 1.0f, 1.0f);
+                AbyssCountdownPacket.send(player);
+                tag.putInt(KEY_CHARGE_STATE, 2);
+                tag.putLong(KEY_COUNTDOWN_NEXT, now + COUNTDOWN_TICKS);
+                dirty = true;
+            }
+        } else if (state == 2) {
+            long cdNext = tag.getLong(KEY_COUNTDOWN_NEXT);
+            if (now >= cdNext) {
+                performSummon(player);
+                tag.putInt(KEY_CHARGE_STATE, 0);
+                tag.putLong(KEY_CHARGE_NEXT, now + chargeInterval(getTwist(player)));
+                dirty = true;
+            }
         }
         if (dirty) writeBack(player, tag);
     }
@@ -488,7 +615,9 @@ public class FeatherAbyssHandler {
         CompoundTag tag = persisted(player);
         boolean dirty = false;
         if (tag.contains(KEY_DOOM_TIMER)) { tag.remove(KEY_DOOM_TIMER); dirty = true; }
-        if (tag.contains(KEY_SPAWN_TIMER)) { tag.remove(KEY_SPAWN_TIMER); dirty = true; }
+        if (tag.contains(KEY_CHARGE_STATE)) { tag.remove(KEY_CHARGE_STATE); dirty = true; }
+        if (tag.contains(KEY_CHARGE_NEXT)) { tag.remove(KEY_CHARGE_NEXT); dirty = true; }
+        if (tag.contains(KEY_COUNTDOWN_NEXT)) { tag.remove(KEY_COUNTDOWN_NEXT); dirty = true; }
         if (dirty) writeBack(player, tag);
     }
 
@@ -510,6 +639,24 @@ public class FeatherAbyssHandler {
         clearStackState(player.getUUID());
         if (hasAbyss(player)) {
             setTwist(player, 0);
+        }
+    }
+
+    /** 疯狂：击杀怪物有 3% 概率降低 1 点扭曲值 */
+    @SubscribeEvent
+    public static void onMobKilled(LivingDeathEvent event) {
+        if (event.getEntity().level().isClientSide) return;
+        if (event.getEntity() instanceof Player) return;
+        if (!(event.getEntity() instanceof Monster)) return;
+        Entity killer = event.getSource().getEntity();
+        ServerPlayer player = null;
+        if (killer instanceof ServerPlayer sp) {
+            player = sp;
+        } else if (killer instanceof Projectile projectile && projectile.getOwner() instanceof ServerPlayer sp) {
+            player = sp;
+        }
+        if (player != null && hasAbyss(player) && player.getRandom().nextFloat() < 0.03f) {
+            addTwist(player, -1);
         }
     }
 

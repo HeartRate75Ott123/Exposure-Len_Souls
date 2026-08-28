@@ -1,0 +1,654 @@
+{
+  "boss_barrage": {
+    "name": "首领套",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "dmg_mod:boss_barrage:1.2",
+          "kb_resist:0.2",
+          "immune_explosion",
+          "on_hit_effect:weak:0.1:60:0"
+        ]
+      }
+    ]
+  },
+  "bone_march": {
+    "name": "枯骨行军",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "cond:night|maxhp:0.3",
+          "barrage_trigger:1"
+        ]
+      }
+    ]
+  },
+  "pale_hunt": {
+    "name": "苍白猎魂",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "barrage_trigger:1",
+          "dmg_mod:pale_hunt:1.1"
+        ]
+      }
+    ]
+  },
+  "twin_spider": {
+    "name": "双蛛噬影",
+    "tiers": [
+      {
+        "count": 2,
+        "effects": [
+          "cond:night|infusion_boost:1",
+          "barrage_dmg:1.2"
+        ]
+      }
+    ]
+  },
+  "molten_oath": {
+    "name": "熔心誓约",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "immune_fire",
+          "cond:fire|maxhp:0.3",
+          "barrage_dmg:1.15"
+        ]
+      }
+    ]
+  },
+  "abyss_whisper": {
+    "name": "深渊低语",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "env:water_breath",
+          "cond:water|speed:0.15",
+          "dmg_mod:abyss_whisper:1.1"
+        ]
+      }
+    ]
+  },
+  "wither_samsara": {
+    "name": "凋朽轮回",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "convert_eff:wither:healing",
+          "convert_eff:slow:speed"
+        ]
+      }
+    ]
+  },
+  "twin_phase": {
+    "name": "昼夜双生",
+    "tiers": [
+      {
+        "count": 2,
+        "effects": [
+          "dmg_mod:twin_phase:1.1"
+        ],
+        "when": "day"
+      },
+      {
+        "count": 2,
+        "effects": [
+          "maxhp:0.3"
+        ],
+        "when": "night"
+      }
+    ]
+  },
+  "steel_hoof": {
+    "name": "钢蹄铁骑",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "speed:0.1",
+          "kb_resist:0.2"
+        ]
+      }
+    ]
+  },
+  "blaze_crest": {
+    "name": "炽翎烈羽",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "immune_fire",
+          "barrage_trigger:1",
+          "dmg_mod:blaze_crest:1.15"
+        ]
+      }
+    ]
+  },
+  "magma_kin": {
+    "name": "岩浆之裔",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "immune_fire",
+          "cond:fire|speed:0.15"
+        ]
+      }
+    ]
+  },
+  "infernal_herd": {
+    "name": "炼狱牧人",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "kb_resist:0.2",
+          "dmg_mod:infernal_herd:1.1",
+          "barrage_trigger:1"
+        ]
+      }
+    ]
+  },
+  "ember_revenant": {
+    "name": "余烬亡魂",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "immune_fire",
+          "convert_eff:wither:healing",
+          "dmg_mod:ember_revenant:1.1"
+        ]
+      }
+    ]
+  },
+  "cinder_swarm": {
+    "name": "炽粉虫群",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "immune_fire",
+          "cond:fire|maxhp:0.2"
+        ]
+      }
+    ]
+  },
+  "abyss_song": {
+    "name": "渊海歌者",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "env:water_breath",
+          "dmg_mod:abyss_song:1.15",
+          "barrage_trigger:1"
+        ]
+      }
+    ]
+  },
+  "tide_fang": {
+    "name": "潮汐之牙",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "env:water_breath",
+          "cond:water|speed:0.2"
+        ]
+      }
+    ]
+  },
+  "deep_reef": {
+    "name": "幽渊礁民",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "env:water_breath",
+          "dmg_mod:deep_reef:1.1"
+        ]
+      }
+    ]
+  },
+  "kraken_grip": {
+    "name": "海妖之握",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "env:water_breath",
+          "kb_resist:0.2",
+          "dmg_mod:kraken_grip:1.15"
+        ]
+      }
+    ]
+  },
+  "coral_guard": {
+    "name": "珊瑚守哨",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "env:water_breath",
+          "armor:0.15"
+        ]
+      }
+    ]
+  },
+  "bramble_hunt": {
+    "name": "荆棘林巡",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "barrage_dmg:1.15",
+          "cond:night|speed:0.1"
+        ]
+      }
+    ]
+  },
+  "frost_titan": {
+    "name": "霜原巨兽",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "dmg_mod:frost_titan:1.15",
+          "kb_resist:0.2"
+        ]
+      }
+    ]
+  },
+  "forest_spirit": {
+    "name": "林间精灵",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "speed:0.1",
+          "maxhp:0.1"
+        ]
+      }
+    ]
+  },
+  "castle_guard": {
+    "name": "城堡卫队",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "armor:0.15",
+          "kb_resist:0.2"
+        ]
+      }
+    ]
+  },
+  "maze_lurker": {
+    "name": "迷牢潜伏者",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "cond:night|maxhp:0.2",
+          "dodge:0.1"
+        ]
+      }
+    ]
+  },
+  "wraith_veil": {
+    "name": "幽魂纱影",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "env:dark_invis",
+          "cond:night|speed:0.15"
+        ]
+      }
+    ]
+  },
+  "astral_herd": {
+    "name": "星辉游徙",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "speed:0.1",
+          "maxhp:0.15"
+        ]
+      }
+    ]
+  },
+  "glow_ward": {
+    "name": "辉光守者",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "armor:0.15",
+          "kb_resist:0.2"
+        ]
+      }
+    ]
+  },
+  "moth_dance": {
+    "name": "流萤之舞",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "env:dark_invis",
+          "cond:night|maxhp:0.15"
+        ]
+      }
+    ]
+  },
+  "permafrost_bind": {
+    "name": "永冻之缚",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "dmg_mod:permafrost_bind:1.15",
+          "kb_resist:0.15"
+        ]
+      }
+    ]
+  },
+  "lunar_spawn": {
+    "name": "月相之裔",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "cond:night|maxhp:0.25",
+          "dodge:0.1"
+        ]
+      }
+    ]
+  },
+  "starfire_ascend": {
+    "name": "星火升腾",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "env:water_breath",
+          "cond:water|speed:0.15"
+        ]
+      }
+    ]
+  },
+  "paladin_oath": {
+    "name": "圣骑誓约",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "kb_resist:0.2",
+          "dmg_mod:paladin_oath:1.15",
+          "barrage_trigger:1"
+        ]
+      }
+    ]
+  },
+  "obliterator": {
+    "name": "湮灭协议",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "dmg_mod:obliterator:1.2",
+          "barrage_trigger:1"
+        ]
+      }
+    ]
+  },
+  "frost_golem": {
+    "name": "霜铸魔像",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "dmg_mod:frost_golem:1.15",
+          "armor:0.15"
+        ]
+      }
+    ]
+  },
+  "overgrown": {
+    "name": "藤甲巨像",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "maxhp:0.25",
+          "kb_resist:0.2"
+        ]
+      }
+    ]
+  },
+  "cloud_beam": {
+    "name": "云筑天穹",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "barrage_trigger:1",
+          "dmg_mod:cloud_beam:1.15"
+        ]
+      }
+    ]
+  },
+  "skeletal_legion": {
+    "name": "白骨军团",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "dmg_mod:skeletal_legion:1.1",
+          "cond:night|maxhp:0.15"
+        ]
+      }
+    ]
+  },
+  "daybreak": {
+    "name": "破晓之誓",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "dmg_mod:daybreak:1.15"
+        ],
+        "when": "day"
+      },
+      {
+        "count": 3,
+        "effects": [
+          "maxhp:0.25"
+        ],
+        "when": "night"
+      }
+    ]
+  },
+  "tide_clock": {
+    "name": "潮汐轮转",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "maxhp:0.15"
+        ],
+        "when": "day"
+      },
+      {
+        "count": 3,
+        "effects": [
+          "env:water_breath"
+        ],
+        "when": "night"
+      }
+    ]
+  },
+  "ember_cycle": {
+    "name": "烬火轮回",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "speed:0.15"
+        ],
+        "when": "day"
+      },
+      {
+        "count": 3,
+        "effects": [
+          "immune_fire"
+        ],
+        "when": "night"
+      }
+    ]
+  },
+  "wither_chain": {
+    "name": "凋零连锁",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "convert_eff:wither:healing",
+          "convert_eff:slow:speed",
+          "dmg_mod:wither_chain:1.1"
+        ]
+      }
+    ]
+  },
+  "venom_twist": {
+    "name": "剧毒逆转",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "convert_eff:poison:healing",
+          "on_hit_effect:poison:0.15:60:0"
+        ]
+      }
+    ]
+  },
+  "pack_bond": {
+    "name": "群兽之契",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "maxhp:0.1",
+          "speed:0.08"
+        ]
+      }
+    ]
+  },
+  "guardian_beast": {
+    "name": "守家猛兽",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "armor:0.15",
+          "kb_resist:0.15"
+        ]
+      }
+    ]
+  },
+  "sky_riders": {
+    "name": "翔空之翼",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "speed:0.1",
+          "maxhp:0.1"
+        ]
+      }
+    ]
+  },
+  "underground": {
+    "name": "幽冥矿工",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "dmg_mod:underground:1.1",
+          "armor:0.1"
+        ]
+      }
+    ]
+  },
+  "ender_void": {
+    "name": "终末虚空",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "dodge:0.1",
+          "cond:night|maxhp:0.2",
+          "dmg_mod:ender_void:1.1"
+        ]
+      }
+    ]
+  },
+  "swamp_witch": {
+    "name": "沼泽巫咒",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "on_hit_effect:weak:0.1:60:0",
+          "maxhp:0.15"
+        ]
+      }
+    ]
+  },
+  "ravager_charge": {
+    "name": "蛮力冲锋",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "kb_resist:0.25",
+          "dmg_mod:ravager_charge:1.1"
+        ]
+      }
+    ]
+  },
+  "frozen_tundra": {
+    "name": "冰原远征",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "dmg_mod:frozen_tundra:1.1",
+          "kb_resist:0.15"
+        ]
+      }
+    ]
+  },
+  "beast_tamer": {
+    "name": "驯兽大师",
+    "tiers": [
+      {
+        "count": 6,
+        "effects": [
+          "speed:0.12",
+          "maxhp:0.1"
+        ]
+      }
+    ]
+  }
+}

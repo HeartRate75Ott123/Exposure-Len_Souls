@@ -2,6 +2,7 @@
   "values": [
     "exposure:photograph",
     "exposure_polaroid:instant_photograph",
-    "lensouls:entity_photograph"
+    "lensouls:entity_photograph",
+    "lensouls:photo_album"
   ]
 }

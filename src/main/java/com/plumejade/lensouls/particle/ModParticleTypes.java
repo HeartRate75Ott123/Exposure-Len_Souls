@@ -88,6 +88,10 @@ public class ModParticleTypes {
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> FILTER_HIDDEN =
             PARTICLE_TYPES.register("filter_hidden", () -> new SimpleParticleType(false));
 
+    /** 折翼沉渊·祸之可能性召唤粒子（精灵） */
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> ABYSS_SUMMON =
+            PARTICLE_TYPES.register("abyss_summon", () -> new SimpleParticleType(false));
+
     public static void register(IEventBus modEventBus) {
         PARTICLE_TYPES.register(modEventBus);
     }

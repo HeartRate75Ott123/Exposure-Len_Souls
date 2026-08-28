@@ -1,0 +1,472 @@
+{
+  "minecraft:zombie": [
+    "bone_march",
+    "twin_phase",
+    "daybreak"
+  ],
+  "minecraft:chicken": [
+    "bone_march"
+  ],
+  "minecraft:zombie_horse": [
+    "bone_march",
+    "steel_hoof",
+    "daybreak"
+  ],
+  "minecraft:skeleton": [
+    "pale_hunt",
+    "skeletal_legion"
+  ],
+  "minecraft:spider": [
+    "pale_hunt",
+    "twin_spider",
+    "venom_twist"
+  ],
+  "minecraft:skeleton_horse": [
+    "pale_hunt"
+  ],
+  "minecraft:cave_spider": [
+    "twin_spider",
+    "venom_twist"
+  ],
+  "cataclysm:ignis": [
+    "molten_oath",
+    "blaze_crest",
+    "ember_cycle"
+  ],
+  "cataclysm:lava_bat": [
+    "molten_oath",
+    "magma_kin",
+    "cinder_swarm"
+  ],
+  "minecraft:magma_cube": [
+    "molten_oath",
+    "magma_kin",
+    "ember_cycle"
+  ],
+  "cataclysm:ignited_berserker": [
+    "molten_oath",
+    "blaze_crest",
+    "ember_revenant"
+  ],
+  "minecraft:drowned": [
+    "abyss_whisper",
+    "tide_clock"
+  ],
+  "minecraft:axolotl": [
+    "abyss_whisper",
+    "tide_fang"
+  ],
+  "minecraft:squid": [
+    "abyss_whisper",
+    "tide_fang"
+  ],
+  "minecraft:guardian": [
+    "abyss_whisper",
+    "abyss_song",
+    "tide_clock"
+  ],
+  "minecraft:wither_skeleton": [
+    "wither_samsara",
+    "ember_revenant",
+    "skeletal_legion",
+    "wither_chain"
+  ],
+  "cataclysm:draugr": [
+    "wither_samsara",
+    "wither_chain"
+  ],
+  "legendary_monsters:withered_abomination": [
+    "wither_samsara"
+  ],
+  "minecraft:creeper": [
+    "twin_phase"
+  ],
+  "minecraft:horse": [
+    "steel_hoof",
+    "beast_tamer"
+  ],
+  "minecraft:donkey": [
+    "steel_hoof",
+    "beast_tamer"
+  ],
+  "minecraft:mule": [
+    "steel_hoof",
+    "beast_tamer"
+  ],
+  "minecraft:blaze": [
+    "blaze_crest",
+    "ember_cycle"
+  ],
+  "cataclysm:ignited_revenant": [
+    "blaze_crest",
+    "ember_revenant"
+  ],
+  "cataclysm:the_prowler": [
+    "magma_kin"
+  ],
+  "cataclysm:netherite_monstrosity": [
+    "infernal_herd"
+  ],
+  "minecraft:zoglin": [
+    "infernal_herd"
+  ],
+  "minecraft:hoglin": [
+    "infernal_herd"
+  ],
+  "cataclysm:netherite_ministrosity": [
+    "infernal_herd"
+  ],
+  "cataclysm:cindaria": [
+    "cinder_swarm"
+  ],
+  "twilightforest:fire_beetle": [
+    "cinder_swarm"
+  ],
+  "cataclysm:the_leviathan": [
+    "abyss_song"
+  ],
+  "minecraft:elder_guardian": [
+    "abyss_song"
+  ],
+  "cataclysm:scylla": [
+    "tide_fang"
+  ],
+  "cataclysm:deepling": [
+    "deep_reef",
+    "tide_clock"
+  ],
+  "cataclysm:deepling_angler": [
+    "deep_reef"
+  ],
+  "cataclysm:deepling_brute": [
+    "deep_reef"
+  ],
+  "cataclysm:deepling_priest": [
+    "deep_reef"
+  ],
+  "cataclysm:deepling_warlock": [
+    "deep_reef"
+  ],
+  "block_factorys_bosses:kraken": [
+    "kraken_grip"
+  ],
+  "block_factorys_bosses:kraken_tentacle": [
+    "kraken_grip"
+  ],
+  "cataclysm:hippocamtus": [
+    "kraken_grip"
+  ],
+  "cataclysm:coral_golem": [
+    "coral_guard"
+  ],
+  "cataclysm:coralssus": [
+    "coral_guard"
+  ],
+  "cataclysm:urchinkin": [
+    "coral_guard"
+  ],
+  "cataclysm:lionfish": [
+    "coral_guard"
+  ],
+  "twilightforest:hedge_spider": [
+    "bramble_hunt"
+  ],
+  "twilightforest:king_spider": [
+    "bramble_hunt"
+  ],
+  "twilightforest:swarm_spider": [
+    "bramble_hunt"
+  ],
+  "twilightforest:alpha_yeti": [
+    "frost_titan",
+    "permafrost_bind"
+  ],
+  "twilightforest:ice_crystal": [
+    "frost_titan",
+    "frost_golem"
+  ],
+  "twilightforest:snow_guardian": [
+    "frost_titan"
+  ],
+  "twilightforest:stable_ice_core": [
+    "frost_titan"
+  ],
+  "twilightforest:deer": [
+    "forest_spirit"
+  ],
+  "twilightforest:tiny_bird": [
+    "forest_spirit"
+  ],
+  "twilightforest:squirrel": [
+    "forest_spirit"
+  ],
+  "twilightforest:raven": [
+    "forest_spirit"
+  ],
+  "twilightforest:knight_phantom": [
+    "castle_guard"
+  ],
+  "twilightforest:redcap": [
+    "castle_guard"
+  ],
+  "twilightforest:redcap_sapper": [
+    "castle_guard"
+  ],
+  "twilightforest:upper_goblin_knight": [
+    "castle_guard"
+  ],
+  "twilightforest:maze_slime": [
+    "maze_lurker"
+  ],
+  "twilightforest:slime_beetle": [
+    "maze_lurker"
+  ],
+  "twilightforest:towerwood_borer": [
+    "maze_lurker"
+  ],
+  "twilightforest:pinch_beetle": [
+    "maze_lurker"
+  ],
+  "twilightforest:wraith": [
+    "wraith_veil"
+  ],
+  "twilightforest:harbinger_cube": [
+    "wraith_veil"
+  ],
+  "twilightforest:roving_cube": [
+    "wraith_veil"
+  ],
+  "eternal_starlight:aurora_deer": [
+    "astral_herd"
+  ],
+  "eternal_starlight:boarwarf": [
+    "astral_herd"
+  ],
+  "eternal_starlight:ratlin": [
+    "astral_herd"
+  ],
+  "eternal_starlight:shimmer_lacewing": [
+    "astral_herd",
+    "moth_dance"
+  ],
+  "eternal_starlight:starfire_bird": [
+    "astral_herd",
+    "starfire_ascend"
+  ],
+  "eternal_starlight:starlight_golem": [
+    "glow_ward"
+  ],
+  "eternal_starlight:astral_golem": [
+    "glow_ward"
+  ],
+  "eternal_starlight:aethersent_golem": [
+    "glow_ward"
+  ],
+  "eternal_starlight:grimstone_golem": [
+    "glow_ward"
+  ],
+  "eternal_starlight:crystallized_moth": [
+    "moth_dance"
+  ],
+  "eternal_starlight:luminaris": [
+    "moth_dance"
+  ],
+  "eternal_starlight:twilight_gaze": [
+    "moth_dance"
+  ],
+  "eternal_starlight:permafrost": [
+    "permafrost_bind"
+  ],
+  "eternal_starlight:freeze": [
+    "permafrost_bind"
+  ],
+  "eternal_starlight:yeti": [
+    "permafrost_bind",
+    "frozen_tundra"
+  ],
+  "eternal_starlight:lunar_monstrosity": [
+    "lunar_spawn"
+  ],
+  "eternal_starlight:seeker": [
+    "lunar_spawn"
+  ],
+  "eternal_starlight:shadow_snail": [
+    "lunar_spawn"
+  ],
+  "eternal_starlight:luminofish": [
+    "starfire_ascend"
+  ],
+  "eternal_starlight:rookfish": [
+    "starfire_ascend"
+  ],
+  "eternal_starlight:thirst_walker": [
+    "starfire_ascend"
+  ],
+  "legendary_monsters:posessed_paladin": [
+    "paladin_oath"
+  ],
+  "legendary_monsters:resurrected_knight": [
+    "paladin_oath"
+  ],
+  "legendary_monsters:beheaded_knight": [
+    "paladin_oath"
+  ],
+  "legendary_monsters:the_obliterator": [
+    "obliterator"
+  ],
+  "legendary_monsters:annihilation_pursuer": [
+    "obliterator"
+  ],
+  "legendary_monsters:endersent": [
+    "obliterator"
+  ],
+  "legendary_monsters:frostbitten_golem": [
+    "frost_golem"
+  ],
+  "minecraft:stray": [
+    "frost_golem",
+    "frozen_tundra"
+  ],
+  "legendary_monsters:overgrown_colossus": [
+    "overgrown"
+  ],
+  "legendary_monsters:mossy_golem": [
+    "overgrown"
+  ],
+  "twilightforest:minoshroom": [
+    "overgrown"
+  ],
+  "legendary_monsters:cloud_golem": [
+    "cloud_beam"
+  ],
+  "legendary_monsters:hovering_hurricane": [
+    "cloud_beam"
+  ],
+  "legendary_monsters:wandering_eye": [
+    "cloud_beam"
+  ],
+  "legendary_monsters:skeletosaurus": [
+    "skeletal_legion"
+  ],
+  "legendary_monsters:skeloraptor": [
+    "skeletal_legion"
+  ],
+  "minecraft:husk": [
+    "daybreak"
+  ],
+  "cataclysm:royal_draugr": [
+    "wither_chain"
+  ],
+  "cataclysm:elite_draugr": [
+    "wither_chain"
+  ],
+  "minecraft:bee": [
+    "venom_twist",
+    "sky_riders"
+  ],
+  "minecraft:silverfish": [
+    "venom_twist",
+    "underground"
+  ],
+  "minecraft:wolf": [
+    "pack_bond"
+  ],
+  "minecraft:cat": [
+    "pack_bond"
+  ],
+  "minecraft:fox": [
+    "pack_bond"
+  ],
+  "minecraft:ocelot": [
+    "pack_bond"
+  ],
+  "minecraft:parrot": [
+    "pack_bond",
+    "sky_riders"
+  ],
+  "minecraft:iron_golem": [
+    "guardian_beast"
+  ],
+  "minecraft:snow_golem": [
+    "guardian_beast"
+  ],
+  "minecraft:polar_bear": [
+    "guardian_beast",
+    "frozen_tundra"
+  ],
+  "minecraft:armadillo": [
+    "guardian_beast"
+  ],
+  "minecraft:bat": [
+    "sky_riders"
+  ],
+  "minecraft:allay": [
+    "sky_riders"
+  ],
+  "minecraft:vex": [
+    "sky_riders"
+  ],
+  "minecraft:strider": [
+    "underground"
+  ],
+  "minecraft:zombified_piglin": [
+    "underground"
+  ],
+  "minecraft:piglin": [
+    "underground"
+  ],
+  "minecraft:piglin_brute": [
+    "underground"
+  ],
+  "minecraft:enderman": [
+    "ender_void"
+  ],
+  "minecraft:endermite": [
+    "ender_void"
+  ],
+  "cataclysm:ender_golem": [
+    "ender_void"
+  ],
+  "cataclysm:endermaptera": [
+    "ender_void"
+  ],
+  "cataclysm:ender_guardian": [
+    "ender_void"
+  ],
+  "minecraft:witch": [
+    "swamp_witch"
+  ],
+  "minecraft:bogged": [
+    "swamp_witch"
+  ],
+  "minecraft:slime": [
+    "swamp_witch"
+  ],
+  "minecraft:frog": [
+    "swamp_witch"
+  ],
+  "minecraft:ravager": [
+    "ravager_charge"
+  ],
+  "minecraft:pillager": [
+    "ravager_charge"
+  ],
+  "minecraft:vindicator": [
+    "ravager_charge"
+  ],
+  "minecraft:illusioner": [
+    "ravager_charge"
+  ],
+  "twilightforest:yeti": [
+    "frozen_tundra"
+  ],
+  "minecraft:camel": [
+    "beast_tamer"
+  ],
+  "minecraft:llama": [
+    "beast_tamer"
+  ],
+  "minecraft:trader_llama": [
+    "beast_tamer"
+  ]
+}

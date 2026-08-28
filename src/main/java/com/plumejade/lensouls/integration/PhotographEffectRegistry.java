@@ -488,6 +488,14 @@ public class PhotographEffectRegistry {
         return tag.contains("lensouls:stolen_entity") ? tag.getString("lensouls:stolen_entity") : null;
     }
 
+    /** 照片主体是否为 Boss（拍摄时打过 lensouls:is_boss 标记） */
+    public static boolean isBossPhoto(ItemStack stack) {
+        var data = stack.get(DataComponents.CUSTOM_DATA);
+        if (data == null) return false;
+        var tag = data.copyTag();
+        return tag.contains("lensouls:is_boss") && tag.getBoolean("lensouls:is_boss");
+    }
+
     public static boolean hasEffect(String entityId) {
         return entityId != null && (DESCRIPTIONS.containsKey(entityId) || POTIONS.containsKey(entityId));
     }
@@ -513,6 +521,8 @@ public class PhotographEffectRegistry {
         event.getToolTip().add(Component.translatable("lensouls.photograph.slot_hint").withStyle(ChatFormatting.YELLOW));
         event.getToolTip().add(Component.translatable("lensouls.photograph.entity_name",
                 Component.translatable(entityIdToTranslationKey(entityId))));
+
+        PhotoSetRegistry.appendTooltip(event, entityId);
 
         List<String> lines = DESCRIPTIONS.get(entityId);
         String staticText = lines != null ? String.join("", lines) : "";

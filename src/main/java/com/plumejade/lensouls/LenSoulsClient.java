@@ -82,6 +82,7 @@ public class LenSoulsClient {
         event.register(ModMenus.CONVERTER.get(), ConverterScreen::new);
         event.register(ModMenus.CONVERTER_SELECT.get(), SoulSelectOverlay::new);
         event.register(ModMenus.PHOTO_GUI.get(), PhotoGuiScreen::new);
+        event.register(ModMenus.PHOTO_ALBUM.get(), com.plumejade.lensouls.gui.AlbumScreen::new);
     }
 
     /** 注册客户端扩展（显示元素灌注图标，隐藏原版粒子） */
@@ -287,6 +288,10 @@ public class LenSoulsClient {
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.FILTER_HIDDEN.get(),
                 (net.minecraft.client.particle.SpriteSet sprites) ->
                         (type, level, x, y, z, vx, vy, vz) -> null);
+
+        // 折翼沉渊·祸之可能性召唤粒子（精灵）
+        event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.ABYSS_SUMMON.get(),
+                com.plumejade.lensouls.client.particle.SummonSpiritParticle.Provider::new);
     }
 
     private static void onGatherEffectTooltips(GatherEffectScreenTooltipsEvent event) {

@@ -219,5 +219,12 @@ public class PacketHandler {
                 TwistSyncPacket.STREAM_CODEC,
                 TwistSyncPacket::handle
         );
+
+        // ---- 祸之可能性倒计时 S2C（物品栏上方红字） ----
+        registrar.playToClient(
+                AbyssCountdownPacket.TYPE,
+                AbyssCountdownPacket.STREAM_CODEC,
+                AbyssCountdownPacket::handle
+        );
     }
 }

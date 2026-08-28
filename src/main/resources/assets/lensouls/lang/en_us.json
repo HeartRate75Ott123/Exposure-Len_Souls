@@ -259,11 +259,11 @@
   "item.lensouls.feather_abyss.desc6": "§cObtuse: experience gained is halved",
   "item.lensouls.feather_abyss.desc7": "§cSeclusion: each creature joining within 16 blocks deals 0.5 magic damage and reduces your armor ×75% (3s per stack)",
   "item.lensouls.feather_abyss.desc8": "§cDoom: 0.8% chance per mined block to spawn 15 silverfish; every minute, draw 2 (unique) from hunger/blindness/slowness/mining fatigue/poison/weakness/levitation, 20s, level 3-20",
-  "item.lensouls.feather_abyss.desc9": "§cDisaster: every 30s, spawn 5 of a random type (zombie/skeleton/cave spider) nearby",
+  "item.lensouls.feather_abyss.desc9": "§cDisaster: charges for 15 minutes (higher distortion charges faster, minimum 2 minutes); once charged, if 5+ monsters are within 7 blocks, the Ender Dragon's roar sounds and a 3-second countdown appears above the inventory, then summons 5 of one type (zombie/skeleton/cave spider) around you",
   "item.lensouls.feather_abyss.desc10": "§cFrustration: each hit taken reduces your attack by ×0.94 (5s per stack)",
   "item.lensouls.feather_abyss.desc11": "§cTasteless: cannot heal through food",
   "item.lensouls.feather_abyss.desc12": "§cAmnesia: cannot use Copy Souls, but they still drop normally",
-  "item.lensouls.feather_abyss.desc13": "§cMadness: distortion cap 200, +1 per crafted item; each point: damage taken +0.2%, damage dealt +1%; resets on death",
+  "item.lensouls.feather_abyss.desc13": "§cMadness: distortion cap 200, +1 per crafted item; each point: damage taken +0.2%, damage dealt +1%; resets on death; killing a monster has a 3% chance to lower distortion by 1",
   "item.lensouls.feather_abyss.desc14": "§cMalice: elemental additional damage you take +12%",
   "message.lensouls.hardman.inject_fail": "Huh, how does this thing work",
   "gui.lensouls.ability.title": "Ability Selection",
@@ -360,5 +360,14 @@
   "tooltip.lensouls.potion_glass.input.potion": "§dCan be combined with a glass pane to infuse potion effects",
   "tooltip.lensouls.potion_glass.input.reagent": "§dCan be combined with a glass pane to infuse potion effects",
   "tooltip.lensouls.potion_glass.input.camera": "After the glass pane is infused with potion effects, it becomes a camera accessory installed in the filter slot; photograph a creature to inject effects, or switch to third-person front view for a selfie",
-  "tooltip.lensouls.potion_glass.usage": "Can be installed as a camera accessory in the filter slot; photograph a creature to inject effects, or switch to third-person front view for a selfie"
+  "tooltip.lensouls.potion_glass.usage": "Can be installed as a camera accessory in the filter slot; photograph a creature to inject effects, or switch to third-person front view for a selfie",
+
+  "item.lensouls.photo_album": "Photo Album",
+  "item.lensouls.photo_album.tooltip": "§bHold right-click to open the container and place curio photographs (ability-stealing in nature), §athen equip the album in a curio slot to activate all contained photo effects",
+  "container.lensouls.photo_album": "Photo Album",
+
+  "effect.lensouls.suppress_water": "Water Suppress",
+  "effect.lensouls.suppress_earth": "Earth Suppress",
+  "effect.lensouls.suppress_fire": "Fire Suppress",
+  "effect.lensouls.suppress_ender": "Ender Suppress"
 }

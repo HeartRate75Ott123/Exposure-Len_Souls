@@ -46,7 +46,9 @@ public class PhotoSetClient {
         return ids;
     }
 
+    /** 客户端：已装备 Boss 照片的去重种类数（同 Boss 多张只算一次） */
     public static int countBossPhotos(Player player) {
+        java.util.Set<String> seen = new java.util.HashSet<>();
         int n = 0;
         var handlerOpt = CuriosApi.getCuriosInventory(player);
         if (handlerOpt.isPresent()) {
@@ -58,15 +60,21 @@ public class PhotoSetClient {
                     if (stack.getItem() instanceof PhotoAlbumItem) {
                         ItemContainerContents contents = stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
                         for (ItemStack photo : contents.nonEmptyItems()) {
-                            if (PhotographEffectRegistry.isBossPhoto(photo)) n++;
+                            if (isBossDedup(photo, seen)) n++;
                         }
-                    } else if (PhotographEffectRegistry.isBossPhoto(stack)) {
+                    } else if (isBossDedup(stack, seen)) {
                         n++;
                     }
                 }
             }
         }
         return n;
+    }
+
+    private static boolean isBossDedup(ItemStack stack, java.util.Set<String> seen) {
+        if (!PhotographEffectRegistry.isBossPhoto(stack)) return false;
+        String ent = PhotographEffectRegistry.getPhotoEntity(stack);
+        return ent != null ? seen.add(ent) : true;
     }
 
     /** 客户端：当前各元素抑制等级（供「照片套装效果」界面通用效果块显示） */

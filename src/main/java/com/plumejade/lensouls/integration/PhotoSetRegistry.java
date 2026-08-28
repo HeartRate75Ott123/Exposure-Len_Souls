@@ -151,10 +151,15 @@ public class PhotoSetRegistry {
             if (def == null) continue;
             event.getToolTip().add(Component.literal("§a[ " + def.name() + " ]").withStyle(ChatFormatting.GREEN));
             if (!shift) continue;
-            // 成员译名表头
+            // 成员译名表头（首领套按实际张数显示）
             List<String> members = getMembers(setId);
-            String names = setId.equals("boss_barrage") ? "各类首领"
-                    : members.stream().map(PhotoSetRegistry::entityName).toList().stream().collect(java.util.stream.Collectors.joining("/"));
+            String names;
+            if (setId.equals("boss_barrage")) {
+                int need = def.tiers().stream().mapToInt(t -> t.count()).max().orElse(1);
+                names = need + " 张首领";
+            } else {
+                names = members.stream().map(PhotoSetRegistry::entityName).toList().stream().collect(java.util.stream.Collectors.joining("/"));
+            }
             event.getToolTip().add(Component.literal("  §7集齐 " + names + " 照片，触发效果").withStyle(ChatFormatting.GRAY));
             for (PhotoSetDefs.Tier t : def.tiers()) {
                 String whenPrefix = t.when() != null ? "§e" + condCn(t.when()) + "：" : "";
@@ -247,8 +252,12 @@ public class PhotoSetRegistry {
                         + effectNameCn(p[1]) + ampCn(Integer.parseInt(p[4])) + "效果";
                 case "on_hit_suppress" -> "造成伤害时 " + pct(Double.parseDouble(p[2])) + " 概率施加"
                         + elementCn(ElementDamage.byName(p[1])) + "元素抑制";
-                case "dmg_mod" -> "对套装所需的这几种生物造成伤害 +" + pct(Double.parseDouble(p[2]));
-                case "dmg_taken" -> "受到套装所需的这几种生物伤害 -" + pct(Double.parseDouble(p[2]));
+                case "dmg_mod" -> "boss_barrage".equals(p[1])
+                        ? "对 200 血以上的生物造成伤害 +" + pct(Double.parseDouble(p[2]) - 1.0)
+                        : "对套装所需的这几种生物造成伤害 +" + pct(Double.parseDouble(p[2]) - 1.0);
+                case "dmg_taken" -> "boss_barrage".equals(p[1])
+                        ? "受到 200 血以上的生物伤害 -" + pct(1.0 - Double.parseDouble(p[2]))
+                        : "受到套装所需的这几种生物伤害 -" + pct(1.0 - Double.parseDouble(p[2]));
                 case "infusion_boost" -> "元素活性等级 +" + p[1];
                 case "convert_eff" -> "获得" + effectNameCn(p[1]) + "时转为" + effectNameCn(p[2]) + "效果";
                 case "barrage_trigger" -> "弹幕额外触发 " + p[1] + " 次";

@@ -857,8 +857,9 @@ public class PhotoSpecialEffects {
         return ids;
     }
 
-    /** 已装备照片中，主体为 Boss（拥有 Boss 血条）的数量（仅照片栏位；含栏位内相册的照片） */
+    /** 已装备照片中，主体为 Boss（is_boss 标记或实体命中首领清单）的去重种类数（仅照片栏位；含栏位内相册的照片） */
     public static int countBossPhotos(ServerPlayer player) {
+        Set<String> seen = new HashSet<>();
         int n = 0;
         var handlerOpt = CuriosApi.getCuriosInventory(player);
         if (handlerOpt.isPresent()) {
@@ -870,15 +871,22 @@ public class PhotoSpecialEffects {
                     if (stack.getItem() instanceof PhotoAlbumItem) {
                         ItemContainerContents contents = stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
                         for (ItemStack photo : contents.nonEmptyItems()) {
-                            if (PhotographEffectRegistry.isBossPhoto(photo)) n++;
+                            if (isBossPhotoDedup(photo, seen)) n++;
                         }
-                    } else if (PhotographEffectRegistry.isBossPhoto(stack)) {
+                    } else if (isBossPhotoDedup(stack, seen)) {
                         n++;
                     }
                 }
             }
         }
         return n;
+    }
+
+    /** Boss 照片且实体 id 未统计过（同 Boss 多张只算一次） */
+    private static boolean isBossPhotoDedup(ItemStack stack, Set<String> seen) {
+        if (!PhotographEffectRegistry.isBossPhoto(stack)) return false;
+        String ent = PhotographEffectRegistry.getPhotoEntity(stack);
+        return ent != null ? seen.add(ent) : true;
     }
 
     @SubscribeEvent

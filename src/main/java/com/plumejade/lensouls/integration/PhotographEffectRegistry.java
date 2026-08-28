@@ -493,6 +493,15 @@ public class PhotographEffectRegistry {
         return tag.contains("lensouls:element_entity") ? tag.getString("lensouls:element_entity") : null;
     }
 
+    /** 照片记录的实体 id：能力窃取照片取 stolen_entity，普通照片取 element_entity */
+    public static String getPhotoEntity(ItemStack stack) {
+        var data = stack.get(DataComponents.CUSTOM_DATA);
+        if (data == null) return null;
+        var tag = data.copyTag();
+        if (tag.contains("lensouls:stolen_entity")) return tag.getString("lensouls:stolen_entity");
+        return tag.contains("lensouls:element_entity") ? tag.getString("lensouls:element_entity") : null;
+    }
+
     /**
      * 由「去重后的装备实体列表」统计各元素抑制等级。
      * 每元素等级 = 该元素活性生物数 / 2（≥2 张同元素才构成 1 级）。

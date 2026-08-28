@@ -7,7 +7,6 @@ import com.plumejade.lensouls.config.AttackerElementLoader;
 import com.plumejade.lensouls.config.BossEntityLoader;
 import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
-import com.plumejade.lensouls.handler.CopySoulDropHandler;
 import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
 import net.minecraft.core.component.DataComponents;
@@ -90,15 +89,14 @@ public class PhotoInjectionHandler {
             LenSouls.LOGGER.info("[PhotoInject] onFrameAdded: exposureId={} ability={}", exposureId, ability);
             pendingAbilities.put(exposureId, ability);
 
-            // 能力窃取：缓存被窃取实体 + Boss 判定（首领清单优先，Boss 血条兜底）
+            // 能力窃取：缓存被窃取实体 + Boss 判定（首领清单）
             if (ability == AbilityType.ABILITY_STEAL) {
                 var frameEntities = event.getEntitiesInFrame();
                 if (frameEntities != null && !frameEntities.isEmpty()) {
                     LivingEntity first = frameEntities.get(0);
                     String stolenId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(first.getType()).toString();
                     cacheStolenEntity(exposureId, stolenId);
-                    boolean boss = BossEntityLoader.isBoss(first) || CopySoulDropHandler.hasBossBar(first);
-                    bossFlagCache.put(exposureId, boss);
+                    bossFlagCache.put(exposureId, BossEntityLoader.isBoss(first));
                 }
             }
         } catch (Exception e) {

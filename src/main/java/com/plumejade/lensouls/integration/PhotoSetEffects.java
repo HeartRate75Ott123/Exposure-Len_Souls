@@ -338,7 +338,7 @@ public class PhotoSetEffects {
                 default -> null;
             };
             if (sup == null) continue;
-            target.addEffect(new MobEffectInstance(sup, 100, Math.max(0, e.getValue() - 1), false, false, false));
+            target.addEffect(new MobEffectInstance(sup, 100, Math.max(0, e.getValue() - 1), false, true, true));
         }
     }
 
@@ -370,7 +370,7 @@ public class PhotoSetEffects {
                 };
                 if (sup == null) continue;
                 int dur = Integer.parseInt(p[3]);
-                target.addEffect(new MobEffectInstance(sup, dur, 0, false, false, false));
+                target.addEffect(new MobEffectInstance(sup, dur, 0, false, true, true));
             }
         }
     }

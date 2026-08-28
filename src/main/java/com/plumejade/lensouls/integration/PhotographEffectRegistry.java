@@ -2,6 +2,7 @@ package com.plumejade.lensouls.integration;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.config.AttackerElementLoader;
+import com.plumejade.lensouls.config.BossEntityLoader;
 import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.effect.ModEffects;
 import net.minecraft.ChatFormatting;
@@ -517,12 +518,15 @@ public class PhotographEffectRegistry {
         return levels;
     }
 
-    /** 照片主体是否为 Boss（拍摄时打过 lensouls:is_boss 标记） */
+    /** 照片主体是否为 Boss：拍摄时打的 lensouls:is_boss 标记，或实体 id 命中首领清单（JEI/创造栏照片亦可识别） */
     public static boolean isBossPhoto(ItemStack stack) {
         var data = stack.get(DataComponents.CUSTOM_DATA);
         if (data == null) return false;
         var tag = data.copyTag();
-        return tag.contains("lensouls:is_boss") && tag.getBoolean("lensouls:is_boss");
+        if (tag.contains("lensouls:is_boss") && tag.getBoolean("lensouls:is_boss")) return true;
+        String ent = tag.contains("lensouls:stolen_entity") ? tag.getString("lensouls:stolen_entity") : null;
+        if (ent == null) ent = tag.contains("lensouls:element_entity") ? tag.getString("lensouls:element_entity") : null;
+        return ent != null && BossEntityLoader.isBoss(ent);
     }
 
     public static boolean hasEffect(String entityId) {

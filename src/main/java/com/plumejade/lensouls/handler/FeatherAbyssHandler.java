@@ -87,6 +87,7 @@ public class FeatherAbyssHandler {
     private static final String KEY_DOOM_TIMER = "lensouls:abyss_doom_timer";
     private static final String KEY_CHARGE_STATE = "lensouls:abyss_charge_state"; // 0 充能中 1 已充能待触发 2 倒计时中
     private static final String KEY_CHARGE_NEXT = "lensouls:abyss_charge_next";    // 充能完成 gameTime
+    private static final String KEY_CHARGE_INTERVAL = "lensouls:abyss_charge_interval"; // 本次充能使用的间隔 tick（扭曲值变化时按进度比例迁移）
     private static final String KEY_COUNTDOWN_NEXT = "lensouls:abyss_countdown_next";
     private static final String SNOWBALL_TAG = "lensouls:feather_snowball";
 
@@ -575,6 +576,49 @@ public class FeatherAbyssHandler {
 
     // ========== 计时器（持久化，掉线不丢） ==========
 
+    /**
+     * 祸之可能性充能推进（state==0）。
+     * <p>
+     * 充能间隔随扭曲值动态变化：扭曲值越高间隔越短。为保证「已充能进度」不浪费，
+     * 间隔变化时按进度比例迁移剩余时间——新的完成时间 = now + (1 - 进度) × 新间隔。
+     * 扭曲值升高 → 间隔缩短 → 剩余时间压缩（充能加速）；扭曲值降低 → 相应拉长。
+     */
+    private static boolean advanceCharge(ServerPlayer player, CompoundTag tag) {
+        long now = player.level().getGameTime();
+        long chargeNext = tag.getLong(KEY_CHARGE_NEXT);
+        if (chargeNext <= 0L) {
+            int interval = chargeInterval(getTwist(player));
+            tag.putLong(KEY_CHARGE_NEXT, now + interval);
+            tag.putInt(KEY_CHARGE_INTERVAL, interval);
+            LOGGER.info("[AbyssCharge] init twist={} interval={} next={}", getTwist(player), interval, now + interval);
+            return true;
+        }
+        if (now >= chargeNext) {
+            tag.putInt(KEY_CHARGE_STATE, 1);
+            return true;
+        }
+        int oldInterval = tag.getInt(KEY_CHARGE_INTERVAL);
+        int newInterval = chargeInterval(getTwist(player));
+        if (oldInterval <= 0) {
+            // 旧存档无 interval 记录：无进度可迁移，直接按当前扭曲值重设充能
+            tag.putLong(KEY_CHARGE_NEXT, now + newInterval);
+            tag.putInt(KEY_CHARGE_INTERVAL, newInterval);
+            LOGGER.info("[AbyssCharge] legacy reset twist={} interval={} next={}", getTwist(player), newInterval, now + newInterval);
+            return true;
+        }
+        if (newInterval != oldInterval) {
+            long chargeStart = chargeNext - oldInterval;
+            double progress = Math.max(0.0, Math.min(1.0, (double) (now - chargeStart) / oldInterval));
+            long newNext = now + Math.round((1.0 - progress) * newInterval);
+            tag.putLong(KEY_CHARGE_NEXT, newNext);
+            tag.putInt(KEY_CHARGE_INTERVAL, newInterval);
+            LOGGER.info("[AbyssCharge] twist={} interval {}->{} progress={} next {}->{}",
+                    getTwist(player), oldInterval, newInterval, progress, chargeNext, newNext);
+            return true;
+        }
+        return false;
+    }
+
     private static void advanceTimers(ServerPlayer player) {
         long now = player.level().getGameTime();
         CompoundTag tag = persisted(player);
@@ -592,14 +636,7 @@ public class FeatherAbyssHandler {
         // 祸之可能性 状态机：0 充能中 → 1 已充能待触发 → 2 倒计时中
         int state = tag.getInt(KEY_CHARGE_STATE);
         if (state == 0) {
-            long chargeNext = tag.getLong(KEY_CHARGE_NEXT);
-            if (chargeNext <= 0L) {
-                tag.putLong(KEY_CHARGE_NEXT, now + chargeInterval(getTwist(player)));
-                dirty = true;
-            } else if (now >= chargeNext) {
-                tag.putInt(KEY_CHARGE_STATE, 1);
-                dirty = true;
-            }
+            dirty |= advanceCharge(player, tag);
         } else if (state == 1) {
             if (hasEnoughNearbyMobs(player, 7.0, 5)) {
                 player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
@@ -613,8 +650,10 @@ public class FeatherAbyssHandler {
             long cdNext = tag.getLong(KEY_COUNTDOWN_NEXT);
             if (now >= cdNext) {
                 performSummon(player);
+                int interval = chargeInterval(getTwist(player));
                 tag.putInt(KEY_CHARGE_STATE, 0);
-                tag.putLong(KEY_CHARGE_NEXT, now + chargeInterval(getTwist(player)));
+                tag.putLong(KEY_CHARGE_NEXT, now + interval);
+                tag.putInt(KEY_CHARGE_INTERVAL, interval);
                 dirty = true;
             }
         }
@@ -628,6 +667,7 @@ public class FeatherAbyssHandler {
         if (tag.contains(KEY_DOOM_TIMER)) { tag.remove(KEY_DOOM_TIMER); dirty = true; }
         if (tag.contains(KEY_CHARGE_STATE)) { tag.remove(KEY_CHARGE_STATE); dirty = true; }
         if (tag.contains(KEY_CHARGE_NEXT)) { tag.remove(KEY_CHARGE_NEXT); dirty = true; }
+        if (tag.contains(KEY_CHARGE_INTERVAL)) { tag.remove(KEY_CHARGE_INTERVAL); dirty = true; }
         if (tag.contains(KEY_COUNTDOWN_NEXT)) { tag.remove(KEY_COUNTDOWN_NEXT); dirty = true; }
         if (dirty) writeBack(player, tag);
     }

@@ -6,6 +6,7 @@ import com.plumejade.lensouls.LenSouls;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
@@ -24,6 +25,8 @@ public class SanBarOverlay {
     private static final int FRAME_TIME = 2;
     private static final float SCALE = 1.4f;
     private static final int X = 10;
+    /** 上次发送的剩余秒数，用于仅在秒数变化时发送一次临时消息 */
+    private static int lastSent = 0;
     /** bar 区高度（帧内 y=2..31，30px） */
     private static final int BAR_HEIGHT = 30;
     /** bar 区底部像素 y=31（从下往上第 3 格），填充从该像素底端（v=32 线）往上 */
@@ -62,12 +65,22 @@ public class SanBarOverlay {
                     FRAME_WIDTH, FRAME_COUNT * FRAME_HEIGHT);
         }
 
-        // 祸之可能性倒计时：物品栏上方红字数字
+        // 祸之可能性倒计时：每秒发送一次临时 action bar 消息（自然消失、下次覆盖），仿转换器模式切换
         if (AbyssCountdownClient.isActive()) {
             int sec = AbyssCountdownClient.remainingSeconds();
-            int cx = g.guiWidth() / 2;
-            int cy = g.guiHeight() - 60;
-            g.drawCenteredString(mc.font, Component.literal("§c" + sec), cx, cy, 0xFF3333);
+            if (sec != lastSent) {
+                mc.player.displayClientMessage(
+                        Component.translatable("message.lensouls.abyss_countdown", sec + "s").withStyle(ChatFormatting.RED),
+                        true);
+                lastSent = sec;
+            }
+        } else {
+            if (lastSent > 0) {
+                mc.player.displayClientMessage(
+                        Component.translatable("message.lensouls.abyss_countdown", "0s").withStyle(ChatFormatting.RED),
+                        true);
+                lastSent = 0;
+            }
         }
     }
 }

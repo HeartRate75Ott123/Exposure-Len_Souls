@@ -371,5 +371,6 @@
   "effect.lensouls.suppress_fire": "Fire Suppress",
   "effect.lensouls.suppress_ender": "Ender Suppress",
   "lensouls.tabs.photo_effects": "Photo Effects",
-  "lensouls.tabs.photo_effects.empty": "No photo set effects are currently active"
+  "lensouls.tabs.photo_effects.empty": "No photo set effects are currently active",
+  "message.lensouls.abyss_countdown": "Abyssal Possibility Countdown: %s"
 }

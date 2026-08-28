@@ -513,25 +513,33 @@ public class FeatherAbyssHandler {
             Vec3 p = new Vec3(x, py, z);
             positions.add(p);
             level.sendParticles(ModParticleTypes.ABYSS_SUMMON.get(), x, py, z, 1, 0, 0, 0, 0);
+            LOGGER.info("[AbyssSummon] performSummon particle#{} at ({},{},{})", i, x, py, z);
         }
         PENDING_SUMMONS.add(new SummonPlan(level.getGameTime() + SUMMON_DELAY_TICKS, level, positions, type));
+        LOGGER.info("[AbyssSummon] queued {} positions, type={}, spawn at gameTime={}", positions.size(), type, level.getGameTime() + SUMMON_DELAY_TICKS);
     }
 
     private static void spawnAtPositions(SummonPlan plan) {
+        int spawned = 0;
         for (Vec3 p : plan.positions) {
             Entity e = plan.type.create(plan.level);
             if (e == null) continue;
             e.setPos(p.x, p.y, p.z);
             plan.level.addFreshEntity(e);
+            spawned++;
+            LOGGER.info("[AbyssSummon] spawned {} at ({},{},{})", e.getType(), p.x, p.y, p.z);
         }
+        LOGGER.info("[AbyssSummon] spawnAtPositions done, total={}", spawned);
     }
 
     /** 测试指令：直接从「触发倒计时」阶段开始（龙吼 + 3s 倒计时 + 召唤），不污染充能计时器 */
     public static void triggerTestCalamity(ServerPlayer player) {
         if (!hasAbyss(player)) return;
-        player.playSound(SoundEvents.ENDER_DRAGON_AMBIENT, 1.0f, 1.0f);
+        player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
+                SoundEvents.ENDER_DRAGON_AMBIENT, SoundSource.PLAYERS, 1.0f, 1.0f);
         AbyssCountdownPacket.send(player);
         DELAYED_SUMMONS.add(new DelayedSummon(player.level().getGameTime() + COUNTDOWN_TICKS, player));
+        LOGGER.info("[AbyssSummon] triggerTestCalamity by {}, countdown until gameTime={}", player.getName().getString(), player.level().getGameTime() + COUNTDOWN_TICKS);
     }
 
     /** 每服务器刻推进延迟召唤与测试召唤队列 */
@@ -552,10 +560,12 @@ public class FeatherAbyssHandler {
                 DelayedSummon d = it.next();
                 ServerPlayer p = d.player;
                 if (p == null || !p.isAlive() || !hasAbyss(p)) {
+                    LOGGER.info("[AbyssSummon] delayed summon dropped (player={}, alive={})", p == null ? "null" : p.getName().getString(), p != null && p.isAlive());
                     it.remove();
                     continue;
                 }
                 if (p.level().getGameTime() >= d.time) {
+                    LOGGER.info("[AbyssSummon] delayed summon fired at gameTime={}", p.level().getGameTime());
                     performSummon(p);
                     it.remove();
                 }
@@ -592,7 +602,8 @@ public class FeatherAbyssHandler {
             }
         } else if (state == 1) {
             if (hasEnoughNearbyMobs(player, 7.0, 5)) {
-                player.playSound(SoundEvents.ENDER_DRAGON_AMBIENT, 1.0f, 1.0f);
+                player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
+                        SoundEvents.ENDER_DRAGON_AMBIENT, SoundSource.PLAYERS, 1.0f, 1.0f);
                 AbyssCountdownPacket.send(player);
                 tag.putInt(KEY_CHARGE_STATE, 2);
                 tag.putLong(KEY_COUNTDOWN_NEXT, now + COUNTDOWN_TICKS);

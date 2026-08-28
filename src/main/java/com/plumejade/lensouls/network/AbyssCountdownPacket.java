@@ -21,7 +21,7 @@ public class AbyssCountdownPacket implements CustomPacketPayload {
                     ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "abyss_countdown"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, AbyssCountdownPacket> STREAM_CODEC =
-            StreamCodec.unit(new AbyssCountdownPacket());
+            StreamCodec.of((buf, pkt) -> {}, buf -> new AbyssCountdownPacket());
 
     public AbyssCountdownPacket() {
     }

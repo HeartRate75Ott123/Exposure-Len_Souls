@@ -17,7 +17,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public class SummonSpiritParticle extends TextureSheetParticle {
     private final SpriteSet sprites;
-    private static final int LIFETIME = 24;       // 1.2s
+    private static final int LIFETIME = 30;       // 1.5s
     private static final int ENLARGE_AT = 20;     // 1s 后开始放大渐隐
     private static final float BASE_SIZE = 1.2f;
 
@@ -47,9 +47,9 @@ public class SummonSpiritParticle extends TextureSheetParticle {
             this.quadSize = BASE_SIZE;
             this.alpha = 1.0f;
         } else {
-            float p = (this.age - ENLARGE_AT) / (float) (this.lifetime - ENLARGE_AT); // 0→1 over 0.2s
-            this.quadSize = BASE_SIZE * (1.0f + p);   // 放大
-            this.alpha = 1.0f - p;                    // 渐隐
+            float p = (this.age - ENLARGE_AT) / (float) (this.lifetime - ENLARGE_AT); // 0→1 over 0.5s
+            this.quadSize = BASE_SIZE * (1.0f + 4.0f * p);   // 冲击波式扩散放大（末端约 5.8 倍）
+            this.alpha = (1.0f - p) * (1.0f - p);            // 平滑渐隐
         }
     }
 

@@ -73,7 +73,7 @@ public class PhotoEffectsScreen extends BaseTextScreen {
         if (player == null) return;
         var sets = PhotoSetRegistry.getActiveSets(player,
                 PhotoSetClient.collectGearEntities(player), PhotoSetClient.countBossPhotos(player));
-        int x = leftPos + 8;
+        int x = leftPos + 2;
         int y = topPos + 6;
         if (sets.isEmpty()) {
             g.drawString(font, Component.translatable("lensouls.tabs.photo_effects.empty"), x, y, 0x888888, false);

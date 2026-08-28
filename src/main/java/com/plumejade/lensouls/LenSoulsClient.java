@@ -32,6 +32,7 @@ import net.neoforged.neoforge.client.event.GatherEffectScreenTooltipsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
+import com.plumejade.lensouls.client.itemoutline.ItemOutlineShaders;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientMobEffectExtensions;
@@ -180,6 +181,20 @@ public class LenSoulsClient {
             );
         } catch (java.io.IOException e) {
             LenSouls.LOGGER.error("[BossGlow] composite 着色器加载失败", e);
+        }
+
+        // 第一人称手持物单色描边 composite（独立 mask 目标，仿 yuyu，仅第一人称手持物）
+        try {
+            event.registerShader(
+                    new ShaderInstance(provider,
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "item_outline_composite"),
+                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX),
+                    instance -> {
+                        ItemOutlineShaders.itemCompositeShader = instance;
+                    }
+            );
+        } catch (java.io.IOException e) {
+            LenSouls.LOGGER.error("[ItemOutline] 第一人称描边 composite 着色器加载失败", e);
         }
 
         // FBO item mask 着色器 — alpha test + 纯白（手持物品用，避免透明区域方框）

@@ -27,7 +27,7 @@
     "client.BossBufferSourceMixin",
     "client.GameRendererMixin",
     "client.GunBowAnimationMixin",
-    "client.ItemInHandRendererMixin",
+    "client.ItemRendererOutlineMixin",
     "client.ItemRendererAccessor",
     "client.ItemInHandLayerMixin",
     "client.PlayerClientMixin",

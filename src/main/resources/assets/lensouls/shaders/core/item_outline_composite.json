@@ -1,0 +1,15 @@
+{
+    "vertex": "lensouls:rendertype_screen_quad",
+    "fragment": "lensouls:item_outline_composite",
+    "samplers": [
+        { "name": "DiffuseSampler" }
+    ],
+    "attributes": [ "Position", "UV0" ],
+    "uniforms": [
+        { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "ScreenSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
+        { "name": "OutlineColor", "type": "float", "count": 3, "values": [ 1.0, 1.0, 1.0 ] },
+        { "name": "OutlineWidth", "type": "float", "count": 1, "values": [ 3.0 ] }
+    ]
+}

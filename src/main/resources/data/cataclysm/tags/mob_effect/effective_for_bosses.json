@@ -5,6 +5,10 @@
     "lensouls:water_infusion",
     "lensouls:earth_infusion",
     "lensouls:ender_infusion",
-    "lensouls:filter_spider"
+    "lensouls:filter_spider",
+    "lensouls:suppress_water",
+    "lensouls:suppress_earth",
+    "lensouls:suppress_fire",
+    "lensouls:suppress_ender"
   ]
 }

@@ -73,7 +73,7 @@ public class TimeFreezeManager {
             }
             frozenEntities.add(e.getId());
         }
-        // 定身成功集含 block_factorys_bosses 双 BOSS 时：给拍照者抗5 + 满抗击退（持续整个定格时长）
+        // 定身成功集含 block_factorys_bosses 受保护 BOSS 时：给拍照者抗5 + 满抗击退（持续整个定格时长）
         for (LivingEntity e : entitiesInFrame) {
             if (e == null || e.isRemoved()) continue;
             if (!frozenEntities.contains(e.getId())) continue;

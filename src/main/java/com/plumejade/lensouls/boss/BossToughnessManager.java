@@ -140,7 +140,7 @@ public class BossToughnessManager {
         // 时停中破韧并存：全局冻结不解除，视觉由 resolveState 优先级（STUNNED > FROZEN）自动接管
         data.setStunTicks(stunTicks);
 
-        // 对 block_factorys_bosses 双 BOSS 破刹：给削韧者抗5 + 满抗击退（持续整个定身时长）
+        // 对 block_factorys_bosses 受保护 BOSS 破刹：给削韧者抗5 + 满抗击退（持续整个定身时长）
         if (player != null && BossGuardHelper.isProtectedBoss(entity)) {
             BossGuardHelper.apply(player, stunTicks);
         }

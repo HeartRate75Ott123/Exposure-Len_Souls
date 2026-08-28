@@ -15,9 +15,9 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks;
 /**
  * BOSS 破刹/定格保护（服务端）。
  * <p>
- * 当玩家对 block_factorys_bosses 的 infernal_dragon / yeti 触发破刹（韧性打破）
- * 或时间定格时，给予玩家抗性提升 V（80% 减伤）与 100% 满抗击退，
- * 持续与破刹定身/定格相同的时间。
+ * 当玩家对 block_factorys_bosses 的 infernal_dragon / yeti / kraken / sandworm /
+ * underworld_knight 触发破刹（韧性打破）或时间定格时，给予玩家抗性提升 V
+ * （80% 减伤）与 100% 满抗击退，持续与破刹定身/定格相同的时间。
  */
 public final class BossGuardHelper {
 
@@ -25,6 +25,12 @@ public final class BossGuardHelper {
             ResourceLocation.fromNamespaceAndPath("block_factorys_bosses", "infernal_dragon");
     private static final ResourceLocation ID_YETI =
             ResourceLocation.fromNamespaceAndPath("block_factorys_bosses", "yeti");
+    private static final ResourceLocation ID_KRAKEN =
+            ResourceLocation.fromNamespaceAndPath("block_factorys_bosses", "kraken");
+    private static final ResourceLocation ID_SANDWORM =
+            ResourceLocation.fromNamespaceAndPath("block_factorys_bosses", "sandworm");
+    private static final ResourceLocation ID_UNDERWORLD_KNIGHT =
+            ResourceLocation.fromNamespaceAndPath("block_factorys_bosses", "underworld_knight");
 
     private static final ResourceLocation KB_ID =
             ResourceLocation.fromNamespaceAndPath("lensouls", "boss_guard_kb");
@@ -32,10 +38,14 @@ public final class BossGuardHelper {
 
     private BossGuardHelper() {}
 
-    /** 是否是需要给玩家保护的两个 BOSS。 */
+    /** 是否是需要给玩家保护的 BOSS。 */
     public static boolean isProtectedBoss(LivingEntity entity) {
         ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
-        return ID_INFERNAL_DRAGON.equals(id) || ID_YETI.equals(id);
+        return ID_INFERNAL_DRAGON.equals(id)
+                || ID_YETI.equals(id)
+                || ID_KRAKEN.equals(id)
+                || ID_SANDWORM.equals(id)
+                || ID_UNDERWORLD_KNIGHT.equals(id);
     }
 
     /** 对玩家施加抗5 + 满抗击退，持续 durationTicks 刻。 */

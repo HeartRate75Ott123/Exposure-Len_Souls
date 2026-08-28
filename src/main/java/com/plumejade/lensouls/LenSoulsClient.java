@@ -8,6 +8,7 @@ import com.plumejade.lensouls.ability.client.SpatialWarpOutlineRenderer;
 import com.plumejade.lensouls.client.screen.ScreenShakeApplier;
 import com.plumejade.lensouls.boss.ToughnessBarRenderer;
 import com.plumejade.lensouls.client.render.BossPhantomRenderer;
+import com.plumejade.lensouls.client.tabs.PhotoTabRegistry;
 import com.plumejade.lensouls.entity.ModEntities;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
 import com.plumejade.lensouls.effect.FilterEffect;
@@ -75,6 +76,9 @@ public class LenSoulsClient {
         NeoForge.EVENT_BUS.addListener(LenSoulsClient::onGatherEffectTooltips);
         // 兼容 Stylish Effects 的 tooltip 事件
         tryRegisterStylishEffectsListener();
+
+        // 注册背包「照片效果」选项卡（L2 Library tabs 框架）
+        PhotoTabRegistry.register();
     }
 
     /** 注册菜单界面到 RegisterMenuScreensEvent */

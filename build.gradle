@@ -154,6 +154,18 @@ dependencies {
     implementation files("run/mods/exposure_polaroid-neoforge-1.21.1-1.1.5.jar")
     // ---- Curios 饰品 API ----
     implementation files("run/mods/curios-neoforge-9.5.1+1.21.1.jar")
+    // ---- L2 Library 选项卡框架（背包照片效果页，硬依赖） ----
+    // 编译期需要 API，故保留 implementation；同时 jarJar 嵌入成品，使模组自包含（l2serial 无 mods.toml，须随包携带）
+    implementation files("libs/l2core-3.0.8+1.jar")
+    implementation files("libs/l2serial-3.0.9+5.jar")
+    implementation files("libs/l2menustacker-3.0.9.jar")
+    implementation files("libs/l2tabs-3.0.5+7.jar")
+    implementation files("libs/l2library-3.0.3+1.jar")
+    jarJar files("libs/l2core-3.0.8+1.jar")
+    jarJar files("libs/l2serial-3.0.9+5.jar")
+    jarJar files("libs/l2menustacker-3.0.9.jar")
+    jarJar files("libs/l2tabs-3.0.5+7.jar")
+    jarJar files("libs/l2library-3.0.3+1.jar")
     // ---- LDLib2 GUI 框架（能力选择界面，本地 libs/ 文件方式，避免远程 snapshot 解析卡顿） ----
     implementation files("libs/ldlib2-neoforge-1.21.1-2.2.35-all.jar")
     // LDLib2 传递依赖（flatDir 不解析传递依赖，显式声明）

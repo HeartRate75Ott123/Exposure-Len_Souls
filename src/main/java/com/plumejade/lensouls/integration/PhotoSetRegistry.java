@@ -39,7 +39,13 @@ public class PhotoSetRegistry {
      * 计算玩家当前「满足张数要求」的所有档位（含 when 变体的全部档位；无 when 的套装只取最高档）。
      * 档位内的条件（when / cond:）由 {@link PhotoSetEffects#applyPlan} 每 tick 求值，故此处不做时间相关过滤。
      */
-    public static List<PhotoSetDefs.Tier> getActiveTiers(Player player, List<String> gear, int bossCount) {
+    /**
+     * 计算玩家当前「满足张数要求」的所有档位（含 when 变体的全部档位；无 when 的套装只取最高档）。
+     * 档位内的条件（when / cond:）由 {@link PhotoSetEffects#applyPlan} 每 tick 求值，故此处不做时间相关过滤。
+     */
+    public record ActiveSet(String setId, PhotoSetDefs.Tier tier) {}
+
+    public static List<ActiveSet> getActiveSets(Player player, List<String> gear, int bossCount) {
         Map<String, Integer> counts = new HashMap<>();
         for (String id : gear) {
             for (String setId : getSets(id)) {
@@ -48,7 +54,7 @@ public class PhotoSetRegistry {
             }
         }
         if (bossCount > 0) counts.merge("boss_barrage", bossCount, Integer::sum);
-        List<PhotoSetDefs.Tier> result = new ArrayList<>();
+        List<ActiveSet> result = new ArrayList<>();
         Map<String, List<PhotoSetDefs.Tier>> bySet = new HashMap<>();
         for (Map.Entry<String, Integer> e : counts.entrySet()) {
             PhotoSetDefs.SetDef def = PhotoSetDefs.get(e.getKey());
@@ -59,22 +65,39 @@ public class PhotoSetRegistry {
                 }
             }
         }
-        for (List<PhotoSetDefs.Tier> qs : bySet.values()) {
+        for (Map.Entry<String, List<PhotoSetDefs.Tier>> e : bySet.entrySet()) {
+            List<PhotoSetDefs.Tier> qs = e.getValue();
             boolean hasWhen = false;
             for (PhotoSetDefs.Tier t : qs) {
                 if (t.when() != null) { hasWhen = true; break; }
             }
             if (hasWhen) {
-                result.addAll(qs);
+                for (PhotoSetDefs.Tier t : qs) result.add(new ActiveSet(e.getKey(), t));
             } else {
                 PhotoSetDefs.Tier best = null;
                 for (PhotoSetDefs.Tier t : qs) {
                     if (best == null || t.count() > best.count()) best = t;
                 }
-                if (best != null) result.add(best);
+                if (best != null) result.add(new ActiveSet(e.getKey(), best));
             }
         }
         return result;
+    }
+
+    public static List<PhotoSetDefs.Tier> getActiveTiers(Player player, List<String> gear, int bossCount) {
+        return getActiveSets(player, gear, bossCount).stream().map(ActiveSet::tier).toList();
+    }
+
+    /** 单个档位 → 逐行带配色 Component（供背包照片效果页渲染），处理 when / cond: 前缀 */
+    public static List<Component> formatTier(PhotoSetDefs.Tier t) {
+        List<Component> out = new ArrayList<>();
+        String whenPrefix = t.when() != null ? "§e" + condCn(t.when()) + "：" : "";
+        for (String eff : t.effects()) {
+            Component line = effectLine(eff);
+            if (!whenPrefix.isEmpty()) line = Component.literal(whenPrefix).append(line);
+            out.add(line);
+        }
+        return out;
     }
 
     /** 目标实体是否属于某套装（用于 dmg_mod 判定） */

@@ -369,5 +369,7 @@
   "effect.lensouls.suppress_water": "Water Suppress",
   "effect.lensouls.suppress_earth": "Earth Suppress",
   "effect.lensouls.suppress_fire": "Fire Suppress",
-  "effect.lensouls.suppress_ender": "Ender Suppress"
+  "effect.lensouls.suppress_ender": "Ender Suppress",
+  "lensouls.tabs.photo_effects": "Photo Effects",
+  "lensouls.tabs.photo_effects.empty": "No photo set effects are currently active"
 }

@@ -123,14 +123,13 @@ public class PhotoSetRegistry {
         if (stack != null && PhotographEffectRegistry.isBossPhoto(stack)) {
             setIds.add("boss_barrage");
         }
-        if (setIds.isEmpty()) return;
 
         boolean shift = false;
         try {
             shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
         } catch (Exception ignored) {}
 
-        // 四元素抑制顶部块（仅当本照片含活性时提示该元素规则）
+        // 四元素抑制顶部块（仅当本照片含活性时提示该元素规则；独立于套装归属，先显示）
         try {
             var id = ResourceLocation.parse(entityId);
             ElementDamage elem = AttackerElementLoader.getElement(id);
@@ -143,6 +142,8 @@ public class PhotoSetRegistry {
                 }
             }
         } catch (Exception ignored) {}
+
+        if (setIds.isEmpty()) return;
 
         event.getToolTip().add(Component.literal("§6套装：").withStyle(ChatFormatting.GOLD));
         for (String setId : setIds) {

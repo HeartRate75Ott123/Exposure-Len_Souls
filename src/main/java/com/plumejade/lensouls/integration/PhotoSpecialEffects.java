@@ -843,11 +843,13 @@ public class PhotoSpecialEffects {
                         ItemContainerContents contents = stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
                         for (ItemStack photo : contents.nonEmptyItems()) {
                             String stolen = PhotographEffectRegistry.getStolenEntity(photo);
+                            if (stolen == null) stolen = PhotographEffectRegistry.getElementEntity(photo);
                             if (stolen != null && !ids.contains(stolen)) ids.add(stolen);
                         }
                         continue;
                     }
                     String stolen = PhotographEffectRegistry.getStolenEntity(stack);
+                    if (stolen == null) stolen = PhotographEffectRegistry.getElementEntity(stack);
                     if (stolen != null && !ids.contains(stolen)) ids.add(stolen);
                 }
             }

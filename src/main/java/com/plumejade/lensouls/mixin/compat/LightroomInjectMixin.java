@@ -4,6 +4,7 @@ import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.ability.handler.PhotoInjectionHandler;
 import com.plumejade.lensouls.ability.util.TemporalSnapshot;
+import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import io.github.mortuusars.exposure.Exposure;
 import io.github.mortuusars.exposure.world.camera.frame.Frame;
@@ -40,11 +41,29 @@ public class LightroomInjectMixin {
         String exposureId = frame.identifier() != null ? frame.identifier().toString() : null;
         if (exposureId == null) return;
 
-        AbilityType ability = PhotoInjectionHandler.pollAbility(exposureId);
-        if (ability == null) return;
-
         CompoundTag tag = result.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (tag.getBoolean("lensouls:injected")) return;
+        boolean injected = tag.getBoolean("lensouls:injected");
+
+        // 通用元素活性组件：普通拍照/能力拍照都注入（组件驱动抑制判定，与 attacker_element 数据对齐）
+        java.util.Map<ElementDamage, Integer> levels = PhotoInjectionHandler.pollElementLevels(exposureId);
+        String elemEntity = PhotoInjectionHandler.pollElementEntity(exposureId);
+        if (!injected && levels != null && elemEntity != null && !levels.isEmpty()) {
+            CompoundTag el = new CompoundTag();
+            for (var en : levels.entrySet()) el.putInt(en.getKey().getSerializedName(), en.getValue());
+            tag.put("lensouls:element_levels", el);
+            tag.putString("lensouls:element_entity", elemEntity);
+            tag.putBoolean("lensouls:photograph_curio", true);
+        }
+
+        AbilityType ability = PhotoInjectionHandler.pollAbility(exposureId);
+        if (ability == null) {
+            // 普通照片：仅补元素组件，不标 injected
+            if (tag.contains("lensouls:element_levels")) {
+                result.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+            }
+            return;
+        }
+        if (injected) return;
 
         boolean hasEntities = frame.entitiesInFrame() != null && !frame.entitiesInFrame().isEmpty();
         boolean doInject = true;

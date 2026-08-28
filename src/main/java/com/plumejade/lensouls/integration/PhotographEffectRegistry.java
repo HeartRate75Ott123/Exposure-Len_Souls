@@ -484,6 +484,39 @@ public class PhotographEffectRegistry {
         return tag.contains("lensouls:stolen_entity") ? tag.getString("lensouls:stolen_entity") : null;
     }
 
+    /** 普通 exposure 照片记录的帧内活性实体 id（拍照时注入） */
+    public static String getElementEntity(ItemStack stack) {
+        var data = stack.get(DataComponents.CUSTOM_DATA);
+        if (data == null) return null;
+        var tag = data.copyTag();
+        return tag.contains("lensouls:element_entity") ? tag.getString("lensouls:element_entity") : null;
+    }
+
+    /**
+     * 由「去重后的装备实体列表」统计各元素抑制等级。
+     * 每元素等级 = 该元素活性生物数 / 2（≥2 张同元素才构成 1 级）。
+     */
+    public static Map<ElementDamage, Integer> countElementLevels(List<String> ids) {
+        Map<ElementDamage, Integer> counts = new EnumMap<>(ElementDamage.class);
+        for (String id : ids) {
+            ResourceLocation rl;
+            try {
+                rl = ResourceLocation.parse(id);
+            } catch (Exception ignored) {
+                continue;
+            }
+            for (ElementDamage el : ElementDamage.values()) {
+                if (AttackerElementLoader.getLevel(rl, el) > 0) counts.merge(el, 1, Integer::sum);
+            }
+        }
+        Map<ElementDamage, Integer> levels = new EnumMap<>(ElementDamage.class);
+        for (Map.Entry<ElementDamage, Integer> e : counts.entrySet()) {
+            int lvl = e.getValue() / 2;
+            if (lvl > 0) levels.put(e.getKey(), lvl);
+        }
+        return levels;
+    }
+
     /** 照片主体是否为 Boss（拍摄时打过 lensouls:is_boss 标记） */
     public static boolean isBossPhoto(ItemStack stack) {
         var data = stack.get(DataComponents.CUSTOM_DATA);

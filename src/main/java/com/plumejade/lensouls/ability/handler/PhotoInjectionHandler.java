@@ -3,18 +3,24 @@ package com.plumejade.lensouls.ability.handler;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.ability.CameraAbilityStore;
-import com.plumejade.lensouls.boss.ToughnessDamageHandler;
+import com.plumejade.lensouls.config.AttackerElementLoader;
+import com.plumejade.lensouls.config.BossEntityLoader;
+import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
+import com.plumejade.lensouls.handler.CopySoulDropHandler;
 import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.bus.api.SubscribeEvent;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,9 +30,21 @@ public class PhotoInjectionHandler {
     private static final Map<String, AbilityType> pendingAbilities = new ConcurrentHashMap<>();
     private static final Map<String, String> stolenEntityCache = new ConcurrentHashMap<>();
     private static final Map<String, Boolean> bossFlagCache = new ConcurrentHashMap<>();
+    /** 帧标识符 → 帧内带元素活性实体的元素等级（普通拍照也注入照片组件） */
+    private static final Map<String, Map<ElementDamage, Integer>> elementCache = new ConcurrentHashMap<>();
+    private static final Map<String, String> elementEntityCache = new ConcurrentHashMap<>();
 
     public static Boolean pollBoss(String exposureId) {
         return exposureId != null ? bossFlagCache.remove(exposureId) : null;
+    }
+
+    /** 消费帧内活性实体信息（元素等级 + 实体 id） */
+    public static Map<ElementDamage, Integer> pollElementLevels(String exposureId) {
+        return exposureId != null ? elementCache.remove(exposureId) : null;
+    }
+
+    public static String pollElementEntity(String exposureId) {
+        return exposureId != null ? elementEntityCache.remove(exposureId) : null;
     }
 
     public static void cacheStolenEntity(String exposureId, String entityId) {
@@ -58,6 +76,9 @@ public class PhotoInjectionHandler {
                 return;
             }
 
+            // 帧内第一个带元素活性的实体 → 缓存（普通拍照也注入组件）
+            cacheFrameElements(exposureId, event.getEntitiesInFrame());
+
             AbilityType ability = CameraAbilityStore.getSelected(player);
             if (ability == null) return;
             if (ability == AbilityType.TIME_STOP || ability == AbilityType.VITAL_STRIKE || ability == AbilityType.SOUL_SEVER) return;
@@ -69,18 +90,34 @@ public class PhotoInjectionHandler {
             LenSouls.LOGGER.info("[PhotoInject] onFrameAdded: exposureId={} ability={}", exposureId, ability);
             pendingAbilities.put(exposureId, ability);
 
-            // 能力窃取：缓存被窃取实体
+            // 能力窃取：缓存被窃取实体 + Boss 判定（首领清单优先，Boss 血条兜底）
             if (ability == AbilityType.ABILITY_STEAL) {
                 var frameEntities = event.getEntitiesInFrame();
                 if (frameEntities != null && !frameEntities.isEmpty()) {
                     LivingEntity first = frameEntities.get(0);
                     String stolenId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(first.getType()).toString();
                     cacheStolenEntity(exposureId, stolenId);
-                    bossFlagCache.put(exposureId, ToughnessDamageHandler.isBoss(first));
+                    boolean boss = BossEntityLoader.isBoss(first) || CopySoulDropHandler.hasBossBar(first);
+                    bossFlagCache.put(exposureId, boss);
                 }
             }
         } catch (Exception e) {
             LenSouls.LOGGER.error("[PhotoInject] fail", e);
+        }
+    }
+
+    /** 缓存帧内第一个带元素活性实体的元素等级与 id */
+    private static void cacheFrameElements(String exposureId, List<LivingEntity> frameEntities) {
+        if (frameEntities == null || frameEntities.isEmpty()) return;
+        for (LivingEntity e : frameEntities) {
+            ResourceLocation rl = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType());
+            if (rl == null) continue;
+            Map<ElementDamage, Integer> levels = AttackerElementLoader.getLevels(rl);
+            if (!levels.isEmpty()) {
+                elementEntityCache.put(exposureId, rl.toString());
+                elementCache.put(exposureId, levels);
+                return;
+            }
         }
     }
 }

@@ -1,11 +1,11 @@
 package com.plumejade.lensouls.integration;
 
 import com.plumejade.lensouls.LenSouls;
-import com.plumejade.lensouls.config.AttackerElementLoader;
 import com.plumejade.lensouls.config.PhotoSetDefs;
 import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.effect.ModEffects;
 import com.plumejade.lensouls.integration.PhotoSpecialEffects;
+import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -324,25 +324,12 @@ public class PhotoSetEffects {
         }
     }
 
-    /** 通用元素套装（按 attacker_element）：≥2 张同元素照片时，2% 给敌人上抑制，等级=同元素张数/2 */
+    /** 通用元素抑制（组件驱动）：按去重装备实体统计各元素等级，玩家攻击时每种元素独立 3% 平行掷骰施加抑制 */
     private static void applyGenericSuppress(ServerPlayer player, LivingEntity target, List<String> gear) {
-        Map<ElementDamage, Integer> counts = new EnumMap<>(ElementDamage.class);
-        for (String id : gear) {
-            ResourceLocation rl;
-            try {
-                rl = ResourceLocation.parse(id);
-            } catch (Exception ignored) {
-                continue;
-            }
-            for (ElementDamage el : ElementDamage.values()) {
-                int lvl = AttackerElementLoader.getLevel(rl, el);
-                if (lvl > 0) counts.merge(el, 1, Integer::sum);
-            }
-        }
-        for (Map.Entry<ElementDamage, Integer> e : counts.entrySet()) {
-            if (e.getValue() < 2) continue;
-            if (player.level().random.nextFloat() >= 0.02f) continue;
-            int lvl = e.getValue() / 2;
+        Map<ElementDamage, Integer> levels = PhotographEffectRegistry.countElementLevels(gear);
+        if (levels.isEmpty()) return;
+        for (Map.Entry<ElementDamage, Integer> e : levels.entrySet()) {
+            if (player.level().random.nextFloat() >= 0.03f) continue;
             Holder<MobEffect> sup = switch (e.getKey()) {
                 case FIRE -> ModEffects.SUPPRESS_FIRE;
                 case WATER -> ModEffects.SUPPRESS_WATER;
@@ -351,7 +338,7 @@ public class PhotoSetEffects {
                 default -> null;
             };
             if (sup == null) continue;
-            target.addEffect(new MobEffectInstance(sup, 100, Math.max(0, lvl - 1), false, false, false));
+            target.addEffect(new MobEffectInstance(sup, 100, Math.max(0, e.getValue() - 1), false, false, false));
         }
     }
 

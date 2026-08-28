@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.client.tabs;
 
+import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import com.plumejade.lensouls.item.PhotoAlbumItem;
 import net.minecraft.core.component.DataComponents;
@@ -11,6 +12,7 @@ import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 客户端版「装备照片收集器」：只读 Curios 照片栏（含相册展开），不依赖服务端逻辑。
@@ -30,11 +32,13 @@ public class PhotoSetClient {
                         ItemContainerContents contents = stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
                         for (ItemStack photo : contents.nonEmptyItems()) {
                             String stolen = PhotographEffectRegistry.getStolenEntity(photo);
+                            if (stolen == null) stolen = PhotographEffectRegistry.getElementEntity(photo);
                             if (stolen != null && !ids.contains(stolen)) ids.add(stolen);
                         }
                         continue;
                     }
                     String stolen = PhotographEffectRegistry.getStolenEntity(stack);
+                    if (stolen == null) stolen = PhotographEffectRegistry.getElementEntity(stack);
                     if (stolen != null && !ids.contains(stolen)) ids.add(stolen);
                 }
             }
@@ -63,5 +67,10 @@ public class PhotoSetClient {
             }
         }
         return n;
+    }
+
+    /** 客户端：当前各元素抑制等级（供「照片套装效果」界面通用效果块显示） */
+    public static Map<ElementDamage, Integer> collectElementLevels(Player player) {
+        return PhotographEffectRegistry.countElementLevels(collectGearEntities(player));
     }
 }

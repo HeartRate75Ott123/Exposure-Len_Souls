@@ -132,6 +132,11 @@ public class PhotoSetEffects {
                 if (cond != null && !condMet(cond, player)) continue;
                 String[] p = inner.split(":");
                 if (p.length == 0) continue;
+                // 兼容 defs 里 immune_fire / immune_explosion（无冒号）写法
+                if (p[0].startsWith("immune_")) {
+                    flags.putBoolean(p[0], true);
+                    continue;
+                }
                 try {
                     switch (p[0]) {
                         case "maxhp" -> maxhp += Double.parseDouble(p[1]);

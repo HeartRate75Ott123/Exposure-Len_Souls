@@ -205,6 +205,19 @@ public class PhotoSetRegistry {
     private static String effectText(String inner) {
         String[] p = inner.split(":");
         if (p.length == 0) return inner;
+        // 兼容 defs 里 immune_fire / immune_explosion（无冒号）写法
+        if (p[0].startsWith("immune_")) {
+            String flag = p[0].substring("immune_".length());
+            return "你免疫" + switch (flag) {
+                case "fire" -> "火焰";
+                case "explosion" -> "爆炸";
+                case "poison" -> "中毒";
+                case "wither" -> "凋零";
+                case "projectile" -> "抛射物";
+                case "fall" -> "摔落";
+                default -> flag;
+            } + "伤害";
+        }
         try {
             return switch (p[0]) {
                 case "maxhp" -> "最大生命值 +" + pct(Double.parseDouble(p[1]));
@@ -250,6 +263,7 @@ public class PhotoSetRegistry {
     /** 效果行配色：§c 进攻/伤害、§a 防御/生存、§9 增益/机动、§5 转化 */
     private static ChatFormatting effectColor(String inner) {
         String[] p = inner.split(":");
+        if (p[0].startsWith("immune_")) return ChatFormatting.GREEN;
         return switch (p[0]) {
             case "dmg_mod", "dmg_taken", "barrage_trigger", "barrage_dmg", "on_hit_effect", "on_hit_suppress" -> ChatFormatting.RED;
             case "maxhp", "armor", "kb_resist", "immune", "dodge", "death_revive" -> ChatFormatting.GREEN;

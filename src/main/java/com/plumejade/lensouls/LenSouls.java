@@ -167,7 +167,6 @@ public class LenSouls {
         TimerService.getInstance().tick();
         BossPhantomManager.getInstance().tick();
         TimeFreezeManager.getInstance().tick();
-        com.plumejade.lensouls.boss.BossGuardHelper.tick();
         com.plumejade.lensouls.boss.BossToughnessManager.getInstance().tick();
     }
 }

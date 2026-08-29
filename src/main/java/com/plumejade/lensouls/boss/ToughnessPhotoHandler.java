@@ -40,7 +40,7 @@ public class ToughnessPhotoHandler {
                     continue;
                 }
 
-                if (hasTier && !inManager) {
+                if (hasTier && !inManager && ToughnessDamageHandler.isBoss(entity)) {
                     manager.register(entity);
                     inManager = true;
                 }

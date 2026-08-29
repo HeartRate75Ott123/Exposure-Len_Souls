@@ -16,7 +16,8 @@
     "LegendaryMonstersVanillaDamageMixin",
     "IgnisFireballBrandMixin",
     "GatekeeperStunBlockMixin",
-    "TwilightLichStunMixin"
+    "TwilightLichStunMixin",
+    "BlockFactorysBossStunMixin"
   ],
   "client": [
     "BetterCombatRangeMixin"

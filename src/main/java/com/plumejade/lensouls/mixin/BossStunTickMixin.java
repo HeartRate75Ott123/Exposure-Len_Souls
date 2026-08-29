@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.mixin;
 
+import com.plumejade.lensouls.boss.BossGuardHelper;
 import com.plumejade.lensouls.boss.StunPauseHelper;
 import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -36,7 +37,9 @@ public class BossStunTickMixin {
     private void lensouls$pauseTickOnStun(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
         if (self.isDeadOrDying()) return; // 死亡放行：tickDeath 需要执行
-        if (StunPauseHelper.isStunPaused(self)) {
+        // block_factorys_bosses 的 boss 不在此整段取消：其转阶段逻辑写在 tick 内（依赖血量），
+        // 整段取消会卡阶段；改由 BlockFactorysBossStunMixin 选择性压制移动/攻击，tick 仍跑。
+        if (StunPauseHelper.isStunPaused(self) && !BossGuardHelper.isBlockFactorysBoss(self)) {
             self.yRotO = self.getYRot();
             self.xRotO = self.getXRot();
             self.xOld = self.getX();

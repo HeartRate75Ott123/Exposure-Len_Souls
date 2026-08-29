@@ -181,6 +181,8 @@ dependencies {
     compileOnly files("run/mods/[JEI物品管理器] jei-1.21.1-neoforge-19.44.0.401.jar")
     // ---- Jade/WTHIT 兼容（compileOnly，运行时可选） ----
     compileOnly files("run/mods/[辅助][玉 🔍] Jade-1.21.1-NeoForge-15.10.5.jar")
+    // ---- GeckoLib 兼容（compileOnly，运行时由 block_factorys_bosses 等 GeckoLib mod 提供） ----
+    compileOnly files("run/mods/geckolib-neoforge-1.21.1-4.9.2.jar")
 
     // NeoForge moddev 自动配置 Mixin 注解处理器和 refmap
 }

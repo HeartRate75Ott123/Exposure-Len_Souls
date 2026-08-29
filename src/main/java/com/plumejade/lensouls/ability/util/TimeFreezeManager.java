@@ -73,15 +73,6 @@ public class TimeFreezeManager {
             }
             frozenEntities.add(e.getId());
         }
-        // 定身成功集含 block_factorys_bosses 受保护 BOSS 时：给拍照者抗5 + 满抗击退（持续整个定格时长）
-        for (LivingEntity e : entitiesInFrame) {
-            if (e == null || e.isRemoved()) continue;
-            if (!frozenEntities.contains(e.getId())) continue;
-            if (com.plumejade.lensouls.boss.BossGuardHelper.isProtectedBoss(e)) {
-                com.plumejade.lensouls.boss.BossGuardHelper.apply(source, remainingTicks);
-                break;
-            }
-        }
         LenSouls.LOGGER.debug("[TimeFreeze] 时间定格开始，定身 {} 个实体", frozenEntities.size());
         broadcast(true);
     }

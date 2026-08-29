@@ -17,7 +17,12 @@
     "IgnisFireballBrandMixin",
     "GatekeeperStunBlockMixin",
     "TwilightLichStunMixin",
-    "BlockFactorysBossStunMixin"
+    "BlockFactorysBossStunMixin",
+    "UnderworldKnightStunPassiveMixin",
+    "KrakenStunPassiveMixin",
+    "SandwormStunPassiveMixin",
+    "YetiStunPassiveMixin",
+    "InfernalDragonStunPassiveMixin"
   ],
   "client": [
     "BetterCombatRangeMixin"

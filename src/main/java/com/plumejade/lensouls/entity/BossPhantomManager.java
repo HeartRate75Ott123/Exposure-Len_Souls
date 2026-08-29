@@ -216,6 +216,10 @@ public class BossPhantomManager {
             // 6. 加入世界（addFreshEntity 会触发 startSeenByPlayer → boss bar 出现）
             level.addFreshEntity(entity);
             addedToWorld = true;
+            // 幻灵生成即赋予「抗性提升 V」（level 5 → amplifier 4），时长匹配演出、显示图标
+            if (entity instanceof LivingEntity le) {
+                le.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, PHANTOM_TOTAL_TICKS, 4, false, true, true));
+            }
             // 加入后再清除 boss bar（startSeenByPlayer 新增的玩家被 removeAllPlayers 移除）
             com.plumejade.lensouls.boss.BossBarCache.clearBossBar(entity);
 

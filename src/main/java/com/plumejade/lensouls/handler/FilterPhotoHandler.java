@@ -7,6 +7,7 @@ import com.plumejade.lensouls.component.PotionFilterData;
 import com.plumejade.lensouls.effect.ModEffects;
 import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import io.github.mortuusars.exposure.Exposure;
+import io.github.mortuusars.exposure.server.CameraInstances;
 import io.github.mortuusars.exposure.data.Filters;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
 import io.github.mortuusars.exposure.world.camera.frame.Frame;
@@ -18,7 +19,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
@@ -46,6 +46,8 @@ public class FilterPhotoHandler {
     private static final ResourceLocation ENEMY_FILTER = ResourceLocation.fromNamespaceAndPath("exposure_expanded", "spider");
     /** 每玩家滤镜拍摄冷却闸门（游戏刻）；保证 30s 内不重复触发，防御 Exposure 覆盖 MC 冷却。 */
     private static final Map<UUID, Long> lastFilterShot = new ConcurrentHashMap<>();
+    /** 药水玻璃板独立冷却闸门（游戏刻）；300 刻，区别于 16 特殊滤镜的 600 刻。 */
+    private static final Map<UUID, Long> lastGlassShot = new ConcurrentHashMap<>();
 
     private static void reg(String filter, Holder<MobEffect> effect) {
         SELF_EFFECTS.put(ResourceLocation.fromNamespaceAndPath("exposure_expanded", filter), effect);
@@ -89,29 +91,35 @@ public class FilterPhotoHandler {
             ResourceLocation filter = filterOpt.get();
 
             long now = player.level().getGameTime();
-            if (now < lastFilterShot.getOrDefault(player.getUUID(), Long.MIN_VALUE) + 600) return;
 
             // 药水玻璃板：玻璃板本身已是相机滤镜，若其携带 POTION_FILTER_DATA 组件，
-            // 则对自拍目标或入镜生物施加对应原版药水效果 30s（600 刻）
+            // 则对自拍目标或入镜生物施加对应原版药水效果；独立 3s（60 刻）冷却，区别于 16 特殊滤镜
             var stored = hand.get(Exposure.DataComponents.FILTER);
             if (stored != null && !stored.isEmpty()) {
                 var pdata = stored.getForReading().get(ModDataComponents.POTION_FILTER_DATA);
                 if (pdata != null) {
+                    if (now < lastGlassShot.getOrDefault(player.getUUID(), Long.MIN_VALUE) + 60) return;
                     applyPotionFilter(player, hand, pdata, selfie, event, now);
                     return;
                 }
             }
 
-            // 敌人易伤：仅拍敌人（非自拍）时对其上易伤
+            if (now < lastFilterShot.getOrDefault(player.getUUID(), Long.MIN_VALUE) + 120) return;
+
+            // 敌人易伤：仅拍敌人（非自拍）时对其上易伤（对所有入镜非自己生物生效）；无生物则不消耗冷却
             if (filter.equals(ENEMY_FILTER)) {
                 if (!selfie) {
+                    boolean hasTarget = false;
+                    for (LivingEntity e : event.getEntitiesInFrame()) {
+                        if (e != player && e.isAlive()) { hasTarget = true; break; }
+                    }
+                    if (!hasTarget) return;
                     for (LivingEntity e : event.getEntitiesInFrame()) {
                         if (e != player && e.isAlive()) {
                             e.addEffect(new MobEffectInstance(ModEffects.FILTER_SPIDER, 400));
-                            break;
                         }
                     }
-                    scheduleCooldown(player, hand.getItem());
+                    scheduleCooldown(hand, 120);
                     lastFilterShot.put(player.getUUID(), now);
                 }
                 return;
@@ -126,21 +134,23 @@ public class FilterPhotoHandler {
             } else {
                 player.addEffect(new MobEffectInstance(effect, 400));
             }
-            scheduleCooldown(player, hand.getItem());
+            scheduleCooldown(hand, 120);
             lastFilterShot.put(player.getUUID(), now);
         } catch (Exception e) {
             LenSouls.LOGGER.error("[FilterPhoto] fail", e);
         }
     }
 
-    /** 相机快门关闭时会把自己的冷却覆盖为 2 tick（在 FrameAddedEvent 之后执行），故延后一 tick 写入 600，确保后写生效。 */
-    private static void scheduleCooldown(ServerPlayer player, Item cooldownItem) {
-        player.server.execute(() -> player.getCooldowns().addCooldown(cooldownItem, 600));
+    /** 通过曝光的 CameraInstance 通道设置冷却：takePhoto 已将 deferredCooldown 设为自身值，
+     *  本方法在 FrameAddedEvent（早于 onShutterClosed）覆盖为我们的刻数，快门关闭时曝光据此 addCooldown，
+     *  确保相机真正进入冷却（不被 BASE_COOLDOWN=2 覆盖）。 */
+    private static void scheduleCooldown(ItemStack cameraStack, int ticks) {
+        CameraInstances.getOptional(cameraStack).ifPresent(inst -> inst.setDeferredCooldown(ticks));
     }
 
     /**
      * 药水玻璃板：施加携带的全部原版药水效果（各自等级与时长，按注入药水迁移）。
-     * 自拍 → 施加给自己；否则 → 施加给入镜首个非自己且存活的实体。
+     * 自拍 → 施加给自己；否则 → 施加给入镜全部非自己且存活的实体。
      */
     private static void applyPotionFilter(ServerPlayer player, ItemStack hand, PotionFilterData data,
                                           boolean selfie, FrameAddedEvent event, long now) {
@@ -152,18 +162,28 @@ public class FilterPhotoHandler {
             instances.add(new MobEffectInstance(effect, e.duration(), e.amplifier()));
         }
         if (instances.isEmpty()) return;
+
         if (selfie) {
+            // 自拍：目标为自己，必命中，记冷却
             instances.forEach(player::addEffect);
+            scheduleCooldown(hand, 60);
+            lastGlassShot.put(player.getUUID(), now);
         } else {
+            // 非自拍：入镜无生物则不消耗冷却
+            boolean hasTarget = false;
+            for (LivingEntity ent : event.getEntitiesInFrame()) {
+                if (ent != player && ent.isAlive()) { hasTarget = true; break; }
+            }
+            if (!hasTarget) return;
+            // 先记冷却，避免下方效果施加异常被 onFrameAdded 的 try/catch 吞掉而跳过冷却
+            scheduleCooldown(hand, 60);
+            lastGlassShot.put(player.getUUID(), now);
             for (LivingEntity ent : event.getEntitiesInFrame()) {
                 if (ent != player && ent.isAlive()) {
                     instances.forEach(ent::addEffect);
-                    break;
                 }
             }
         }
-        scheduleCooldown(player, hand.getItem());
-        lastFilterShot.put(player.getUUID(), now);
     }
 
     /** #7 万象加持：随机 4 个原版正面效果，等级 2~3，持续 20s */

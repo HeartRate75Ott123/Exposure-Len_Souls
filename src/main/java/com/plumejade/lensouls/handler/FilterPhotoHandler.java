@@ -22,6 +22,7 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 
@@ -106,16 +107,16 @@ public class FilterPhotoHandler {
 
             if (now < lastFilterShot.getOrDefault(player.getUUID(), Long.MIN_VALUE) + 120) return;
 
-            // 敌人易伤：仅拍敌人（非自拍）时对其上易伤（对所有入镜非自己生物生效）；无生物则不消耗冷却
+            // 敌人易伤（蜘蛛）：仅非自拍，对取景框内全部非玩家生物生效；无生物则不消耗冷却
             if (filter.equals(ENEMY_FILTER)) {
                 if (!selfie) {
                     boolean hasTarget = false;
                     for (LivingEntity e : event.getEntitiesInFrame()) {
-                        if (e != player && e.isAlive()) { hasTarget = true; break; }
+                        if (e != player && !(e instanceof Player) && e.isAlive()) { hasTarget = true; break; }
                     }
                     if (!hasTarget) return;
                     for (LivingEntity e : event.getEntitiesInFrame()) {
-                        if (e != player && e.isAlive()) {
+                        if (e != player && !(e instanceof Player) && e.isAlive()) {
                             e.addEffect(new MobEffectInstance(ModEffects.FILTER_SPIDER, 400));
                         }
                     }
@@ -125,17 +126,35 @@ public class FilterPhotoHandler {
                 return;
             }
 
-            if (!selfie) return;
             Holder<MobEffect> effect = SELF_EFFECTS.get(filter);
             if (effect == null) return;
 
-            if (effect == ModEffects.FILTER_ART) {
-                applyRandomBuffs(player);
+            if (selfie) {
+                // 自拍：仅对自己生效
+                if (effect == ModEffects.FILTER_ART) {
+                    applyRandomBuffs(player);
+                } else {
+                    player.addEffect(new MobEffectInstance(effect, 400));
+                }
+                scheduleCooldown(hand, 120);
+                lastFilterShot.put(player.getUUID(), now);
             } else {
-                player.addEffect(new MobEffectInstance(effect, 400));
+                // 非自拍：仅对取景框内全部其他玩家生效；无玩家则不进冷却
+                boolean applied = false;
+                for (LivingEntity ent : event.getEntitiesInFrame()) {
+                    if (ent != player && ent instanceof ServerPlayer sp && ent.isAlive()) {
+                        if (effect == ModEffects.FILTER_ART) {
+                            applyRandomBuffs(sp);
+                        } else {
+                            sp.addEffect(new MobEffectInstance(effect, 400));
+                        }
+                        applied = true;
+                    }
+                }
+                if (!applied) return;
+                scheduleCooldown(hand, 120);
+                lastFilterShot.put(player.getUUID(), now);
             }
-            scheduleCooldown(hand, 120);
-            lastFilterShot.put(player.getUUID(), now);
         } catch (Exception e) {
             LenSouls.LOGGER.error("[FilterPhoto] fail", e);
         }

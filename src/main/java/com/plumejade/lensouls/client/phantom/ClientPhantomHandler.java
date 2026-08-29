@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.client.phantom;
 
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.client.PhantomMemoryLeakDiagnostic;
 import com.plumejade.lensouls.client.screen.ScreenShakeHandler;
 import com.plumejade.lensouls.entity.BossPhantomType;
 import net.minecraft.client.Minecraft;
@@ -10,6 +11,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.phys.Vec3;
@@ -38,6 +40,17 @@ public class ClientPhantomHandler {
     /** Mixin 检测用：指定实体 ID 是否为活跃幻灵 */
     public static boolean isPhantomEntity(int entityId) { return PHANTOM_ENTITY_IDS.contains(entityId); }
 
+    /**
+     * Mixin 检测用（实体版）：id 集合 或 实体自身 persistentData 标记。
+     * 虚灵实体入世界前服务端已打上 lensouls:phantom 标记并随生成数据同步客户端，
+     * 该标记持续整个实体生命周期——即便 stop 包整表清空了 id 集合，存活虚灵仍保持半透明。
+     */
+    public static boolean isPhantomEntity(Entity entity) {
+        if (entity == null) return false;
+        return PHANTOM_ENTITY_IDS.contains(entity.getId())
+                || entity.getPersistentData().getBoolean("lensouls:phantom");
+    }
+
     /** 注册幻灵（由 LenSoulsClient 的 packet handler 调用） */
     public static void addPhantomEntity(int entityId) { PHANTOM_ENTITY_IDS.add(entityId); }
 
@@ -51,6 +64,7 @@ public class ClientPhantomHandler {
         this.phantomActive = true;
         this.phantomPos = new Vec3(px, py, pz);
         this.phantomYaw = yaw;
+        PhantomMemoryLeakDiagnostic.onPhantomStart(type);
 
         // 启动假身驱动器（有灾变模组时才生效）
         if (ModList.get().isLoaded("cataclysm") || ModList.get().isLoaded("legendary_monsters")) {
@@ -113,12 +127,14 @@ public class ClientPhantomHandler {
         this.phantomActive = false;
         PHANTOM_ENTITY_IDS.clear();
         driver.dispose();
+        PhantomMemoryLeakDiagnostic.onPhantomStop();
     }
 
     public void reset() {
         this.phantomActive = false;
         PHANTOM_ENTITY_IDS.clear();
         driver.dispose();
+        PhantomMemoryLeakDiagnostic.onPhantomStop();
     }
 
     /** 每客户端 tick 驱动假身 */
@@ -134,6 +150,7 @@ public class ClientPhantomHandler {
     public static void onPlayerTick(net.neoforged.neoforge.event.tick.PlayerTickEvent.Post event) {
         if (event.getEntity().level().isClientSide) {
             INSTANCE.tickDriver();
+            PhantomMemoryLeakDiagnostic.clientTick();
         }
     }
 

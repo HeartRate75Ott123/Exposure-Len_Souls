@@ -23,6 +23,7 @@
     "client.ItemRendererMixin",
     "client.SoulLevelOverlayMixin",
     "client.EntityRenderDispatcherMixin",
+    "client.EntityPhantomNameMixin",
     "client.EntityBossOutlineMixin",
     "client.BossBufferSourceMixin",
     "client.GameRendererMixin",

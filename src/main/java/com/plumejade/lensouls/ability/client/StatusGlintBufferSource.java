@@ -50,8 +50,6 @@ public class StatusGlintBufferSource implements MultiBufferSource {
         this.delegate = delegate;
         this.state = state;
         this.maskActive = maskActive;
-        LOGGER.info("[Lensouls][Glint] wrap bufferSource state={} mask={} shader={}",
-                state, maskActive, CaptureState.glintEntityShader != null);
     }
 
     /** 解析实体状态，互斥顺序：破定 > 定格 > 无敌（冻结优先于白霸体）。 */

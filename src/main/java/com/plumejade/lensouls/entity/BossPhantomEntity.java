@@ -92,7 +92,7 @@ public class BossPhantomEntity extends Entity {
 
     @Override public boolean isPickable()                { return false; }
     @Override public boolean isPushable()                { return false; }
-    @Override public boolean isNoGravity()               { return true; }
+    @Override public boolean isNoGravity()               { return false; }
     @Override public boolean shouldRenderAtSqrDistance(double d) { return true; }
 
     public int getBossTypeOrdinal() { return entityData.get(DATA_BOSS_TYPE); }

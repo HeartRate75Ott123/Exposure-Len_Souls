@@ -1,7 +1,6 @@
 package com.plumejade.lensouls.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.logging.LogUtils;
 import com.plumejade.lensouls.ability.client.CaptureState;
 import com.plumejade.lensouls.ability.client.ClientFreezeCache;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
@@ -16,7 +15,6 @@ import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.entity.PartEntity;
-import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -41,8 +39,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @OnlyIn(Dist.CLIENT)
 @Mixin(EntityRenderDispatcher.class)
 public abstract class EntityRenderDispatcherMixin {
-
-    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final String RENDER_METHOD =
             "render(Lnet/minecraft/world/entity/Entity;DDDFFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V";
@@ -75,11 +71,7 @@ public abstract class EntityRenderDispatcherMixin {
             return;
         }
         FrozenOutlineManager.ensureMaskCleared();
-        boolean captured = CaptureState.tryStartCapture(root.getId());
-        if (captured) {
-            LOGGER.info("[FrozenMask] render entity={} (id={}) state=FROZEN captured=true",
-                    root.getName().getString(), root.getId());
-        }
+        CaptureState.tryStartCapture(root.getId());
     }
 
     @SuppressWarnings("rawtypes")
@@ -95,8 +87,8 @@ public abstract class EntityRenderDispatcherMixin {
         }
         StatusGlintBufferSource.State state = StatusGlintBufferSource.resolveState(root);
         if (state == StatusGlintBufferSource.State.NONE) {
-            // 虚灵：统一半透明（原色 + 0.5 alpha），覆盖多部件/GeckoLib
-            if (ClientPhantomHandler.isPhantomEntity(root.getId())) {
+            // 虚灵：统一半透明（原色 + 0.5 alpha），覆盖多部件/GeckoLib；标记持续整个实体生命周期
+            if (ClientPhantomHandler.isPhantomEntity(root)) {
                 renderer.render(entity, rotationYaw, partialTicks, poseStack,
                         new PhantomBufferSource(buffer), packedLight);
                 return;

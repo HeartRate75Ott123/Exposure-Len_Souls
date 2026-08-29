@@ -218,11 +218,6 @@ public class CaptureState {
     public static void flushMask() {
         endMaskVertex();
         commitMaskVertices();
-        if (maskVertexCount > 0) {
-            LOGGER.info("[FrozenMask] entity={} vertices={} AABB=({},{},{})-({},{},{})",
-                    captureEntityId.get(), maskVertexCount,
-                    maskMinX, maskMinY, maskMinZ, maskMaxX, maskMaxY, maskMaxZ);
-        }
         resetMaskStats();
     }
 

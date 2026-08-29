@@ -147,7 +147,7 @@ public class BossPhantomManager {
     /**
      * 泛化借体方法：通过 BossPhantomType 元数据反射构造任意 BOSS 实体，
      * 设 target = 附近敌对生物，让 AI 自动出招。
-     * 渲染层由 LivingEntityPhantomMixin 替换为半透明。
+     * 渲染层由 EntityRenderDispatcherMixin.redirectRender 走主缓冲源正常渲染（已取消半透明）。
      */
     private void startBorrowedEntity(ServerPlayer player, BossPhantomType type, String descId, int amplifier,
                                       double ox, double oy, double oz, float oyaw, float opitch) {
@@ -343,14 +343,13 @@ public class BossPhantomManager {
         return null;
     }
 
-    /** 利维坦：强制水域导航 + 悬浮 */
+    /** 利维坦：强制水域导航（不再设无重力，按正常重力） */
     private static void forceLeviathanWaterMode(Entity entity) {
         try {
             Class<?> clazz = Class.forName("com.github.L_Ender.cataclysm.entity.AnimationMonster.BossMonsters.The_Leviathan.The_Leviathan_Entity");
             java.lang.reflect.Field landNav = clazz.getDeclaredField("isLandNavigator");
             landNav.setAccessible(true);
             landNav.set(entity, false);
-            entity.setNoGravity(true);
         } catch (Exception e) {
             LenSouls.LOGGER.error("[幻灵] 利维坦水域模式切换失败", e);
         }

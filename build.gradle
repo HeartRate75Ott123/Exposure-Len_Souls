@@ -62,6 +62,13 @@ neoForge {
 
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+
+            // 虚影原生内存泄漏诊断：开启后每秒输出原生/堆/块数曲线（[LeakDiag]）。
+            // 压测娜迦镜魂复现 OOM 时启用，确认是否为 lensouls 原生泄漏。
+            jvmArgument '-Dlensouls.leakdiag=true'
+            // 原生内存追踪：配合 tools/leakdiag_nmt.ps1 用 jcmd VM.native_memory 看哪个桶在涨
+            // （GL/Internal、DirectBuffer、Thread、Code、GC heap）。
+            jvmArgument '-XX:NativeMemoryTracking=summary'
         }
 
         server {

@@ -39,6 +39,19 @@ public class ItemOutlinePostProcessor {
     private static int outlineRgb = 0;
     private static int outlineRadius = 3;
 
+    /**
+     * 常驻 mask 缓冲源（复用单例）。不可每帧 new RenderBuffers：
+     * 每帧新建会让 Sodium 的 VertexBufferWriter 原生缓冲随旧 BufferBuilder 被 GC 而不释放 → 每帧原生泄漏。
+     */
+    private static MultiBufferSource.BufferSource maskBufferSource;
+
+    private static MultiBufferSource.BufferSource getMaskBufferSource() {
+        if (maskBufferSource == null) {
+            maskBufferSource = new RenderBuffers(256).bufferSource();
+        }
+        return maskBufferSource;
+    }
+
     private static void ensureTarget() {
         var main = Minecraft.getInstance().getMainRenderTarget();
         if (main == null) return;
@@ -75,7 +88,7 @@ public class ItemOutlinePostProcessor {
 
         inMaskRender.set(true);
         try {
-            MultiBufferSource.BufferSource maskBuffer = new RenderBuffers(256).bufferSource();
+            MultiBufferSource.BufferSource maskBuffer = getMaskBufferSource();
             itemRenderer.render(stack, context, leftHand, pose, maskBuffer, light, overlay, model);
             maskBuffer.endBatch();
         } finally {

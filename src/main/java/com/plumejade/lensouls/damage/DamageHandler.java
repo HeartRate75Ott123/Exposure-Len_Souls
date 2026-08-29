@@ -170,26 +170,28 @@ public class DamageHandler {
             event.setNewDamage(current + current * totalBonusMultiplier);
         }
 
-        // 弱点武器匹配：目标有弱点但玩家武器元素（item_activity / 次元枪子弹元素）不匹配任一弱点
+        // 弱点武器匹配：目标有弱点但玩家武器元素（item_activity / 次元枪子弹元素）不匹配任一“非弹射物”弱点
         // → 最终伤害拦截为原始的 10%（空手 / 普通无元素武器同样拦截）
+        // 弹射物弱点（PROJECTILE）活性隐含 1.0，无需武器匹配，不触发此惩罚
         if (!level.isClientSide && isPlayer) {
             Map<ElementDamage, Float> weaknesses = DataPackLoader.getAllWeaknesses(entityId);
-            if (!weaknesses.isEmpty()) {
-                boolean matches = false;
-                for (ElementDamage weakElem : weaknesses.keySet()) {
-                    if (weaponId != null && ItemElementActivityLoader.getLevel(weaponId, weakElem) > 0) {
-                        matches = true;
-                        break;
-                    }
-                    if (bulletElement == weakElem) {
-                        matches = true;
-                        break;
-                    }
+            boolean needsMatch = false;
+            boolean matches = false;
+            for (ElementDamage weakElem : weaknesses.keySet()) {
+                if (weakElem == ElementDamage.PROJECTILE) continue;   // 弹射物弱点无需武器匹配
+                needsMatch = true;
+                if (weaponId != null && ItemElementActivityLoader.getLevel(weaponId, weakElem) > 0) {
+                    matches = true;
+                    break;
                 }
-                if (!matches) {
-                    float cap = event.getOriginalDamage() * 0.1f;
-                    if (event.getNewDamage() > cap) event.setNewDamage(cap);
+                if (bulletElement == weakElem) {
+                    matches = true;
+                    break;
                 }
+            }
+            if (needsMatch && !matches) {
+                float cap = event.getOriginalDamage() * 0.1f;
+                if (event.getNewDamage() > cap) event.setNewDamage(cap);
             }
         }
     }

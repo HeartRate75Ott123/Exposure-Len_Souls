@@ -14,10 +14,12 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.entity.PartEntity;
 
 import java.util.List;
 import java.util.Map;
@@ -93,10 +95,12 @@ public class PhotoInjectionHandler {
             if (ability == AbilityType.ABILITY_STEAL) {
                 var frameEntities = event.getEntitiesInFrame();
                 if (frameEntities != null && !frameEntities.isEmpty()) {
-                    LivingEntity first = frameEntities.get(0);
-                    String stolenId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(first.getType()).toString();
+                    // 多部件 boss（九头蛇头/娜迦尾等）子体离相机更近、排在帧首——
+                    // 追溯到父体，确保取到的 id 是 BOSS 本体（与削韧一致），否则按部件 id 查不到效果。
+                    LivingEntity target = resolveToParent(frameEntities.get(0));
+                    String stolenId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
                     cacheStolenEntity(exposureId, stolenId);
-                    bossFlagCache.put(exposureId, BossEntityLoader.isBoss(first));
+                    bossFlagCache.put(exposureId, BossEntityLoader.isBoss(target));
                 }
             }
         } catch (Exception e) {
@@ -117,5 +121,20 @@ public class PhotoInjectionHandler {
                 return;
             }
         }
+    }
+
+    /**
+     * 多部件实体（九头蛇头/娜迦尾等）子体追溯到父体，确保能力窃取取到 BOSS 本体（与削韧一致）。
+     * <p>
+     * 帧内实体按到相机距离排序，子体往往比父体中心离相机更近而排在最前；直接取 {@code get(0)}
+     * 会取到部件实体 id，导致 {@link PhotographEffectRegistry#hasEffect} 查不到效果、退化为普通照片。
+     */
+    private static LivingEntity resolveToParent(LivingEntity entity) {
+        // 子部件（九头蛇头/娜迦尾等）实现 PartEntity，追溯到父体
+        if ((Entity) entity instanceof PartEntity<?> part) {
+            Entity parent = part.getParent();
+            if (parent instanceof LivingEntity le) return le;
+        }
+        return entity;
     }
 }

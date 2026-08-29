@@ -1,7 +1,10 @@
 package com.plumejade.lensouls.mixin;
 
+import io.github.mortuusars.exposure.util.Fov;
+import io.github.mortuusars.exposure.util.PointOfView;
 import io.github.mortuusars.exposure.world.camera.frame.EntitiesInFrame;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -12,11 +15,19 @@ import net.neoforged.neoforge.entity.PartEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.List;
 
 /**
- * 多部件实体（九头蛇的头、娜迦子节等）子部件→本体追溯：
- * 曝光帧实体收集时，用子部件位置做视锥/距离/视线判定——拍到头部/子节也算（父实体会进帧实体列表）。
+ * Multi-part boss (Hydra heads, Naga segments) part -> parent tracing.
+ * Frame entity collection normally filters out PartEntity (it is not a LivingEntity),
+ * so aiming at a boss part never yields the boss. This mixin:
+ *  - redirects the frustum/distance/line-of-sight checks so a part can satisfy them on behalf of its parent;
+ *  - on TAIL, scans in-frustum parts and adds their LivingEntity parent into the frame list,
+ *    so ability-steal / toughness resolve to the boss body exactly like a normal entity shot.
  */
 @Mixin(EntitiesInFrame.class)
 public abstract class EntitiesInFrameMixin {
@@ -62,6 +73,33 @@ public abstract class EntitiesInFrameMixin {
         Entity target = lensouls$resolved.get();
         if (target == null) target = entity;
         return lensouls$hasLineOfSight(cameraPos, target);
+    }
+
+    @Inject(method = "get(Lnet/minecraft/world/entity/Entity;Lio/github/mortuusars/exposure/util/PointOfView;D)Ljava/util/List;",
+            at = @At("TAIL"))
+    private static void lensouls$addPartParents(Entity cameraHolder, PointOfView pov, double fov,
+                                                CallbackInfoReturnable<List<LivingEntity>> cir) {
+        List<LivingEntity> list = cir.getReturnValue();
+        if (list == null) return;
+
+        Level level = cameraHolder.level();
+        Vec3 camPos = pov.pos();
+        double effectiveFov = fov * 0.95;
+        EntitiesInFrame.FrustumCheck frustum = EntitiesInFrame.FrustumCheck.createFromCamera(
+                camPos, pov.dir(), (float) Math.toRadians(effectiveFov));
+        double focalLength = Fov.fovToFocalLength(effectiveFov);
+
+        AABB area = new AABB(cameraHolder.blockPosition()).inflate(128);
+        for (Entity e : level.getEntities(null, area)) {
+            if (!(e instanceof PartEntity<?> part) || !part.isAlive()) continue;
+            Entity parent = part.getParent();
+            if (!(parent instanceof LivingEntity le) || !le.isAlive()) continue;
+            if (list.contains(le)) continue;
+            if (!frustum.contains(part.getEyePosition())) continue;
+            if (lensouls$calculateVisibleDistance(camPos, le) > focalLength) continue;
+            if (!lensouls$hasLineOfSight(camPos, part)) continue;
+            list.add(le);
+        }
     }
 
     @Unique

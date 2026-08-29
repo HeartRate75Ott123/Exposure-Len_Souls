@@ -34,7 +34,9 @@
     "client.MultiPlayerGameModeMixin",
     "client.GameRendererFrameEndMixin",
     "client.LevelRendererMixin",
-    "client.MinecraftSwingMixin"
+    "client.MinecraftSwingMixin",
+    "client.BossHealthOverlayMixin",
+    "client.ClientboundBossEventPacketAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

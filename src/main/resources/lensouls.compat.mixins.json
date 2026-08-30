@@ -24,7 +24,9 @@
     "KrakenStunPassiveMixin",
     "SandwormStunPassiveMixin",
     "YetiStunPassiveMixin",
-    "InfernalDragonStunPassiveMixin"
+    "InfernalDragonStunPassiveMixin",
+    "IgnisStunMixin",
+    "IgnisStunHurtMixin"
   ],
   "client": [
     "BetterCombatRangeMixin"

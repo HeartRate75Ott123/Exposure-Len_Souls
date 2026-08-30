@@ -39,6 +39,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import top.theillusivec4.curios.api.CuriosApi;
+import top.theillusivec4.curios.api.type.ICuriosMenu;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 import java.util.*;
@@ -816,6 +817,15 @@ public class PhotoSpecialEffects {
 
         int cur = player.getPersistentData().getInt(SLOT_TAG);
         if (cur == extra) return;
+
+        // 打开 Curios 容器期间动态改槽会与服务端→客户端的槽位同步产生竞态：
+        // 客户端容器槽列表仍持有旧的 CurioSlot，handler 却已缩小，
+        // 导致 CuriosScreen.render() 访问越界索引崩溃（Slot N not in valid range）。
+        // 关闭容器后下一 tick 检测到 cur != extra 会自动补做。
+        if (player.containerMenu instanceof ICuriosMenu) {
+            return;
+        }
+
         final int targetExtra = extra;
         CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
             if (cur > 0) {

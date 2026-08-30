@@ -88,7 +88,7 @@ public class PhotoInjectionHandler {
             if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), hand) <= 0) return;
 
             // 按帧 ID 存储能力，后续切换能力不影响已拍帧
-            LenSouls.LOGGER.info("[PhotoInject] onFrameAdded: exposureId={} ability={}", exposureId, ability);
+            LenSouls.LOGGER.debug("[PhotoInject] onFrameAdded: exposureId={} ability={}", exposureId, ability);
             pendingAbilities.put(exposureId, ability);
 
             // 能力窃取：缓存被窃取实体 + Boss 判定（首领清单）

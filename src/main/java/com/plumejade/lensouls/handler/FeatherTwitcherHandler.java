@@ -52,6 +52,10 @@ public class FeatherTwitcherHandler {
     /** BOSS 判定半径 */
     public static final int BOSS_RANGE = 64;
 
+    /** [Twist] 日志降频：变化量 ≥20 或距上次日志 ≥100 tick 才打 */
+    private static int lastLoggedTwist = -1;
+    private static long lastTwistLogTick = 0;
+
     /** 佩戴检测：Curios 任意槽位持有扭曲羽毛 */
     public static boolean hasTwitcher(Player player) {
         if (player == null) return false;
@@ -80,7 +84,12 @@ public class FeatherTwitcherHandler {
         CompoundTag tag = persisted(player);
         tag.putInt(KEY_TWIST, clamped);
         player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
-        LOGGER.info("[Twist] {} twist={}", player.getName().getString(), clamped);
+        long now = player.level().getGameTime();
+        if (Math.abs(clamped - lastLoggedTwist) >= 20 || now - lastTwistLogTick >= 100) {
+            LOGGER.info("[Twist] {} twist={}", player.getName().getString(), clamped);
+            lastLoggedTwist = clamped;
+            lastTwistLogTick = now;
+        }
         TwistSyncPacket.send(player, clamped);
     }
 

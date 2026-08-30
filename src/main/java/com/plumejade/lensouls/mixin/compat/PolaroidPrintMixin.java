@@ -44,7 +44,7 @@ public class PolaroidPrintMixin {
     // ── 空空插槽路径 ──
     @ModifyArg(method = "printPhotograph", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Inventory;setItem(ILnet/minecraft/world/item/ItemStack;)V"), index = 1, require = 0)
     private static ItemStack lensouls$captureSetItem(ItemStack stack) {
-        LenSouls.LOGGER.info("[Polaroid] capture: setItem");
+        LenSouls.LOGGER.debug("[Polaroid] capture: setItem");
         if (stack.getItem() instanceof io.github.mortuusars.exposure.world.item.PhotographItem) capturedPhoto.set(stack);
         return stack;
     }
@@ -60,7 +60,7 @@ public class PolaroidPrintMixin {
     // ── 背包满时直接丢地上路径 ──
     @ModifyArg(method = "printPhotograph", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;drop(Lnet/minecraft/world/item/ItemStack;ZZ)Lnet/minecraft/world/entity/item/ItemEntity;"), index = 0, require = 0)
     private static ItemStack lensouls$captureDrop(ItemStack stack) {
-        LenSouls.LOGGER.info("[Polaroid] capture: drop");
+        LenSouls.LOGGER.debug("[Polaroid] capture: drop");
         if (stack.getItem() instanceof io.github.mortuusars.exposure.world.item.PhotographItem) capturedPhoto.set(stack);
         return stack;
     }
@@ -76,7 +76,7 @@ public class PolaroidPrintMixin {
         String exposureId = frame.identifier() != null ? frame.identifier().toString() : null;
         if (exposureId == null) return;
         AbilityType ability = PhotoInjectionHandler.pollAbility(exposureId);
-        LenSouls.LOGGER.info("[Polaroid] inject: ability={} photo={} hasEntities={}", ability, photo != null && !photo.isEmpty(), frame.entitiesInFrame() != null && !frame.entitiesInFrame().isEmpty());
+        LenSouls.LOGGER.debug("[Polaroid] inject: ability={} photo={} hasEntities={}", ability, photo != null && !photo.isEmpty(), frame.entitiesInFrame() != null && !frame.entitiesInFrame().isEmpty());
         if (photo == null || photo.isEmpty()) return;
 
         CompoundTag tag = photo.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();

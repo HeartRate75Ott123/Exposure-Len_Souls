@@ -514,10 +514,9 @@ public class FeatherAbyssHandler {
             Vec3 p = new Vec3(x, py, z);
             positions.add(p);
             level.sendParticles(ModParticleTypes.ABYSS_SUMMON.get(), x, py, z, 1, 0, 0, 0, 0);
-            LOGGER.info("[AbyssSummon] performSummon particle#{} at ({},{},{})", i, x, py, z);
         }
         PENDING_SUMMONS.add(new SummonPlan(level.getGameTime() + SUMMON_DELAY_TICKS, level, positions, type));
-        LOGGER.info("[AbyssSummon] queued {} positions, type={}, spawn at gameTime={}", positions.size(), type, level.getGameTime() + SUMMON_DELAY_TICKS);
+        LOGGER.info("[AbyssSummon] queued {}x {} at gameTime={}", positions.size(), type, level.getGameTime() + SUMMON_DELAY_TICKS);
     }
 
     private static void spawnAtPositions(SummonPlan plan) {
@@ -528,9 +527,8 @@ public class FeatherAbyssHandler {
             e.setPos(p.x, p.y, p.z);
             plan.level.addFreshEntity(e);
             spawned++;
-            LOGGER.info("[AbyssSummon] spawned {} at ({},{},{})", e.getType(), p.x, p.y, p.z);
         }
-        LOGGER.info("[AbyssSummon] spawnAtPositions done, total={}", spawned);
+        LOGGER.info("[AbyssSummon] spawned {}x {}", spawned, plan.type);
     }
 
     /** 测试指令：直接从「触发倒计时」阶段开始（龙吼 + 3s 倒计时 + 召唤），不污染充能计时器 */
@@ -576,6 +574,10 @@ public class FeatherAbyssHandler {
 
     // ========== 计时器（持久化，掉线不丢） ==========
 
+    /** [AbyssCharge] 日志降频：interval 变化 >10% 或距上次 ≥200 tick 才打 */
+    private static int lastLoggedChargeInterval = 0;
+    private static long lastChargeLogTick = 0;
+
     /**
      * 祸之可能性充能推进（state==0）。
      * <p>
@@ -612,8 +614,12 @@ public class FeatherAbyssHandler {
             long newNext = now + Math.round((1.0 - progress) * newInterval);
             tag.putLong(KEY_CHARGE_NEXT, newNext);
             tag.putInt(KEY_CHARGE_INTERVAL, newInterval);
-            LOGGER.info("[AbyssCharge] twist={} interval {}->{} progress={} next {}->{}",
-                    getTwist(player), oldInterval, newInterval, progress, chargeNext, newNext);
+            if (Math.abs(newInterval - lastLoggedChargeInterval) * 10 > oldInterval || now - lastChargeLogTick >= 200) {
+                LOGGER.info("[AbyssCharge] twist={} interval {}->{} progress={} next {}->{}",
+                        getTwist(player), oldInterval, newInterval, progress, chargeNext, newNext);
+                lastLoggedChargeInterval = newInterval;
+                lastChargeLogTick = now;
+            }
             return true;
         }
         return false;

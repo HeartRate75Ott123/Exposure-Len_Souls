@@ -236,6 +236,8 @@ public class CaptureState {
 
     private static final Map<RenderType, Integer> TEXTURE_ID_CACHE = new IdentityHashMap<>();
     private static DynamicTexture whitePixelTexture;
+    /** [FrozenMask] 汇总计数：反射失败的 RenderType 数量 */
+    private static int frozenMaskFailCount = 0;
 
     /**
      * 提取渲染类型对应的实体纹理 ID（反射 + IdentityHashMap 缓存；失败兜底白像素）。
@@ -262,7 +264,12 @@ public class CaptureState {
             }
             return whitePixelTextureId();
         } catch (ReflectiveOperationException | RuntimeException e) {
-            LOGGER.warn("[FrozenMask] 反射提取实体纹理失败（fallback 白像素）: {}", e.toString());
+            frozenMaskFailCount++;
+            if (frozenMaskFailCount <= 3) {
+                LOGGER.warn("[FrozenMask] 反射提取实体纹理失败（fallback 白像素）: {}", e.toString());
+            } else if (frozenMaskFailCount == 4) {
+                LOGGER.warn("[FrozenMask] 已省略后续同类警告，共 {} 种 RenderType 反射失败", frozenMaskFailCount);
+            }
             return whitePixelTextureId();
         }
     }

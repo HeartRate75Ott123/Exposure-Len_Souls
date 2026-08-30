@@ -16,6 +16,8 @@
     "LegendaryMonstersVanillaDamageMixin",
     "IgnisFireballBrandMixin",
     "GatekeeperStunBlockMixin",
+    "GatekeeperSoulDropMixin",
+    "EternalStarlightBossStunMixin",
     "TwilightLichStunMixin",
     "BlockFactorysBossStunMixin",
     "UnderworldKnightStunPassiveMixin",

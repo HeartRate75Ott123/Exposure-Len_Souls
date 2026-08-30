@@ -85,4 +85,11 @@ public class PhotoSetLoader extends SimpleJsonResourceReloadListener {
     public static Map<ResourceLocation, List<String>> getAll() {
         return membership;
     }
+
+    /**
+     * 客户端接收数据包同步后的缓存填充（多人模式下服务端解析结果经 S2C 同步）。
+     */
+    public static void setClientCache(Map<ResourceLocation, List<String>> cache) {
+        membership = Map.copyOf(cache);
+    }
 }

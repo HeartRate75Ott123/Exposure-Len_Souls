@@ -36,6 +36,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
@@ -157,6 +158,26 @@ public class LenSouls {
         event.addListener(new com.plumejade.lensouls.config.CopySoulFilter());
         event.addListener(new com.plumejade.lensouls.config.PhotoSetLoader());
         event.addListener(new com.plumejade.lensouls.config.PhotoSetDefs());
+    }
+
+    /**
+     * 玩家加入 / /reload 时，把服务端解析的数据包结果同步到客户端。
+     * <p>
+     * 这些 {@code SimpleJsonResourceReloadListener} 只在服务端触发 {@link AddReloadListenerEvent}，
+     * 多人客机进程从不执行，需经 S2C 包填充客户端静态缓存，
+     * 否则 Jade 面板弱点/活性/韧性与照片套装 Shift tooltip 在客机为空。
+     */
+    @SubscribeEvent
+    public void onDatapackSync(OnDatapackSyncEvent event) {
+        com.plumejade.lensouls.network.DatapackSyncPacket packet =
+                new com.plumejade.lensouls.network.DatapackSyncPacket(
+                        DataPackLoader.allWeaknesses(),
+                        com.plumejade.lensouls.config.AttackerElementLoader.allMappings(),
+                        com.plumejade.lensouls.config.ItemElementActivityLoader.allMappings(),
+                        com.plumejade.lensouls.config.PhotoSetLoader.getAll(),
+                        com.plumejade.lensouls.config.PhotoSetDefs.allMap());
+        event.getRelevantPlayers().forEach(player ->
+                net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, packet));
     }
 
     /**

@@ -1,8 +1,10 @@
 package com.plumejade.lensouls.handler;
 
+import com.plumejade.lensouls.config.BossEntityLoader;
 import com.plumejade.lensouls.config.CopySoulFilter;
 import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -28,8 +30,9 @@ public class CopySoulDropHandler {
     public static void onLivingDrops(LivingDropsEvent event) {
         LivingEntity entity = event.getEntity();
         if (entity.level().isClientSide) return;
-        // 基础判定：200 血以上（替代原 BOSS 血条检测）
-        if (entity.getMaxHealth() < 200f) return;
+        // 基础判定：200 血以上（替代原 BOSS 血条检测）；
+        // 首领清单（boss_entities/bosses.json）内的实体豁免血量门槛（如 the_gatekeeper 仅 175 血）
+        if (entity.getMaxHealth() < 200f && !BossEntityLoader.isBoss(entity)) return;
 
         // 佩戴羽·元素觉醒者/羽·荒厄遗咒的玩家击杀 → 不掉落复制之魂
         LivingEntity killer = entity.getKillCredit();
@@ -41,9 +44,15 @@ public class CopySoulDropHandler {
         // 数据驱动掉落黑白名单：综合白/黑名单与 "all" 通配
         if (!CopySoulFilter.isDropAllowed(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()))) return;
 
-        int count = 5 + entity.level().random.nextInt(16); // 5..20
-        event.getDrops().add(new ItemEntity(entity.level(),
-                entity.getX(), entity.getY(), entity.getZ(),
+        spawnCopySoulDrop((ServerLevel) entity.level(), entity.getX(), entity.getY(), entity.getZ());
+    }
+
+    /**
+     * 生成 5~20 个复制之魂的掉落实体（供死亡事件与 Gatekeeper 挑战胜利 mixin 复用）。
+     */
+    public static void spawnCopySoulDrop(ServerLevel level, double x, double y, double z) {
+        int count = 5 + level.random.nextInt(16); // 5..20
+        level.addFreshEntity(new ItemEntity(level, x, y, z,
                 new ItemStack(ModItems.COPY_SOUL.get(), count)));
     }
 

@@ -89,6 +89,18 @@ public class PhotoSetDefs extends SimpleJsonResourceReloadListener {
         return defs.values();
     }
 
+    /** 全部定义映射（服务端数据包同步用） */
+    public static Map<String, SetDef> allMap() {
+        return defs;
+    }
+
+    /**
+     * 客户端接收数据包同步后的缓存填充（多人模式下服务端解析结果经 S2C 同步）。
+     */
+    public static void setClientCache(Map<String, SetDef> cache) {
+        defs = Map.copyOf(cache);
+    }
+
     public record SetDef(String id, String name, String desc, List<Tier> tiers) {}
 
     public record Tier(int count, List<String> effects, String when) {}

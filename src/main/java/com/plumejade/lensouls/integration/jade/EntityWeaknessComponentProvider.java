@@ -40,9 +40,7 @@ public enum EntityWeaknessComponentProvider implements IEntityComponentProvider 
         ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
         Map<ElementDamage, Float> weaknesses = DataPackLoader.getAllWeaknesses(entityId);
 
-        if (weaknesses.isEmpty()) return;
-
-        // 按元素顺序收集名称，包含 projectile
+        // 弱点：按元素顺序收集名称，包含 projectile
         List<Component> names = new ArrayList<>();
         for (ElementDamage element : ElementDamage.values()) {
             if (!weaknesses.containsKey(element)) continue;
@@ -50,15 +48,15 @@ public enum EntityWeaknessComponentProvider implements IEntityComponentProvider 
             names.add(Component.translatable(shortKey));
         }
 
-        if (names.isEmpty()) return;
-
-        // 弱点：火, 水, 末影, 弹射物
-        MutableComponent line = Component.translatable("jade.lensouls.weakness");
-        for (int i = 0; i < names.size(); i++) {
-            if (i > 0) line = line.append("、");
-            line = line.append(names.get(i));
+        if (!names.isEmpty()) {
+            // 弱点：火, 水, 末影, 弹射物
+            MutableComponent line = Component.translatable("jade.lensouls.weakness");
+            for (int i = 0; i < names.size(); i++) {
+                if (i > 0) line = line.append("、");
+                line = line.append(names.get(i));
+            }
+            tooltip.add(line.copy().withStyle(ChatFormatting.GREEN));
         }
-        tooltip.add(line.copy().withStyle(ChatFormatting.GREEN));
 
         // 活性：实体固有元素（来自 attacker_element 数据包，多元素逐一显示 + 等级）
         Map<ElementDamage, Integer> levels = AttackerElementLoader.getLevels(entityId);
@@ -78,6 +76,7 @@ public enum EntityWeaknessComponentProvider implements IEntityComponentProvider 
         }
 
         // 韧性：生物韧性 x/x（服务端同步的 requiredHits + progress）
+        // 独立于弱点/活性——多人客机即便上述数据包缓存为空，韧性也应正常显示
         com.plumejade.lensouls.boss.ToughnessEntry toughness =
                 com.plumejade.lensouls.boss.BossToughnessClientCache.find(entity.getId());
         if (toughness != null && toughness.requiredHits() > 0) {

@@ -226,5 +226,12 @@ public class PacketHandler {
                 AbyssCountdownPacket.STREAM_CODEC,
                 AbyssCountdownPacket::handle
         );
+
+        // ---- 数据包解析结果统一同步 S2C（弱点/活性/套装，玩家加入 + /reload 时） ----
+        registrar.playToClient(
+                DatapackSyncPacket.TYPE,
+                DatapackSyncPacket.STREAM_CODEC,
+                DatapackSyncPacket::handle
+        );
     }
 }

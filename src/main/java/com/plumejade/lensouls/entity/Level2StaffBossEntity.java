@@ -256,8 +256,9 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                     return;
                 }
                 // 中距（3 ≤ dist < 9）：不贴近，原地放 spike 压制；
-                // 带冷却防循环，且独立于「近战打满 5 次才拉远」的撤退路径。
-                if (dist >= SPIKE_MID_MIN && dist < CAMERA_RANGE && spikeMidCooldown <= 0) {
+                // 带冷却防循环；camera 冷却内（camera_shoot 后优先拉近）不触发中距 spike。
+                if (dist >= SPIKE_MID_MIN && dist < CAMERA_RANGE
+                        && spikeMidCooldown <= 0 && cameraCooldown <= 0) {
                     spikeMidCooldown = 80;
                     startSpike();
                     return;

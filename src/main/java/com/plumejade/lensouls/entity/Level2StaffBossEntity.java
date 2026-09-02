@@ -60,6 +60,8 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
     private static final double RETREAT_MAX = 9.0D;
     /** camera_shoot 触发距离 */
     private static final double CAMERA_RANGE = 9.0D;
+    /** 中距原地 spike 触发距离下界（3 ≤ dist < 9，不含 9——9 及以上归 camera） */
+    private static final double SPIKE_MID_MIN = 3.0D;
     /** 魔法射线每 tick 推进距离（格） */
     private static final double RAY_SPEED = 0.7D;
     /** 魔法伤害 */
@@ -84,6 +86,8 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
     private int fightState = ST_IDLE;
     private int meleeHits = 0;                 // 累计近战命中（造成伤害）
     private int cameraCooldown = 0;            // camera_shoot 后的冷却，防止连发
+    /** 中距原地 spike 冷却：触发一轮后让 Boss 先贴近/拉开，避免在 3~9 区间原地无限放 */
+    private int spikeMidCooldown = 0;
 
     // ---- 近战进行中 ----
     private String meleeAnimName;
@@ -162,8 +166,9 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
             return;
         }
 
-        // 相机冷却递减
+        // 相机冷却递减 / 中距 spike 冷却递减
         if (cameraCooldown > 0) cameraCooldown--;
+        if (spikeMidCooldown > 0) spikeMidCooldown--;
 
         tickRay(player);
         runFightLoop(player);
@@ -248,6 +253,13 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                     } else {
                         startSpike();
                     }
+                    return;
+                }
+                // 中距（3 ≤ dist < 9）：不贴近，原地放 spike 压制；
+                // 带冷却防循环，且独立于「近战打满 5 次才拉远」的撤退路径。
+                if (dist >= SPIKE_MID_MIN && dist < CAMERA_RANGE && spikeMidCooldown <= 0) {
+                    spikeMidCooldown = 80;
+                    startSpike();
                     return;
                 }
                 // 交互距离内 → 近战
@@ -431,6 +443,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.fightState = ST_IDLE;
         this.meleeHits = 0;
         this.spikeShotsDone = 0;
+        this.spikeMidCooldown = 0;
         this.rayTicksLeft = 0;
         this.lastSpikeHit = false;
         this.rayResult = -1;

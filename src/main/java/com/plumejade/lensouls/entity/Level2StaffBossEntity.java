@@ -92,7 +92,8 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
     private int meleeWindowEndTick;
     private int meleeEndTick;
     private boolean meleeDamaged;
-    /** 本次近战挥击是否实际命中目标（doHurtTarget 成功）；未命中可能触发 spike 切入 */
+    /** 本次近战挥击落点是否成立：动画伤害窗口内目标在攻击距离（未中=整个窗口目标都不在范围）；
+     *  未命中时 30% 概率切入 spike。不受无敌帧影响。 */
     private boolean meleeLanded;
 
     // ---- spike 进行中 ----
@@ -260,37 +261,36 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
             }
             case ST_MELEE -> {
                 int elapsed = this.tickCount - meleeStartTick;
-                // 窗口内 + 目标仍在交互距离 + 未造成伤害 → 造成一次近战伤害并播音效
+                // 窗口内 + 目标仍在交互距离 → 挥击落点成立：施放伤害（无敌帧吞伤不计入"未命中"）
                 if (!meleeDamaged && elapsed >= meleeWindowStartTick && elapsed <= meleeWindowEndTick) {
                     double d = horizontalDist(target);
                     if (d <= MELEE_RANGE + target.getBbWidth() * 0.5D) {
                         meleeDamaged = true;
+                        meleeLanded = true; // 挥击命中成立（动画窗口内目标在范围）
                         playBossSound(soundForMelee(meleeAnimName));
                         if (this.doHurtTarget(target)) {
                             meleeHits++;
-                            meleeLanded = true;
                         }
                     }
                 }
-                // 动画播完：持续连击 / 撤退 / 近战未命中 30% 切入 spike
+                // 动画播完：撤退 / 近战未命中 30% 切入 spike / 连击 / 追击
                 if (this.tickCount >= meleeEndTick) {
                     double d = horizontalDist(target);
                     boolean stillClose = d <= MELEE_RANGE + target.getBbWidth() * 0.5D;
-                    if (stillClose && meleeHits < MELEE_HITS_TO_RETREAT) {
-                        if (!meleeLanded && this.random.nextFloat() < 0.30f) {
-                            // 近战挥空 → 30% 概率拉远进入 spike（后续命中分支与远程拉远 spike 一致）
-                            startRetreat();
-                        } else {
-                            startMelee(target);   // 无缝衔接下一个随机 hit
-                        }
-                    } else if (meleeHits >= MELEE_HITS_TO_RETREAT) {
+                    if (meleeHits >= MELEE_HITS_TO_RETREAT) {
                         if (d < RETREAT_MIN) {
                             startRetreat();
                         } else {
                             startSpike();
                         }
+                    } else if (!meleeLanded && this.random.nextFloat() < 0.30f) {
+                        // 本次挥击未命中（目标躲开/伤害被吞）→ 30% 原地切入 spike（无需先拉远），
+                        // 后续命中分支与远程 spike 一致（一/二发命中→camera，未命中→下一发/近身）。
+                        startSpike();
+                    } else if (stillClose) {
+                        startMelee(target);   // 无缝衔接下一个随机 hit
                     } else {
-                        fightState = ST_IDLE;
+                        fightState = ST_IDLE; // 目标已跑远 → 追击
                     }
                 }
             }

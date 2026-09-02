@@ -65,8 +65,12 @@ public class ClientAbilityCache {
         warpDimension = "";
     }
 
-    /** 客户端登出事件（切档/退出到标题时触发） */
+    /** 客户端登出事件（切档/退出到标题时触发）。
+     *  仅当登出的是本地玩家才清缓存——局域网主机同进程内，他人（客机）登出的
+     *  PlayerLoggedOutEvent 也会广播到此，若不区分会把主机自己的能力缓存误清。 */
     public static void onClientLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        var local = Minecraft.getInstance().player;
+        if (event.getEntity() != local) return;
         reset();
     }
 

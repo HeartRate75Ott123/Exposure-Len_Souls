@@ -44,4 +44,17 @@ public abstract class LegendaryMonstersVanillaDamageMixin extends IAnimatedMonst
     private void lensouls$noopAddDamage(float amount, DamageSource source, CallbackInfo ci) {
         ci.cancel();
     }
+
+    /**
+     * 移除 {@code IAnimatedBoss.addEffect()} 的无条件 {@code return false}，
+     * 让原版药水效果逻辑（含白名单检查）正常执行。
+     * 这样蜘蛛滤镜易伤（FILTER_SPIDER）等效果可以正常施加到传奇怪物 BOSS 身上。
+     */
+    @Inject(method = "addEffect(Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z",
+            at = @At("HEAD"), cancellable = true, remap = false, require = 0)
+    private void lensouls$allowEffects(net.minecraft.world.effect.MobEffectInstance instance,
+                                       @javax.annotation.Nullable net.minecraft.world.entity.Entity applier,
+                                       CallbackInfoReturnable<Boolean> cir) {
+        cir.setReturnValue(super.addEffect(instance, applier));
+    }
 }

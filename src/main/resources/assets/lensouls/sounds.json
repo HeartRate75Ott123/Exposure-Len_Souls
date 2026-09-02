@@ -74,5 +74,53 @@
         "stream": false
       }
     ]
+  },
+  "level2_staff.hit1": {
+    "sounds": [
+      {
+        "name": "lensouls:level2_staff/hit1",
+        "stream": false
+      }
+    ]
+  },
+  "level2_staff.hit2": {
+    "sounds": [
+      {
+        "name": "lensouls:level2_staff/hit2",
+        "stream": false
+      }
+    ]
+  },
+  "level2_staff.hit3": {
+    "sounds": [
+      {
+        "name": "lensouls:level2_staff/hit3",
+        "stream": false
+      }
+    ]
+  },
+  "level2_staff.spike_hit": {
+    "sounds": [
+      {
+        "name": "lensouls:level2_staff/spike_hit",
+        "stream": false
+      }
+    ]
+  },
+  "level2_staff.camera_shoot": {
+    "sounds": [
+      {
+        "name": "lensouls:level2_staff/camera_shoot",
+        "stream": false
+      }
+    ]
+  },
+  "level2_staff.bgm": {
+    "sounds": [
+      {
+        "name": "lensouls:level2_staff/bgm",
+        "stream": false
+      }
+    ]
   }
 }

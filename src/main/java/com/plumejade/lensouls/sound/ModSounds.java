@@ -40,6 +40,32 @@ public class ModSounds {
             SOUNDS.register("heal.use", () -> SoundEvent.createVariableRangeEvent(
                     ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "heal.use")));
 
+    // ========== N公司2级员工 Boss 音效 ==========
+
+    public static final DeferredHolder<SoundEvent, SoundEvent> LEVEL2_STAFF_HIT1 =
+            SOUNDS.register("level2_staff.hit1", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "level2_staff.hit1")));
+
+    public static final DeferredHolder<SoundEvent, SoundEvent> LEVEL2_STAFF_HIT2 =
+            SOUNDS.register("level2_staff.hit2", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "level2_staff.hit2")));
+
+    public static final DeferredHolder<SoundEvent, SoundEvent> LEVEL2_STAFF_HIT3 =
+            SOUNDS.register("level2_staff.hit3", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "level2_staff.hit3")));
+
+    public static final DeferredHolder<SoundEvent, SoundEvent> LEVEL2_STAFF_SPIKE_HIT =
+            SOUNDS.register("level2_staff.spike_hit", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "level2_staff.spike_hit")));
+
+    public static final DeferredHolder<SoundEvent, SoundEvent> LEVEL2_STAFF_CAMERA_SHOOT =
+            SOUNDS.register("level2_staff.camera_shoot", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "level2_staff.camera_shoot")));
+
+    public static final DeferredHolder<SoundEvent, SoundEvent> LEVEL2_STAFF_BGM =
+            SOUNDS.register("level2_staff.bgm", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "level2_staff.bgm")));
+
     public static void register(IEventBus modEventBus) {
         SOUNDS.register(modEventBus);
     }

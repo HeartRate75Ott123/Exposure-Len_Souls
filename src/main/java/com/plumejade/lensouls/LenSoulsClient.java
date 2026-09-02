@@ -73,7 +73,10 @@ public class LenSoulsClient {
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.ability.client.ClientAbilityCache::onClientLogout);
         // 客户端元素螺旋粒子 Tick 驱动
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.particle.ClientElementSpiralHandler::onClientTick);
-        // 药水效果 tooltip 追加描述行
+        // N公司2级员工 BGM 距离控制（客户端 tick）
+        NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.sound.Level2StaffBossBgmHandler::onClientTick);
+        // 客户端断线停止 BGM（幻灵已在上方注册）
+        NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.sound.Level2StaffBossBgmHandler::reset);
         NeoForge.EVENT_BUS.addListener(LenSoulsClient::onGatherEffectTooltips);
         // 兼容 Stylish Effects 的 tooltip 事件
         tryRegisterStylishEffectsListener();
@@ -116,6 +119,9 @@ public class LenSoulsClient {
                 ctx -> new net.minecraft.client.renderer.entity.ThrownItemRenderer<com.plumejade.lensouls.entity.GravityBulletEntity>(ctx, 1.5f, false));
         event.registerEntityRenderer(ModEntities.TWITCHER.get(),
                 com.plumejade.lensouls.client.render.TwitcherRenderer::new);
+        // N公司2级员工（GeckoLib，运行时 geckolib 由 mod 提供）
+        event.registerEntityRenderer(ModEntities.LEVEL2_STAFF_BOSS.get(),
+                com.plumejade.lensouls.client.render.Level2StaffBossRenderer::new);
     }
 
     /** 注册幻灵模型层定义 */

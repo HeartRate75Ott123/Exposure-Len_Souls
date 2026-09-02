@@ -4,6 +4,8 @@ import com.plumejade.lensouls.LenSouls;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.Zombie;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
@@ -55,6 +57,15 @@ public class ModEntities {
                     .clientTrackingRange(8)
                     .build("twitcher"));
 
+    /** N公司2级员工（GeckoLib Boss，测试中） */
+    public static final DeferredHolder<EntityType<?>, EntityType<Level2StaffBossEntity>> LEVEL2_STAFF_BOSS =
+            ENTITIES.register("level2_staff_boss", () -> EntityType.Builder.<Level2StaffBossEntity>of(
+                            Level2StaffBossEntity::new, MobCategory.MONSTER)
+                    .sized(0.8f, 2.0f)
+                    .clientTrackingRange(16)
+                    .updateInterval(2)
+                    .build("level2_staff_boss"));
+
     public static void register(IEventBus modEventBus) {
         ENTITIES.register(modEventBus);
         modEventBus.addListener(ModEntities::registerAttributes);
@@ -63,5 +74,13 @@ public class ModEntities {
     /** 扭曲者属性：基于僵尸基础属性（后续生成时按玩家状态覆写） */
     private static void registerAttributes(EntityAttributeCreationEvent event) {
         event.put(TWITCHER.get(), Zombie.createAttributes().build());
+        event.put(LEVEL2_STAFF_BOSS.get(), Monster.createMonsterAttributes()
+                .add(Attributes.MAX_HEALTH, 300.0D)
+                .add(Attributes.MOVEMENT_SPEED, 0.32D)
+                .add(Attributes.ATTACK_DAMAGE, 8.0D)
+                .add(Attributes.FOLLOW_RANGE, 32.0D)
+                .add(Attributes.ARMOR, 6.0D)
+                .add(Attributes.KNOCKBACK_RESISTANCE, 0.8D)
+                .build());
     }
 }

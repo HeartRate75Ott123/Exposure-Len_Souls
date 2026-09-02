@@ -127,6 +127,7 @@ public class LenSouls {
 
         // BOSS 韧性 — 伤害减免 + 自动注册事件处理器
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.ToughnessDamageHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.StunResistanceCleanupHandler.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }

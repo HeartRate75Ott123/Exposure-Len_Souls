@@ -40,6 +40,11 @@ public class BossStunTickMixin {
         // block_factorys_bosses 的 boss 不在此整段取消：其转阶段逻辑写在 tick 内（依赖血量），
         // 整段取消会卡阶段；改由 BlockFactorysBossStunMixin 选择性压制移动/攻击，tick 仍跑。
         if (StunPauseHelper.isStunPaused(self) && !BossGuardHelper.isBlockFactorysBoss(self)) {
+            // 定格特性：进入定身的首个暂停刻即移除抗性提升（服务端清除并同步客户端）。
+            // block_factorys 的 5 个 boss 不在此分支，其伤害时点由 StunResistanceCleanupHandler 兜底。
+            if (!self.level().isClientSide && self.hasEffect(net.minecraft.world.effect.MobEffects.DAMAGE_RESISTANCE)) {
+                self.removeEffect(net.minecraft.world.effect.MobEffects.DAMAGE_RESISTANCE);
+            }
             self.yRotO = self.getYRot();
             self.xRotO = self.getXRot();
             self.xOld = self.getX();

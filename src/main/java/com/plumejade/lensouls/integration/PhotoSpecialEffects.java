@@ -103,8 +103,7 @@ public class PhotoSpecialEffects {
         return src.getEntity() instanceof LivingEntity && src.isDirect() && !src.is(DamageTypeTags.IS_PROJECTILE);
     }
     private static boolean isRanged(LivingDamageEvent.Pre e) {
-        DamageSource src = e.getSource();
-        return src.getEntity() instanceof LivingEntity && (!src.isDirect() || src.is(DamageTypeTags.IS_PROJECTILE));
+        return com.plumejade.lensouls.damage.RangedAttackHelper.isRanged(e.getSource());
     }
     private static boolean isMagic(LivingDamageEvent.Pre e) {
         DamageSource src = e.getSource();

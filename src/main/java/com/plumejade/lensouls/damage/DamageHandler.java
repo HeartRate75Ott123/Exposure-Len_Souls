@@ -12,7 +12,6 @@ import com.plumejade.lensouls.network.ElementSpiralPacket;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -151,9 +150,10 @@ public class DamageHandler {
         }
 
         // ── 弹射物弱点（PROJECTILE 元素，活性隐含 1.0）──
-        // 次元枪子弹不再算投射物（解除 AlphaYeti 类远程免疫），但显式判定仍吃弹射物弱点
+        // 触发口径 = 远程（活体攻击方的非直接命中或 IS_PROJECTILE），对齐「远程伤害加成词条」对远程伤害的定义。
+        // 次元枪子弹不再算投射物（解除 AlphaYeti 类远程免疫），但其本身满足远程判定；isGunBullet 仅作无主/边界兜底。
         boolean isGunBullet = source.getDirectEntity() instanceof com.plumejade.lensouls.entity.GunBulletEntity;
-        if (source.is(DamageTypeTags.IS_PROJECTILE) || isGunBullet) {
+        if (RangedAttackHelper.isRanged(source) || isGunBullet) {
             float projWeakness = DataPackLoader.getWeakness(entityId, ElementDamage.PROJECTILE);
             totalBonusMultiplier += projWeakness;
             if (projWeakness > 0f) emitSpiralParticle(level, target, ElementDamage.PROJECTILE);

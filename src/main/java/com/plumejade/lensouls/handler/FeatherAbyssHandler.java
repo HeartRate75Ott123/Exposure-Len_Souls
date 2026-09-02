@@ -176,7 +176,8 @@ public class FeatherAbyssHandler {
         boolean has = hasAbyss(player);
         // 创造模式切换：每 tick 响应（手持判定开销小）
         updateAutoCreative(player, has);
-        // 安魂曲：每 tick 实时读取天数并应用（内部仅变化时更新，开销小）
+        // 安魂曲：纯佩戴驱动——戴上按实时天数挂扣血，取下即恢复正常。
+        // 死亡后羽毛 ALWAYS_KEEP 仍在身上，重生后 has=true → 本 tick 自动按实时天数重建扣血（无需任何缓存）。
         if (has) {
             applyRequiem(player);
         } else {
@@ -243,45 +244,55 @@ public class FeatherAbyssHandler {
         processSummonScheduler();
     }
 
+    /**
+     * 安魂曲：佩戴期间按「已过天数」压低最大生命（ADD_VALUE 瞬态修饰符，不动基值）。
+     * <p>
+     * 扣量 = min(天数, 基础上限 - 1)。用基础值减去本修饰符后的值做「自然上限」：
+     * 从实体当前 value 反推（value 已含本修饰符 -penalty，故自然 = value + penalty），
+     * 这样扣量以基础上限为锚、随其它来源的基值变动自适应，且从不触碰 setBaseValue。
+     * 仅在天数变化导致目标扣量变化时重建修饰符；死亡重生后本修饰符丢失，但本方法
+     * 每 tick 由佩戴状态驱动重建——无需任何持久化标记/缓存。
+     */
     private static void applyRequiem(ServerPlayer player) {
-        long rawDayTime = player.level().getDayTime();
         int days = getSaveDays(player);
         AttributeInstance max = player.getAttribute(Attributes.MAX_HEALTH);
         if (max == null) {
             LOGGER.info("[AbyssRequiem] maxHealth attribute null");
             return;
         }
-        double before = max.getValue();
-        // 自然上限（去掉本修饰符）→ 保证最终上限 ≥ 1：penalty = min(days, natural - 1)
-        double natural = before + days;
+        AttributeModifier mod = max.getModifier(REQUIEM_MODIFIER);
+        // 当前已扣量（若无修饰符则为 0）
+        int curPenalty = mod == null ? 0 : (int) Math.round(-mod.amount());
+        // 自然上限 = 当前 value（含扣量）+ 已扣量；保证最终上限 ≥ 1
+        double natural = max.getValue() + curPenalty;
         int penalty = (int) Math.max(0, Math.min(days, Math.floor(natural - 1.0)));
+
         if (penalty <= 0) {
-            if (max.getModifier(REQUIEM_MODIFIER) != null) {
+            if (mod != null) {
                 max.removeModifier(REQUIEM_MODIFIER);
-                LOGGER.info("[AbyssRequiem] removed: getDayTime={} days={}", rawDayTime, days);
+                LOGGER.info("[AbyssRequiem] removed days={}", days);
             }
             return;
         }
         double want = -penalty;
-        AttributeModifier mod = max.getModifier(REQUIEM_MODIFIER);
-        boolean changed = mod == null || Math.abs(mod.amount() - want) > 0.001;
-        if (changed) {
+        if (mod == null || Math.abs(mod.amount() - want) > 0.001) {
             max.removeModifier(REQUIEM_MODIFIER);
             max.addTransientModifier(
                     new AttributeModifier(REQUIEM_MODIFIER, want, AttributeModifier.Operation.ADD_VALUE));
-            double after = max.getValue();
-            // 让扣上限立刻反映到血条
             if (player.getHealth() > player.getMaxHealth()) {
                 player.setHealth(player.getMaxHealth());
             }
-            LOGGER.info("[AbyssRequiem] apply getDayTime={} days={} natural={} penalty={} maxBefore={} maxAfter={}",
-                    rawDayTime, days, natural, penalty, before, after);
+            LOGGER.info("[AbyssRequiem] apply days={} natural={} penalty={}",
+                    days, natural, penalty);
         }
     }
 
+    /** 取下羽毛：移除扣血修饰符，恢复基础最大生命（不动基值）。 */
     private static void removeRequiem(ServerPlayer player) {
         AttributeInstance max = player.getAttribute(Attributes.MAX_HEALTH);
-        if (max != null) max.removeModifier(REQUIEM_MODIFIER);
+        if (max != null && max.getModifier(REQUIEM_MODIFIER) != null) {
+            max.removeModifier(REQUIEM_MODIFIER);
+        }
     }
 
     // ========== 自闭 / 挫败：分层乘算属性 ==========
@@ -426,6 +437,8 @@ public class FeatherAbyssHandler {
         for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class,
                 entity.getBoundingBox().inflate(16))) {
             if (!hasAbyss(player)) continue;
+            // 每次自闭魔法伤害都清除玩家无敌帧，保证 0.5 点必中（不被上次受击的无敌帧吞掉）
+            ((EntityInvulnerableTimeAccessor) (Object) player).lensouls$setInvulnerableTime(0);
             player.hurt(player.level().damageSources().magic(), 0.5f);
             addArmorStack(player);
         }
@@ -718,30 +731,25 @@ public class FeatherAbyssHandler {
     }
 
     /**
-     * 死亡重生：立即重挂安魂曲修饰符。
-     * <p>
-     * {@code restoreFrom} 只复制属性基础值（assignBaseValues），修饰符一律丢失——
-     * 无论 transient 还是 permanent。这里在重生实体创建瞬间重挂，消除重生间隙。
-     * Clone 时新实体 curio 可能未就绪，用旧实体佩戴状态作主判据。
+     * 死亡重生：安魂曲无需缓存恢复——羽毛 ALWAYS_KEEP 死亡不掉落，
+     * 重生后 {@link #onPlayerTick} 检测佩戴即按实时天数重建扣血。
+     * 此处仅在重生瞬间立即补挂，消除 modifier 重建前的短暂满上限间隙。
+     * 取下羽毛（has=false）由 onPlayerTick 走 removeRequiem，恢复正常最大生命。
      */
     @SubscribeEvent
     public static void onClone(PlayerEvent.Clone event) {
         if (!(event.getEntity() instanceof ServerPlayer newPlayer)) return;
         if (!event.isWasDeath()) return;
-        Player oldPlayer = event.getOriginal();
-        if (hasAbyss(oldPlayer) || hasAbyss(newPlayer)) {
-            applyRequiem(newPlayer);
-        }
+        applyRequiem(newPlayer);
     }
 
-    /** 登录：疯狂值同步 + 清残留内存层 + 安魂曲即时重挂（崩溃/断线兜底） */
+    /** 登录：疯狂值同步 + 清残留内存层（安魂曲由 onPlayerTick 按佩戴状态维护） */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         clearStackState(player.getUUID());
         if (hasAbyss(player)) {
             TwistSyncPacket.send(player, Math.round(getTwist(player) / 2.0f));
-            applyRequiem(player);
         }
         // 卡创造兜底：下一 tick 的 updateAutoCreative 会按当前手持状态自愈
     }

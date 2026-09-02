@@ -161,6 +161,16 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.bossEvent.setProgress(this.getHealth() / this.getMaxHealth());
         this.bossEvent.setVisible(this.isAlive() && !this.isDeadOrDying());
 
+        // 破刹 / 时间定格：战斗状态机整段暂停（super.tick 已被 BossStunTickMixin 取消，
+        // 此处是自定义 tick 尾部逻辑，需自行停摆：不推进状态机/冷却/射线/转向，导航停下）
+        if (com.plumejade.lensouls.boss.StunPauseHelper.isStunPaused(this)) {
+            this.getNavigation().stop();
+            if (this.entityData.get(MOVING)) {
+                this.entityData.set(MOVING, false);
+            }
+            return;
+        }
+
         LivingEntity target = getTarget();
         // 无目标：状态归位
         if (!(target instanceof Player player) || !player.isAlive() || player.isSpectator()) {

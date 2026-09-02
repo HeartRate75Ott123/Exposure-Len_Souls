@@ -363,7 +363,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                 // 动画放完 → 施加 debuff 并必然接近玩家（不再进入 spike）
                 if (this.tickCount >= cameraEndTick) {
                     applyCameraDebuff();
-                    cameraCooldown = 60; // 冷却防止对远处目标无限连发
+                    cameraCooldown = 200; // 冷却 10s：期间专心拉近，不触发 camera/中距 spike
                     meleeHits = 0;
                     fightState = ST_APPROACH;
                     this.getNavigation().moveTo(target, 1.0D);

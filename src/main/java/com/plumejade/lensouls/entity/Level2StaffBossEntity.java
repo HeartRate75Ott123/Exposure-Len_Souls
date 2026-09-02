@@ -65,7 +65,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
     /** 魔法射线每 tick 推进距离（格） */
     private static final double RAY_SPEED = 0.7D;
     /** 魔法伤害 */
-    private static final float RAY_DAMAGE = 10.0F;
+    private static final float RAY_DAMAGE = 14.0F;
 
     private final AnimatableInstanceCache animCache = GeckoLibUtil.createInstanceCache(this);
 

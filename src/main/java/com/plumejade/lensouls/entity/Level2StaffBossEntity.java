@@ -88,6 +88,8 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
     private int cameraCooldown = 0;            // camera_shoot 后的冷却，防止连发
     /** 中距原地 spike 冷却：触发一轮后让 Boss 先贴近/拉开，避免在 3~9 区间原地无限放 */
     private int spikeMidCooldown = 0;
+    /** 本次 spike 是否由中距(3~9)触发（用于结束后设 4s 冷却，期间专心靠近） */
+    private boolean spikeFromMid = false;
 
     // ---- 近战进行中 ----
     private String meleeAnimName;
@@ -256,10 +258,10 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                     return;
                 }
                 // 中距（3 ≤ dist < 9）：不贴近，原地放 spike 压制；
-                // 带冷却防循环；camera 冷却内（camera_shoot 后优先拉近）不触发中距 spike。
+                // spike 流程结束回待机时设 4s 冷却，期间专心靠近；camera 冷却内不触发。
                 if (dist >= SPIKE_MID_MIN && dist < CAMERA_RANGE
                         && spikeMidCooldown <= 0 && cameraCooldown <= 0) {
-                    spikeMidCooldown = 80;
+                    spikeFromMid = true;
                     startSpike();
                     return;
                 }
@@ -343,6 +345,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                         // 第一次 spike：命中 → camera_shoot；未命中 → 第二次 spike
                         if (hit) {
                             spikeShotsDone = 0;
+                            finishMidSpikeRound();
                             startCamera();
                         } else {
                             startSpike();
@@ -351,6 +354,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                         // 第二次 spike：命中 → camera_shoot；未命中 → 近身
                         meleeHits = 0;
                         spikeShotsDone = 0;
+                        finishMidSpikeRound();
                         if (hit) {
                             startCamera();
                         } else {
@@ -389,6 +393,14 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.meleeLanded = false;
 
         triggerAnim(ANIM_CONTROLLER, anim.name());
+    }
+
+    /** 结束由中距(3~9)发起的一轮 spike：设 8s 冷却（期间专心靠近玩家，不再触发中距 spike），清来源标记 */
+    private void finishMidSpikeRound() {
+        if (this.spikeFromMid) {
+            this.spikeFromMid = false;
+            this.spikeMidCooldown = 160; // 8s
+        }
     }
 
     /** 开始撤退 */
@@ -445,6 +457,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.meleeHits = 0;
         this.spikeShotsDone = 0;
         this.spikeMidCooldown = 0;
+        this.spikeFromMid = false;
         this.rayTicksLeft = 0;
         this.lastSpikeHit = false;
         this.rayResult = -1;

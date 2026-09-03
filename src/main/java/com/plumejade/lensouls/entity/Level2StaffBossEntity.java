@@ -540,9 +540,9 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         };
     }
 
-    /** 在实体位置广播音效，响度/音高随机浮动 ±10% */
+    /** 在实体位置广播音效，响度基准 1.5（hit/spike/camera 整体上调），响度/音高随机浮动 ±10% */
     private void playBossSound(SoundEvent sound) {
-        float vol = 1.0f + (this.random.nextFloat() - 0.5f) * 0.2f;
+        float vol = 1.5f + (this.random.nextFloat() - 0.5f) * 0.2f;
         float pitch = 1.0f + (this.random.nextFloat() - 0.5f) * 0.2f;
         this.level().playSound(null,
                 this.getX(), this.getEyeY(), this.getZ(),

@@ -128,6 +128,8 @@ public class LenSouls {
         // ---- 法师胸针 / 灵魂口哨效果 ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.BroochEffectHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.WhistlePhantomHandler.class);
+        // ---- 照片弹幕 maxHP% 伤害 10tick 内置间隔 ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.PhotoPercentDamageThrottleHandler.class);
 
         // BOSS 韧性 — 伤害减免 + 自动注册事件处理器
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.ToughnessDamageHandler.class);

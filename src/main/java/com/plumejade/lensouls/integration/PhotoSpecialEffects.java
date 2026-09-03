@@ -41,6 +41,7 @@ import com.google.common.collect.Multimap;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.type.ICuriosMenu;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
+import top.theillusivec4.curios.common.network.server.sync.SPacketSyncCurios;
 
 import java.util.*;
 import java.util.Locale;
@@ -817,14 +818,6 @@ public class PhotoSpecialEffects {
         int cur = player.getPersistentData().getInt(SLOT_TAG);
         if (cur == extra) return;
 
-        // 打开 Curios 容器期间动态改槽会与服务端→客户端的槽位同步产生竞态：
-        // 客户端容器槽列表仍持有旧的 CurioSlot，handler 却已缩小，
-        // 导致 CuriosScreen.render() 访问越界索引崩溃（Slot N not in valid range）。
-        // 关闭容器后下一 tick 检测到 cur != extra 会自动补做。
-        if (player.containerMenu instanceof ICuriosMenu) {
-            return;
-        }
-
         final int targetExtra = extra;
         CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
             if (cur > 0) {
@@ -834,6 +827,17 @@ public class PhotoSpecialEffects {
                 handler.addTransientSlotModifier("photograph", ResourceLocation.parse(SLOT_MOD_ID),
                         targetExtra, AttributeModifier.Operation.ADD_VALUE);
             }
+
+            // 槽位容量即时生效：若玩家正打开 CuriosScreen，先重建服务端菜单（Curios 官方
+            // /reload 同款：发全量同步包由客户端重建并 resetSlots），再推送到客户端。
+            // 这样 shrink/grow 与服务端→客户端的槽广播不失配，规避多人下
+            // "取下加槽照片时 CuriosScreen 越界崩溃（Slot N not in valid range）"的竞态，
+            // 也让佩戴加槽照片（如绵羊 +3）当场扩容，无需关闭容器重开。
+            if (player.containerMenu instanceof ICuriosMenu curiosMenu) {
+                curiosMenu.resetSlots();
+            }
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                    new SPacketSyncCurios(player.getId(), handler.getCurios()));
         });
         player.getPersistentData().putInt(SLOT_TAG, extra);
     }

@@ -6,6 +6,7 @@ import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.config.ItemElementActivityLoader;
 import com.plumejade.lensouls.config.PhotoSetDefs;
 import com.plumejade.lensouls.config.PhotoSetLoader;
+import com.plumejade.lensouls.config.StaffItemLoader;
 import com.plumejade.lensouls.damage.ElementDamage;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -43,18 +44,21 @@ public class DatapackSyncPacket implements CustomPacketPayload {
     private final Map<ResourceLocation, Map<ElementDamage, Integer>> itemElementActivity;
     private final Map<ResourceLocation, List<String>> photoSetMembership;
     private final Map<String, PhotoSetDefs.SetDef> photoSetDefs;
+    private final List<ResourceLocation> staffItems;
 
     public DatapackSyncPacket(
             Map<ResourceLocation, Map<ElementDamage, Float>> weaknesses,
             Map<ResourceLocation, Map<ElementDamage, Integer>> attackerElement,
             Map<ResourceLocation, Map<ElementDamage, Integer>> itemElementActivity,
             Map<ResourceLocation, List<String>> photoSetMembership,
-            Map<String, PhotoSetDefs.SetDef> photoSetDefs) {
+            Map<String, PhotoSetDefs.SetDef> photoSetDefs,
+            List<ResourceLocation> staffItems) {
         this.weaknesses = weaknesses;
         this.attackerElement = attackerElement;
         this.itemElementActivity = itemElementActivity;
         this.photoSetMembership = photoSetMembership;
         this.photoSetDefs = photoSetDefs;
+        this.staffItems = staffItems;
     }
 
     /**
@@ -69,7 +73,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
                 AttackerElementLoader.allMappings(),
                 ItemElementActivityLoader.allMappings(),
                 PhotoSetLoader.getAll(),
-                PhotoSetDefs.allMap());
+                PhotoSetDefs.allMap(),
+                StaffItemLoader.allStaffs());
     }
 
     private DatapackSyncPacket(RegistryFriendlyByteBuf buf) {
@@ -78,6 +83,10 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         this.itemElementActivity = decodeElementInt(buf);
         this.photoSetMembership = decodeStringList(buf);
         this.photoSetDefs = decodeSetDefs(buf);
+        int staffSize = buf.readVarInt();
+        List<ResourceLocation> staffs = new ArrayList<>(staffSize);
+        for (int i = 0; i < staffSize; i++) staffs.add(buf.readResourceLocation());
+        this.staffItems = List.copyOf(staffs);
     }
 
     // ========== 编码 ==========
@@ -88,6 +97,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         encodeElementInt(buf, itemElementActivity);
         encodeStringList(buf, photoSetMembership);
         encodeSetDefs(buf, photoSetDefs);
+        buf.writeVarInt(staffItems.size());
+        for (ResourceLocation id : staffItems) buf.writeResourceLocation(id);
     }
 
     private static void encodeWeakness(RegistryFriendlyByteBuf buf,
@@ -237,6 +248,7 @@ public class DatapackSyncPacket implements CustomPacketPayload {
             ItemElementActivityLoader.setClientCache(packet.itemElementActivity);
             PhotoSetLoader.setClientCache(packet.photoSetMembership);
             PhotoSetDefs.setClientCache(packet.photoSetDefs);
+            StaffItemLoader.setClientCache(packet.staffItems);
         });
     }
 }

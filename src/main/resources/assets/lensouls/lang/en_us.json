@@ -246,6 +246,7 @@
   "item.lensouls.feather_twitcher.desc4": "§cDying at 100 twist spawns a Twitcher (skipped if a Twitcher owned by you is alive within 32 blocks or a boss is within 64 blocks, twist stays 100; spawned -> twist resets to 0); that death ignores keepInventory protection",
   "item.lensouls.feather_twitcher.desc5": "§aTwist returns to 0 when the Twitcher dies",
   "item.lensouls.curio_any_slot": "§eSlots: Any",
+  "item.lensouls.staff_tag": "Staff",
   "item.lensouls.feather_hardman": "§dFeather of the Wasted Curse",
   "item.lensouls.feather_hardman.desc1": "§dA feather wrapped in cursed doom",
   "item.lensouls.feather_hardman.desc2": "§eWorks in any curio slot. Cannot be removed once equipped",

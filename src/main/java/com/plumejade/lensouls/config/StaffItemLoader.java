@@ -79,4 +79,14 @@ public class StaffItemLoader extends SimpleJsonResourceReloadListener {
     public static boolean isStaff(ItemStack stack) {
         return !stack.isEmpty() && staffItems.contains(BuiltInRegistries.ITEM.getKey(stack.getItem()));
     }
+
+    /** 全量法杖清单（服务端数据包同步用；tooltip 显示需客户端缓存） */
+    public static java.util.List<ResourceLocation> allStaffs() {
+        return java.util.List.copyOf(staffItems);
+    }
+
+    /** 客户端接收数据包同步后的缓存填充（多人模式下服务端解析结果经 S2C 同步） */
+    public static void setClientCache(java.util.List<ResourceLocation> cache) {
+        staffItems = java.util.Set.copyOf(cache);
+    }
 }

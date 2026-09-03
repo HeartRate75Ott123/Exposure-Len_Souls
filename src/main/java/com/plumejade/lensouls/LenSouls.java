@@ -124,6 +124,7 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherAbyssHandler.class);
         // ---- 元素活性 tooltip（客户端物品 hover 提示） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.ElementActivityTooltipHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.StaffItemTooltipHandler.class);
         // ---- 法师胸针 / 灵魂口哨效果 ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.BroochEffectHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.WhistlePhantomHandler.class);

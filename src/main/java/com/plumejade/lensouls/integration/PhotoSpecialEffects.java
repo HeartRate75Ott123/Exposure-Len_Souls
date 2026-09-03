@@ -1055,7 +1055,8 @@ public class PhotoSpecialEffects {
                                         String entityId, String element) {
         if (!present) return;
         String path = "weak_" + entityId.replace(':', '_') + "_" + element;
-        map.put(attr, new AttributeModifier(MOD_BASE.withPath(path), 0.12, AttributeModifier.Operation.ADD_VALUE));
+        // 基值 1.0 + ADD_MULTIPLIED_BASE：0.12 → Curios/原版显示 +12%，实际系数 = 属性值-1
+        map.put(attr, new AttributeModifier(MOD_BASE.withPath(path), 0.12, AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
     }
 
     /**

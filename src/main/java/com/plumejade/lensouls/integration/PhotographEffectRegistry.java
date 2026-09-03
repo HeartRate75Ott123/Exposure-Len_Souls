@@ -560,7 +560,6 @@ public class PhotographEffectRegistry {
         String entityId = getStolenEntity(stack);
         if (entityId == null) return;
 
-        event.getToolTip().add(Component.translatable("lensouls.photograph.slot_hint").withStyle(ChatFormatting.YELLOW));
         event.getToolTip().add(Component.translatable("lensouls.photograph.entity_name",
                 Component.translatable(entityIdToTranslationKey(entityId))));
 

@@ -132,15 +132,16 @@ public class DamageHandler {
             float weakness = DataPackLoader.getWeakness(entityId, element);
 
             // 照片元素弱点（佩戴者受到）：读自定义弱点属性（由 PhotoSpecialEffects 每 tick 核算）
+            // 属性基值 1.0、修饰为 ADD_MULTIPLIED_BASE → 实际系数 = 属性值 - 1（tooltip 显示为百分比）
             if (target instanceof ServerPlayer targetPlayer) {
                 double photoWeak = switch (element) {
                     case FIRE -> targetPlayer.getAttributeValue(com.plumejade.lensouls.attribute.ModAttributes.FIRE_WEAKNESS);
                     case WATER -> targetPlayer.getAttributeValue(com.plumejade.lensouls.attribute.ModAttributes.WATER_WEAKNESS);
                     case EARTH -> targetPlayer.getAttributeValue(com.plumejade.lensouls.attribute.ModAttributes.EARTH_WEAKNESS);
                     case ENDER -> targetPlayer.getAttributeValue(com.plumejade.lensouls.attribute.ModAttributes.ENDER_WEAKNESS);
-                    default -> 0.0;
+                    default -> 1.0;
                 };
-                weakness += (float) photoWeak;
+                weakness += (float) (photoWeak - 1.0);
             }
 
             if (weakness > 0f) {

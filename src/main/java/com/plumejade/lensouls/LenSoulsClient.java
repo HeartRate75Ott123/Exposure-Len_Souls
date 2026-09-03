@@ -28,6 +28,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.GatherEffectScreenTooltipsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
@@ -78,6 +79,9 @@ public class LenSoulsClient {
         // 客户端断线停止 BGM（幻灵已在上方注册）
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.sound.Level2StaffBossBgmHandler::reset);
         NeoForge.EVENT_BUS.addListener(LenSoulsClient::onGatherEffectTooltips);
+        // 登录进世界后主动向服务端拉取数据包解析结果（弱点/活性/套装），
+        // 兜底 OnDatapackSyncEvent 在局域网等环境下登录时序不可靠导致的客机缓存为空。
+        NeoForge.EVENT_BUS.addListener(LenSoulsClient::onClientLoggingIn);
         // 兼容 Stylish Effects 的 tooltip 事件
         tryRegisterStylishEffectsListener();
 
@@ -317,6 +321,12 @@ public class LenSoulsClient {
         // 折翼沉渊·祸之可能性召唤粒子（精灵）
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.ABYSS_SUMMON.get(),
                 com.plumejade.lensouls.client.particle.SummonSpiritParticle.Provider::new);
+    }
+
+    /** 登录进世界后，主动向服务端拉取一次数据包解析结果全量包（弱点/活性/套装兜底同步）。 */
+    private static void onClientLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                com.plumejade.lensouls.network.DatapackSyncRequestPacket.instance());
     }
 
     private static void onGatherEffectTooltips(GatherEffectScreenTooltipsEvent event) {

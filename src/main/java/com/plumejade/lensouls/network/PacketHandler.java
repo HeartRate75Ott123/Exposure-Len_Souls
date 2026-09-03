@@ -227,6 +227,13 @@ public class PacketHandler {
                 AbyssCountdownPacket::handle
         );
 
+        // ---- 数据包解析结果拉取 C2S（客户端登录后主动请求，服务端应答全量包）----
+        registrar.playToServer(
+                DatapackSyncRequestPacket.TYPE,
+                DatapackSyncRequestPacket.STREAM_CODEC,
+                DatapackSyncRequestPacket::handle
+        );
+
         // ---- 数据包解析结果统一同步 S2C（弱点/活性/套装，玩家加入 + /reload 时） ----
         registrar.playToClient(
                 DatapackSyncPacket.TYPE,

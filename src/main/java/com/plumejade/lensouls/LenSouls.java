@@ -167,18 +167,27 @@ public class LenSouls {
      * 这些 {@code SimpleJsonResourceReloadListener} 只在服务端触发 {@link AddReloadListenerEvent}，
      * 多人客机进程从不执行，需经 S2C 包填充客户端静态缓存，
      * 否则 Jade 面板弱点/活性/韧性与照片套装 Shift tooltip 在客机为空。
+     * <p>
+     * 该事件在登录时序下存在局域网投递不可靠的情况，因此另加
+     * {@link #onPlayerLoggedIn}（登录显式推送）与客户端 C2S 拉取（{@code DatapackSyncRequestPacket}）双保险。
      */
     @SubscribeEvent
     public void onDatapackSync(OnDatapackSyncEvent event) {
         com.plumejade.lensouls.network.DatapackSyncPacket packet =
-                new com.plumejade.lensouls.network.DatapackSyncPacket(
-                        DataPackLoader.allWeaknesses(),
-                        com.plumejade.lensouls.config.AttackerElementLoader.allMappings(),
-                        com.plumejade.lensouls.config.ItemElementActivityLoader.allMappings(),
-                        com.plumejade.lensouls.config.PhotoSetLoader.getAll(),
-                        com.plumejade.lensouls.config.PhotoSetDefs.allMap());
+                com.plumejade.lensouls.network.DatapackSyncPacket.build();
         event.getRelevantPlayers().forEach(player ->
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, packet));
+    }
+
+    /**
+     * 玩家登录完成（play 阶段）显式推送全量数据包结果，规避 OnDatapackSyncEvent 登录时序不可靠。
+     */
+    @SubscribeEvent
+    public void onPlayerLoggedIn(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player) {
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(
+                    player, com.plumejade.lensouls.network.DatapackSyncPacket.build());
+        }
     }
 
     /**

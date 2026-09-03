@@ -57,6 +57,21 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         this.photoSetDefs = photoSetDefs;
     }
 
+    /**
+     * 构造当前服务端解析结果的同步包。
+     * <p>
+     * 供 OnDatapackSyncEvent（/reload 广播 + 常规加入）、玩家登录显式推送、
+     * 以及客户端 C2S 拉取应答三处共用，保证发往客户端的是同一份全量快照。
+     */
+    public static DatapackSyncPacket build() {
+        return new DatapackSyncPacket(
+                DataPackLoader.allWeaknesses(),
+                AttackerElementLoader.allMappings(),
+                ItemElementActivityLoader.allMappings(),
+                PhotoSetLoader.getAll(),
+                PhotoSetDefs.allMap());
+    }
+
     private DatapackSyncPacket(RegistryFriendlyByteBuf buf) {
         this.weaknesses = decodeWeakness(buf);
         this.attackerElement = decodeElementInt(buf);

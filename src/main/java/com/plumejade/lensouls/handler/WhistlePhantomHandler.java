@@ -35,9 +35,13 @@ public class WhistlePhantomHandler {
     private static final int STACK_TICKS = 200;
     private static final float PERCENT_TRIGGER = 0.4f;
     private static final float PERCENT_DAMAGE = 0.30f;
+    /** 百分比一击内置冷却（tick）：3s——触发后 3s 内不再触发替换伤害，仍走正常幻灵伤害 */
+    private static final int PERCENT_COOLDOWN_TICKS = 60;
 
     /** 玩家 UUID → 每层的到期 gameTime（≤ MAX_STACKS 条） */
     private static final Map<UUID, List<Long>> STACKS = new HashMap<>();
+    /** 玩家 UUID → 下一次允许触发百分比一击的 gameTime */
+    private static final Map<UUID, Long> PERCENT_COOLDOWN = new HashMap<>();
 
     /** 该玩家是否佩戴灵魂口哨 */
     public static boolean hasWhistle(Player player) {
@@ -102,18 +106,25 @@ public class WhistlePhantomHandler {
         int stacks = currentStacks(player);
         float mult = 1f + 0.5f * stacks;
 
-        if (player.getRandom().nextFloat() < PERCENT_TRIGGER) {
+        long now = player.level().getGameTime();
+        Long cdUntil = PERCENT_COOLDOWN.get(player.getUUID());
+        boolean onCooldown = cdUntil != null && cdUntil > now;
+
+        if (!onCooldown && player.getRandom().nextFloat() < PERCENT_TRIGGER) {
+            // 触发：替换为目标最大生命百分比伤害，并进入 3s 内置冷却
+            PERCENT_COOLDOWN.put(player.getUUID(), now + PERCENT_COOLDOWN_TICKS);
             event.setNewDamage(target.getMaxHealth() * PERCENT_DAMAGE * mult);
         } else {
             event.setNewDamage(event.getNewDamage() * mult);
         }
     }
 
-    /** 登出清理叠层 */
+    /** 登出清理叠层与百分比冷却 */
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof Player player) {
             STACKS.remove(player.getUUID());
+            PERCENT_COOLDOWN.remove(player.getUUID());
         }
     }
 

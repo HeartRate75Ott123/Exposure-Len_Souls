@@ -167,7 +167,7 @@ public class BossPhotoProjHelper {
             Vec3 dir = look.yRot((float) spread);
             fb.shoot(dir.x, dir.y, dir.z, 0.25f, 3.0f);
             try { fb.setUp(0); } catch (Exception ignored) {}
-            markAndSpawn(fb);
+            markPercentAndSpawn(fb);
         }
     }
 
@@ -210,7 +210,7 @@ public class BossPhotoProjHelper {
         float yaw = (float) (player.getYRot() * Math.PI / 180.0);
         var blast = new com.github.L_Ender.cataclysm.entity.AnimationMonster.BossMonsters.The_Leviathan.Abyss_Blast_Portal_Entity(
                 level, px, py, pz, yaw, 40, playerFinalDamage(player), 0.05f, player);
-        markAndSpawn(blast);
+        markPercentAndSpawn(blast);
     }
 
     /** 远古遗魂：岩碑阵 ×3（8 点魔法伤害） */
@@ -305,7 +305,7 @@ public class BossPhotoProjHelper {
                 (EntityType<? extends net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.EnergyBeamEntity>) beamType,
                 level, player, player.getX(), player.getY() + 1.0, player.getZ(),
                 yaw, pitch, 40, playerFinalDamage(player), 0.0f);
-        markAndSpawn(beam);
+        markPercentAndSpawn(beam);
     }
 
     /** 弹幕基础伤害 = 玩家攻击面板（ATTACK_DAMAGE 属性值，已含力量/武器等加成）；受 barrage_dmg 倍率影响 */
@@ -327,7 +327,7 @@ public class BossPhotoProjHelper {
                 (EntityType<? extends net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.AnnihilationBeamEntity>) beamType,
                 level, player, player.getX(), player.getEyeY(), player.getZ(),
                 yaw, pitch, 40, dmg, 5.0f, 1, false, 0.0f, 0.0f, 0.0f, false, 3.0f);
-        markAndSpawn(beam);
+        markPercentAndSpawn(beam);
     }
 
     /** 唤魔者：尖牙一排（从玩家视线前方地面钻出；群伤，伤害为原版固定值——Minecraft 未暴露 setter，无法挂面板） */
@@ -386,5 +386,14 @@ public class BossPhotoProjHelper {
     private static void markAndSpawn(net.minecraft.world.entity.Entity entity) {
         entity.getPersistentData().putBoolean("lensouls:photo_proj", true);
         entity.level().addFreshEntity(entity);
+    }
+
+    /**
+     * 打上照片弹幕 + "会造成目标最大生命百分比伤害"标记后加入世界。
+     * BossProjHurtMixin 仅对带该标记的弹幕做 10tick 内置间隔（同目标命中节流）。
+     */
+    private static void markPercentAndSpawn(net.minecraft.world.entity.Entity entity) {
+        entity.getPersistentData().putBoolean("lensouls:photo_percent", true);
+        markAndSpawn(entity);
     }
 }

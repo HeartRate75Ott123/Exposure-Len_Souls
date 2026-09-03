@@ -1,5 +1,6 @@
 {
   "size": 3,
   "order": 200,
-  "icon": "lensouls:item/photograph_slot"
+  "icon": "lensouls:item/photograph_slot",
+  "validators": ["lensouls:photo_curio"]
 }

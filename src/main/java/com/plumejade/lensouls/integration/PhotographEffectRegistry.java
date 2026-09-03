@@ -601,13 +601,10 @@ public class PhotographEffectRegistry {
         } catch (Exception ignored) {
         }
 
-        // 动态属性/元素弱点摘要：使用属性修饰符官方译名，与静态描述去重
-        if (!attrLines.isEmpty()) {
-            event.getToolTip().add(Component.literal("§6属性效果：").withStyle(ChatFormatting.GOLD));
-            for (Component c : attrLines) {
-                event.getToolTip().add(c);
-            }
-        }
+        // 动态属性/元素弱点摘要：改由 Curios 原生渲染（照片槽位装备后自动显示"装备在照片栏位时"
+        // 及其修饰符），此处不再手动重复输出同一份修饰符。
+
+        // 动态元素弱点行（旧手动弱点摘要入口保留点：describeAttributes 仍用于上方"无特殊效果"回退判断）
     }
 
     private static String elementCnName(ElementDamage e) {

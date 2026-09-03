@@ -103,6 +103,7 @@ public class LenSouls {
 
         // Curios 照片饰品槽（运行时检测）
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.CuriosIntegration.class);
+        com.plumejade.lensouls.integration.CuriosIntegration.registerPhotoCurioPredicate();
 
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.ability.handler.TimeFreezeHandler.class);
 

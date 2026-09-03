@@ -275,7 +275,7 @@
   "item.lensouls.soul_whistle.desc1": "§e佩戴在饰品栏任意槽位上即可生效",
   "item.lensouls.soul_whistle.desc2": "§c佩戴时，你的伤害降低80%",
   "item.lensouls.soul_whistle.desc3": "§a但你召唤的虚影幻灵有40%概率造成30%的百分比伤害",
-  "item.lensouls.soul_whistle.desc4": "§a你每受到一次伤害，虚影幻灵的伤害就提高50%，每层持续10s",
+  "item.lensouls.soul_whistle.desc4": "§a你每次受击会增幅虚影幻灵的伤害：每层 +50%，最高 10 层，每层持续 10s",
   "message.lensouls.hardman.inject_fail": "奇怪，这东西怎么用来着",
   "gui.lensouls.ability.title": "能力选择",
   "gui.lensouls.ability.select": "选择",

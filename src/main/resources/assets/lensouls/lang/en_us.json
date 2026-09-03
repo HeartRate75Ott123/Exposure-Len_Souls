@@ -276,7 +276,7 @@
   "item.lensouls.soul_whistle.desc1": "§eWorks when worn in any trinket slot",
   "item.lensouls.soul_whistle.desc2": "§cWhen worn, your damage is reduced by 80%",
   "item.lensouls.soul_whistle.desc3": "§aBut your summoned phantom spirits have a 40% chance to deal 30% percentage damage",
-  "item.lensouls.soul_whistle.desc4": "§aEach time you take damage, phantom damage is increased by 50%, 10s per stack",
+  "item.lensouls.soul_whistle.desc4": "§aEach time you take damage, phantom spirit damage is increased by 50% per stack, max 10 stacks, 10s per stack",
   "message.lensouls.hardman.inject_fail": "Huh, how does this thing work",
   "gui.lensouls.ability.title": "Ability Selection",
   "gui.lensouls.ability.select": "Select",

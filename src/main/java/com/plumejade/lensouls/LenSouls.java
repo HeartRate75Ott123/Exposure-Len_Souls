@@ -124,6 +124,9 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherAbyssHandler.class);
         // ---- 元素活性 tooltip（客户端物品 hover 提示） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.ElementActivityTooltipHandler.class);
+        // ---- 法师胸针 / 灵魂口哨效果 ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.BroochEffectHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.WhistlePhantomHandler.class);
 
         // BOSS 韧性 — 伤害减免 + 自动注册事件处理器
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.ToughnessDamageHandler.class);
@@ -159,6 +162,7 @@ public class LenSouls {
         event.addListener(new com.plumejade.lensouls.config.CopySoulFilter());
         event.addListener(new com.plumejade.lensouls.config.PhotoSetLoader());
         event.addListener(new com.plumejade.lensouls.config.PhotoSetDefs());
+        event.addListener(new com.plumejade.lensouls.config.StaffItemLoader());
     }
 
     /**

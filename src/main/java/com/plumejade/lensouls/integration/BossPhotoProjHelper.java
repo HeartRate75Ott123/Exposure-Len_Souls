@@ -73,9 +73,13 @@ public class BossPhotoProjHelper {
         float barrageDmg = setFlags.getFloat("barrage_dmg");
 
         List<String> gear = PhotoSpecialEffects.collectGearEntities(player);
+        // 法师胸针 + 手持法杖（数据驱动 staff_item）→ 弹幕必定触发
+        boolean broochForce = com.plumejade.lensouls.handler.BroochEffectHandler.hasBrooch(player)
+                && (com.plumejade.lensouls.config.StaffItemLoader.isStaff(player.getMainHandItem())
+                || com.plumejade.lensouls.config.StaffItemLoader.isStaff(player.getOffhandItem()));
         for (String id : gear) {
             Float chance = TRIGGER.get(id);
-            if (chance != null && player.getRandom().nextFloat() < chance) {
+            if (chance != null && (broochForce || player.getRandom().nextFloat() < chance)) {
                 fireBossSkill(player, id);
                 for (int k = 0; k < barrageExtra; k++) {
                     player.getPersistentData().putFloat("lensouls:barrage_dmg_mult", barrageDmg);

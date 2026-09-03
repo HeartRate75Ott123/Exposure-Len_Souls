@@ -109,6 +109,10 @@ public class ModCreativeTabs {
                         // ---- 羽·折翼沉渊 ----
                         output.accept(ModItems.FEATHER_ABYSS.get());
 
+                        // ---- 法师胸针 / 灵魂口哨（互斥新饰品） ----
+                        output.accept(ModItems.MAGE_BROOCH.get());
+                        output.accept(ModItems.SOUL_WHISTLE.get());
+
                         // 摄魂术附魔书（通过参数查找注册表避免闪退）
                         var enchants = params.holders()
                                 .lookupOrThrow(Registries.ENCHANTMENT);

@@ -163,6 +163,13 @@ ITEMS.register("feather_hardman", () -> new FeatherHardmanItem(new Item.Properti
 public static final DeferredItem<FeatherAbyssItem> FEATHER_ABYSS =
 ITEMS.register("feather_abyss", () -> new FeatherAbyssItem(new Item.Properties()));
 
+    // ---- 法师胸针 / 灵魂口哨（Curios 任意槽位饰品，二者互斥） ----
+    public static final DeferredItem<MageBroochItem> MAGE_BROOCH =
+            ITEMS.register("mage_brooch", () -> new MageBroochItem(new Item.Properties()));
+
+    public static final DeferredItem<SoulWhistleItem> SOUL_WHISTLE =
+            ITEMS.register("soul_whistle", () -> new SoulWhistleItem(new Item.Properties()));
+
     // ---- 子弹物品（仅用于渲染弹射物模型） ----
     public static final DeferredItem<Item> OVERWORLD_BULLET = ITEMS.register("overworld_bullet",
             () -> new Item(new Item.Properties()));

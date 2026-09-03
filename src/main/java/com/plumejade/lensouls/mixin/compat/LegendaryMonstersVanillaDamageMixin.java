@@ -46,6 +46,18 @@ public abstract class LegendaryMonstersVanillaDamageMixin extends IAnimatedMonst
     }
 
     /**
+     * 血量已 vanilla 化（totalDamageTaken 恒 0），但 {@code IAnimatedBoss.heal()} 仍走
+     * totalDamageTaken 分支 → {@code amount<=0 || totalDamageTaken<=0} 时直接 return，
+     * 导致所有 heal（含 boss_heal 等药水效果的 entity.heal）对湮灭构造体等传奇 Boss 无效。
+     * 此处同样拉回原版：heal 直接恢复原版血量字段。
+     */
+    @Inject(method = "heal", at = @At("HEAD"), cancellable = true, remap = false, require = 0)
+    private void lensouls$vanillaHeal(float amount, CallbackInfo ci) {
+        super.heal(amount);
+        ci.cancel();
+    }
+
+    /**
      * 移除 {@code IAnimatedBoss.addEffect()} 的无条件 {@code return false}，
      * 让原版药水效果逻辑（含白名单检查）正常执行。
      * 这样蜘蛛滤镜易伤（FILTER_SPIDER）等效果可以正常施加到传奇怪物 BOSS 身上。

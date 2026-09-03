@@ -74,6 +74,21 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
             net.minecraft.network.syncher.SynchedEntityData.defineId(
                     Level2StaffBossEntity.class, net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
 
+    /** 同步数据：动作状态驱动——服务端开招写 active=true + 动画名 + 自增段号；
+     *  客户端 actionPredicate 据此持续 setAnimation（一次性），不依赖 triggerAnim 偶发送达。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> ACTION_ACTIVE =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    Level2StaffBossEntity.class, net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Integer> ACTION_SEQ =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    Level2StaffBossEntity.class, net.minecraft.network.syncher.EntityDataSerializers.INT);
+    private static final net.minecraft.network.syncher.EntityDataAccessor<String> ACTION_ANIM =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    Level2StaffBossEntity.class, net.minecraft.network.syncher.EntityDataSerializers.STRING);
+
+    /** 客户端已播放的最后一段动作标识（纯客户端本地字段，不同步；供 predicate 判变化） */
+    private String lastActionKey = "";
+
     /** 原版 Boss 血条（顶部显示） */
     private final net.minecraft.server.level.ServerBossEvent bossEvent =
             (net.minecraft.server.level.ServerBossEvent) new net.minecraft.server.level.ServerBossEvent(
@@ -129,6 +144,9 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
     protected void defineSynchedData(net.minecraft.network.syncher.SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(MOVING, false);
+        builder.define(ACTION_ACTIVE, false);
+        builder.define(ACTION_SEQ, 0);
+        builder.define(ACTION_ANIM, "");
     }
 
     /** 服务端移动标志（供客户端动画选择 walk） */
@@ -304,6 +322,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                     boolean stillClose = d <= MELEE_RANGE + target.getBbWidth() * 0.5D;
                     if (meleeHits >= MELEE_HITS_TO_RETREAT) {
                         if (d < RETREAT_MIN) {
+                            setActionInactive();
                             startRetreat();
                         } else {
                             startSpike();
@@ -315,6 +334,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                     } else if (stillClose) {
                         startMelee(target);   // 无缝衔接下一个随机 hit
                     } else {
+                        setActionInactive();
                         fightState = ST_IDLE; // 目标已跑远 → 追击
                     }
                 }
@@ -368,6 +388,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                         if (hit) {
                             startCamera();
                         } else {
+                            setActionInactive();
                             fightState = ST_IDLE;
                         }
                     }
@@ -379,6 +400,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                     applyCameraDebuff();
                     cameraCooldown = 200; // 冷却 10s：期间专心拉近，不触发 camera/中距 spike
                     meleeHits = 0;
+                    setActionInactive();
                     fightState = ST_APPROACH;
                     this.getNavigation().moveTo(target, 1.0D);
                 }
@@ -402,7 +424,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.meleeDamaged = false;
         this.meleeLanded = false;
 
-        triggerAnim(ANIM_CONTROLLER, anim.name());
+        triggerAction(anim.name());
     }
 
     /** 结束由中距(3~9)发起的一轮 spike：设 8s 冷却（期间专心靠近玩家，不再触发中距 spike），清来源标记 */
@@ -431,7 +453,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         // +1 tick：确保客户端动画完整播完再放下一段，避免掐断
         this.spikeEndTick = this.tickCount + Math.round(anim.lengthSec() * 20f) + 1;
 
-        triggerAnim(ANIM_CONTROLLER, anim.name());
+        triggerAction(anim.name());
     }
 
     /** 开始 camera_shoot（动画起即播音效；debuff 在动画放完后由 ST_CAMERA 分支施加） */
@@ -440,7 +462,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.fightState = ST_CAMERA;
         this.cameraEndTick = this.tickCount
                 + Math.round(Level2StaffBossAnimations.CAMERA_SHOOT_LENGTH_SEC * 20f);
-        triggerAnim(ANIM_CONTROLLER, Level2StaffBossAnimations.CAMERA_SHOOT);
+        triggerAction(Level2StaffBossAnimations.CAMERA_SHOOT);
         playBossSound(ModSounds.LEVEL2_STAFF_CAMERA_SHOOT.get());
     }
 
@@ -471,6 +493,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.rayTicksLeft = 0;
         this.lastSpikeHit = false;
         this.rayResult = -1;
+        setActionInactive();
         this.getNavigation().stop();
     }
 
@@ -565,6 +588,23 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
     /** 动作动画 controller 名（triggerAnim 目标） */
     private static final String ANIM_CONTROLLER = "action_controller";
 
+    /**
+     * 服务端登记一段动作动画（状态驱动）：active=true + 自增段号 + 动画名。
+     * 客户端 actionPredicate 检测段号/名字变化后持续播放该一次性动画，杜绝偶发整段无动画。
+     */
+    private void triggerAction(String animName) {
+        if (this.level().isClientSide) return;
+        this.entityData.set(ACTION_ACTIVE, true);
+        this.entityData.set(ACTION_ANIM, animName);
+        this.entityData.set(ACTION_SEQ, this.entityData.get(ACTION_SEQ) + 1);
+    }
+
+    /** 服务端：结束当前动作阶段（动作完成/被打断/归位），让客户端回到待机 */
+    private void setActionInactive() {
+        if (this.level().isClientSide) return;
+        this.entityData.set(ACTION_ACTIVE, false);
+    }
+
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
         // 移动 controller：MOVING → walk 循环
@@ -572,17 +612,18 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                 new AnimationController<>(this, "move_controller", 0, this::movePredicate);
         controllers.add(moveController);
 
-        // 动作 controller：predicate 不主动播（恒 STOP，等待 triggerAnim），trigger 动画一次播放
+        // 动作 controller：状态驱动——服务端同步 active/段号/动画名，predicate 播放一次性动画；
+        // 不再依赖 triggerAnim 一次性触发（GeckoLib 偶发丢弃导致"整段无动画"）。
         AnimationController<Level2StaffBossEntity> actionController =
                 new AnimationController<>(this, ANIM_CONTROLLER, 0, this::actionPredicate);
-        for (String animName : Level2StaffBossAnimations.ATTACK_NAMES) {
-            actionController.triggerableAnim(animName, RawAnimation.begin().thenPlay(animName));
-        }
         controllers.add(actionController);
     }
 
-    /** 移动：MOVING 标志（服务端导航）为真 → 播 walk；否则 STOP（不干扰动作） */
+    /** 移动：MOVING 标志为真且非动作期间 → 播 walk；动作(ACTION_ACTIVE)中让路，避免与动作抢骨骼 */
     private <E extends Level2StaffBossEntity> PlayState movePredicate(AnimationState<E> state) {
+        if (this.entityData.get(ACTION_ACTIVE)) {
+            return PlayState.STOP;
+        }
         if (this.isServerMoving()) {
             state.setAnimation(Level2StaffBossAnimations.WALK);
             return PlayState.CONTINUE;
@@ -590,9 +631,29 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         return PlayState.STOP;
     }
 
-    /** 动作：只播 triggerAnim 触发的一次性动画；无触发时不播任何动作 */
+    /**
+     * 动作：状态驱动。active 期间按(段号,动画名)变化播放一次对应动画并持续推进；
+     * 动作结束(active=false)回到待机。
+     * 关键：GeckoLib setAnimation 对"内容相同"的 RawAnimation 会 no-op（equals 去重，
+     * 一次性动画播完后 currentRawAnimation 不清空）——若相邻两段动画同名（连击/双发/上轮末刀），
+     * 不强制重载会整段不播。故新段必须先 resetCurrentAnimation() 强制 reload 再 setAnimation。
+     */
     private <E extends Level2StaffBossEntity> PlayState actionPredicate(AnimationState<E> state) {
-        return PlayState.STOP;
+        if (!this.entityData.get(ACTION_ACTIVE)) {
+            this.lastActionKey = "";
+            return PlayState.STOP;
+        }
+        int seq = this.entityData.get(ACTION_SEQ);
+        String name = this.entityData.get(ACTION_ANIM);
+        if (name == null || name.isEmpty()) return PlayState.STOP;
+
+        String key = seq + "|" + name;
+        if (!key.equals(this.lastActionKey)) {
+            this.lastActionKey = key;
+            state.resetCurrentAnimation(); // 强制 needsAnimationReload，突破同名 no-op
+            state.setAnimation(RawAnimation.begin().thenPlay(name));
+        }
+        return PlayState.CONTINUE;
     }
 
     @Override

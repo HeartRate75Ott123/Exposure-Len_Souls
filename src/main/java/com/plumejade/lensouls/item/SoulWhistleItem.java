@@ -51,5 +51,6 @@ public class SoulWhistleItem extends Item implements ICurioItem {
         tooltip.add(Component.translatable("item.lensouls.soul_whistle.desc1"));
         tooltip.add(Component.translatable("item.lensouls.soul_whistle.desc2"));
         tooltip.add(Component.translatable("item.lensouls.soul_whistle.desc3"));
+        tooltip.add(Component.translatable("item.lensouls.soul_whistle.desc4"));
     }
 }

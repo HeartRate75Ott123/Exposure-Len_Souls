@@ -74,7 +74,7 @@ public class PhotographEffectRegistry {
                 "§a佩戴时受到的所有来源伤害 -15%");
         add("cataclysm:ignis",
                 "§a挥击时 15% 概率连发 3 颗 烈焰轰击（不破坏方块）",
-                "§a烈焰轰击：命中造成 5 点 + 目标最大生命 5% 的火焰伤害",
+                "§a烈焰轰击：命中造成 6 点 + 目标最大生命 2% 的火焰伤害",
                 "§a烈焰轰击命中时赋予目标 炽焰烙印2 效果（防具/韧性 -20%）",
                 "§a挥击时 20% 概率直接赋予目标 炽焰烙印1 效果",
                 "§a佩戴时赋予 火焰免疫 效果");
@@ -110,7 +110,7 @@ public class PhotographEffectRegistry {
                 "");
         add("legendary_monsters:posessed_paladin",
                 "§a挥击时 15% 概率在目标脚下逐排升起 3 根灵魂尖刺",
-                "§a灵魂尖刺：命中造成 等同攻击面板 + 目标最大生命 3% 的幽灵伤害",
+                "§a灵魂尖刺：命中造成 等同攻击面板 的幽灵伤害",
                 "§a灵魂尖刺命中时赋予目标 灵魂碎裂 效果（持续 4 秒）",
                 "§a佩戴时赋予 抗性提升1 效果",
                 "§c佩戴时近战伤害 -12%");
@@ -298,7 +298,7 @@ public class PhotographEffectRegistry {
         add("legendary_monsters:lava_eater", "§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
         add("legendary_monsters:overgrown_colossus", "§a赋予 再生1 效果", "");
         add("legendary_monsters:endersent", "§a你受到的魔法伤害 -12%", "§c近战伤害 -5%");
-        add("legendary_monsters:the_obliterator", "§a你受到的所有来源伤害 -10%", "§a挥击时 15% 概率向视线方向发射 湮灭激光", "§a湮灭激光：贯穿视线方向；命中造成 等同攻击面板 + 目标最大生命 5% 的伤害");
+        add("legendary_monsters:the_obliterator", "§a你受到的所有来源伤害 -10%", "§a挥击时 15% 概率向视线方向发射 湮灭激光", "§a湮灭激光：贯穿视线方向；命中造成 等同攻击面板 + 目标最大生命 2% 的伤害");
         add("legendary_monsters:frostbitten_golem", "§a免疫 冰冻 伤害", "§c你受到的 火 伤害 +12%");
         add("legendary_monsters:withered_abomination", "§a免疫 凋零 效果；§a近战攻击 +10%", "§c你受到的治疗量 -10%");
         add("legendary_monsters:skeletosaurus", "§a免疫 箭矢/弹射物 伤害", "");

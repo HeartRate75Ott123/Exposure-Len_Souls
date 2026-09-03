@@ -155,7 +155,7 @@ public class BossPhotoProjHelper {
         return best;
     }
 
-    /** 焰魔：烈焰轰击 ×3（5+5%生命，命中施加炽焰烙印） */
+    /** 焰魔：烈焰轰击 ×3（照片版 6 点 + 目标最大生命 2%，命中施加炽焰烙印；由 IgnisFireballPercentMixin 修正） */
     private static void spawnIgnisFireballs(ServerPlayer player) {
         Level level = player.level();
         Vec3 look = player.getViewVector(1.0F);
@@ -315,7 +315,7 @@ public class BossPhotoProjHelper {
         return m > 0 ? base * m : base;
     }
 
-    /** 湮灭构造体：湮灭激光（等同攻击面板 + 目标最大生命 5%，贯穿视线方向） */
+    /** 湮灭构造体：湮灭激光（等同攻击面板 + 目标最大生命 2%，贯穿视线方向） */
     private static void spawnAnnihilationLaser(ServerPlayer player) {
         if (!com.plumejade.lensouls.entity.BossPhantomType.OBLITERATOR.isModLoaded()) return;
         Level level = player.level();
@@ -326,7 +326,7 @@ public class BossPhotoProjHelper {
         var beam = new net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.AnnihilationBeamEntity(
                 (EntityType<? extends net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.AnnihilationBeamEntity>) beamType,
                 level, player, player.getX(), player.getEyeY(), player.getZ(),
-                yaw, pitch, 40, dmg, 5.0f, 1, false, 0.0f, 0.0f, 0.0f, false, 3.0f);
+                yaw, pitch, 40, dmg, 2.0f, 1, false, 0.0f, 0.0f, 0.0f, false, 3.0f);
         markPercentAndSpawn(beam);
     }
 

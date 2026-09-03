@@ -12,6 +12,8 @@
   "effect.lensouls.water_infusion.description": "提升水流元素伤害，免疫水活性附加伤害",
   "effect.lensouls.earth_infusion.description": "提升大地元素伤害，免疫土活性附加伤害",
   "effect.lensouls.ender_infusion.description": "提升末影元素伤害，免疫末影活性附加伤害",
+  "effect.lensouls.boss_heal": "浓雾的治愈",
+  "effect.lensouls.boss_heal.description": "每秒回复最大生命值 x%（0.2% × 等级）",
   "item.lensouls.fire_soul": "火焰镜魂",
   "item.lensouls.water_soul": "流水镜魂",
   "item.lensouls.earth_soul": "大地镜魂",

@@ -9,6 +9,7 @@
     "lensouls:suppress_water",
     "lensouls:suppress_earth",
     "lensouls:suppress_fire",
-    "lensouls:suppress_ender"
+    "lensouls:suppress_ender",
+    "lensouls:boss_heal"
   ]
 }

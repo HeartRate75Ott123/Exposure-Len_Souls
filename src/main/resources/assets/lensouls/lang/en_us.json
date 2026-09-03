@@ -12,6 +12,8 @@
   "effect.lensouls.water_infusion.description": "Boosts Water elemental damage, immune to elemental bonus damage from Water attackers",
   "effect.lensouls.earth_infusion.description": "Boosts Earth elemental damage, immune to elemental bonus damage from Earth attackers",
   "effect.lensouls.ender_infusion.description": "Boosts Ender elemental damage, immune to elemental bonus damage from Ender attackers",
+  "effect.lensouls.boss_heal": "Misty Heal",
+  "effect.lensouls.boss_heal.description": "Restores X% of max health per second (0.2% × level)",
   "item.lensouls.fire_soul": "Fire Soul",
   "item.lensouls.water_soul": "Water Soul",
   "item.lensouls.earth_soul": "Earth Soul",

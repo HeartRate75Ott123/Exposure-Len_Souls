@@ -107,6 +107,10 @@ public class ModEffects {
     public static final DeferredHolder<MobEffect, MobEffect> FILTER_SPIDER =
             register("filter_spider", () -> new FilterEffect(MobEffectCategory.HARMFUL, 0));
 
+    // ========== 浓雾的治愈（每秒回血，可对灾变 Boss 生效） ==========
+    public static final DeferredHolder<MobEffect, MobEffect> BOSS_HEAL =
+            register("boss_heal", () -> new BossHealEffect(MobEffectCategory.BENEFICIAL, 0x54D054));
+
     private static DeferredHolder<MobEffect, MobEffect> register(String name, Supplier<MobEffect> effect) {
         return EFFECTS.register(name, effect);
     }

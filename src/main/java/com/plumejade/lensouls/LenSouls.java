@@ -96,6 +96,7 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.ability.handler.CameraLoginHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotographEffectRegistry.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.TrophyModifierHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.BossPhotoProjHelper.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotoSpecialEffects.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotoSetEffects.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.SuppressHandler.class);

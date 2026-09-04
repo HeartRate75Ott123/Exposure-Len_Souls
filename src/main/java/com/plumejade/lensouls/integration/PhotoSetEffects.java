@@ -54,12 +54,14 @@ public class PhotoSetEffects {
     private static final ResourceLocation ID_SPEED = ResourceLocation.fromNamespaceAndPath("lensouls", "set_speed");
     private static final ResourceLocation ID_ARMOR = ResourceLocation.fromNamespaceAndPath("lensouls", "set_armor");
     private static final ResourceLocation ID_KB = ResourceLocation.fromNamespaceAndPath("lensouls", "set_kb");
+    private static final ResourceLocation ID_DODGE = ResourceLocation.fromNamespaceAndPath("lensouls", "set_dodge");
 
     private static final List<Holder<Attribute>> SET_ATTRS = List.of(
             net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH,
             net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED,
             net.minecraft.world.entity.ai.attributes.Attributes.ARMOR,
-            net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE);
+            net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE,
+            com.plumejade.lensouls.attribute.ModAttributes.DODGE_CHANCE);
 
     /** 缓存结构（参照 L2Artifacts：重算仅在装备变动时发生，不在每 tick 重解析） */
     private record ElementActivity(ElementDamage el, int lvl) {}
@@ -109,7 +111,7 @@ public class PhotoSetEffects {
 
     private static void applyPlan(ServerPlayer player, Plan plan) {
         Set<ResourceLocation> desired = new HashSet<>();
-        double maxhp = 0, speed = 0, armor = 0, kb = 0;
+        double maxhp = 0, speed = 0, armor = 0, kb = 0, dodge = 0;
         List<ElementActivity> elems = new ArrayList<>();
         Set<String> envs = new HashSet<>();
         int deathCharges = 0, deathCd = 0;
@@ -157,7 +159,7 @@ public class PhotoSetEffects {
                             deathCharges = Math.max(deathCharges, Integer.parseInt(p[1]));
                             deathCd = Math.max(deathCd, Integer.parseInt(p[2]));
                         }
-                        case "dodge" -> flags.putFloat("dodge", Math.max(flags.getFloat("dodge"), Float.parseFloat(p[1])));
+                        case "dodge" -> dodge += Double.parseDouble(p[1]);
                         case "on_hit_effect", "on_hit_suppress" -> onHit.add(inner);
                         case "dmg_mod" -> flags.putString("dmg_mod_" + p[1], p[2]);
                         case "dmg_taken" -> flags.putString("dmg_taken_" + p[1], p[2]);
@@ -177,6 +179,7 @@ public class PhotoSetEffects {
         applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED, ID_SPEED, speed, AttributeModifier.Operation.ADD_MULTIPLIED_BASE, desired);
         applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.ARMOR, ID_ARMOR, armor, AttributeModifier.Operation.ADD_VALUE, desired);
         applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE, ID_KB, kb, AttributeModifier.Operation.ADD_VALUE, desired);
+        applyAttr(player, com.plumejade.lensouls.attribute.ModAttributes.DODGE_CHANCE, ID_DODGE, dodge, AttributeModifier.Operation.ADD_VALUE, desired);
         reconcile(player, desired);
 
         for (ElementActivity ea : elems) applyInfusion(player, ea.el(), ea.lvl() + infusionBoost);
@@ -410,10 +413,11 @@ public class PhotoSetEffects {
     private static void applySetTakenDamage(ServerPlayer player, LivingDamageEvent.Pre event) {
         CompoundTag flags = player.getPersistentData().getCompound(FLAGS);
 
-        // 闪避
-        if (flags.contains("dodge")) {
-            float dodge = flags.getFloat("dodge");
-            if (player.level().random.nextFloat() < dodge) {
+        // 闪避（photo 固有 + 套装效果均通过 DODGE_CHANCE 属性叠加，封顶 90%）
+        var dodgeAttr = player.getAttribute(com.plumejade.lensouls.attribute.ModAttributes.DODGE_CHANCE);
+        if (dodgeAttr != null) {
+            float dodge = (float) Math.min(0.9, dodgeAttr.getValue());
+            if (dodge > 0 && player.level().random.nextFloat() < dodge) {
                 event.setNewDamage(0f);
                 return;
             }

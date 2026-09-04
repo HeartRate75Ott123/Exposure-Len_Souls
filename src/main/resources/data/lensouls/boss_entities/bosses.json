@@ -526,5 +526,26 @@
     },
     {
         "id": "eternal_starlight:starlight_golem"
-    }
+    },
+	{
+		"id": "archaion:brave"
+	},
+	{
+		"id": "archaion:deepslate_sentinel"
+	},
+	{
+		"id": "archaion:grimoray"
+	},
+	{
+		"id": "archaion:haunter"
+	},
+	{
+		"id": "archaion:last_of_deepslate"
+	},
+	{
+		"id": "archaion:slated"
+	},
+	{
+		"id": "archaion:wight"
+	}
 ]

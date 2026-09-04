@@ -34,11 +34,20 @@ public class ModAttributes {
     public static final DeferredHolder<Attribute, Attribute> ENDER_WEAKNESS =
             register("ender_weakness");
 
+    /** 闪避率：照片固有 + 套装效果均通过 ADD_VALUE 修饰符叠加，伤害处理时读取属性值掷骰 */
+    public static final DeferredHolder<Attribute, Attribute> DODGE_CHANCE =
+            register("dodge_chance", 0.0, 0.0, 1.0);
+
     private static DeferredHolder<Attribute, Attribute> register(String name) {
         // 默认 1.0：弱点以 ADD_MULTIPLIED_BASE 百分比修饰叠加（0.12 → 显示 +12%），
         // 实际系数 = 属性值 - 1.0
         return ATTRIBUTES.register(name, () ->
                 new RangedAttribute("attribute.name.lensouls." + name, 1.0, 0.0, 10.0));
+    }
+
+    private static DeferredHolder<Attribute, Attribute> register(String name, double base, double min, double max) {
+        return ATTRIBUTES.register(name, () ->
+                new RangedAttribute("attribute.name.lensouls." + name, base, min, max));
     }
 
     public static void register(IEventBus modEventBus) {

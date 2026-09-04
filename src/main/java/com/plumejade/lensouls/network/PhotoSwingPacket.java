@@ -38,7 +38,7 @@ public class PhotoSwingPacket implements CustomPacketPayload {
     public static void handle(PhotoSwingPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer sp) {
-                BossPhotoProjHelper.onSwing(sp);
+                BossPhotoProjHelper.onSwing(sp, null);
             }
         });
     }

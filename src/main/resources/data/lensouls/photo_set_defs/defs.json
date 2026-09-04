@@ -650,5 +650,42 @@
         ]
       }
     ]
+  },
+  "archaion_evasion": {
+    "name": "残影织网",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "dodge:0.08",
+          "speed:0.05"
+        ]
+      }
+    ]
+  },
+  "archaion_speed": {
+    "name": "幽途疾行",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "speed:0.10",
+          "env:water_breath"
+        ]
+      }
+    ]
+  },
+  "fdbosses_damage": {
+    "name": "僭律裁决",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "dmg_mod:boss_barrage:4.0",
+          "barrage_trigger:1",
+          "barrage_dmg:1.5"
+        ]
+      }
+    ]
   }
 }

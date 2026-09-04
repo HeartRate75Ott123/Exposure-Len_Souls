@@ -358,7 +358,6 @@ public class PhotographEffectRegistry {
         add("eternal_starlight:rookfish", "§a赋予 水下呼吸 效果；§a游泳 +15%", "");
         add("eternal_starlight:shadow_snail", "", "");
         add("eternal_starlight:shimmer_lacewing", "§a移动 +10%", "");
-        add("eternal_starlight:solar_creeper", "§a免疫 爆炸 伤害", "");
         add("eternal_starlight:starfire_bird", "§a免疫 摔落 伤害", "");
         add("eternal_starlight:twilight_gaze", "§a远程攻击 +10%", "");
         add("eternal_starlight:yeti", "§a免疫 冰冻 伤害；§a近战攻击 +10%", "");
@@ -383,6 +382,31 @@ public class PhotographEffectRegistry {
 
         // ── lensouls 自身 ──
         add("lensouls:twitcher", "§a移动 +10%", "");
+
+        // ── 逆卡巴拉：觉醒（archaion）──
+        add("archaion:brave", "§7逆卡巴拉：觉醒——勇魂守卫。", "");
+        add("archaion:deepslate_sentinel", "§7逆卡巴拉：觉醒——深板岩哨卫。", "");
+        add("archaion:grimoray", "§7逆卡巴拉：觉醒——秘法游魂。", "");
+        add("archaion:haunter", "§7逆卡巴拉：觉醒——逐影猎手。", "");
+        add("archaion:last_of_deepslate",
+                "§a挥击时 12% 概率发射 回声之星",
+                "§a回声之星：沿视线飞向被打中的敌人，命中处 3 格范围爆炸，造成 等同攻击面板 的伤害",
+                "");
+        add("archaion:slated", "§7逆卡巴拉：觉醒——石板行者。", "");
+        add("archaion:wight", "§7逆卡巴拉：觉醒——守墓幽灵。", "");
+        // ── 逆卡巴拉：觉醒 fdbosses ──
+        add("fdbosses:chesed",
+                "§a挥击时 12% 概率在被打中的敌人位置竖起 动能力场",
+                "§a动能力场：困住目标，每 0.25 秒对其造成 攻击面板×0.5 的电击伤害（共 6 次），1.5 秒后消散",
+                "");
+        add("fdbosses:malkuth",
+                "§a挥击时 12% 概率在自身位置拔起 巨剑（面朝被打中的敌人）",
+                "§a巨剑：短暂蓄力后朝敌人方向大范围竖劈，对敌人造成 等同攻击面板 的伤害（不伤自己）",
+                "");
+        add("fdbosses:geburah",
+                "§a挥击时 12% 概率在被打中的敌人身上浮现 青色法阵",
+                "§a法阵：短暂蓄力后朝敌我连线方向射出 20 格贯穿射线",
+                "");
     }
 
     // ========== 药水常驻条目（与描述对应） ==========

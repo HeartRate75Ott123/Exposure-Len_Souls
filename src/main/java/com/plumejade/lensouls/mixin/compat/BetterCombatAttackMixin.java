@@ -22,6 +22,6 @@ public abstract class BetterCombatAttackMixin {
                                          ServerPlayer player,
                                          ServerGamePacketListenerImpl handler,
                                          CallbackInfo ci) {
-        BossPhotoProjHelper.onSwing(player);
+        BossPhotoProjHelper.onSwing(player, null);
     }
 }

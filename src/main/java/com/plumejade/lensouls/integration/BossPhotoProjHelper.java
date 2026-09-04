@@ -4,21 +4,31 @@ import com.mojang.math.Axis;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.EvokerFangs;
 import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Boss 照片弹幕触发框架。
@@ -53,6 +63,10 @@ public class BossPhotoProjHelper {
         TRIGGER.put("legendary_monsters:the_obliterator", 0.15f);
         TRIGGER.put("minecraft:evoker", 0.15f);
         TRIGGER.put("minecraft:skeleton", 0.15f);
+        TRIGGER.put("archaion:last_of_deepslate", 0.12f);
+        TRIGGER.put("fdbosses:chesed", 0.12f);
+        TRIGGER.put("fdbosses:malkuth", 0.12f);
+        TRIGGER.put("fdbosses:geburah", 0.12f);
     }
 
     /** 清理指定玩家的挥击去重记录（切档/登出时调用，避免跨会话 tick 残留导致 boss 弹幕被卡死） */
@@ -60,12 +74,15 @@ public class BossPhotoProjHelper {
         LAST_SWING.remove(uuid);
     }
 
-    /** 每次完整挥砍开始调用（由 Player#attack / BetterCombat handleAttackRequest mixin 触发） */
-    public static void onSwing(ServerPlayer player) {
+    /** 每次完整挥砍开始调用（由 Player#attack / BetterCombat handleAttackRequest mixin 触发）。
+     *  {@code hitTarget} 为本次被攻击的实体（可为 null：空挥/BetterCombat 路径无目标时退化为最近敌人）。 */
+    public static void onSwing(ServerPlayer player, Entity hitTarget) {
         // 去重：BetterCombat 命中时会同时走原版 attack 与 handleAttackRequest，3 tick 内只触发一次
         Long last = LAST_SWING.get(player.getUUID());
         if (last != null && player.level().getGameTime() - last < 3) return;
         LAST_SWING.put(player.getUUID(), player.level().getGameTime());
+
+        LivingEntity target = hitTarget instanceof LivingEntity le ? le : null;
 
         // 套装弹幕钩子：从玩家 persistent 读取 barrage_trigger / barrage_dmg
         CompoundTag setFlags = player.getPersistentData().getCompound("lensouls:set_flags");
@@ -80,10 +97,10 @@ public class BossPhotoProjHelper {
         for (String id : gear) {
             Float chance = TRIGGER.get(id);
             if (chance != null && (broochForce || player.getRandom().nextFloat() < chance)) {
-                fireBossSkill(player, id);
+                fireBossSkill(player, id, target);
                 for (int k = 0; k < barrageExtra; k++) {
                     player.getPersistentData().putFloat("lensouls:barrage_dmg_mult", barrageDmg);
-                    fireBossSkill(player, id);
+                    fireBossSkill(player, id, target);
                 }
                 if (barrageExtra > 0) player.getPersistentData().remove("lensouls:barrage_dmg_mult");
             }
@@ -92,7 +109,7 @@ public class BossPhotoProjHelper {
 
     // ========== 各 Boss 弹幕 ==========
 
-    private static void fireBossSkill(ServerPlayer player, String bossId) {
+    private static void fireBossSkill(ServerPlayer player, String bossId, LivingEntity hit) {
         try {
             switch (bossId) {
                 case "cataclysm:ender_guardian" -> spawnVoidRune(player);
@@ -108,6 +125,10 @@ public class BossPhotoProjHelper {
                 case "legendary_monsters:the_obliterator" -> spawnAnnihilationLaser(player);
                 case "minecraft:evoker" -> spawnEvokerFangs(player);
                 case "minecraft:skeleton" -> spawnSkeletonArrows(player);
+                case "archaion:last_of_deepslate" -> spawnEchoStar(player, hit);
+                case "fdbosses:chesed" -> spawnChesedField(player, hit);
+                case "fdbosses:malkuth" -> spawnMalkuthSword(player, hit);
+                case "fdbosses:geburah" -> spawnGeburahRay(player, hit);
             }
         } catch (Exception e) {
             com.plumejade.lensouls.LenSouls.LOGGER.warn("[PhotoBoss] 弹幕触发失败: " + bossId, e);
@@ -366,6 +387,208 @@ public class BossPhotoProjHelper {
             arrow.setCritArrow(false);
             arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
             markAndSpawn(arrow);
+        }
+    }
+
+    // ========== archaion / fdbosses 兼容弹幕（运行时反射，可选 mod 缺席时优雅跳过）==========
+
+    private static boolean modLoaded(String id) {
+        return ModList.get().isLoaded(id);
+    }
+
+    /** 反射读取 fdbosses BossEntities 的静态 Supplier<EntityType> 字段并求值 */
+    private static EntityType<?> fdEntityType(String field) throws Exception {
+        Class<?> init = Class.forName("com.finderfeed.fdbosses.init.BossEntities");
+        java.util.function.Supplier<?> sup = (java.util.function.Supplier<?>) init.getField(field).get(null);
+        return (EntityType<?>) sup.get();
+    }
+
+    /** 深渊终末：回声之星（模仿 echos_grace 满蓄射击，命中点 3 格 AoE 爆炸伤害） */
+    private static void spawnEchoStar(ServerPlayer player, LivingEntity hit) {
+        if (!modLoaded("archaion")) return;
+        Level level = player.level();
+        LivingEntity target = hit != null ? hit : findNearestNonPlayer(player, 24.0);
+        Vec3 eye = player.getEyePosition();
+        Vec3 dir = target != null
+                ? new Vec3(target.getX(), target.getY() + target.getEyeHeight(), target.getZ()).subtract(eye).normalize()
+                : player.getViewVector(1.0F);
+        try {
+            Class<?> cls = Class.forName("com.ratrod.archaion.entities.projectile.EchoStarProjectile");
+            Projectile proj = (Projectile) cls.getConstructor(Level.class, LivingEntity.class, ItemStack.class)
+                    .newInstance(level, player, ItemStack.EMPTY);
+            cls.getMethod("setBaseDamage", float.class).invoke(proj, playerFinalDamage(player));
+            proj.shoot(dir.x, dir.y, dir.z, 1.8f, 0.0f);
+            markAndSpawn((Entity) proj);
+        } catch (Exception ex) {
+            com.plumejade.lensouls.LenSouls.LOGGER.warn("[PhotoBoss] 回声之星弹幕失败", ex);
+        }
+    }
+
+    /** 王国：巨剑斩击（巨剑在玩家位置拔起，面朝被打中的敌人；命中时刻由镜头对前方敌人劈出免自伤的范围竖劈） */
+    private static void spawnMalkuthSword(ServerPlayer player, LivingEntity hit) {
+        if (!modLoaded("fdbosses")) return;
+        Level level = player.level();
+        LivingEntity target = hit != null ? hit : findNearestNonPlayer(player, 24.0);
+        if (target == null) return;
+        try {
+            Class<?> atkCls = Class.forName("com.finderfeed.fdbosses.content.entities.malkuth_boss.MalkuthAttackType");
+            Object fire = Enum.valueOf((Class<? extends Enum>) atkCls, "FIRE");
+            Vec3 pos = player.position();
+            Vec3 dir = new Vec3(target.getX() - pos.x, 0, target.getZ() - pos.z);
+            if (dir.lengthSqr() < 1e-6) dir = new Vec3(0, 0, 1);
+            dir = dir.normalize();
+            Class<?> swordCls = Class.forName("com.finderfeed.fdbosses.content.entities.malkuth_boss.malkuth_giant_sword.MalkuthGiantSwordSlash");
+            Method summon = swordCls.getMethod("summon", Level.class, Vec3.class, Vec3.class, atkCls, float.class);
+            Object sword = summon.invoke(null, level, pos, dir, fire, playerFinalDamage(player));
+            if (sword != null && level instanceof ServerLevel sl && sl.getServer() != null) {
+                // 关掉实体自带伤害（会连玩家一起劈），由镜头在命中时刻自行劈出（免自伤、归属玩家）
+                swordCls.getMethod("setDoDamage", boolean.class).invoke(sword, false);
+                SWORD_CLEAVES.add(new SwordCleave(
+                        (long) sl.getServer().getTickCount() + 90, sl, pos, dir, player, playerFinalDamage(player)));
+            }
+        } catch (Exception ex) {
+            com.plumejade.lensouls.LenSouls.LOGGER.warn("[PhotoBoss] 巨剑斩击弹幕失败", ex);
+        }
+    }
+
+    /** 待竖劈的巨剑（fdbosses MalkuthGiantSwordSlash 起手 60t + 下劈 30t = 90t 命中） */
+    private record SwordCleave(long atTick, ServerLevel level, Vec3 pos, Vec3 dir, ServerPlayer caster, float dmg) {}
+    private static final java.util.concurrent.ConcurrentLinkedQueue<SwordCleave> SWORD_CLEAVES =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+    /** 在巨剑命中时刻对其视线前方 32 格范围的敌人劈出 面板 伤害（排除玩家/队友，归属玩家攻击源） */
+    private static void runSwordCleaves(ServerTickEvent.Post event) {
+        long now = event.getServer().getTickCount();
+        SwordCleave sc;
+        while ((sc = SWORD_CLEAVES.peek()) != null) {
+            if (sc.atTick() > now) break;
+            SWORD_CLEAVES.poll();
+            ServerPlayer caster = sc.caster();
+            if (caster == null || !caster.isAlive()) continue;
+            Vec3 c = sc.pos().add(sc.dir().scale(7.5)).add(0, -1, 0);
+            Vec3 a = sc.dir().scale(32.0);
+            Vec3 p = sc.dir().yRot((float) (Math.PI / 2.0)).scale(10.0);
+            Vec3 up = new Vec3(0, 10, 0);
+            double mnx = Double.MAX_VALUE, mny = Double.MAX_VALUE, mnz = Double.MAX_VALUE;
+            double mxx = -Double.MAX_VALUE, myy = -Double.MAX_VALUE, mzz = -Double.MAX_VALUE;
+            for (Vec3 v : new Vec3[] {
+                    c.add(a).add(p), c.add(a).subtract(p), c.subtract(a).add(p), c.subtract(a).subtract(p),
+                    c.add(a).add(p).add(up), c.add(a).subtract(p).add(up),
+                    c.subtract(a).add(p).add(up), c.subtract(a).subtract(p).add(up)}) {
+                mnx = Math.min(mnx, v.x); mny = Math.min(mny, v.y); mnz = Math.min(mnz, v.z);
+                mxx = Math.max(mxx, v.x); myy = Math.max(myy, v.y); mzz = Math.max(mzz, v.z);
+            }
+            net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(mnx, mny, mnz, mxx, myy, mzz);
+            Class<?> buddy = null;
+            try {
+                buddy = Class.forName("com.finderfeed.fdbosses.content.entities.malkuth_boss.MalkuthBossBuddy");
+            } catch (Exception ignored) {}
+            for (LivingEntity e : sc.level().getEntitiesOfClass(LivingEntity.class, box)) {
+                if (e == caster || e instanceof net.minecraft.world.entity.player.Player) continue;
+                if (!e.isAlive()) continue;
+                if (buddy != null && buddy.isInstance(e)) continue;
+                e.invulnerableTime = 0;
+                e.hurt(caster.damageSources().playerAttack(caster), sc.dmg());
+            }
+        }
+    }
+
+    /** 审判：法阵射线（在被打中的敌人身上浮现青色法阵，蓄力后朝敌我连线方向射出 20 格贯穿射线） */
+    private static void spawnGeburahRay(ServerPlayer player, LivingEntity hit) {
+        if (!modLoaded("fdbosses")) return;
+        Level level = player.level();
+        LivingEntity target = hit != null ? hit : findNearestNonPlayer(player, 24.0);
+        if (target == null) return;
+        try {
+            Vec3 origin = new Vec3(target.getX(), target.getY() + target.getBbHeight() * 0.6, target.getZ());
+            Vec3 dir = origin.subtract(player.getEyePosition()).normalize();
+            Class<?> cls = Class.forName("com.finderfeed.fdbosses.content.entities.geburah.casts.GeburahRayCastingCircle");
+            Method summon = cls.getMethod("summon", Level.class, Vec3.class, Vec3.class);
+            summon.invoke(null, level, origin, dir);
+        } catch (Exception ex) {
+            com.plumejade.lensouls.LenSouls.LOGGER.warn("[PhotoBoss] 法阵射线弹幕失败", ex);
+        }
+    }
+
+    /** 仁慈：动能力场（在被打中的敌人位置竖起能量场，1.5s 内对其持续造成每 5tick 一次的电击伤害后消散） */
+    private static void spawnChesedField(ServerPlayer player, LivingEntity hit) {
+        if (!modLoaded("fdbosses")) return;
+        Level level = player.level();
+        LivingEntity target = hit != null ? hit : findNearestNonPlayer(player, 16.0);
+        if (target == null) return;
+        try {
+            EntityType<?> type = fdEntityType("CHESED_KINETIC_FIELD");
+            Entity field = type.create(level);
+            if (field == null) return;
+            field.setPos(target.getX(), target.getY(), target.getZ());
+            markAndSpawn(field);
+            discardLater(field, 45);
+            KINETIC_FIELDS.put(field.getUUID(),
+                    new KineticField(target.getUUID(), player, playerFinalDamage(player) * 0.5f,
+                            level.getGameTime(), 6));
+        } catch (Exception ex) {
+            com.plumejade.lensouls.LenSouls.LOGGER.warn("[PhotoBoss] 动能力场弹幕失败", ex);
+        }
+    }
+
+    // ---- 临时实体超时清理（fdbosses 动能力场等不自删实体兜底）----
+
+    private static final Map<java.util.UUID, Long> DISCARD_AT = new ConcurrentHashMap<>();
+
+    /** 动能力场 tick 电击记录：锁定被召唤时困住的敌人，每 5tick 电击一次 */
+    private record KineticField(java.util.UUID enemy, ServerPlayer caster, float dmg, long nextHit, int hitsLeft) {}
+    private static final Map<java.util.UUID, KineticField> KINETIC_FIELDS = new ConcurrentHashMap<>();
+
+    private static void discardLater(Entity entity, int ticks) {
+        if (entity.level() instanceof ServerLevel sl && sl.getServer() != null) {
+            DISCARD_AT.put(entity.getUUID(), (long) sl.getServer().getTickCount() + ticks);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+        long now = event.getServer().getTickCount();
+        // 超时清理不自删的临时实体（动能力场墙）
+        if (!DISCARD_AT.isEmpty()) {
+            DISCARD_AT.entrySet().removeIf(entry -> {
+                if (entry.getValue() > now) return false;
+                for (ServerLevel sl : event.getServer().getAllLevels()) {
+                    Entity ent = sl.getEntity(entry.getKey());
+                    if (ent != null) ent.discard();
+                }
+                return true;
+            });
+        }
+        // 巨剑竖劈：到达 90t 命中时刻的自管伤害（实体自带伤害已关）
+        runSwordCleaves(event);
+        // 动能力场 tick 电击：对被困住的敌人持续伤害（清无敌帧保证每 5tick 全额命中）
+        if (KINETIC_FIELDS.isEmpty()) return;
+        for (var e : new ArrayList<>(KINETIC_FIELDS.entrySet())) {
+            KineticField kf = e.getValue();
+            ServerPlayer caster = kf.caster();
+            boolean dead = caster == null || !caster.isAlive();
+            if (dead || caster.level().getGameTime() < kf.nextHit()) {
+                if (dead) KINETIC_FIELDS.remove(e.getKey());
+                continue;
+            }
+            LivingEntity enemy = null;
+            for (ServerLevel sl : event.getServer().getAllLevels()) {
+                Entity ent = sl.getEntity(kf.enemy());
+                if (ent instanceof LivingEntity le) { enemy = le; break; }
+            }
+            if (enemy == null || !enemy.isAlive()) {
+                KINETIC_FIELDS.remove(e.getKey());
+                continue;
+            }
+            enemy.invulnerableTime = 0;
+            enemy.hurt(caster.damageSources().playerAttack(caster), kf.dmg());
+            int left = kf.hitsLeft() - 1;
+            if (left <= 0) {
+                KINETIC_FIELDS.remove(e.getKey());
+            } else {
+                KINETIC_FIELDS.put(e.getKey(),
+                        new KineticField(kf.enemy(), caster, kf.dmg(), caster.level().getGameTime() + 5, left));
+            }
         }
     }
 

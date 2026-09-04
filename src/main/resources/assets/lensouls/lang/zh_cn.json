@@ -390,5 +390,9 @@
   "effect.lensouls.suppress_ender": "末影抑制",
   "lensouls.tabs.photo_effects": "照片套装效果",
   "lensouls.tabs.photo_effects.empty": "当前没有触发任何照片套装效果",
-  "message.lensouls.abyss_countdown": "祸之可能性降临倒计时：%s"
+  "message.lensouls.abyss_countdown": "祸之可能性降临倒计时：%s",
+  "attribute.name.lensouls.dodge_chance": "闪避率",
+  "photo_set.lensouls.archaion_evasion": "残影织网",
+  "photo_set.lensouls.archaion_speed": "幽途疾行",
+  "photo_set.lensouls.fdbosses_damage": "僭律裁决"
 }

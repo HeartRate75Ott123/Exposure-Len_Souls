@@ -199,7 +199,6 @@ public class PhotoSpecialEffects {
         addRule("eternal_starlight:creteor", new DamageRule(PhotoSpecialEffects::isMagic, 0.88f));
         addRule("eternal_starlight:tiny_creteor", new DamageRule(PhotoSpecialEffects::isMagic, 0.88f));
         addRule("eternal_starlight:the_gatekeeper", new DamageRule(e -> true, 0.88f));
-        addRule("eternal_starlight:solar_creeper", new DamageRule(e -> e.getSource().is(DamageTypes.EXPLOSION) || e.getSource().is(DamageTypes.PLAYER_EXPLOSION), 0.0f));
         // ── 首领崛起 ──
         addRule("block_factorys_bosses:yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
         addRule("block_factorys_bosses:underworld_knight", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
@@ -386,6 +385,29 @@ public class PhotoSpecialEffects {
         attr("minecraft:iron_golem", Attributes.MOVEMENT_SPEED.value(), "ig_spd", -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("minecraft:iron_golem", Attributes.JUMP_STRENGTH.value(), "ig_jump", -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("minecraft:iron_golem", Attributes.ENTITY_INTERACTION_RANGE.value(), "ig_range", -0.5, AttributeModifier.Operation.ADD_VALUE);
+        // ---- archaion 逆卡巴拉 ----
+        attr("archaion:brave", Attributes.ARMOR_TOUGHNESS.value(), "brave_tough", 2.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:brave", Attributes.ARMOR.value(), "brave_armor", 1.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:deepslate_sentinel", Attributes.ARMOR_TOUGHNESS.value(), "ds_tough", 3.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:deepslate_sentinel", Attributes.ARMOR.value(), "ds_armor", 2.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:grimoray", Attributes.ARMOR_TOUGHNESS.value(), "grim_tough", 1.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:grimoray", Attributes.MOVEMENT_SPEED.value(), "grim_speed", 0.03, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("archaion:haunter", Attributes.ARMOR_TOUGHNESS.value(), "hunt_tough", 1.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:haunter", Attributes.MOVEMENT_SPEED.value(), "hunt_speed", 0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("archaion:last_of_deepslate", Attributes.ARMOR_TOUGHNESS.value(), "lod_tough", 4.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:last_of_deepslate", Attributes.ARMOR.value(), "lod_armor", 3.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:slated", Attributes.ARMOR_TOUGHNESS.value(), "slat_tough", 2.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:slated", Attributes.ARMOR.value(), "slat_armor", 1.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:wight", Attributes.ARMOR_TOUGHNESS.value(), "wight_tough", 1.5, AttributeModifier.Operation.ADD_VALUE);
+        attr("archaion:wight", Attributes.ARMOR.value(), "wight_armor", 1.5, AttributeModifier.Operation.ADD_VALUE);
+        // ---- fdbosses 逆卡巴拉：觉醒 ----
+        attr("fdbosses:chesed", Attributes.ARMOR_TOUGHNESS.value(), "chesed_tough", 7.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("fdbosses:chesed", ModAttributes.DODGE_CHANCE.value(), "chesed_dodge", 0.12, AttributeModifier.Operation.ADD_VALUE);
+        attr("fdbosses:malkuth", Attributes.ARMOR_TOUGHNESS.value(), "malkuth_tough", 7.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("fdbosses:malkuth", ModAttributes.DODGE_CHANCE.value(), "malkuth_dodge", 0.23, AttributeModifier.Operation.ADD_VALUE);
+        attr("fdbosses:geburah", Attributes.ARMOR_TOUGHNESS.value(), "geburah_tough", 7.0, AttributeModifier.Operation.ADD_VALUE);
+        attr("fdbosses:geburah", ModAttributes.DODGE_CHANCE.value(), "geburah_dodge", 0.12, AttributeModifier.Operation.ADD_VALUE);
+        // ---- 原版 ----
         attr("minecraft:llama", Attributes.KNOCKBACK_RESISTANCE.value(), "llama_kb", 0.5, AttributeModifier.Operation.ADD_VALUE);
         attr("minecraft:llama", Attributes.MOVEMENT_SPEED.value(), "llama_spd", -0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("minecraft:trader_llama", Attributes.KNOCKBACK_RESISTANCE.value(), "tllama_kb", 0.5, AttributeModifier.Operation.ADD_VALUE);

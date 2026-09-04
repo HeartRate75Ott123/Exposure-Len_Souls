@@ -460,5 +460,32 @@
   ],
   "minecraft:trader_llama": [
     "beast_tamer"
+  ],
+  "archaion:brave": [
+    "archaion_evasion"
+  ],
+  "archaion:slated": [
+    "archaion_evasion"
+  ],
+  "archaion:wight": [
+    "archaion_evasion"
+  ],
+  "archaion:grimoray": [
+    "archaion_speed"
+  ],
+  "archaion:haunter": [
+    "archaion_speed"
+  ],
+  "archaion:deepslate_sentinel": [
+    "archaion_speed"
+  ],
+  "fdbosses:chesed": [
+    "fdbosses_damage"
+  ],
+  "fdbosses:malkuth": [
+    "fdbosses_damage"
+  ],
+  "fdbosses:geburah": [
+    "fdbosses_damage"
   ]
 }

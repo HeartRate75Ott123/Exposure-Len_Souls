@@ -391,5 +391,9 @@
   "effect.lensouls.suppress_ender": "Ender Suppress",
   "lensouls.tabs.photo_effects": "Photo Effects",
   "lensouls.tabs.photo_effects.empty": "No photo set effects are currently active",
-  "message.lensouls.abyss_countdown": "Abyssal Possibility Countdown: %s"
+  "message.lensouls.abyss_countdown": "Abyssal Possibility Countdown: %s",
+  "attribute.name.lensouls.dodge_chance": "Dodge Chance",
+  "photo_set.lensouls.archaion_evasion": "Phantom Web",
+  "photo_set.lensouls.archaion_speed": "Specter's Path",
+  "photo_set.lensouls.fdbosses_damage": "Usurper's Edict"
 }

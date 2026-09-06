@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.effect;
 
 import com.plumejade.lensouls.damage.ElementDamage;
+import com.plumejade.lensouls.particle.ModParticleTypes;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -143,16 +144,49 @@ public class SoulDotEffect extends MobEffect {
 
     // ========== 效果 tick ==========
 
+    /** 原版环绕粒子（与元素灌注同款）：按元素输出 swirl 粒子 */
+    @Override
+    public net.minecraft.core.particles.ParticleOptions createParticleOptions(MobEffectInstance instance) {
+        return getElementParticleType();
+    }
+
+    /** 根据元素类型获取对应的环境粒子类型 */
+    private net.minecraft.core.particles.SimpleParticleType getElementParticleType() {
+        return switch (element) {
+            case FIRE -> ModParticleTypes.ELEMENT_PARTICLE_FIRE.get();
+            case WATER -> ModParticleTypes.ELEMENT_PARTICLE_WATER.get();
+            case EARTH -> ModParticleTypes.ELEMENT_PARTICLE_EARTH.get();
+            case ENDER -> ModParticleTypes.ELEMENT_PARTICLE_ENDER.get();
+            case PROJECTILE -> ModParticleTypes.ELEMENT_PARTICLE_FIRE.get();
+        };
+    }
+
     @Override
     public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
-        // 仅服务端 60/40/20 到期提醒
-        return duration <= 60 && duration % 20 == 0;
+        // 每 8 ticks 漂浮粒子（客户端），60/40/20 到期提醒（服务端）
+        return duration % 8 == 0 || (duration <= 60 && duration % 20 == 0);
     }
 
     @Override
     public boolean applyEffectTick(LivingEntity entity, int amplifier) {
-        if (entity.level().isClientSide || !(entity instanceof Player player)) return true;
-        // 60/40/20 tick 到期提醒（显示镜魂名，普通镜魂显示元素名）
+        if (entity.level().isClientSide) {
+            // 客户端：环绕玩家缓慢漂浮的元素粒子（与元素灌注同款）
+            if (entity.level().random.nextInt(3) == 0) {
+                double x = entity.getX() + (entity.level().random.nextDouble() - 0.5) * 2.0;
+                double z = entity.getZ() + (entity.level().random.nextDouble() - 0.5) * 2.0;
+                double y = entity.getY() + entity.getBbHeight() * 0.3
+                        + entity.level().random.nextDouble() * entity.getBbHeight() * 0.6;
+                entity.level().addParticle(getElementParticleType(),
+                        x, y, z,
+                        (entity.level().random.nextDouble() - 0.5) * 0.02,
+                        0.02 + entity.level().random.nextDouble() * 0.03,
+                        (entity.level().random.nextDouble() - 0.5) * 0.02);
+            }
+            return true;
+        }
+
+        // 服务端：仅 60/40/20 tick 到期提醒（显示镜魂名，普通镜魂显示元素名）
+        if (!(entity instanceof Player player)) return true;
         int duration = 0;
         for (MobEffectInstance inst : entity.getActiveEffects()) {
             if (inst.getEffect().value() == this) {

@@ -47,6 +47,16 @@ public class ModEffects {
     public static final DeferredHolder<MobEffect, MobEffect> ENDER_INFUSION =
             register("ender_infusion", () -> new ElementInfusionEffect(ElementDamage.ENDER, 0x9933CC));
 
+    // ========== 镜魂 DoT 增益效果（镜魂右键专属，HUD 显示图标，攻击附加持续伤害） ==========
+    public static final DeferredHolder<MobEffect, MobEffect> FIRE_DOT =
+            register("fire_dot", () -> new SoulDotEffect(ElementDamage.FIRE, 0xFF4500));
+    public static final DeferredHolder<MobEffect, MobEffect> WATER_DOT =
+            register("water_dot", () -> new SoulDotEffect(ElementDamage.WATER, 0x1E90FF));
+    public static final DeferredHolder<MobEffect, MobEffect> EARTH_DOT =
+            register("earth_dot", () -> new SoulDotEffect(ElementDamage.EARTH, 0x8B4513));
+    public static final DeferredHolder<MobEffect, MobEffect> ENDER_DOT =
+            register("ender_dot", () -> new SoulDotEffect(ElementDamage.ENDER, 0x9933CC));
+
     // ========== 元素抑制效果（压制同元素活性，无粒子，HARMFUL） ==========
     public static final DeferredHolder<MobEffect, MobEffect> SUPPRESS_WATER =
             register("suppress_water", () -> new FilterEffect(MobEffectCategory.HARMFUL, 0x1E90FF));

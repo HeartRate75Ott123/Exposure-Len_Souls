@@ -3,6 +3,7 @@ package com.plumejade.lensouls.entity;
 import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
+import com.plumejade.lensouls.effect.SoulDotEffect;
 import com.plumejade.lensouls.integration.BossPhotoProjHelper;
 import com.plumejade.lensouls.network.PhantomStartPacket;
 import com.plumejade.lensouls.network.PhantomStopPacket;
@@ -77,7 +78,7 @@ public class BossPhantomManager {
         player.removeEffect(type.getEffectHolder());
         player.addEffect(new MobEffectInstance(type.getEffectHolder(),
                 Config.DEFAULT_DURATION.get() * 20, amplifier, false, false, false));
-        ElementInfusionEffect.setPlayerData(player, type.getElement(), type.shouldApplySlowness(), descId);
+        SoulDotEffect.setPlayerData(player, type.getElement(), type.shouldApplySlowness(), descId);
         player.sendSystemMessage(Component.translatable("message.lensouls.soul_activated",
                 Component.translatable(descId)));
 
@@ -708,7 +709,7 @@ public class BossPhantomManager {
             if (!p.hasEffect(t.getEffectHolder())) {
                 p.addEffect(new MobEffectInstance(t.getEffectHolder(),
                         Config.DEFAULT_DURATION.get() * 20, d.amplifier(), false, false, false));
-                ElementInfusionEffect.setPlayerData(p, t.getElement(), t.shouldApplySlowness(), d.descId());
+                SoulDotEffect.setPlayerData(p, t.getElement(), t.shouldApplySlowness(), d.descId());
             }
         }
 
@@ -947,6 +948,8 @@ public class BossPhantomManager {
             BossPhotoProjHelper.clearSwing(player.getUUID());
             // 清除上一会话残留的元素附魔数据（自定义名称、减速标记）
             ElementInfusionEffect.cleanupPlayer(player);
+            // 清除上一会话残留的镜魂 DoT 数据（镜魂 descId、减速标记）
+            SoulDotEffect.cleanupPlayer(player);
             // 清除残留的定身效果（幻灵期间 Slowness 255 + Resistance 255）
             removeStunEffects(player);
             // 如果玩家还残留无重力（断线时未触发 endPhantom），强制关闭

@@ -5,8 +5,8 @@ import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.component.SoulCooldownData;
 import com.plumejade.lensouls.damage.ElementDamage;
-import com.plumejade.lensouls.effect.ElementInfusionEffect;
 import com.plumejade.lensouls.effect.ModEffects;
+import com.plumejade.lensouls.effect.SoulDotEffect;
 import com.plumejade.lensouls.entity.BossPhantomManager;
 import com.plumejade.lensouls.entity.BossPhantomType;
 import com.plumejade.lensouls.timer.TimerService;
@@ -271,30 +271,28 @@ public class LensoulItem extends Item {
         return tag.contains("SoulItemId") ? tag.getString("SoulItemId") : null;
     }
 
+    /** 右键激活时施加的效果 Holder（镜魂 DoT 增益，与照片活性的灌注效果分离） */
     public Holder<MobEffect> getEffectHolder() {
-        return switch (element) {
-            case FIRE -> ModEffects.FIRE_INFUSION;
-            case WATER -> ModEffects.WATER_INFUSION;
-            case EARTH -> ModEffects.EARTH_INFUSION;
-            case ENDER -> ModEffects.ENDER_INFUSION;
-            case PROJECTILE -> ModEffects.FIRE_INFUSION; // 不应发生，占位编译
-        };
+        return SoulDotEffect.getEffectForElement(element);
     }
 
     /**
-     * 直接施加元素效果（基础镜魂 / BOSS 模组未加载时的降级路径）。
+     * 直接施加镜魂 DoT 增益（基础镜魂 / BOSS 模组未加载时的降级路径）。
+     * 替代原元素灌注效果：增益期间攻击命中附加 DoT（见 SoulDotHandler），
+     * BOSS 镜魂激活同时是描边信号（见 BossOutlineColors）。
      */
     public void applyElementEffect(Player player, ItemStack stack) {
         int amplifier = getAmplifier(stack);
         Holder<MobEffect> effectHolder = getEffectHolder();
         int durationTicks = Config.DEFAULT_DURATION.get() * 20;
+        // visible=true / showIcon=true：HUD 显示效果图标
         player.addEffect(new MobEffectInstance(
-                effectHolder, durationTicks, amplifier, false, false, false
+                effectHolder, durationTicks, amplifier, false, true, true
         ));
 
-        // 始终设置自定义名称（即使效果未变更），确保后续覆盖正确
+        // 记录镜魂数据（BOSS 镜魂存 descId，供描边判定与 DoT ×2；减速标记供 DamageHandler）
         String descId = this.isBossSoul ? stack.getDescriptionId() : null;
-        ElementInfusionEffect.setPlayerData(player, this.element, this.applySlowness, descId);
+        SoulDotEffect.setPlayerData(player, this.element, this.applySlowness, descId);
 
         Component soulDisplay = this.damageMultiplier > 1.0f || this.applySlowness
                 ? Component.translatable(stack.getDescriptionId())

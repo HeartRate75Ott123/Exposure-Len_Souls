@@ -190,15 +190,9 @@ public enum BossPhantomType {
         return ModList.get().isLoaded(modId);
     }
 
-    /** 获取对应元素的隐藏效果 Holder */
+    /** 获取对应元素的镜魂 DoT 效果 Holder（BOSS 镜魂激活施加的效果） */
     public Holder<MobEffect> getEffectHolder() {
-        return switch (element) {
-            case FIRE      -> ModEffects.FIRE_INFUSION;
-            case WATER     -> ModEffects.WATER_INFUSION;
-            case EARTH     -> ModEffects.EARTH_INFUSION;
-            case ENDER     -> ModEffects.ENDER_INFUSION;
-            case PROJECTILE -> ModEffects.FIRE_INFUSION;
-        };
+        return com.plumejade.lensouls.effect.SoulDotEffect.getEffectForElement(element);
     }
 
     public int getAmplifier() {

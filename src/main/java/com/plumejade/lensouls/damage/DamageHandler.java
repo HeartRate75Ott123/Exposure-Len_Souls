@@ -6,6 +6,7 @@ import com.plumejade.lensouls.config.DamageTypeElementLoader;
 import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.config.ItemElementActivityLoader;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
+import com.plumejade.lensouls.effect.SoulDotEffect;
 import com.plumejade.lensouls.handler.FeatherAbyssHandler;
 import com.plumejade.lensouls.integration.PhotoSpecialEffects;
 import com.plumejade.lensouls.network.ElementSpiralPacket;
@@ -75,7 +76,8 @@ public class DamageHandler {
                 .registryOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE)
                 .getKey(source.type());
 
-        boolean slowness = isPlayer && ElementInfusionEffect.hasPlayerSlowness(player);
+        // 减速标记现记录在镜魂 DoT 效果侧（照片活性不携带减速）
+        boolean slowness = isPlayer && SoulDotEffect.hasPlayerSlowness(player);
 
         // ── 统一元素追加：逐元素独立计算 ──
         for (ElementDamage element : ElementDamage.values()) {
@@ -93,10 +95,17 @@ public class DamageHandler {
                 activitySum += AttackerElementLoader.getActivity(attackerId, element);
             }
 
-            // 攻击者药水活性（玩家或实体均可挂灌注）
+            // 攻击者药水活性（玩家或实体均可挂灌注；镜魂 DoT 增益同样贡献活性）
             if (attacker instanceof LivingEntity livingAttacker) {
                 for (MobEffectInstance inst : livingAttacker.getActiveEffects()) {
                     if (inst.getEffect().value() instanceof ElementInfusionEffect effect
+                            && effect.getElement() == element) {
+                        activitySum += ElementDamage.getActivityByAmplifier(inst.getAmplifier());
+                        break;
+                    }
+                }
+                for (MobEffectInstance inst : livingAttacker.getActiveEffects()) {
+                    if (inst.getEffect().value() instanceof SoulDotEffect effect
                             && effect.getElement() == element) {
                         activitySum += ElementDamage.getActivityByAmplifier(inst.getAmplifier());
                         break;
@@ -190,22 +199,28 @@ public class DamageHandler {
                     break;
                 }
             }
-            if (needsMatch && !matches) {
+            Entity sourceEntity = event.getSource().getEntity();
+            boolean isGytrinket = sourceEntity != null && sourceEntity.getClass().getName().contains("gytrinket");
+            if (needsMatch && !matches && !isGytrinket) {
                 float cap = event.getOriginalDamage() * 0.1f;
                 if (event.getNewDamage() > cap) event.setNewDamage(cap);
             }
         }
     }
 
-    /** 获取实体身上指定元素的灌注药水等级（无灌注 = 0） */
+    /** 获取实体身上指定元素的灌注/镜魂 DoT 药水等级（无 = 0） */
     private static int getPotionLevel(LivingEntity entity, ElementDamage element) {
+        int level = 0;
         for (MobEffectInstance inst : entity.getActiveEffects()) {
             if (inst.getEffect().value() instanceof ElementInfusionEffect effect
                     && effect.getElement() == element) {
-                return inst.getAmplifier() + 1;
+                level = Math.max(level, inst.getAmplifier() + 1);
+            } else if (inst.getEffect().value() instanceof SoulDotEffect effect
+                    && effect.getElement() == element) {
+                level = Math.max(level, inst.getAmplifier() + 1);
             }
         }
-        return 0;
+        return level;
     }
 
     /** 发射元素弱点螺旋粒子（仅显式配置的弱点） */

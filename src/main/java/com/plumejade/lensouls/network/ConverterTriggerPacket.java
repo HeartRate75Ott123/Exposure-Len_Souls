@@ -2,7 +2,7 @@ package com.plumejade.lensouls.network;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.Config;
-import com.plumejade.lensouls.effect.ElementInfusionEffect;
+import com.plumejade.lensouls.effect.SoulDotEffect;
 import com.plumejade.lensouls.entity.BossPhantomManager;
 import com.plumejade.lensouls.entity.BossPhantomType;
 import com.plumejade.lensouls.gui.ModMenus;
@@ -157,7 +157,7 @@ public class ConverterTriggerPacket implements CustomPacketPayload {
                             effectHolder, durationTicks, amplifier, false, false, false
                     ));
                     // 始终设置自定义名称（即使效果未变更），确保后续覆盖正确
-                    ElementInfusionEffect.setPlayerData(player, soulItem.getElement(), soulItem.shouldApplySlowness(),
+                    SoulDotEffect.setPlayerData(player, soulItem.getElement(), soulItem.shouldApplySlowness(),
                             soulItem.getDamageMultiplier() > 1.0f || soulItem.shouldApplySlowness() ? descId : null);
 
                     String soulId = soulItem.getElement().getSerializedName();

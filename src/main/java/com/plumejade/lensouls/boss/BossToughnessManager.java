@@ -12,6 +12,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.scores.PlayerTeam;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -151,9 +152,11 @@ public class BossToughnessManager {
         // 无需迟缓 255；暂停期间实体刻不走，效果时长也会冻结，故不再施加任何效果
         entity.setNoGravity(true);
 
-        // 白霸体结束（红霸体接管，白 glint 消失）：同步移除发光。
-        // 若不移除，发光时长会被冻结在定身里，破定后多亮一段白霸体之外的时间
-        entity.removeEffect(net.minecraft.world.effect.MobEffects.GLOWING);
+        // 定身期间保留原版发光描边并染红（与红 glint 一致）：
+        // 重新施加发光，时长=定身时长（实体刻冻结期间药水时长同步冻结，不会中途过期）
+        entity.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                net.minecraft.world.effect.MobEffects.GLOWING, stunTicks, 0, false, false));
+        setStunGlowTeam(entity, true);
 
     }
 
@@ -165,6 +168,10 @@ public class BossToughnessManager {
         // 解除定身：恢复重力（暂停实体刻期间重力不结算，解除后恢复正常）
         entity.setNoGravity(false);
 
+        // 退出定身：移出红色描边队伍，并清掉被冻结的发光（时长未递减，不清会破定后残留）
+        setStunGlowTeam(entity, false);
+        entity.removeEffect(net.minecraft.world.effect.MobEffects.GLOWING);
+
         data.onStunEnd();
 
         // 播放韧性重置音效
@@ -174,6 +181,32 @@ public class BossToughnessManager {
 
         // 广播恢复后的状态
         broadcastToughness(entity);
+    }
+
+    /** 定身描边红色队伍名（原版发光 outline 颜色跟随队伍颜色，无队伍=白色） */
+    private static final String TEAM_STUN_GLOW = "lensouls_stun_glow";
+
+    /**
+     * 定身描边染色：把实体加入/移出红色队伍。
+     * 加入时原版自动先移出旧队；移出前校验当前队伍确为本队，防误移别的队伍或抛异常。
+     */
+    private static void setStunGlowTeam(LivingEntity entity, boolean stun) {
+        if (entity.level().isClientSide) return;
+        MinecraftServer server = entity.getServer();
+        if (server == null) return;
+        var scoreboard = server.getScoreboard();
+        PlayerTeam team = scoreboard.getPlayerTeam(TEAM_STUN_GLOW);
+        if (team == null) {
+            if (!stun) return;
+            team = scoreboard.addPlayerTeam(TEAM_STUN_GLOW);
+            team.setColor(net.minecraft.ChatFormatting.RED);
+        }
+        String name = entity.getScoreboardName();
+        if (stun) {
+            scoreboard.addPlayerToTeam(name, team);
+        } else if (scoreboard.getPlayersTeam(name) == team) {
+            scoreboard.removePlayerFromTeam(name, team);
+        }
     }
 
     // ========== 定身期间伤害累计（提前解除分支） ==========
@@ -392,5 +425,7 @@ public class BossToughnessManager {
         remove(event.getEntity());
         // 清除持久化数据，防止复活类模组读到脏数据
         event.getEntity().removeData(ModAttachments.BOSS_TOUGHNESS);
+        // 定身中被打死时 onStunEnd 不会触发，兜底移出描边红队
+        setStunGlowTeam(event.getEntity(), false);
     }
 }

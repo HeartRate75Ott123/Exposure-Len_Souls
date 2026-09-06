@@ -125,15 +125,15 @@ public class PhotoSpecialEffects {
         // ── 原版 ──
         addRule("minecraft:creeper", new DamageRule(e -> e.getSource().is(DamageTypes.EXPLOSION) || e.getSource().is(DamageTypes.PLAYER_EXPLOSION), 0.8f));
         addRule("minecraft:ghast", new DamageRule(e -> e.getSource().is(DamageTypes.EXPLOSION) || e.getSource().is(DamageTypes.PLAYER_EXPLOSION), 0.8f));
-        addRule("minecraft:wither", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
-        addRule("minecraft:ender_dragon", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
-        addRule("minecraft:snow_golem", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("minecraft:stray", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("minecraft:slime", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
-        addRule("minecraft:chicken", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
-        addRule("minecraft:parrot", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
-        addRule("minecraft:phantom", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
-        addRule("minecraft:magma_cube", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
+        addRule("minecraft:wither", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.0f));
+        addRule("minecraft:ender_dragon", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
+        addRule("minecraft:snow_golem", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("minecraft:stray", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("minecraft:slime", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
+        addRule("minecraft:chicken", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
+        addRule("minecraft:parrot", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
+        addRule("minecraft:phantom", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
+        addRule("minecraft:magma_cube", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
         addRule("minecraft:iron_golem", new DamageRule(e -> e.getSource().is(DamageTypeTags.IS_PROJECTILE), 0.0f));
         addRule("minecraft:skeletosaurus", new DamageRule(e -> e.getSource().is(DamageTypeTags.IS_PROJECTILE), 0.0f));
         addRule("minecraft:enderman", new DamageRule(e -> e.getSource().is(DamageTypes.MAGIC) || e.getSource().is(DamageTypes.INDIRECT_MAGIC), 1.12f));
@@ -148,18 +148,18 @@ public class PhotoSpecialEffects {
         // ── 暮色 ──
         addRule("twilightforest:hydra", new DamageRule(e -> e.getSource().is(DamageTypeTags.IS_PROJECTILE), 0.88f));
         addRule("twilightforest:knight_phantom", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.75f));
-        addRule("twilightforest:alpha_yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("twilightforest:yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("twilightforest:ice_crystal", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("twilightforest:stable_ice_core", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("twilightforest:unstable_ice_core", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("twilightforest:snow_guardian", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
+        addRule("twilightforest:alpha_yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("twilightforest:yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("twilightforest:ice_crystal", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("twilightforest:stable_ice_core", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("twilightforest:unstable_ice_core", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("twilightforest:snow_guardian", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
         addRule("twilightforest:snow_queen", new DamageRule(e -> e.getSource().is(DamageTypes.IN_FIRE) || e.getSource().is(DamageTypes.ON_FIRE) || e.getSource().is(DamageTypes.LAVA) || e.getSource().is(DamageTypes.FIREBALL), 1.12f));
         addRule("twilightforest:fire_beetle", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 1.12f));
-        addRule("twilightforest:maze_slime", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
-        addRule("twilightforest:carminite_broodling", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
-        addRule("twilightforest:carminite_ghastling", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
-        addRule("twilightforest:tiny_bird", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.05f));
+        addRule("twilightforest:maze_slime", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
+        addRule("twilightforest:carminite_broodling", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
+        addRule("twilightforest:carminite_ghastling", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
+        addRule("twilightforest:tiny_bird", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));
         addRule("twilightforest:carminite_ghastguard", new DamageRule(e -> e.getSource().is(DamageTypes.EXPLOSION) || e.getSource().is(DamageTypes.PLAYER_EXPLOSION), 0.0f));
         addRule("twilightforest:carminite_golem", new DamageRule(e -> e.getSource().is(DamageTypes.EXPLOSION) || e.getSource().is(DamageTypes.PLAYER_EXPLOSION), 0.0f));
         addRule("twilightforest:lich", new DamageRule(PhotoSpecialEffects::isMagic, 0.88f));
@@ -168,9 +168,9 @@ public class PhotoSpecialEffects {
         addRule("cataclysm:ignited_revenant", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 1.12f));
         addRule("cataclysm:ignited_berserker", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 1.12f));
         addRule("cataclysm:ender_golem", new DamageRule(e -> e.getSource().is(DamageTypeTags.IS_PROJECTILE), 0.0f));
-        addRule("cataclysm:draugr", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
-        addRule("cataclysm:elite_draugr", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
-        addRule("cataclysm:royal_draugr", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
+        addRule("cataclysm:draugr", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.0f));
+        addRule("cataclysm:elite_draugr", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.0f));
+        addRule("cataclysm:royal_draugr", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.0f));
         addRule("cataclysm:the_prowler", new DamageRule(PhotoSpecialEffects::isRanged, 0.88f));
         addRule("cataclysm:deepling_priest", new DamageRule(PhotoSpecialEffects::isMagic, 0.88f));
         addRule("cataclysm:endermaptera", new DamageRule(PhotoSpecialEffects::isMagic, 0.88f));
@@ -183,7 +183,7 @@ public class PhotoSpecialEffects {
         addRule("legendary_monsters:ancient_guardian", new DamageRule(PhotoSpecialEffects::isMagic, 0.88f));
         addRule("legendary_monsters:annihilation_pursuer", new DamageRule(PhotoSpecialEffects::isMelee, 0.88f));
         addRule("legendary_monsters:skeletosaurus", new DamageRule(e -> e.getSource().is(DamageTypeTags.IS_PROJECTILE), 0.0f));
-        addRule("legendary_monsters:frostbitten_golem", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
+        addRule("legendary_monsters:frostbitten_golem", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
         addRule("legendary_monsters:frostbitten_golem", new DamageRule(e -> e.getSource().is(DamageTypes.IN_FIRE) || e.getSource().is(DamageTypes.ON_FIRE) || e.getSource().is(DamageTypes.LAVA) || e.getSource().is(DamageTypes.FIREBALL), 1.12f));
         addRule("legendary_monsters:flame_drifter", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 1.12f));
         addRule("legendary_monsters:flameborn_guard", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 1.12f));
@@ -192,22 +192,22 @@ public class PhotoSpecialEffects {
         addRule("legendary_monsters:bomber", new DamageRule(e -> e.getSource().is(DamageTypes.EXPLOSION) || e.getSource().is(DamageTypes.PLAYER_EXPLOSION), 0.0f));
         addRule("legendary_monsters:chorusling", new DamageRule(PhotoSpecialEffects::isMagic, 1.12f));
         // ── 永恒星光 ──
-        addRule("eternal_starlight:freeze", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("eternal_starlight:permafrost", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("eternal_starlight:yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
+        addRule("eternal_starlight:freeze", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("eternal_starlight:permafrost", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("eternal_starlight:yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
         addRule("eternal_starlight:lunar_monstrosity", new DamageRule(PhotoSpecialEffects::isMagic, 0.88f));
         addRule("eternal_starlight:creteor", new DamageRule(PhotoSpecialEffects::isMagic, 0.88f));
         addRule("eternal_starlight:tiny_creteor", new DamageRule(PhotoSpecialEffects::isMagic, 0.88f));
         addRule("eternal_starlight:the_gatekeeper", new DamageRule(e -> true, 0.88f));
         // ── 首领崛起 ──
-        addRule("block_factorys_bosses:yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.05f));
-        addRule("block_factorys_bosses:underworld_knight", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
+        addRule("block_factorys_bosses:yeti", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 0.0f));
+        addRule("block_factorys_bosses:underworld_knight", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.0f));
         addRule("block_factorys_bosses:infernal_dragon", new DamageRule(e -> e.getSource().is(DamageTypeTags.IS_PROJECTILE), 0.0f));
         addRule("block_factorys_bosses:infernal_dragon", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 1.12f));
         addRule("block_factorys_bosses:flaming_skeleton_guard_fireball", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 1.12f));
         addRule("block_factorys_bosses:flaming_skeleton_guard_sword", new DamageRule(e -> e.getSource().is(DamageTypes.FREEZE), 1.12f));
-        addRule("block_factorys_bosses:soul_knight_wither_skeleton", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
-        addRule("block_factorys_bosses:soul_skeleton", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.05f));
+        addRule("block_factorys_bosses:soul_knight_wither_skeleton", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.0f));
+        addRule("block_factorys_bosses:soul_skeleton", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.0f));
     }
 
     // ── 属性修饰符（一 mob 可多属性） ──

@@ -133,7 +133,7 @@ public class ConverterMenuActivatePacket implements CustomPacketPayload {
                 int amplifier = soulItem.getAmplifier(soulStack);
                 var effectHolder = soulItem.getEffectHolder();
                 int durationTicks = Config.DEFAULT_DURATION.get() * 20;
-                player.addEffect(new MobEffectInstance(effectHolder, durationTicks, amplifier, false, false, false));
+                player.addEffect(new MobEffectInstance(effectHolder, durationTicks, amplifier, false, false, true));
                 com.plumejade.lensouls.effect.SoulDotEffect.setPlayerData(player, soulItem.getElement(),
                         soulItem.shouldApplySlowness(),
                         soulItem.getDamageMultiplier() > 1.0f || soulItem.shouldApplySlowness() ? descId : null);

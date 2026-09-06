@@ -63,6 +63,14 @@ public class SoulDotHandler {
     /** 防递归护栏：本系统结算伤害期间不再触发新增 */
     private static boolean applyingDot = false;
 
+    /** 当前正在结算的 DoT 元素（供 DamageHandler 豁免武器匹配 ×0.1），null = 非结算期 */
+    private static ElementDamage applyingDotElement = null;
+
+    /** DamageHandler 判断当前伤害是否为 DoT 跳伤及其元素 */
+    public static ElementDamage getApplyingDotElement() {
+        return applyingDotElement;
+    }
+
     // ========== 命中时附加 ==========
 
     @SubscribeEvent
@@ -144,11 +152,13 @@ public class SoulDotHandler {
         DamageSource source = new DamageSource(typeRef, null, attacker);
 
         applyingDot = true;
+        applyingDotElement = dot.element();
         try {
             target.invulnerableTime = 0;   // DoT 跳不被无敌帧吞掉
             target.hurt(source, dot.damagePerTick());
         } finally {
             applyingDot = false;
+            applyingDotElement = null;
         }
     }
 

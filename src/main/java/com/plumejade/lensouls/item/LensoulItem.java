@@ -285,9 +285,9 @@ public class LensoulItem extends Item {
         int amplifier = getAmplifier(stack);
         Holder<MobEffect> effectHolder = getEffectHolder();
         int durationTicks = Config.DEFAULT_DURATION.get() * 20;
-        // visible=true / showIcon=true：HUD 显示效果图标
+        // ambient=false / visible=false / showIcon=true：不跑原版发射器（粒子由 applyEffectTick 自绘），HUD 显示图标
         player.addEffect(new MobEffectInstance(
-                effectHolder, durationTicks, amplifier, false, true, true
+                effectHolder, durationTicks, amplifier, false, false, true
         ));
 
         // 记录镜魂数据（BOSS 镜魂存 descId，供描边判定与 DoT ×2；减速标记供 DamageHandler）

@@ -8,6 +8,7 @@ import com.plumejade.lensouls.config.ItemElementActivityLoader;
 import com.plumejade.lensouls.effect.ElementInfusionEffect;
 import com.plumejade.lensouls.effect.SoulDotEffect;
 import com.plumejade.lensouls.handler.FeatherAbyssHandler;
+import com.plumejade.lensouls.handler.SoulDotHandler;
 import com.plumejade.lensouls.integration.PhotoSpecialEffects;
 import com.plumejade.lensouls.network.ElementSpiralPacket;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -155,7 +156,10 @@ public class DamageHandler {
 
             if (weakness > 0f) {
                 totalBonusMultiplier += activitySum * weakness;
-                emitSpiralParticle(level, target, element);
+                // 镜魂 DoT 元素不爆 up 螺旋（仅停粒子，追伤照常）；武器/照片活性等其他来源照常触发
+                if (!(isPlayer && SoulDotEffect.hasActiveDot(player, element))) {
+                    emitSpiralParticle(level, target, element);
+                }
             }
         }
 
@@ -201,7 +205,10 @@ public class DamageHandler {
             }
             Entity sourceEntity = event.getSource().getEntity();
             boolean isGytrinket = sourceEntity != null && sourceEntity.getClass().getName().contains("gytrinket");
-            if (needsMatch && !matches && !isGytrinket) {
+            // DoT 跳伤豁免：正在结算的 DoT 元素属于目标弱点集 → 不吃武器匹配 ×0.1
+            ElementDamage dotElem = SoulDotHandler.getApplyingDotElement();
+            if (needsMatch && !matches && !isGytrinket
+                    && !(dotElem != null && weaknesses.containsKey(dotElem))) {
                 float cap = event.getOriginalDamage() * 0.1f;
                 if (event.getNewDamage() > cap) event.setNewDamage(cap);
             }

@@ -50,6 +50,23 @@ public class FilterPhotoHandler {
     /** 药水玻璃板独立冷却闸门（游戏刻）；300 刻，区别于 16 特殊滤镜的 600 刻。 */
     private static final Map<UUID, Long> lastGlassShot = new ConcurrentHashMap<>();
 
+    /**
+     * 登出清理冷却闸门：静态 Map 以 UUID 为 key 且存 gameTime，单机切换存档时 JVM 不销毁，
+     * 同一玩家跨档命中旧值（存档 B 的 gameTime 回退）会导致闸门永久拦截。
+     */
+    @SubscribeEvent
+    public static void onPlayerLogout(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        lastFilterShot.remove(event.getEntity().getUUID());
+        lastGlassShot.remove(event.getEntity().getUUID());
+    }
+
+    /** 服务器停止兜底全表清理 */
+    @SubscribeEvent
+    public static void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
+        lastFilterShot.clear();
+        lastGlassShot.clear();
+    }
+
     private static void reg(String filter, Holder<MobEffect> effect) {
         SELF_EFFECTS.put(ResourceLocation.fromNamespaceAndPath("exposure_expanded", filter), effect);
     }

@@ -77,7 +77,7 @@ public class BossPhantomManager {
         // 立即刷新元素效果（使用物品实际等级，而非 type 硬编码）
         player.removeEffect(type.getEffectHolder());
         player.addEffect(new MobEffectInstance(type.getEffectHolder(),
-                Config.DEFAULT_DURATION.get() * 20, amplifier, false, false, false));
+                Config.DEFAULT_DURATION.get() * 20, amplifier, false, false, true));
         SoulDotEffect.setPlayerData(player, type.getElement(), type.shouldApplySlowness(), descId);
         player.sendSystemMessage(Component.translatable("message.lensouls.soul_activated",
                 Component.translatable(descId)));
@@ -708,7 +708,7 @@ public class BossPhantomManager {
             // startPhantom 已立即应用效果，此处仅确保生效（使用物品实际等级）
             if (!p.hasEffect(t.getEffectHolder())) {
                 p.addEffect(new MobEffectInstance(t.getEffectHolder(),
-                        Config.DEFAULT_DURATION.get() * 20, d.amplifier(), false, false, false));
+                        Config.DEFAULT_DURATION.get() * 20, d.amplifier(), false, false, true));
                 SoulDotEffect.setPlayerData(p, t.getElement(), t.shouldApplySlowness(), d.descId());
             }
         }

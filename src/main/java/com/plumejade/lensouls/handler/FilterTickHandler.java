@@ -38,6 +38,21 @@ public class FilterTickHandler {
 
     private static final Map<UUID, Double> lastBlobsArmor = new HashMap<>();
 
+    /**
+     * 登出清理护甲换算残值：跨存档残留会导致换档首几 tick 护甲转伤害按存档 A 的残值错算
+     * （攻击虚高 / 护甲扣成负数）。
+     */
+    @SubscribeEvent
+    public static void onPlayerLogout(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        lastBlobsArmor.remove(event.getEntity().getUUID());
+    }
+
+    /** 服务器停止兜底全表清理 */
+    @SubscribeEvent
+    public static void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
+        lastBlobsArmor.clear();
+    }
+
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;

@@ -154,7 +154,7 @@ public class ConverterTriggerPacket implements CustomPacketPayload {
                     var effectHolder = soulItem.getEffectHolder();
                     int durationTicks = Config.DEFAULT_DURATION.get() * 20;
                     player.addEffect(new MobEffectInstance(
-                            effectHolder, durationTicks, amplifier, false, false, false
+                            effectHolder, durationTicks, amplifier, false, false, true
                     ));
                     // 始终设置自定义名称（即使效果未变更），确保后续覆盖正确
                     SoulDotEffect.setPlayerData(player, soulItem.getElement(), soulItem.shouldApplySlowness(),

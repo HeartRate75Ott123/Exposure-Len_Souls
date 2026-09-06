@@ -58,6 +58,7 @@ public class LenSouls {
         ModEnchantments.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModDataComponents.register(modEventBus);
+        com.plumejade.lensouls.boss.ModAttachments.register(modEventBus);
         ModEntities.register(modEventBus);
         com.plumejade.lensouls.recipe.DimensionalGunRecipes.register(modEventBus);
         com.plumejade.lensouls.recipe.CopySoulRecipes.register(modEventBus);

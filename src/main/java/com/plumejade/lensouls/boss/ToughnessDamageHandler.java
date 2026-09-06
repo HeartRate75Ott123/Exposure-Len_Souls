@@ -50,6 +50,21 @@ public class ToughnessDamageHandler {
     }
 
     /**
+     * 定身期间统计玩家造成的实际伤害（{@link LivingDamageEvent.Post}：伤害已生效）。
+     * 累计达到目标最大血量的配置比例时提前解除定身（见 {@link BossToughnessManager#addStunDamage}）。
+     */
+    @SubscribeEvent
+    public static void onLivingDamagePost(LivingDamageEvent.Post event) {
+        if (event.getEntity().level().isClientSide) return;
+        if (!(event.getEntity() instanceof LivingEntity target)) return;
+        if (event.getNewDamage() <= 0f) return;
+        // 只统计玩家造成的伤害（getEntity 为最终来源，投射物归属射手）
+        if (!(event.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer)) return;
+
+        BossToughnessManager.getInstance().addStunDamage(target, event.getNewDamage());
+    }
+
+    /**
      * 判断实体是否触发韧性。
      * <p>
      * 白名单 / 黑名单均支持通配 {@code "all"}，语义对称：

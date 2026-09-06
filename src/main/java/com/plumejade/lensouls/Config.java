@@ -125,6 +125,11 @@ public class Config {
             .comment("Stun duration when toughness broken (ticks, 20 = 1s)")
             .defineInRange("toughStunDurationTicks", 200, 40, 600);
 
+    public static final ModConfigSpec.DoubleValue TOUGH_STUN_BREAK_DAMAGE_PERCENT = BUILDER
+            .comment("Stun ends early when damage dealt by players during stun reaches this fraction of target max health (0-1). 0 disables the damage-based early exit",
+                    "Example: 0.16 = 16% of max health")
+            .defineInRange("toughStunBreakDamagePercent", 0.16, 0.0, 1.0);
+
     public static final ModConfigSpec.IntValue TOUGHNESS_DEFAULT_HITS = BUILDER
             .comment("Default photos needed to break toughness")
             .defineInRange("toughnessDefaultHits", 5, 1, 100);

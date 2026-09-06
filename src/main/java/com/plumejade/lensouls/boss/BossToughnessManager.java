@@ -103,6 +103,13 @@ public class BossToughnessManager {
         boolean actuallyHit = data.hit(invTicks, hitMultiplier);
         boolean isBroken = data.isBroken();
 
+        // 白霸体开始：与客户端白 glint 同步，施加原版发光（无队伍颜色时第三人称 outline 为白色），
+        // 时长与无敌窗口一致（同源 invTicks），随实体 tick 自然过期；连击时重新施加覆盖时长
+        if (actuallyHit && !entity.level().isClientSide) {
+            entity.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                    net.minecraft.world.effect.MobEffects.GLOWING, invTicks, 0, false, false));
+        }
+
         if (!entity.level().isClientSide) {
             if (actuallyHit) {
                 if (!isBroken) {
@@ -144,12 +151,16 @@ public class BossToughnessManager {
         // 无需迟缓 255；暂停期间实体刻不走，效果时长也会冻结，故不再施加任何效果
         entity.setNoGravity(true);
 
+        // 白霸体结束（红霸体接管，白 glint 消失）：同步移除发光。
+        // 若不移除，发光时长会被冻结在定身里，破定后多亮一段白霸体之外的时间
+        entity.removeEffect(net.minecraft.world.effect.MobEffects.GLOWING);
+
     }
 
-    /** 由外部（或 tick 逻辑）在定身结束时调用 */
+    /** 由外部（或 tick 逻辑）在定身结束时调用；幂等：非破防状态直接返回 */
     public void onStunEnd(LivingEntity entity) {
         BossToughnessData data = dataMap.get(entity.getUUID());
-        if (data == null) return;
+        if (data == null || !data.isBroken()) return;
 
         // 解除定身：恢复重力（暂停实体刻期间重力不结算，解除后恢复正常）
         entity.setNoGravity(false);
@@ -163,6 +174,27 @@ public class BossToughnessManager {
 
         // 广播恢复后的状态
         broadcastToughness(entity);
+    }
+
+    // ========== 定身期间伤害累计（提前解除分支） ==========
+
+    /**
+     * 定身期间玩家累计伤害达标则提前解除定身。
+     * 由 {@link LivingDamageEvent.Post} 在实际伤害生效后调用。
+     */
+    public void addStunDamage(LivingEntity entity, float amount) {
+        if (amount <= 0) return;
+        BossToughnessData data = dataMap.get(entity.getUUID());
+        if (data == null || !data.isBroken()) return;
+
+        double percent = Config.TOUGH_STUN_BREAK_DAMAGE_PERCENT.get();
+        if (percent <= 0) return;
+
+        float total = data.addStunDamage(amount);
+        float threshold = (float) (entity.getMaxHealth() * percent);
+        if (total >= threshold) {
+            onStunEnd(entity);
+        }
     }
 
     // ========== 减伤计算 ==========
@@ -321,21 +353,44 @@ public class BossToughnessManager {
     // ========== 事件 ==========
 
     /** 实体死亡时清理韧性数据 */
-    /** 实体加入世界即注入韧性（BOSS 判定通过才注册）——韧性条立即显示。 */
+    /** 实体加入世界即注入韧性（BOSS 判定通过才注册）——韧性条立即显示。
+     *  若实体携带持久化数据（存档前卸载时写入），优先恢复，定身倒计时继续。 */
     @SubscribeEvent
     public void onEntityJoinLevel(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
         if (!(event.getEntity() instanceof LivingEntity le)) return;
         if (le instanceof net.minecraft.world.entity.player.Player) return;
+
+        // 恢复持久化的韧性数据（含定身状态：NoGravity 已在实体 NBT 中，恢复数据后 tick 继续倒计时并正常解除）
+        if (le.hasData(ModAttachments.BOSS_TOUGHNESS)) {
+            BossToughnessData persisted = le.getData(ModAttachments.BOSS_TOUGHNESS);
+            dataMap.put(le.getUUID(), persisted);
+            broadcastToughness(le);
+            return;
+        }
+
         if (has(le)) return;
         if (!ToughnessDamageHandler.isBoss(le)) return;
         register(le);
         broadcastToughness(le);
     }
 
+    /** 实体卸载（区块卸载/换维度/关服）时，把韧性数据写入实体附件随 NBT 持久化 */
+    @SubscribeEvent
+    public void onEntityLeaveLevel(net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent event) {
+        if (event.getLevel().isClientSide()) return;
+        if (!(event.getEntity() instanceof LivingEntity le)) return;
+        BossToughnessData data = dataMap.remove(le.getUUID());
+        if (data != null) {
+            le.setData(ModAttachments.BOSS_TOUGHNESS, data);
+        }
+    }
+
     @SubscribeEvent
     public void onLivingDeath(net.neoforged.neoforge.event.entity.living.LivingDeathEvent event) {
         if (event.getEntity().level().isClientSide) return;
         remove(event.getEntity());
+        // 清除持久化数据，防止复活类模组读到脏数据
+        event.getEntity().removeData(ModAttachments.BOSS_TOUGHNESS);
     }
 }

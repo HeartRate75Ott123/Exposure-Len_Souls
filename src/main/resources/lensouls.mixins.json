@@ -25,7 +25,6 @@
     "client.EntityRenderDispatcherMixin",
     "client.EntityPhantomNameMixin",
     "client.EntityBossOutlineMixin",
-    "client.BossBufferSourceMixin",
     "client.GameRendererMixin",
     "client.GunBowAnimationMixin",
     "client.ItemRendererOutlineMixin",

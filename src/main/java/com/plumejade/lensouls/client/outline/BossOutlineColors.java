@@ -2,8 +2,7 @@ package com.plumejade.lensouls.client.outline;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.damage.ElementDamage;
-import com.plumejade.lensouls.effect.ElementInfusionEffect;
-import com.plumejade.lensouls.entity.BossPhantomType;
+import com.plumejade.lensouls.effect.SoulDotEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -11,9 +10,9 @@ import net.minecraft.world.entity.player.Player;
 /**
  * BOSS 镜魂描边配色（四元素四套渐变，大众审美、绚丽、不深色）。
  * <p>
- * 第三人称全身描边走原版 outline（{@code isCurrentlyGlowing}/{@code getTeamColor}），
- * 由渐变 composite shader 读取 {@link #MARKER_COLOR} 标记色后替换为四色渐变；
- * 第一人称手持物发光（SoulGlow）也直接用这四套渐变。
+ * 描边信号 = 玩家身上有 BOSS 镜魂的镜魂 DoT 效果（{@link SoulDotEffect}）；
+ * 第三人称全身描边走原版 outline（{@code isCurrentlyGlowing}/{@code getTeamColor}）取主色，
+ * 第一人称手持物描边（{@code client/itemoutline} 独立 FBO 管线）同样经 {@link #fromPlayer} 判定。
  *
  * @param color1 主色 R/G/B
  * @param color2 次色 R/G/B
@@ -79,33 +78,20 @@ public record BossOutlineColors(
         return (r << 16) | (g << 8) | b;
     }
 
-    /** 从任意活跃实体的元素附魔效果检测 BOSS 类型并返回配色。颜色只按镜魂元素四套渐变，不按 BOSS/等级。 */
+    /**
+     * 描边信号源：只认镜魂 DoT 效果（{@link SoulDotEffect}）且当前激活的是 BOSS 镜魂
+     * （{@link SoulDotEffect#getPlayerSoulId} 非空）。照片活性走元素灌注效果，
+     * 永远不会触发描边；第三人称全身 glow 与第一人称手持物描边共用本判定。
+     */
     public static BossOutlineColors fromEntity(LivingEntity entity) {
         if (entity == null) return null;
-        BossPhantomType bestType = null;
-        ElementDamage bestElement = null;
-        int bestDuration = -1;
-
         for (MobEffectInstance inst : entity.getActiveEffects()) {
-            if (inst.getEffect().value() instanceof ElementInfusionEffect effect) {
-                ElementDamage element = effect.getElement();
-                String descId = ElementInfusionEffect.getPlayerCustomName(entity, element);
-                if (descId != null && !descId.isEmpty()) {
-                    BossPhantomType matched = BossPhantomType.fromDescriptionId(descId);
-                    if (matched != null) {
-                        int dur = inst.getDuration();
-                        if (dur > bestDuration) {
-                            bestDuration = dur;
-                            bestType = matched;
-                            bestElement = element;
-                        }
-                    }
+            if (inst.getEffect().value() instanceof SoulDotEffect effect) {
+                String soulId = SoulDotEffect.getPlayerSoulId(entity, effect.getElement());
+                if (soulId != null && !soulId.isEmpty()) {
+                    return fromElement(effect.getElement());
                 }
             }
-        }
-
-        if (bestType != null) {
-            return bestElement != null ? fromElement(bestElement) : null;
         }
         return null;
     }

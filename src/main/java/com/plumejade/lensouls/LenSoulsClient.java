@@ -1,6 +1,5 @@
 package com.plumejade.lensouls;
 
-import com.plumejade.lensouls.ability.client.BossOutlineManager;
 import com.plumejade.lensouls.ability.client.FrozenOutlineManager;
 import com.plumejade.lensouls.ability.client.GravityTetherRenderer;
 import com.plumejade.lensouls.ability.client.SpatialWarpOutlineRenderer;
@@ -62,7 +61,6 @@ public class LenSoulsClient {
         // 客户端游戏事件（RenderLevelStageEvent）
         NeoForge.EVENT_BUS.register(SpatialWarpOutlineRenderer.class);
         NeoForge.EVENT_BUS.register(FrozenOutlineManager.class);
-        NeoForge.EVENT_BUS.register(BossOutlineManager.class);
         NeoForge.EVENT_BUS.register(GravityTetherRenderer.class);
         NeoForge.EVENT_BUS.register(ToughnessBarRenderer.class);
         NeoForge.EVENT_BUS.register(ScreenShakeApplier.class);
@@ -179,19 +177,7 @@ public class LenSoulsClient {
             LenSouls.LOGGER.error("[Outline] 金边复合着色器加载失败", e);
         }
 
-        // BOSS 镜魂描边 composite（第一人称手部 mask 描边，distance field 无噪点）
-        try {
-            event.registerShader(
-                    new ShaderInstance(provider,
-                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "boss_outline_composite"),
-                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX),
-                    instance -> {
-                        BossOutlineManager.bossCompositeShader = instance;
-                    }
-            );
-        } catch (java.io.IOException e) {
-            LenSouls.LOGGER.error("[BossGlow] composite 着色器加载失败", e);
-        }
+        // BOSS 镜魂描边 composite（第一人称手部 mask 描边，distance field 无噪点）——管线已随镜魂 DoT 重构移除
 
         // 第一人称手持物单色描边 composite（独立 mask 目标，仿 yuyu，仅第一人称手持物）
         try {

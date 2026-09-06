@@ -2,11 +2,9 @@ package com.plumejade.lensouls.handler;
 
 import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.effect.SoulDotEffect;
-import com.plumejade.lensouls.particle.ModParticleTypes;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
@@ -88,7 +86,6 @@ public class SoulDotHandler {
             float perTick = attack * DAMAGE_FRACTION * (boss ? 2f : 1f);
             addDot(target, new DotInstance(element, perTick,
                     now + TICK_INTERVAL, TOTAL_JUMPS, player.getUUID()), level);
-            emitHitParticles((ServerLevel) target.level(), target, element);
         }
     }
 
@@ -159,23 +156,5 @@ public class SoulDotHandler {
     private static ServerPlayer findAttacker(LivingEntity target, UUID attackerId) {
         var server = target.level().getServer();
         return server != null ? server.getPlayerList().getPlayer(attackerId) : null;
-    }
-
-    /** 按元素取模组元素粒子 */
-    private static net.minecraft.core.particles.SimpleParticleType elementParticle(ElementDamage element) {
-        return switch (element) {
-            case FIRE -> ModParticleTypes.ELEMENT_PARTICLE_FIRE.get();
-            case WATER -> ModParticleTypes.ELEMENT_PARTICLE_WATER.get();
-            case EARTH -> ModParticleTypes.ELEMENT_PARTICLE_EARTH.get();
-            case ENDER -> ModParticleTypes.ELEMENT_PARTICLE_ENDER.get();
-            case PROJECTILE -> ModParticleTypes.ELEMENT_PARTICLE_FIRE.get();
-        };
-    }
-
-    /** 附加 DoT 时的元素粒子反馈 */
-    private static void emitHitParticles(ServerLevel level, LivingEntity target, ElementDamage element) {
-        level.sendParticles(elementParticle(element),
-                target.getX(), target.getY() + target.getBbHeight() * 0.5, target.getZ(),
-                8, target.getBbWidth() * 0.3, target.getBbHeight() * 0.3, target.getBbWidth() * 0.3, 0.02);
     }
 }

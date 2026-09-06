@@ -163,30 +163,15 @@ public class SoulDotEffect extends MobEffect {
 
     @Override
     public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
-        // 每 8 ticks 漂浮粒子（客户端），60/40/20 到期提醒（服务端）
-        return duration % 8 == 0 || (duration <= 60 && duration % 20 == 0);
+        // 仅服务端 60/40/20 tick 到期提醒
+        return duration <= 60 && duration % 20 == 0;
     }
 
     @Override
     public boolean applyEffectTick(LivingEntity entity, int amplifier) {
-        if (entity.level().isClientSide) {
-            // 客户端：环绕玩家缓慢漂浮的元素粒子（与元素灌注同款）
-            if (entity.level().random.nextInt(3) == 0) {
-                double x = entity.getX() + (entity.level().random.nextDouble() - 0.5) * 2.0;
-                double z = entity.getZ() + (entity.level().random.nextDouble() - 0.5) * 2.0;
-                double y = entity.getY() + entity.getBbHeight() * 0.3
-                        + entity.level().random.nextDouble() * entity.getBbHeight() * 0.6;
-                entity.level().addParticle(getElementParticleType(),
-                        x, y, z,
-                        (entity.level().random.nextDouble() - 0.5) * 0.02,
-                        0.02 + entity.level().random.nextDouble() * 0.03,
-                        (entity.level().random.nextDouble() - 0.5) * 0.02);
-            }
-            return true;
-        }
-
+        // 客户端无自定义粒子：只有原版 effect 粒子发射器（createParticleOptions 出 element_particle 贴图）
+        if (entity.level().isClientSide || !(entity instanceof Player player)) return true;
         // 服务端：仅 60/40/20 tick 到期提醒（显示镜魂名，普通镜魂显示元素名）
-        if (!(entity instanceof Player player)) return true;
         int duration = 0;
         for (MobEffectInstance inst : entity.getActiveEffects()) {
             if (inst.getEffect().value() == this) {

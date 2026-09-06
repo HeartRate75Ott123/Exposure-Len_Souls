@@ -1,0 +1,26 @@
+{
+  "minecraft:in_fire": {
+    "element": "fire",
+    "activity": 2.0
+  },
+  "minecraft:on_fire": {
+    "element": "fire",
+    "activity": 2.0
+  },
+  "minecraft:freeze": {
+    "element": "water",
+    "activity": 2.0
+  },
+  "minecraft:wither": {
+    "element": "ender",
+    "activity": 2.0
+  },
+  "minecraft:magic": {
+    "element": "earth",
+    "activity": 2.0
+  },
+  "minecraft:indirect_magic": {
+    "element": "earth",
+    "activity": 2.0
+  }
+}

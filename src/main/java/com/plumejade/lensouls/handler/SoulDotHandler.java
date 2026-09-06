@@ -18,6 +18,7 @@ import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,8 +58,8 @@ public class SoulDotHandler {
     private record DotInstance(ElementDamage element, float damagePerTick,
                                long nextTickGameTime, int jumpsLeft, UUID attackerId) {}
 
-    /** 目标实体 → DoT 实例队列（插入序 = 施加序，最老在前） */
-    private static final Map<LivingEntity, List<DotInstance>> DOTS = new HashMap<>();
+    /** 目标实体 → 元素 → DoT 实例队列（插入序 = 施加序，最老在前；各元素独立封顶，互不挤占） */
+    private static final Map<LivingEntity, Map<ElementDamage, List<DotInstance>>> DOTS = new HashMap<>();
 
     /** 防递归护栏：本系统结算伤害期间不再触发新增 */
     private static boolean applyingDot = false;
@@ -97,9 +98,11 @@ public class SoulDotHandler {
         }
     }
 
-    /** 添加实例，队列长度不超过 cap（满时顶掉最老实例） */
+    /** 添加实例到该元素的队列，队列长度不超过 cap（满时顶掉最老实例）；不同元素互不挤占 */
     private static void addDot(LivingEntity target, DotInstance dot, int cap) {
-        List<DotInstance> list = DOTS.computeIfAbsent(target, k -> new ArrayList<>());
+        Map<ElementDamage, List<DotInstance>> byElement =
+                DOTS.computeIfAbsent(target, k -> new EnumMap<>(ElementDamage.class));
+        List<DotInstance> list = byElement.computeIfAbsent(dot.element(), k -> new ArrayList<>());
         while (list.size() >= Math.max(1, cap)) {
             list.remove(0);
         }
@@ -119,20 +122,24 @@ public class SoulDotHandler {
                 continue;
             }
             long now = target.level().getGameTime();
-            List<DotInstance> list = entry.getValue();
-            var listIt = list.listIterator();
-            while (listIt.hasNext()) {
-                DotInstance dot = listIt.next();
-                if (now < dot.nextTickGameTime()) continue;
-                applyDotTick(target, dot);
-                if (dot.jumpsLeft() - 1 <= 0) {
-                    listIt.remove();
-                } else {
-                    listIt.set(new DotInstance(dot.element(), dot.damagePerTick(),
-                            dot.nextTickGameTime() + TICK_INTERVAL, dot.jumpsLeft() - 1, dot.attackerId()));
+            Map<ElementDamage, List<DotInstance>> byElement = entry.getValue();
+            for (var elIt = byElement.values().iterator(); elIt.hasNext(); ) {
+                List<DotInstance> list = elIt.next();
+                var listIt = list.listIterator();
+                while (listIt.hasNext()) {
+                    DotInstance dot = listIt.next();
+                    if (now < dot.nextTickGameTime()) continue;
+                    applyDotTick(target, dot);
+                    if (dot.jumpsLeft() - 1 <= 0) {
+                        listIt.remove();
+                    } else {
+                        listIt.set(new DotInstance(dot.element(), dot.damagePerTick(),
+                                dot.nextTickGameTime() + TICK_INTERVAL, dot.jumpsLeft() - 1, dot.attackerId()));
+                    }
                 }
+                if (list.isEmpty()) elIt.remove();
             }
-            if (list.isEmpty()) {
+            if (byElement.isEmpty()) {
                 it.remove();
             }
         }

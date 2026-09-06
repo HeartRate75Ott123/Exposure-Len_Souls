@@ -137,6 +137,11 @@ public class ElementInfusionEffect extends MobEffect {
         };
     }
 
+    @Override
+    public net.minecraft.core.particles.ParticleOptions createParticleOptions(MobEffectInstance instance) {
+        return getElementParticleType();
+    }
+
     /** 根据元素类型获取对应的效果 Holder */
     private static Holder<net.minecraft.world.effect.MobEffect> getEffectForElement(ElementDamage element) {
         return switch (element) {

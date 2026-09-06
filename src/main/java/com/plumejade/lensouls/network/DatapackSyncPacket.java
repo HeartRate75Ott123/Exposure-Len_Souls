@@ -2,6 +2,7 @@ package com.plumejade.lensouls.network;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.config.AttackerElementLoader;
+import com.plumejade.lensouls.config.BossEntityLoader;
 import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.config.ItemElementActivityLoader;
 import com.plumejade.lensouls.config.PhotoSetDefs;
@@ -23,9 +24,9 @@ import java.util.Map;
 /**
  * S2C：数据包解析结果统一同步包。
  * <p>
- * 弱点倍率 / 攻击者活性 / 物品活性 / 照片套装成员 / 照片套装定义
+ * 弱点倍率 / 攻击者活性 / 物品活性 / 照片套装成员 / 照片套装定义 / 首领清单（bosslist）
  * 这些 {@code SimpleJsonResourceReloadListener} 只在服务端 {@code AddReloadListenerEvent} 触发，
- * 多人客机进程从不执行，导致 Jade 面板与照片套装 tooltip 为空。
+ * 多人客机进程从不执行，导致 Jade 面板、照片套装 tooltip 为空，以及首领套无法识别。
  * <p>
  * 服务端在 {@code OnDatapackSyncEvent}（玩家加入 + /reload）发送本包，
  * 客户端 handler 填充各加载器的静态缓存，实现多人下客户端数据一致。
@@ -45,6 +46,7 @@ public class DatapackSyncPacket implements CustomPacketPayload {
     private final Map<ResourceLocation, List<String>> photoSetMembership;
     private final Map<String, PhotoSetDefs.SetDef> photoSetDefs;
     private final List<ResourceLocation> staffItems;
+    private final List<ResourceLocation> bosses;
 
     public DatapackSyncPacket(
             Map<ResourceLocation, Map<ElementDamage, Float>> weaknesses,
@@ -52,13 +54,15 @@ public class DatapackSyncPacket implements CustomPacketPayload {
             Map<ResourceLocation, Map<ElementDamage, Integer>> itemElementActivity,
             Map<ResourceLocation, List<String>> photoSetMembership,
             Map<String, PhotoSetDefs.SetDef> photoSetDefs,
-            List<ResourceLocation> staffItems) {
+            List<ResourceLocation> staffItems,
+            List<ResourceLocation> bosses) {
         this.weaknesses = weaknesses;
         this.attackerElement = attackerElement;
         this.itemElementActivity = itemElementActivity;
         this.photoSetMembership = photoSetMembership;
         this.photoSetDefs = photoSetDefs;
         this.staffItems = staffItems;
+        this.bosses = bosses;
     }
 
     /**
@@ -74,7 +78,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
                 ItemElementActivityLoader.allMappings(),
                 PhotoSetLoader.getAll(),
                 PhotoSetDefs.allMap(),
-                StaffItemLoader.allStaffs());
+                StaffItemLoader.allStaffs(),
+                BossEntityLoader.allBosses());
     }
 
     private DatapackSyncPacket(RegistryFriendlyByteBuf buf) {
@@ -87,6 +92,10 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         List<ResourceLocation> staffs = new ArrayList<>(staffSize);
         for (int i = 0; i < staffSize; i++) staffs.add(buf.readResourceLocation());
         this.staffItems = List.copyOf(staffs);
+        int bossSize = buf.readVarInt();
+        List<ResourceLocation> bossList = new ArrayList<>(bossSize);
+        for (int i = 0; i < bossSize; i++) bossList.add(buf.readResourceLocation());
+        this.bosses = List.copyOf(bossList);
     }
 
     // ========== 编码 ==========
@@ -99,6 +108,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         encodeSetDefs(buf, photoSetDefs);
         buf.writeVarInt(staffItems.size());
         for (ResourceLocation id : staffItems) buf.writeResourceLocation(id);
+        buf.writeVarInt(bosses.size());
+        for (ResourceLocation id : bosses) buf.writeResourceLocation(id);
     }
 
     private static void encodeWeakness(RegistryFriendlyByteBuf buf,
@@ -249,6 +260,7 @@ public class DatapackSyncPacket implements CustomPacketPayload {
             PhotoSetLoader.setClientCache(packet.photoSetMembership);
             PhotoSetDefs.setClientCache(packet.photoSetDefs);
             StaffItemLoader.setClientCache(packet.staffItems);
+            BossEntityLoader.setClientCache(packet.bosses);
         });
     }
 }

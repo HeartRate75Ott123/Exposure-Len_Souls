@@ -12,7 +12,9 @@ import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -67,6 +69,17 @@ public class BossEntityLoader extends SimpleJsonResourceReloadListener {
         }
         BOSSES = Set.copyOf(set);
         LenSouls.LOGGER.info("[BossEntity] 加载了 {} 个首领实体", BOSSES.size());
+    }
+
+    /** 当前首领清单快照（DatapackSyncPacket 服务端打包用） */
+    public static List<ResourceLocation> allBosses() {
+        return List.copyOf(BOSSES);
+    }
+
+    /** 客户端收包填充：多人客机进程不执行 apply()，由服务端同步清单 */
+    public static void setClientCache(Collection<ResourceLocation> bosses) {
+        BOSSES = Set.copyOf(bosses);
+        LenSouls.LOGGER.info("[BossEntity] 客户端同步了 {} 个首领实体", BOSSES.size());
     }
 
     /** 实体是否在首领清单中 */

@@ -28,6 +28,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -57,6 +58,8 @@ public class BossPhantomManager {
     private final Map<Integer, BossPhantomData> activePhantoms = new ConcurrentHashMap<>();
     /** 幻灵期间玩家原始游戏模式（用于旁观者模式恢复） */
     private final Map<UUID, net.minecraft.world.level.GameType> originalGameTypes = new ConcurrentHashMap<>();
+    /** 玩家最近攻击的目标（玩家UUID → 受害者；WeakReference 防实体泄漏），供幻灵优先锁定 */
+    private static final Map<UUID, java.lang.ref.WeakReference<LivingEntity>> PLAYER_LAST_ATTACK_TARGET = new ConcurrentHashMap<>();
 
     public static BossPhantomManager getInstance() { return INSTANCE; }
 
@@ -206,8 +209,11 @@ public class BossPhantomManager {
                 }
             }
 
-            // 5. 找最近敌对生物作为 target
-            LivingEntity target = findNearestEnemy(level, ox, py, oz);
+            // 5. 优先以主人最近攻击的目标为目标，否则找最近敌对生物作为 target
+            LivingEntity target = findPlayerLastAttackTarget(player, level);
+            if (target == null) {
+                target = findNearestEnemy(level, ox, py, oz);
+            }
             if (target != null && entity instanceof Mob mob) {
                 mob.setTarget(target);
             } else {
@@ -298,6 +304,32 @@ public class BossPhantomManager {
             if (d < nearestDist) { nearestDist = d; nearest = e; }
         }
         return nearest;
+    }
+
+    /** 玩家对生物造成实际伤害时，记录其最近攻击目标（供幻灵优先锁定；覆盖近战/弹射物/枪/照片） */
+    @SubscribeEvent
+    public static void onLivingDamageTrackTarget(LivingDamageEvent.Post event) {
+        if (event.getEntity().level().isClientSide) return;
+        if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
+        LivingEntity victim = event.getEntity();
+        if (victim instanceof Player) return;
+        // 幻灵及其召唤物不记录（幻灵不互殴，也不该被主人引去打自家召唤物）
+        if (PhantomDamageHandler.isPhantomEntity(victim)) return;
+        if (victim.getPersistentData().getBoolean("lensouls:phantom_minion")) return;
+        PLAYER_LAST_ATTACK_TARGET.put(player.getUUID(), new java.lang.ref.WeakReference<>(victim));
+    }
+
+    /** 取玩家最近攻击且仍合法存活（同维度、非玩家/幻灵/召唤物）的目标，无则 null */
+    @javax.annotation.Nullable
+    private static LivingEntity findPlayerLastAttackTarget(ServerPlayer player, Level level) {
+        var ref = PLAYER_LAST_ATTACK_TARGET.get(player.getUUID());
+        if (ref == null) return null;
+        LivingEntity t = ref.get();
+        if (t == null || !t.isAlive() || t instanceof Player) return null;
+        if (PhantomDamageHandler.isPhantomEntity(t)) return null;
+        if (t.getPersistentData().getBoolean("lensouls:phantom_minion")) return null;
+        if (t.level() != level) return null;
+        return t;
     }
 
     /**
@@ -502,7 +534,13 @@ public class BossPhantomManager {
                 // ===== 借体模式：幻灵自由移动，玩家在旁观者模式自由视角 =====
                 Entity ie = p.level().getEntity(d.phantomEntityId());
                 if (ie instanceof Mob mob) {
-                    if (mob.getTarget() == null || !mob.getTarget().isAlive()) {
+                    // 优先锁定主人最近攻击的目标（跟随玩家集火，攻击新目标即切换）
+                    LivingEntity lastAttack = findPlayerLastAttackTarget(p, mob.level());
+                    if (lastAttack != null) {
+                        if (lastAttack != mob.getTarget()) {
+                            mob.setTarget(lastAttack);
+                        }
+                    } else if (mob.getTarget() == null || !mob.getTarget().isAlive()) {
                         // 丢失 target 时重新指派（解决下界合金巨兽等实体 AI 清除目标的问题）
                         LivingEntity t = findNearestEnemy(p.serverLevel(), mob.getX(), mob.getY(), mob.getZ());
                         if (t != null) mob.setTarget(t);

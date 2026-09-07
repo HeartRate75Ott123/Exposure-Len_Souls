@@ -21,7 +21,7 @@ import top.theillusivec4.curios.api.CuriosApi;
  *   <li>造成伤害 +75%（LivingDamageEvent.Pre 伤害来源为佩戴者）</li>
  *   <li>常驻水火土末影活性 2 级（每 20 tick 直接赋予 10 秒的四种活性效果）</li>
  * </ul>
- * 佩戴者击杀 BOSS 不掉落复制之魂、无法使用复制之魂由 CopySoulDropHandler / CraftingMenuMixin 处理。
+ * 佩戴者击杀 BOSS 不掉落复制之魂、无法使用复制之魂由 CopySoulDropHandler / CopySoulItem 封印（配方层拦截）处理。
  */
 public class FeatherElementRiseHandler {
 

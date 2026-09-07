@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.recipe;
 
+import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.config.CopySoulFilter;
 import com.plumejade.lensouls.item.CopySoulItem;
 import net.minecraft.core.HolderLookup;
@@ -29,18 +30,22 @@ public class CopySoulRecipe extends CustomRecipe {
     @Override
     public boolean matches(CraftingInput input, Level level) {
         boolean hasSoul = false;
+        boolean sealed = false;
         ItemStack target = null;
         for (ItemStack stack : input.items()) {
             if (stack.isEmpty()) continue;
             if (stack.getItem() instanceof CopySoulItem) {
                 if (hasSoul) return false;
                 hasSoul = true;
+                // 封印之魂（佩戴禁复制羽毛的玩家随身自动打标）：配方层拒绝，所有合成台统一空输出
+                if (stack.has(ModDataComponents.COPY_SOUL_SEALED.get())) sealed = true;
             } else {
                 if (target != null) return false;
                 target = stack;
             }
         }
         if (!hasSoul || target == null) return false;
+        if (sealed) return false;
         // 复制之魂本身不可复制；数据驱动复制黑白名单
         if (target.getItem() instanceof CopySoulItem) return false;
         if (!CopySoulFilter.isCopyAllowed(BuiltInRegistries.ITEM.getKey(target.getItem()))) return false;
@@ -49,6 +54,13 @@ public class CopySoulRecipe extends CustomRecipe {
 
     @Override
     public ItemStack assemble(CraftingInput input, HolderLookup.Provider registries) {
+        // 防御兜底：封印之魂在场一律输出空（正常路径 matches 已拦截，不会走到这里）
+        for (ItemStack stack : input.items()) {
+            if (!stack.isEmpty() && stack.getItem() instanceof CopySoulItem
+                    && stack.has(ModDataComponents.COPY_SOUL_SEALED.get())) {
+                return ItemStack.EMPTY;
+            }
+        }
         // 动态输出：原物品完整副本（组件/NBT/附魔/数量全保留）
         for (ItemStack stack : input.items()) {
             if (!stack.isEmpty() && !(stack.getItem() instanceof CopySoulItem)

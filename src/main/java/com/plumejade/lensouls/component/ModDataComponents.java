@@ -1,8 +1,10 @@
 package com.plumejade.lensouls.component;
 
+import com.mojang.serialization.Codec;
 import com.plumejade.lensouls.LenSouls;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -40,6 +42,15 @@ public class ModDataComponents {
             register("potion_filter_data", builder -> builder
                     .persistent(PotionFilterData.CODEC)
                     .networkSynchronized(PotionFilterData.STREAM_CODEC));
+
+    /**
+     * 复制之魂封印标记：佩戴禁复制羽毛（元素觉醒/铁人/深渊）的玩家携带时自动置位，
+     * 复制配方见到即拒绝匹配——判定在配方层，任何合成台（含模组/自动化）统一拦截。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> COPY_SOUL_SEALED =
+            register("copy_soul_sealed", builder -> builder
+                    .persistent(Codec.BOOL)
+                    .networkSynchronized(ByteBufCodecs.BOOL));
 
     private static <T> DeferredHolder<DataComponentType<?>, DataComponentType<T>> register(
             String name, UnaryOperator<DataComponentType.Builder<T>> builder) {

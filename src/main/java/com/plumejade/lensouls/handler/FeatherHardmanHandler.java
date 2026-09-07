@@ -33,7 +33,7 @@ import top.theillusivec4.curios.api.CuriosApi;
  *   <li>每 60 秒自身获得随机原版负面效果 10 秒（计时器持久化在 PlayerPersisted 子键，掉线不丢）</li>
  * </ul>
  * 佩戴者击杀 BOSS 不掉落复制之魂、无法使用复制之魂、拍照注入失败由
- * CopySoulDropHandler / CraftingMenuMixin / PhotoInjectionHandler 处理。
+ * CopySoulDropHandler / CopySoulItem 封印（配方层拦截）/ PhotoInjectionHandler 处理。
  */
 public class FeatherHardmanHandler {
 

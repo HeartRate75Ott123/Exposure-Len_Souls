@@ -7,7 +7,6 @@
     "SoulOutlineMixinTrigger",
     "ability.PlayerInteractionMixin",
     "compat.VitalStrikeNoFilmConsumeMixin",
-    "CraftingMenuMixin",
     "ResultSlotMixin",
     "PlayerDropEquipmentMixin",
     "BossStunTickMixin",

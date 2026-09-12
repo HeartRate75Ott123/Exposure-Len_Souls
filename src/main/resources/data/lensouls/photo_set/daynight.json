@@ -1,0 +1,33 @@
+{
+  "cataclysm:deepling": [
+    "tide_clock"
+  ],
+  "cataclysm:ignis": [
+    "ember_cycle"
+  ],
+  "minecraft:blaze": [
+    "ember_cycle"
+  ],
+  "minecraft:creeper": [
+    "twin_phase"
+  ],
+  "minecraft:drowned": [
+    "tide_clock"
+  ],
+  "minecraft:guardian": [
+    "tide_clock"
+  ],
+  "minecraft:husk": [
+    "daybreak"
+  ],
+  "minecraft:magma_cube": [
+    "ember_cycle"
+  ],
+  "minecraft:zombie": [
+    "daybreak",
+    "twin_phase"
+  ],
+  "minecraft:zombie_horse": [
+    "daybreak"
+  ]
+}

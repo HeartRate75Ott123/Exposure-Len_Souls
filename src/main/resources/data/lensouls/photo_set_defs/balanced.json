@@ -1,0 +1,130 @@
+{
+  "boss_barrage": {
+    "name": "首领套",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "dmg_mod:boss_barrage:2.2",
+          "kb_resist:0.2",
+          "immune_explosion",
+          "on_hit_effect:weak:0.1:60:0"
+        ]
+      }
+    ]
+  },
+  "molten_oath": {
+    "name": "熔心誓约",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "immune_fire",
+          "cond:fire|maxhp:0.3",
+          "barrage_dmg:1.15"
+        ]
+      }
+    ]
+  },
+  "blaze_crest": {
+    "name": "炽翎烈羽",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "immune_fire",
+          "barrage_trigger:1",
+          "dmg_element:fire:2.8"
+        ]
+      }
+    ]
+  },
+  "ember_revenant": {
+    "name": "余烬亡魂",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "immune_fire",
+          "convert_eff:wither:healing",
+          "dmg_element:fire:2.2"
+        ]
+      }
+    ]
+  },
+  "abyss_whisper": {
+    "name": "深渊低语",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "env:water_breath",
+          "cond:water|speed_mult:2.8",
+          "dot_mult:water:1.8"
+        ]
+      }
+    ]
+  },
+  "kraken_grip": {
+    "name": "海妖之握",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "env:water_breath",
+          "kb_resist:0.2",
+          "dot_mult:water:2.5"
+        ]
+      }
+    ]
+  },
+  "paladin_oath": {
+    "name": "圣骑誓约",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "kb_resist:0.2",
+          "dot_mult:ender:2.8",
+          "barrage_trigger:1"
+        ]
+      }
+    ]
+  },
+  "ravager_charge": {
+    "name": "蛮力冲锋",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "kb_resist:0.25",
+          "dot_mult:earth:2.2"
+        ]
+      }
+    ]
+  },
+  "frozen_tundra": {
+    "name": "冰原远征",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "dmg_element:freeze:2.2",
+          "kb_resist:0.15"
+        ]
+      }
+    ]
+  },
+  "twin_spider": {
+    "name": "双蛛噬影",
+    "tiers": [
+      {
+        "count": 2,
+        "effects": [
+          "cond:night|infusion_boost:1",
+          "barrage_dmg:1.2"
+        ]
+      }
+    ]
+  }
+}

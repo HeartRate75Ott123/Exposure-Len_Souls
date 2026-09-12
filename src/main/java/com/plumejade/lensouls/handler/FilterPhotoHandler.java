@@ -36,7 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 相机滤镜触发：手持已挂滤镜的相机自拍（或拍敌人）→ 施加对应滤镜效果 20s，相机进入 30s 冷却。
+ * 相机滤镜触发：手持已挂滤镜的相机自拍（或拍敌人）→ 施加对应滤镜效果 2 分钟，相机进入 30s 冷却。
  * 不要求摄魂术附魔，与既有照片注入能力系统解耦；荒厄遗咒佩戴者无法触发。
  */
 public class FilterPhotoHandler {
@@ -49,6 +49,14 @@ public class FilterPhotoHandler {
     private static final Map<UUID, Long> lastFilterShot = new ConcurrentHashMap<>();
     /** 药水玻璃板独立冷却闸门（游戏刻）；300 刻，区别于 16 特殊滤镜的 600 刻。 */
     private static final Map<UUID, Long> lastGlassShot = new ConcurrentHashMap<>();
+
+    /**
+     * 特殊滤镜授予效果的持续刻数：2 分钟（2400 刻）。
+     * <p>
+     * 只作用于 {@code exposure_expanded} 的 16 个滤镜（含敌人易伤滤镜与「万象加持」随机增益）；
+     * <b>药水玻璃板不在此列</b>——它按注入药水自身的等级与时长施加（见 {@link #applyPotionFilter}）。
+     */
+    private static final int SPECIAL_FILTER_DURATION = 20 * 120;
 
     /**
      * 登出清理冷却闸门：静态 Map 以 UUID 为 key 且存 gameTime，单机切换存档时 JVM 不销毁，
@@ -134,7 +142,7 @@ public class FilterPhotoHandler {
                     if (!hasTarget) return;
                     for (LivingEntity e : event.getEntitiesInFrame()) {
                         if (e != player && !(e instanceof Player) && e.isAlive()) {
-                            e.addEffect(new MobEffectInstance(ModEffects.FILTER_SPIDER, 400));
+                            e.addEffect(new MobEffectInstance(ModEffects.FILTER_SPIDER, SPECIAL_FILTER_DURATION));
                         }
                     }
                     scheduleCooldown(hand, 120);
@@ -151,7 +159,7 @@ public class FilterPhotoHandler {
                 if (effect == ModEffects.FILTER_ART) {
                     applyRandomBuffs(player);
                 } else {
-                    player.addEffect(new MobEffectInstance(effect, 400));
+                    player.addEffect(new MobEffectInstance(effect, SPECIAL_FILTER_DURATION));
                 }
                 scheduleCooldown(hand, 120);
                 lastFilterShot.put(player.getUUID(), now);
@@ -163,7 +171,7 @@ public class FilterPhotoHandler {
                         if (effect == ModEffects.FILTER_ART) {
                             applyRandomBuffs(sp);
                         } else {
-                            sp.addEffect(new MobEffectInstance(effect, 400));
+                            sp.addEffect(new MobEffectInstance(effect, SPECIAL_FILTER_DURATION));
                         }
                         applied = true;
                     }
@@ -222,7 +230,7 @@ public class FilterPhotoHandler {
         }
     }
 
-    /** #7 万象加持：随机 4 个原版正面效果，等级 2~3，持续 20s */
+    /** #7 万象加持：随机 4 个原版正面效果，等级 2~3，持续 2 分钟 */
     private static void applyRandomBuffs(ServerPlayer player) {
         List<Holder<MobEffect>> pool = new ArrayList<>(List.of(
                 MobEffects.DAMAGE_BOOST, MobEffects.DAMAGE_RESISTANCE, MobEffects.DIG_SPEED,
@@ -236,7 +244,7 @@ public class FilterPhotoHandler {
         int count = Math.min(4, pool.size());
         for (int i = 0; i < count; i++) {
             int amp = 1 + player.getRandom().nextInt(2);
-            player.addEffect(new MobEffectInstance(pool.get(i), 400, amp - 1));
+            player.addEffect(new MobEffectInstance(pool.get(i), SPECIAL_FILTER_DURATION, amp - 1));
         }
     }
 }

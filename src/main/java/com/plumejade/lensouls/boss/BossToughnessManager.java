@@ -226,8 +226,8 @@ public class BossToughnessManager {
                 pendingResetSound.add(entry.getKey());
             }
 
-            // 定身到期标记，稍后查找实体解除
-            if (data.isBroken() && data.getStunRemainingTicks() <= 0) {
+            // 定身解除候选：倒计时到期、或生命已降到 1 以下（后者的实体上下文在下面统一取）
+            if (data.isBroken()) {
                 pendingStunEnd.add(entry.getKey());
             }
         }
@@ -249,17 +249,31 @@ public class BossToughnessManager {
             }
         }
 
-        // 定身到期解除（需实体上下文，在 tick 中查找）
+        // 定身解除（需实体上下文，在 tick 中查找），两个条件任一成立即解除：
+        //   ① 定身倒计时结束；
+        //   ② 生命降到 1 以下 —— 适配「死了之后定身还在持续，迟迟不结算死亡」的 BOSS：
+        //      例如 block_factorys_bosses 的 AbstractStateBossEntity#maybeCancelDeath 会把血量压到 0.1
+        //      并取消死亡（阶段/剧情流程），若此时仍被定身压制，那个流程会一直卡着不结算。
         if (!pendingStunEnd.isEmpty()) {
             MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
             if (server != null) {
                 for (UUID uuid : pendingStunEnd) {
                     for (ServerLevel sl : server.getAllLevels()) {
                         Entity entity = sl.getEntity(uuid);
-                        if (entity instanceof LivingEntity le && le.isAlive()) {
+                        if (!(entity instanceof LivingEntity le)) continue;
+
+                        BossToughnessData data = dataMap.get(uuid);
+                        boolean expired = data == null || data.getStunRemainingTicks() <= 0;
+                        boolean dying = le.getHealth() < 1.0f;
+                        if (expired || dying) {
+                            if (dying && !expired && le.getHealth() > 0.0f) {
+                                com.plumejade.lensouls.LenSouls.LOGGER.debug(
+                                        "[Toughness] 生命 {} < 1，提前解除定身：{}",
+                                        le.getHealth(), le.getName().getString());
+                            }
                             onStunEnd(le);
-                            break;
                         }
+                        break;
                     }
                 }
             }

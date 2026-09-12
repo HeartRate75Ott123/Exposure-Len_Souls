@@ -42,13 +42,37 @@ public final class Level2StaffBossAnimations {
     public static final String CAMERA_SHOOT = "camera_shoot";
     public static final float CAMERA_SHOOT_LENGTH_SEC = 2.0f;
 
-    /** 随机取一个近战变体 */
-    public static MeleeAnim randomMelee(RandomSource random) {
-        return MELEE_ANIMS[random.nextInt(MELEE_ANIMS.length)];
+    /**
+     * 随机取一个近战变体，并排除 {@code exclude}（上一次播过的动作名），
+     * 保证相邻两次动作不会重复。所有变体都被排除时（理论上只有 1 个变体才会发生）退回普通随机。
+     */
+    public static MeleeAnim randomMelee(RandomSource random, String exclude) {
+        return pick(MELEE_ANIMS, exclude, random, MeleeAnim::name);
     }
 
-    /** 随机取一个 spike 变体 */
-    public static SpikeAnim randomSpike(RandomSource random) {
-        return SPIKE_ANIMS[random.nextInt(SPIKE_ANIMS.length)];
+    /** 随机取一个 spike 变体，排除 {@code exclude}（实现见 {@link #randomMelee}） */
+    public static SpikeAnim randomSpike(RandomSource random, String exclude) {
+        return pick(SPIKE_ANIMS, exclude, random, SpikeAnim::name);
+    }
+
+    /**
+     * 从候选池里等概率取一个「名字 ≠ exclude」的元素。
+     * <p>
+     * 用蓄水池抽样一次遍历完成，避免 while 重抽在极端情况下打转；
+     * 若池中所有元素都被排除（只有 1 个变体时），退回池内普通随机。
+     */
+    private static <T> T pick(T[] pool, String exclude, RandomSource random,
+                              java.util.function.Function<T, String> nameOf) {
+        T chosen = null;
+        int seen = 0;
+        for (T candidate : pool) {
+            if (exclude != null && exclude.equals(nameOf.apply(candidate))) continue;
+            seen++;
+            if (random.nextInt(seen) == 0) {
+                chosen = candidate;
+            }
+        }
+        if (chosen != null) return chosen;
+        return pool[random.nextInt(pool.length)];
     }
 }

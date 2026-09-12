@@ -145,7 +145,12 @@ public class PotionGlassPaneRecipe extends CustomRecipe {
         return new ArrayList<>(map.values());
     }
 
-    private static List<PotionFilterData.Entry> effectFrom(ItemStack other) {
+    /**
+     * 推导该原料会被注入的效果（药水 → 其全部效果与各自等级/时长；试剂 → 固定 I 级默认时长）。
+     * <p>
+     * public 供 tooltip 使用：直接告诉玩家「这块原料能注入什么效果、几级、多久」。
+     */
+    public static List<PotionFilterData.Entry> effectFrom(ItemStack other) {
         List<PotionFilterData.Entry> result = new ArrayList<>();
         // 路径 A：已酿好的药水（水/喷溅/滞留）→ 携带其全部效果及各自的等级与时长
         if (isPotion(other)) {

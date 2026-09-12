@@ -42,11 +42,10 @@ public class FeatherTwitcherHandler {
     public static final float DAMAGE_TAKEN_MULTIPLIER = 2.0f;
     /** 造成伤害基础倍率（-25%） */
     public static final float BASE_DEALT_MULTIPLIER = 0.75f;
-    /** 每点扭曲值的伤害增幅（+2.5%，满值 +250%） */
-    public static final float DEALT_PER_TWIST = 0.025f;
+    /** 每点扭曲值的伤害增幅（+3%，满值 +300%） */
+    public static final float DEALT_PER_TWIST = 0.03f;
 
     public static final int MAX_TWIST = 100;
-    public static final int DEATH_ADD = 10;
     /** 存活扭曲者判定半径 */
     public static final int SPAWN_RANGE = 32;
     /** BOSS 判定半径 */
@@ -125,22 +124,29 @@ public class FeatherTwitcherHandler {
         }
     }
 
-    /** 死亡：扭曲值 +10 → 满 100 时尝试生成扭曲者 */
+    /**
+     * 死亡结算（触发点在死亡，不是累加）：
+     * <ul>
+     *   <li>扭曲值满 100 时<b>尝试召唤扭曲者</b>——去重逻辑保留：
+     *       附近 32 格内已有存活的归属扭曲者、或 64 格内有 BOSS 时不召唤；</li>
+     *   <li><b>无论这次有没有成功召唤，一律清零</b>（不再把 100 留给下次重试）；</li>
+     *   <li>扭曲值不足 100 时同样清零（「死亡就清0」）。</li>
+     * </ul>
+     * 满 100 时死亡仍保留「本次死亡强制掉落」标记（由掉落 mixin 消费）。
+     */
     @SubscribeEvent
     public static void onDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (!hasTwitcher(player)) return;
 
-        int twist = Math.min(MAX_TWIST, getTwist(player) + DEATH_ADD);
-        if (twist >= MAX_TWIST) {
+        if (getTwist(player) >= MAX_TWIST) {
+            // 去重：附近已有归属扭曲者 / 有 BOSS → 不召唤（但下面照样清零）
             if (canSpawnTwitcher(player)) {
                 spawnTwitcher(player);
-                twist = 0;
             }
-            // 满 100 死亡（无论是否生成）→ 标记本次死亡强制掉落，由掉落 mixin 消费
             player.getPersistentData().putBoolean(KEY_FORCE_DROP, true);
         }
-        setTwist(player, twist);
+        setTwist(player, 0);
     }
 
     /** 生成条件：死亡点 32 格内无存活归属扭曲者，且 64 格内无 BOSS */
@@ -177,26 +183,24 @@ public class FeatherTwitcherHandler {
         level.addFreshEntity(twitcher);
     }
 
-    /** 归属扭曲者死亡 → 玩家扭曲值清零 */
+    /**
+     * 扭曲者死亡 → 清零<b>击杀者</b>的扭曲值。
+     * <p>
+     * 需求：「杀死扭曲者就清击杀者的（如果佩戴了羽毛）」——只看击杀者，不看归属者；
+     * 击杀者必须佩戴着扭曲之人（否则他本来就没有扭曲值）；
+     * 该扭曲者是否归属自己不影响结算。
+     */
     @SubscribeEvent
     public static void onTwitcherDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof TwitcherEntity twitcher)) return;
         if (event.getEntity().level().isClientSide) return;
         LOGGER.info("[TwitchDeath] twitcher died at {}, owner={}", twitcher.blockPosition(), twitcher.getOwnerUuid());
 
-        UUID ownerId = twitcher.getOwnerUuid();
-        if (ownerId == null) return;
-        var server = event.getEntity().level().getServer();
-        if (server == null) return;
-        ServerPlayer player = server.getPlayerList().getPlayer(ownerId);
-        if (player == null) {
-            LOGGER.info("[TwitchDeath] owner {} not online", ownerId);
-            return;
-        }
-        LOGGER.info("[TwitchDeath] owner online, alive={} hasFeather={} twist={}",
-                player.isAlive(), hasTwitcher(player), getTwist(player));
-        if (player.isAlive() && hasTwitcher(player) && getTwist(player) > 0) {
-            setTwist(player, 0);
+        if (!(event.getSource().getEntity() instanceof ServerPlayer killer)) return;
+        if (!hasTwitcher(killer)) return;
+        if (getTwist(killer) > 0) {
+            LOGGER.info("[TwitchDeath] clear twist of killer {}", killer.getName().getString());
+            setTwist(killer, 0);
         }
     }
 }

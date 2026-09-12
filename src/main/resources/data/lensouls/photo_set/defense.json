@@ -1,0 +1,74 @@
+{
+  "cataclysm:cindaria": [
+    "cinder_swarm"
+  ],
+  "cataclysm:coral_golem": [
+    "coral_guard"
+  ],
+  "cataclysm:coralssus": [
+    "coral_guard"
+  ],
+  "cataclysm:lionfish": [
+    "coral_guard"
+  ],
+  "cataclysm:the_prowler": [
+    "magma_kin"
+  ],
+  "cataclysm:urchinkin": [
+    "coral_guard"
+  ],
+  "eternal_starlight:aethersent_golem": [
+    "glow_ward"
+  ],
+  "eternal_starlight:astral_golem": [
+    "glow_ward"
+  ],
+  "eternal_starlight:grimstone_golem": [
+    "glow_ward"
+  ],
+  "eternal_starlight:starlight_golem": [
+    "glow_ward"
+  ],
+  "minecraft:armadillo": [
+    "guardian_beast"
+  ],
+  "minecraft:donkey": [
+    "steel_hoof"
+  ],
+  "minecraft:horse": [
+    "steel_hoof"
+  ],
+  "minecraft:iron_golem": [
+    "guardian_beast"
+  ],
+  "minecraft:magma_cube": [
+    "magma_kin"
+  ],
+  "minecraft:mule": [
+    "steel_hoof"
+  ],
+  "minecraft:polar_bear": [
+    "guardian_beast"
+  ],
+  "minecraft:snow_golem": [
+    "guardian_beast"
+  ],
+  "minecraft:zombie_horse": [
+    "steel_hoof"
+  ],
+  "twilightforest:fire_beetle": [
+    "cinder_swarm"
+  ],
+  "twilightforest:knight_phantom": [
+    "castle_guard"
+  ],
+  "twilightforest:redcap": [
+    "castle_guard"
+  ],
+  "twilightforest:redcap_sapper": [
+    "castle_guard"
+  ],
+  "twilightforest:upper_goblin_knight": [
+    "castle_guard"
+  ]
+}

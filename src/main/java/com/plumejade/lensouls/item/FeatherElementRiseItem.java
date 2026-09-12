@@ -90,5 +90,6 @@ public class FeatherElementRiseItem extends Item implements ICurioItem {
         tooltip.add(Component.translatable("item.lensouls.feather_elementrise.desc1"));
         tooltip.add(Component.translatable("item.lensouls.feather_elementrise.desc2"));
         tooltip.add(Component.translatable("item.lensouls.feather_elementrise.desc3"));
+        tooltip.add(Component.translatable("item.lensouls.feather_elementrise.desc4"));
     }
 }

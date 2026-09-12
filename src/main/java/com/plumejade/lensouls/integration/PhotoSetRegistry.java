@@ -259,7 +259,13 @@ public class PhotoSetRegistry {
                         ? "受到 200 血以上的生物伤害 -" + pct(1.0 - Double.parseDouble(p[2]))
                         : "受到套装所需的这几种生物伤害 -" + pct(1.0 - Double.parseDouble(p[2]));
                 case "infusion_boost" -> "元素活性等级 +" + p[1];
+                case "speed_mult" -> "移动速度 ×" + p[1] + "（独立乘区）";
+                case "dmg_element" -> "你造成的" + elementKindCn(p[1]) + "伤害 ×" + p[2];
+                case "dot_mult" -> elementCn(ElementDamage.byName(p[1])) + "元素 DoT 伤害 ×" + p[2];
                 case "convert_eff" -> "获得" + effectNameCn(p[1]) + "时转为" + effectNameCn(p[2]) + "效果";
+                case "convert_heal" -> "获得" + effectNameCn(p[1]) + "时回复 " + p[2] + " 点生命";
+                case "convert_buff" -> "获得" + effectNameCn(p[1]) + "时获得 "
+                        + pct(Double.parseDouble(p[2])) + " 增伤（" + p[3] + " 秒）";
                 case "barrage_trigger" -> "弹幕额外触发 " + p[1] + " 次";
                 case "barrage_dmg" -> "弹幕伤害 ×" + p[1];
                 default -> inner;
@@ -274,16 +280,28 @@ public class PhotoSetRegistry {
         String[] p = inner.split(":");
         if (p[0].startsWith("immune_")) return ChatFormatting.GREEN;
         return switch (p[0]) {
-            case "dmg_mod", "dmg_taken", "barrage_trigger", "barrage_dmg", "on_hit_effect", "on_hit_suppress" -> ChatFormatting.RED;
+            case "dmg_mod", "dmg_taken", "barrage_trigger", "barrage_dmg", "on_hit_effect", "on_hit_suppress",
+                 "dmg_element", "dot_mult" -> ChatFormatting.RED;
             case "maxhp", "armor", "kb_resist", "immune", "dodge", "death_revive" -> ChatFormatting.GREEN;
-            case "speed", "env", "infusion_boost", "elem_activity" -> ChatFormatting.BLUE;
-            case "convert_eff" -> ChatFormatting.DARK_PURPLE;
+            case "speed", "speed_mult", "env", "infusion_boost", "elem_activity" -> ChatFormatting.BLUE;
+            case "convert_eff", "convert_heal", "convert_buff" -> ChatFormatting.DARK_PURPLE;
             default -> ChatFormatting.GRAY;
         };
     }
 
     private static String pct(double x) {
         return ((int) Math.round(x * 100)) + "%";
+    }
+
+    /** dmg_element 的四类伤害中文名 */
+    private static String elementKindCn(String kind) {
+        return switch (kind) {
+            case "fire" -> "火焰";
+            case "freeze" -> "冰冻";
+            case "wither" -> "凋零";
+            case "poison" -> "中毒";
+            default -> kind;
+        };
     }
 
     private static String ampCn(int amp) {

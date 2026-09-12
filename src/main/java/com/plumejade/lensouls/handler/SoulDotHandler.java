@@ -158,11 +158,21 @@ public class SoulDotHandler {
         ServerPlayer attacker = findAttacker(target, dot.attackerId());
         DamageSource source = new DamageSource(typeRef, null, attacker);
 
+        // 照片套装「元素 DoT 增伤」乘区（无套装效果时为 1.0）
+        // 羽·元素觉醒者：佩戴时元素 DoT ×3
+        float amount = dot.damagePerTick();
+        if (attacker != null) {
+            amount *= com.plumejade.lensouls.integration.PhotoSetEffects.getDotMultiplier(attacker, dot.element());
+            if (FeatherElementRiseHandler.hasFeather(attacker)) {
+                amount *= FeatherElementRiseHandler.DOT_MULTIPLIER;
+            }
+        }
+
         applyingDot = true;
         applyingDotElement = dot.element();
         try {
             target.invulnerableTime = 0;   // DoT 跳不被无敌帧吞掉
-            target.hurt(source, dot.damagePerTick());
+            target.hurt(source, amount);
         } finally {
             applyingDot = false;
             applyingDotElement = null;

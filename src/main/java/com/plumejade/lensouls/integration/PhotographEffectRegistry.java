@@ -111,7 +111,6 @@ public class PhotographEffectRegistry {
         add("legendary_monsters:posessed_paladin",
                 "§a挥击时 15% 概率在目标脚下逐排升起 3 根灵魂尖刺",
                 "§a灵魂尖刺：命中造成 等同攻击面板 的幽灵伤害",
-                "§a灵魂尖刺命中时赋予目标 灵魂碎裂 效果（持续 4 秒）",
                 "§a佩戴时赋予 抗性提升1 效果",
                 "§c佩戴时近战伤害 -12%");
         add("legendary_monsters:cloud_golem",
@@ -570,6 +569,22 @@ public class PhotographEffectRegistry {
         Set<String> s = new HashSet<>(DESCRIPTIONS.keySet());
         s.addAll(POTIONS.keySet());
         return s;
+    }
+
+    /**
+     * 该照片的有效描述行数（非空行）。
+     * <p>
+     * 供命中率分档使用：描述行数是「功能性强度」的现成代理指标——
+     * 0 行 ≈ 无功能、1 行 ≈ 单一被动、2 行及以上 ≈ 强功能。
+     */
+    public static int meaningfulLineCount(String entityId) {
+        List<String> lines = DESCRIPTIONS.get(entityId);
+        if (lines == null) return 0;
+        int count = 0;
+        for (String line : lines) {
+            if (line != null && !line.isEmpty()) count++;
+        }
+        return count;
     }
 
     public static String entityIdToTranslationKey(String entityId) {

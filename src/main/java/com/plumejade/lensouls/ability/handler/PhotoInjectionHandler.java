@@ -82,7 +82,8 @@ public class PhotoInjectionHandler {
 
             AbilityType ability = CameraAbilityStore.getSelected(player);
             if (ability == null) return;
-            if (ability == AbilityType.TIME_STOP || ability == AbilityType.VITAL_STRIKE || ability == AbilityType.SOUL_SEVER) return;
+            // 即时生效类能力（时间定格/要害打击/断魂）不注入照片——行为声明见 AbilityBehavior
+            if (!com.plumejade.lensouls.ability.AbilityBehavior.producesAbilityPhoto(ability)) return;
 
             ItemStack hand = CameraInputHandler.getWieldedCamera(player);
             if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), hand) <= 0) return;
@@ -90,6 +91,15 @@ public class PhotoInjectionHandler {
             // 按帧 ID 存储能力，后续切换能力不影响已拍帧
             LenSouls.LOGGER.debug("[PhotoInject] onFrameAdded: exposureId={} ability={}", exposureId, ability);
             pendingAbilities.put(exposureId, ability);
+
+            // 见微知著：把画面中的生物自动解锁进图鉴（只读生物，花草等环境豁免；零额外射线）
+            if (ability == AbilityType.WILD_GLIMPSE) {
+                int unlocked = com.plumejade.lensouls.integration.FieldGuideBridge.unlockEntities(
+                        player, event.getEntitiesInFrame());
+                if (unlocked > 0) {
+                    LenSouls.LOGGER.debug("[PhotoInject] 见微知著解锁图鉴 {} 条", unlocked);
+                }
+            }
 
             // 能力窃取：缓存被窃取实体 + Boss 判定（首领清单）
             if (ability == AbilityType.ABILITY_STEAL) {

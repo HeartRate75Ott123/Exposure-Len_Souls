@@ -38,6 +38,20 @@ public class ModAttributes {
     public static final DeferredHolder<Attribute, Attribute> DODGE_CHANCE =
             register("dodge_chance", 0.0, 0.0, 1.0);
 
+    /**
+     * 命中率：玩家造成伤害的概率。默认 100%，上限 100%。
+     * <p>
+     * 基值为 1.0 且照片用 {@link net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation#ADD_MULTIPLIED_BASE}
+     * 加减（如 -0.24 表示 -24%）：这样 Curios/原版属性行会原生渲染成百分比
+     * （{@code 命中率 -24%}），无需自定义 tooltip 格式。
+     * <p>
+     * 语义上以「惩罚」为主、其余照片给正向加成用于抵扣：弹幕类照片 -24%，
+     * 小白/唤魔者 -6%，其余按功能性弱强给 +7%~+14%（越弱给越多）。
+     * 因上限为 100%，单独佩戴正向照片不会超过 100%，其价值体现在抵扣惩罚。
+     */
+    public static final DeferredHolder<Attribute, Attribute> HIT_CHANCE =
+            register("hit_chance", 1.0, 0.0, 1.0);
+
     private static DeferredHolder<Attribute, Attribute> register(String name) {
         // 默认 1.0：弱点以 ADD_MULTIPLIED_BASE 百分比修饰叠加（0.12 → 显示 +12%），
         // 实际系数 = 属性值 - 1.0

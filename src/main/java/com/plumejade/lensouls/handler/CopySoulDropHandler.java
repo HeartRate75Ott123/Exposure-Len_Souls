@@ -34,10 +34,11 @@ public class CopySoulDropHandler {
         // 首领清单（boss_entities/bosses.json）内的实体豁免血量门槛（如 the_gatekeeper 仅 175 血）
         if (entity.getMaxHealth() < 200f && !BossEntityLoader.isBoss(entity)) return;
 
-        // 佩戴羽·元素觉醒者/羽·荒厄遗咒的玩家击杀 → 不掉落复制之魂
+        // 佩戴羽·荒厄遗咒的玩家击杀 → 不掉落复制之魂
+        // （羽·元素觉醒者的「无法掉落复制之魂」已按需求移除：佩戴时 BOSS 照常掉落，
+        //   它仍保留「无法使用复制之魂」，由 CopySoulItem 的配方层拦截处理）
         LivingEntity killer = entity.getKillCredit();
-        if (killer instanceof Player player
-                && (FeatherElementRiseHandler.hasFeather(player) || FeatherHardmanHandler.hasHardman(player))) {
+        if (killer instanceof Player player && FeatherHardmanHandler.hasHardman(player)) {
             return;
         }
 

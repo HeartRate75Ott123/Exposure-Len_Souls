@@ -1,0 +1,93 @@
+{
+  "archaion:brave": [
+    "archaion_evasion"
+  ],
+  "archaion:deepslate_sentinel": [
+    "archaion_speed"
+  ],
+  "archaion:grimoray": [
+    "archaion_speed"
+  ],
+  "archaion:haunter": [
+    "archaion_speed"
+  ],
+  "archaion:slated": [
+    "archaion_evasion"
+  ],
+  "archaion:wight": [
+    "archaion_evasion"
+  ],
+  "cataclysm:scylla": [
+    "tide_fang"
+  ],
+  "eternal_starlight:aurora_deer": [
+    "astral_herd"
+  ],
+  "eternal_starlight:boarwarf": [
+    "astral_herd"
+  ],
+  "eternal_starlight:luminofish": [
+    "starfire_ascend"
+  ],
+  "eternal_starlight:ratlin": [
+    "astral_herd"
+  ],
+  "eternal_starlight:rookfish": [
+    "starfire_ascend"
+  ],
+  "eternal_starlight:shimmer_lacewing": [
+    "astral_herd"
+  ],
+  "eternal_starlight:starfire_bird": [
+    "astral_herd",
+    "starfire_ascend"
+  ],
+  "eternal_starlight:thirst_walker": [
+    "starfire_ascend"
+  ],
+  "minecraft:allay": [
+    "sky_riders"
+  ],
+  "minecraft:axolotl": [
+    "tide_fang"
+  ],
+  "minecraft:bat": [
+    "sky_riders"
+  ],
+  "minecraft:bee": [
+    "sky_riders"
+  ],
+  "minecraft:camel": [
+    "beast_tamer"
+  ],
+  "minecraft:donkey": [
+    "beast_tamer"
+  ],
+  "minecraft:horse": [
+    "beast_tamer"
+  ],
+  "minecraft:llama": [
+    "beast_tamer"
+  ],
+  "minecraft:mule": [
+    "beast_tamer"
+  ],
+  "minecraft:parrot": [
+    "sky_riders"
+  ],
+  "minecraft:squid": [
+    "tide_fang"
+  ],
+  "minecraft:trader_llama": [
+    "beast_tamer"
+  ],
+  "minecraft:vex": [
+    "sky_riders"
+  ],
+  "twilightforest:knight_phantom": [
+    "wraith_veil"
+  ],
+  "twilightforest:wraith": [
+    "wraith_veil"
+  ]
+}

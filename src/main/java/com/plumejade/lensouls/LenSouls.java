@@ -76,6 +76,7 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(DamageHandler.class);
         NeoForge.EVENT_BUS.register(PhotoDamageHandler.class);
         NeoForge.EVENT_BUS.register(ArmorPenHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.damage.HitChanceHandler.class);
         NeoForge.EVENT_BUS.register(EnchantmentRemovalListener.class);
         NeoForge.EVENT_BUS.register(VillagerTradeHandler.class);
         NeoForge.EVENT_BUS.register(GunKillHandler.class);
@@ -102,6 +103,10 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotoSetEffects.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.SuppressHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.IgnisBrandHandler.class);
+        // ---- 石之心（单次受伤上限 25% 最大生命，受到伤害 +17%） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.HeartOfStoneHandler.class);
+        // ---- 虚影核心 / 虚影残像（死亡掉落托管容器） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.PhantomRemnantHandler.class);
 
         // Curios 照片饰品槽（运行时检测）
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.CuriosIntegration.class);

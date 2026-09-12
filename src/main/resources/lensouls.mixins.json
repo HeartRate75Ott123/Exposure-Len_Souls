@@ -35,7 +35,8 @@
     "client.LevelRendererMixin",
     "client.MinecraftSwingMixin",
     "client.BossHealthOverlayMixin",
-    "client.ClientboundBossEventPacketAccessor"
+    "client.ClientboundBossEventPacketAccessor",
+    "client.PhantomRemnantScaleMixin"
   ],
   "injectors": {
     "defaultRequire": 1

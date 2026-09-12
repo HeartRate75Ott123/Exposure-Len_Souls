@@ -1,0 +1,93 @@
+{
+  "castle_guard": {
+    "name": "城堡卫队",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "armor:0.15",
+          "kb_resist:0.2",
+          "dmg_element:wither:2.2"
+        ]
+      }
+    ]
+  },
+  "glow_ward": {
+    "name": "辉光守者",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "armor:0.15",
+          "kb_resist:0.2",
+          "dmg_element:freeze:2.2"
+        ]
+      }
+    ]
+  },
+  "guardian_beast": {
+    "name": "守家猛兽",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "armor:0.15",
+          "kb_resist:0.15",
+          "dmg_element:fire:2.2"
+        ]
+      }
+    ]
+  },
+  "coral_guard": {
+    "name": "珊瑚守哨",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "env:water_breath",
+          "armor:0.15",
+          "dot_mult:water:1.8"
+        ]
+      }
+    ]
+  },
+  "cinder_swarm": {
+    "name": "炽粉虫群",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "immune_fire",
+          "cond:fire|maxhp:0.2",
+          "dmg_element:fire:2.8"
+        ]
+      }
+    ]
+  },
+  "magma_kin": {
+    "name": "岩浆之裔",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "immune_fire",
+          "cond:fire|speed_mult:2.8",
+          "dmg_element:fire:2.8"
+        ]
+      }
+    ]
+  },
+  "steel_hoof": {
+    "name": "钢蹄铁骑",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "speed_mult:2.2",
+          "kb_resist:0.2",
+          "dot_mult:earth:1.8"
+        ]
+      }
+    ]
+  }
+}

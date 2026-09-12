@@ -133,3 +133,64 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
 - Exposure/ExposurePolaroid = implementation（必装）；JEI/Jade = compileOnly（jar 在 `run/mods/`）
 - 灾变/传奇怪物相关代码用反射/类名判断（`BossPhantomType.isModLoaded()`），无编译依赖
 - 新增元素：改 `ElementDamage` 枚举 + `ModEffects` + `ModItems` + `ModCreativeTabs` + 弱点数据包 + 语言文件（见 CLAUDE.md）
+
+
+## 2026-09 需求批次（提示词222）落地记录
+
+### 拍摄可见性（Exposure 视锥问题）
+- 唯一入口 `util/CameraVisibility`：视锥 + 硬距离上限（`Config.CAMERA_MAX_CAPTURE_DISTANCE`，默认 32）+ **必须命中包围盒中心**的方块遮挡判定（`ClipContext.Block.COLLIDER`）。
+- `mixin/EntitiesInFrameMixin` 已重写为 TAIL `@Inject`：只**收窄** Exposure 给出的实体列表。不要退回 `@Redirect`——处理器多写的 `Entity` 参数会被当成宿主方法隐式捕获，曾导致距离/穿墙过滤恒失效。
+- `util/AimTargetUtil.isAimedAt` 同样叠加可见性判定（要害打击/断魂不再隔墙锁定）。
+- `mixin/compat/FieldGuideExposureMixin` 取消 Field Guide 的 `ExposureCompat.unlockContentInFrame`（1+49 条射线 × 256 格 + 解锁方块 = 卡顿根因）。
+- `integration/FieldGuideBridge`：纯反射，只解锁 **mob**（过滤 `MobCategory.MISC`），先 `tryUnlock(...SCAN)`，失败再强制 `unlock(player,id,null,true)`——不依赖对方模组的配置/触发/前置。
+
+### 新相机能力：见微知著 wild_glimpse
+- `AbilityType.WILD_GLIMPSE` **必须追加在枚举末尾**（ordinal 参与网络同步）。
+- `ability/AbilityBehavior`：能力 → 是否产出能力照片 / 是否需要框内有实体 / 写什么照片数据；新增能力只改这一处。
+- `ability/PhotoInjector`：拍立得与暗房两条出片路径共用的一份注入实现。
+- 只有 WILD_GLIMPSE 调 `FieldGuideBridge.unlockEntities` 解锁图鉴（需求明确：不依赖原模组配置，拍到即解锁；且只有该能力解锁）。
+
+### 照片饰品
+- 新属性 `lensouls:hit_chance`（默认 100%、上限 100%）：`damage/HitChanceHandler` 在 `LivingIncomingDamageEvent`（LOWEST）掷骰，未命中直接 cancel（完全无法造成伤害）。弹幕类照片 -24%、`minecraft:skeleton`/`evoker` -6%、其余 +7%~14%。
+- 套装定义按 7 类拆分为 `data/lensouls/photo_set_defs/{attack,defense,survival,mobility,conversion,daynight,balanced}.json`（`photo_set/membership.json` 同步拆分）；`cataclysm:lava_bat` 已从 JEI/能力窃取/套装配置中全部移除。
+- 新描述符：`dmg_element:<元素>:<x>`、`dot_mult:<元素>:<x>`、`speed_mult:<x>`（乘区）、`convert_heal:<x>`、`convert_buff:<x>`；转换期临时增益存**根键** `lensouls:convert_dmg_mult` / `lensouls:convert_dmg_until`（不能放 FLAGS，`applyPlan` 会重写它）。
+
+### 虚影核心 / 虚影残像（复刻 Enigmatic Legacy 超维容器）
+- 死亡结算必须放 `LivingDeathEvent`（此时背包完好）；`LivingDropsEvent` 只能当兜底——`dropEquipment()` 在 drops 之前就已清空背包与 Curios。
+- **实体类型必须显式用 `ModEntities.PHANTOM_REMNANT.get()`**：原版 `ItemEntity(Level,x,y,z,ItemStack)` 第一行写死 `this(EntityType.ITEM, level)`，服务端类是 `PhantomRemnantEntity` 而客户端按 `minecraft:item` 造出普通 `ItemEntity` → 走原版渲染器（1×、无自定义渲染、无实体 tick/粒子），实机症状就是"一个发光的普通掉落物"。
+- `ItemEntity.setUnlimitedLifetime()` 的字节码就是 `age = -32768`，而 `tick()` 内是 `if (age != -32768) ++age` → **age 永久冻结**；`getSpin()` 与浮动都以 age 为相位源，冻结后表现为"定住一个方向 + 抽搐"。自绘渲染器的动画相位一律用 `tickCount`（`BossPhantomRenderer` 同款做法）。
+- 发光走原版描边（`setGlowingTag(true)`）：`LevelRenderer.renderEntity` 在 `shouldEntityAppearGlowing` 成立时把 `MultiBufferSource` 换成 `OutlineBufferSource`，后者对非 outline 的 RenderType 取 `RenderType.outline()` —— 因此**自绘渲染器同样会被描边**。
+- 经验**全额**缓存（等级+进度），拾取时先发经验再逐件按原槽位归位；`keepInventory` 开启时整套不生效；容器仅所有者可拾取；虚影核心自身 `ALWAYS_KEEP` 且不被容器收纳。
+
+### 跨模组战斗改动
+- 弹射物免疫全局解除：`mixin/compat/ProjectileImmunityMixins`（嵌套静态类 ×7：传奇怪物 Shulker_Mimic / FlamebornGuard / FlamebornWarrior / AnnihilationPursuer + 灾变 Kobolediator / Wadjet / Scylla）。**刻意排除** Ignis / Ignited_Revenant / Royal_Draugr——它们的 `IS_PROJECTILE` 只用于"吸收自身火球回盾"和盾反前置，改掉会让投射物反而触发盾反。
+- 定身优化：`BossToughnessManager.tick` 中「生命 < 1」同样解除定身（适配 block_factorys_bosses 的 `maybeCancelDeath` 把血量压到 0.1 并取消死亡，否则阶段/死亡流程一直卡住）。
+- 克拉肯船炮：`DamageHandler.isKrakenCannonball` 豁免"非元素弱点攻击 ×0.1"的武器匹配惩罚（伤害类型 `block_factorys_bosses:cannonball_hit` / 实体 `block_factorys_bosses:cannonball` / 物品 `kraken_cannon_item`）。
+- N公司2级员工：`Level2StaffBossAnimations.randomMelee/randomSpike(random, exclude)` 用蓄水池抽样排除上一次动作；挥击音效移到攻击判定帧（`meleeSounded`），不再等命中成立。
+- 药水玻璃板：`PotionGlassPaneRecipe.effectFrom` 改 public，tooltip 对药水/试剂额外列出"可注入效果名 + 等级 + 时长"。
+
+### 构建/环境
+- pwsh 下用 `.\gradlew.bat build`；**客户端开着时 `createMinecraftArtifacts` 会因 merged jar 被锁而失败**（`AccessDeniedException ... is locked by`）。dev 客户端本身就编译源码，无需先构建 jar。
+- `build.gradle` 的 `-Dlensouls.leakdiag=true` 与 `-XX:NativeMemoryTracking=summary` 已注释（遗留诊断，会持续刷 `[LeakDiag]` 日志）。
+
+
+### 补记：弹射物免疫有「两套写法」（实测 legendary_monsters:overgrown_colossus 仍反弹弓箭后发现）
+
+第一版只处理了 `DamageSource.is(DamageTypeTags.IS_PROJECTILE)`，实测遗漏。反编译实际 jar 后确认这两批 boss 还有**第二套**写法：
+`source.getDirectEntity() instanceof AbstractArrow / ThrownPotion` 直接 `return false`（传奇怪物的判定还被
+`ModConfig.MobConfig.<Boss>projectile` 这一系列配置项包着，`Overgrownprojectile` 就是其中之一——所以**改玩家配置没用，必须 mixin**）。
+
+| 写法 | 判定点 | 解除方式 |
+|------|--------|---------|
+| 标签判定 | 传奇怪物 4（Shulker_Mimic / Flameborn×2 / AnnihilationPursuer）＋灾变 3（Kobolediator / Wadjet / Scylla） | `ProjectileImmunityHelper.allowProjectile`：`is(IS_PROJECTILE)` 恒 false |
+| 类型判定 | 传奇怪物 **19**（Cloud_Golem / Frostbitten_Golem / Lava_eater / Overgrown_colossus / Skeletosaurus / Warped_Fungussus / Withered_Abomination / Ambusher / Ancient_Guardian / Chorusling / Endersent / HauntedGuard / PosessedPaladin / HauntedKnightOld / OldHauntedGuard / MossyGolem / Skeloraptor / FHauntedGuard / DuneSentinel）＋灾变 **5**（Ender_Guardian / The_Harbinger / Ancient_Remnant / Kobolediator / Wadjet） | `ProjectileImmunityHelper.hideProjectileDirectEntity`：把外来投射物的直接实体置空，使 `instanceof` 分支失效 |
+
+**必须保留「自己的弹射物不打自己」的自伤保护**：灾变 `Kobolediator`/`Wadjet` 的毒镖免疫与弓箭判定**共用同一个局部变量**，
+`Ender_Guardian` 的自身子弹免疫同理。因此置空逻辑是「`projectile.getOwner() == self` 时原样放行，其余置空」，
+无差别置空会让这些 boss 被自己的弹射物打伤。
+
+刻意不动：`Ignis`（吸收自身火球回盾＋盾反前置）、`Ignited_Revenant`/`Royal_Draugr`（盾反前置）、
+`AreaEffectCloud` 滞留药水云（不属于「弹射物」）。
+
+`ProjectileImmunityMixins` 现为 31 个嵌套静态类，全部由 `javap -c` 逐点核实；`lensouls.compat.mixins.json` 同步登记。
+远端验证方法：进游戏用弓射这些 boss，伤害应正常结算（不再反弹/免伤）。

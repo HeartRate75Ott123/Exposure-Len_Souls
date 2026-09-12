@@ -36,6 +36,11 @@ public class Config {
             .comment("Photo damage bonus multiplier (e.g. 1.2 = +120% damage)")
             .defineInRange("photoBonus", 1.2, 0.0, 10.0);
 
+    public static final ModConfigSpec.DoubleValue CAMERA_MAX_CAPTURE_DISTANCE = BUILDER
+            .comment("Max distance (blocks) at which the camera and camera abilities can register entities.",
+                    "Mobs beyond this are never captured, even if inside the viewfinder frustum. 0 = unlimited.")
+            .defineInRange("cameraMaxCaptureDistance", 32.0, 0.0, 256.0);
+
     static { BUILDER.pop(); }
 
     // ==================== 次元枪 ====================

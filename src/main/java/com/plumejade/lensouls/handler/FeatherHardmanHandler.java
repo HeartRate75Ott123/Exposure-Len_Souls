@@ -39,8 +39,8 @@ public class FeatherHardmanHandler {
 
     /** 受到伤害倍率（+75%） */
     public static final float DAMAGE_TAKEN_MULTIPLIER = 1.75f;
-    /** 造成伤害倍率（+125%） */
-    public static final float DAMAGE_DEALT_MULTIPLIER = 2.25f;
+    /** 造成伤害倍率（总倍率 ×4.0，即增幅 +300%；原为 ×2.25 / +125%） */
+    public static final float DAMAGE_DEALT_MULTIPLIER = 4.0f;
     /** 基础护甲值加成 */
     public static final int ARMOR_BONUS = 10;
     /** 攻击附加负面效果概率（35%） */

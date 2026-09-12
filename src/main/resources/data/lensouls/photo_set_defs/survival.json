@@ -1,0 +1,105 @@
+{
+  "overgrown": {
+    "name": "藤甲巨像",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "maxhp:0.25",
+          "kb_resist:0.2",
+          "dot_mult:earth:2.2"
+        ]
+      }
+    ]
+  },
+  "maze_lurker": {
+    "name": "迷牢潜伏者",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "cond:night|maxhp:0.2",
+          "dodge:0.1",
+          "dot_mult:ender:1.8"
+        ]
+      }
+    ]
+  },
+  "lunar_spawn": {
+    "name": "月相之裔",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "cond:night|maxhp:0.25",
+          "dodge:0.1"
+        ]
+      }
+    ]
+  },
+  "bone_march": {
+    "name": "枯骨行军",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "cond:night|maxhp:0.3",
+          "barrage_trigger:1",
+          "dmg_element:wither:2.2"
+        ]
+      }
+    ]
+  },
+  "pack_bond": {
+    "name": "群兽之契",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "maxhp:0.1",
+          "speed_mult:2.0",
+          "dot_mult:earth:1.8"
+        ]
+      }
+    ]
+  },
+  "forest_spirit": {
+    "name": "林间精灵",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "speed_mult:2.2",
+          "maxhp:0.1",
+          "dot_mult:earth:1.8"
+        ]
+      }
+    ]
+  },
+  "moth_dance": {
+    "name": "流萤之舞",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "env:dark_invis",
+          "cond:night|maxhp:0.15",
+          "dot_mult:ender:1.8"
+        ]
+      }
+    ]
+  },
+  "ender_void": {
+    "name": "终末虚空",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "dodge:0.1",
+          "cond:night|maxhp:0.2",
+          "dot_mult:ender:2.2"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "cataclysm:ender_golem": [
+    "ender_void"
+  ],
+  "cataclysm:ender_guardian": [
+    "ender_void"
+  ],
+  "cataclysm:endermaptera": [
+    "ender_void"
+  ],
+  "eternal_starlight:crystallized_moth": [
+    "moth_dance"
+  ],
+  "eternal_starlight:luminaris": [
+    "moth_dance"
+  ],
+  "eternal_starlight:lunar_monstrosity": [
+    "lunar_spawn"
+  ],
+  "eternal_starlight:seeker": [
+    "lunar_spawn"
+  ],
+  "eternal_starlight:shadow_snail": [
+    "lunar_spawn"
+  ],
+  "eternal_starlight:shimmer_lacewing": [
+    "moth_dance"
+  ],
+  "eternal_starlight:twilight_gaze": [
+    "moth_dance"
+  ],
+  "legendary_monsters:mossy_golem": [
+    "overgrown"
+  ],
+  "legendary_monsters:overgrown_colossus": [
+    "overgrown"
+  ],
+  "minecraft:cat": [
+    "pack_bond"
+  ],
+  "minecraft:chicken": [
+    "bone_march"
+  ],
+  "minecraft:enderman": [
+    "ender_void"
+  ],
+  "minecraft:endermite": [
+    "ender_void"
+  ],
+  "minecraft:fox": [
+    "pack_bond"
+  ],
+  "minecraft:ocelot": [
+    "pack_bond"
+  ],
+  "minecraft:parrot": [
+    "pack_bond"
+  ],
+  "minecraft:wolf": [
+    "pack_bond"
+  ],
+  "minecraft:zombie": [
+    "bone_march"
+  ],
+  "minecraft:zombie_horse": [
+    "bone_march"
+  ],
+  "twilightforest:deer": [
+    "forest_spirit"
+  ],
+  "twilightforest:maze_slime": [
+    "maze_lurker"
+  ],
+  "twilightforest:minoshroom": [
+    "overgrown"
+  ],
+  "twilightforest:pinch_beetle": [
+    "maze_lurker"
+  ],
+  "twilightforest:raven": [
+    "forest_spirit"
+  ],
+  "twilightforest:slime_beetle": [
+    "maze_lurker"
+  ],
+  "twilightforest:squirrel": [
+    "forest_spirit"
+  ],
+  "twilightforest:tiny_bird": [
+    "forest_spirit"
+  ],
+  "twilightforest:towerwood_borer": [
+    "maze_lurker"
+  ]
+}

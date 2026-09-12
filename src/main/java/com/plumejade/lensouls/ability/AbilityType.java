@@ -6,6 +6,10 @@ import net.minecraft.resources.ResourceLocation;
  * 摄魂术能力枚举。
  * <p>
  * 声明顺序即 GUI 中卡片展示顺序（新能力追加枚举即可自动收纳）。
+ * <p>
+ * <b>严禁在中间插入常量</b>：{@code PlayerAbilityData} 的解锁位图与存档里的
+ * {@code currentOrdinal} 都按 ordinal 记录，插队会让老存档的能力解锁状态整体错位。
+ * 新能力一律追加到末尾。
  */
 public enum AbilityType {
 
@@ -15,7 +19,9 @@ public enum AbilityType {
     TIME_STOP("time_stop"),
     VITAL_STRIKE("vital_strike"),
     SOUL_SEVER("soul_sever"),
-    ABILITY_STEAL("ability_steal");
+    ABILITY_STEAL("ability_steal"),
+    /** 见微知著：拍照记录画面中的生物 → 解锁图鉴条目，并赋予随机持久属性增益 */
+    WILD_GLIMPSE("wild_glimpse");
 
     private final String id;
 
@@ -63,12 +69,5 @@ public enum AbilityType {
      */
     public boolean requiresEnchantment() {
         return true;
-    }
-
-    /**
-     * 该能力是否需要在拍照时向照片注入额外数据。
-     */
-    public boolean injectsPhotoData() {
-        return this == SPATIAL_WARP || this == TEMPORAL_RECALL || this == ABILITY_STEAL;
     }
 }

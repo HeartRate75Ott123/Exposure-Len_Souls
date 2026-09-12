@@ -3,6 +3,7 @@ package com.plumejade.lensouls.util;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.entity.PartEntity;
 
@@ -11,6 +12,9 @@ import net.neoforged.neoforge.entity.PartEntity;
  * <p>
  * 对多部件实体（九头蛇/娜迦等），父实体中心可能远离准星；只要其任一存活子部件落在
  * 玩家视锥（锥角内）与射程内，即视为瞄准该父实体——实现「拍子实体局部也能追溯到本体」。
+ * <p>
+ * 判定包含<b>遮挡</b>（{@link CameraVisibility#hasClearSight}）：曾经这里只有锥角 + 射程，
+ * 导致要害打击/断魂可以直接锁定墙后与地下的 BOSS。现在遇方块即止。
  */
 public final class AimTargetUtil {
 
@@ -18,7 +22,7 @@ public final class AimTargetUtil {
     }
 
     /**
-     * 玩家是否瞄准了给定实体（或其任一子部件）。
+     * 玩家是否瞄准了给定实体（或其任一子部件），并且有清晰视线。
      *
      * @param player        玩家
      * @param entity        待判定的实体（父实体）
@@ -26,6 +30,7 @@ public final class AimTargetUtil {
      * @param halfAngleDeg  锥半角（度），如 30 表示总锥角 60°
      */
     public static boolean isAimedAt(Player player, LivingEntity entity, double range, double halfAngleDeg) {
+        Level level = player.level();
         Vec3 eye = player.getEyePosition();
         Vec3 look = player.getLookAngle();
         double maxDistSqr = range * range;
@@ -33,7 +38,7 @@ public final class AimTargetUtil {
 
         if (entity.distanceToSqr(player) <= maxDistSqr) {
             Vec3 dir = entity.position().subtract(eye).normalize();
-            if (look.dot(dir) >= cos) return true;
+            if (look.dot(dir) >= cos && CameraVisibility.hasClearSight(level, eye, entity)) return true;
         }
 
         PartEntity<?>[] parts = entity.getParts();
@@ -42,7 +47,7 @@ public final class AimTargetUtil {
                 if (p == null || !p.isAlive()) continue;
                 if (p.distanceToSqr(player) > maxDistSqr) continue;
                 Vec3 pdir = p.getEyePosition().subtract(eye).normalize();
-                if (look.dot(pdir) >= cos) return true;
+                if (look.dot(pdir) >= cos && CameraVisibility.hasClearSight(level, eye, p)) return true;
             }
         }
         return false;

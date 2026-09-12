@@ -1,0 +1,149 @@
+{
+  "cataclysm:deepling": [
+    "deep_reef"
+  ],
+  "cataclysm:deepling_angler": [
+    "deep_reef"
+  ],
+  "cataclysm:deepling_brute": [
+    "deep_reef"
+  ],
+  "cataclysm:deepling_priest": [
+    "deep_reef"
+  ],
+  "cataclysm:deepling_warlock": [
+    "deep_reef"
+  ],
+  "cataclysm:netherite_ministrosity": [
+    "infernal_herd"
+  ],
+  "cataclysm:netherite_monstrosity": [
+    "infernal_herd"
+  ],
+  "cataclysm:the_leviathan": [
+    "abyss_song"
+  ],
+  "eternal_starlight:freeze": [
+    "permafrost_bind"
+  ],
+  "eternal_starlight:permafrost": [
+    "permafrost_bind"
+  ],
+  "eternal_starlight:yeti": [
+    "permafrost_bind"
+  ],
+  "fdbosses:chesed": [
+    "fdbosses_damage"
+  ],
+  "fdbosses:geburah": [
+    "fdbosses_damage"
+  ],
+  "fdbosses:malkuth": [
+    "fdbosses_damage"
+  ],
+  "legendary_monsters:annihilation_pursuer": [
+    "obliterator"
+  ],
+  "legendary_monsters:cloud_golem": [
+    "cloud_beam"
+  ],
+  "legendary_monsters:endersent": [
+    "obliterator"
+  ],
+  "legendary_monsters:frostbitten_golem": [
+    "frost_golem"
+  ],
+  "legendary_monsters:hovering_hurricane": [
+    "cloud_beam"
+  ],
+  "legendary_monsters:skeletosaurus": [
+    "skeletal_legion"
+  ],
+  "legendary_monsters:skeloraptor": [
+    "skeletal_legion"
+  ],
+  "legendary_monsters:the_obliterator": [
+    "obliterator"
+  ],
+  "legendary_monsters:wandering_eye": [
+    "cloud_beam"
+  ],
+  "minecraft:bogged": [
+    "swamp_witch"
+  ],
+  "minecraft:elder_guardian": [
+    "abyss_song"
+  ],
+  "minecraft:frog": [
+    "swamp_witch"
+  ],
+  "minecraft:guardian": [
+    "abyss_song"
+  ],
+  "minecraft:hoglin": [
+    "infernal_herd"
+  ],
+  "minecraft:piglin": [
+    "underground"
+  ],
+  "minecraft:piglin_brute": [
+    "underground"
+  ],
+  "minecraft:silverfish": [
+    "underground"
+  ],
+  "minecraft:skeleton": [
+    "pale_hunt",
+    "skeletal_legion"
+  ],
+  "minecraft:skeleton_horse": [
+    "pale_hunt"
+  ],
+  "minecraft:slime": [
+    "swamp_witch"
+  ],
+  "minecraft:spider": [
+    "pale_hunt"
+  ],
+  "minecraft:stray": [
+    "frost_golem"
+  ],
+  "minecraft:strider": [
+    "underground"
+  ],
+  "minecraft:witch": [
+    "swamp_witch"
+  ],
+  "minecraft:wither_skeleton": [
+    "skeletal_legion"
+  ],
+  "minecraft:zoglin": [
+    "infernal_herd"
+  ],
+  "minecraft:zombified_piglin": [
+    "underground"
+  ],
+  "twilightforest:alpha_yeti": [
+    "frost_titan",
+    "permafrost_bind"
+  ],
+  "twilightforest:hedge_spider": [
+    "bramble_hunt"
+  ],
+  "twilightforest:ice_crystal": [
+    "frost_golem",
+    "frost_titan"
+  ],
+  "twilightforest:king_spider": [
+    "bramble_hunt"
+  ],
+  "twilightforest:snow_guardian": [
+    "frost_titan"
+  ],
+  "twilightforest:stable_ice_core": [
+    "frost_titan"
+  ],
+  "twilightforest:swarm_spider": [
+    "bramble_hunt"
+  ]
+}

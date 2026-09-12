@@ -55,6 +55,15 @@ public class PhotoSetEffects {
     private static final ResourceLocation ID_ARMOR = ResourceLocation.fromNamespaceAndPath("lensouls", "set_armor");
     private static final ResourceLocation ID_KB = ResourceLocation.fromNamespaceAndPath("lensouls", "set_kb");
     private static final ResourceLocation ID_DODGE = ResourceLocation.fromNamespaceAndPath("lensouls", "set_dodge");
+    /**
+     * 移速「乘区」修饰符：与 {@link #ID_SPEED}（ADD_MULTIPLIED_BASE，与其它 base 加成同池相加）分离，
+     * 走 ADD_MULTIPLIED_TOTAL，从而与速度药水等所有加成相乘，形成独立的乘法层。
+     */
+    private static final ResourceLocation ID_SPEED_MULT = ResourceLocation.fromNamespaceAndPath("lensouls", "set_speed_mult");
+
+    /** 转化时获得的临时增伤：存在 persistentData 根键（不放 FLAGS，避免被每 tick 的 applyPlan 覆盖） */
+    private static final String CONVERT_DMG_MULT = "lensouls:convert_dmg_mult";
+    private static final String CONVERT_DMG_UNTIL = "lensouls:convert_dmg_until";
 
     private static final List<Holder<Attribute>> SET_ATTRS = List.of(
             net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH,
@@ -118,7 +127,11 @@ public class PhotoSetEffects {
         Set<String> onHit = new HashSet<>();
         CompoundTag flags = new CompoundTag();
         int infusionBoost = 0;
-        List<String> converts = new ArrayList<>();
+        double speedMult = 1.0;
+        // 转化类：from → 转化目标 / 转化回血 / 转化临时增伤（乘数,秒）
+        Map<String, String> convertTo = new HashMap<>();
+        Map<String, Double> convertHeal = new HashMap<>();
+        Map<String, double[]> convertBuff = new HashMap<>();
 
         for (PhotoSetDefs.Tier tier : plan.tiers()) {
             if (tier.when() != null && !condMet(tier.when(), player)) continue;
@@ -163,8 +176,29 @@ public class PhotoSetEffects {
                         case "on_hit_effect", "on_hit_suppress" -> onHit.add(inner);
                         case "dmg_mod" -> flags.putString("dmg_mod_" + p[1], p[2]);
                         case "dmg_taken" -> flags.putString("dmg_taken_" + p[1], p[2]);
+                        // 玩家造成的 火焰/冰冻/凋零/中毒 伤害 ×p[2]（同类取最高）
+                        case "dmg_element" -> flags.putFloat("dmg_element_" + p[1],
+                                Math.max(flags.getFloat("dmg_element_" + p[1]), Float.parseFloat(p[2])));
+                        // 元素 DoT（火焰/流水/大地/末影）×p[2]（同类取最高）
+                        case "dot_mult" -> flags.putFloat("dot_mult_" + p[1],
+                                Math.max(flags.getFloat("dot_mult_" + p[1]), Float.parseFloat(p[2])));
+                        // 移速乘区：多套装叠乘（x1.7 → 1.7 倍）
+                        case "speed_mult" -> speedMult *= Double.parseDouble(p[1]);
                         case "infusion_boost" -> infusionBoost += Integer.parseInt(p[1]);
-                        case "convert_eff" -> converts.add("minecraft:" + p[1] + ":" + p[2]);
+                        case "convert_eff" -> convertTo.put("minecraft:" + p[1], p[2]);
+                        case "convert_heal" -> convertHeal.merge("minecraft:" + p[1], Double.parseDouble(p[2]), Double::sum);
+                        case "convert_buff" -> {
+                            String from = "minecraft:" + p[1];
+                            double mult = 1.0 + Double.parseDouble(p[2]);
+                            int secs = Integer.parseInt(p[3]);
+                            double[] prev = convertBuff.get(from);
+                            if (prev == null) {
+                                convertBuff.put(from, new double[]{mult, secs});
+                            } else {
+                                prev[0] = Math.max(prev[0], mult);
+                                prev[1] = Math.max(prev[1], secs);
+                            }
+                        }
                         case "barrage_trigger" -> flags.putInt("barrage_trigger", Math.max(flags.getInt("barrage_trigger"), Integer.parseInt(p[1])));
                         case "barrage_dmg" -> flags.putFloat("barrage_dmg", Math.max(flags.getFloat("barrage_dmg"), Float.parseFloat(p[1])));
                         default -> LenSouls.LOGGER.warn("[PhotoSet] 套装定义含未知效果类型 '{}': {}", p[0], inner);
@@ -180,6 +214,9 @@ public class PhotoSetEffects {
         applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.ARMOR, ID_ARMOR, armor, AttributeModifier.Operation.ADD_VALUE, desired);
         applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE, ID_KB, kb, AttributeModifier.Operation.ADD_VALUE, desired);
         applyAttr(player, com.plumejade.lensouls.attribute.ModAttributes.DODGE_CHANCE, ID_DODGE, dodge, AttributeModifier.Operation.ADD_VALUE, desired);
+        // 移速乘区：amount = 乘数 - 1（x1.7 → +70% 的乘法层）
+        applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED, ID_SPEED_MULT,
+                speedMult - 1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL, desired);
         reconcile(player, desired);
 
         for (ElementActivity ea : elems) applyInfusion(player, ea.el(), ea.lvl() + infusionBoost);
@@ -200,7 +237,16 @@ public class PhotoSetEffects {
         player.getPersistentData().putBoolean("lensouls:set_flight", wantFly);
 
         ListTag conv = new ListTag();
-        for (String s : converts) conv.add(StringTag.valueOf(s));
+        Set<String> convertFroms = new LinkedHashSet<>();
+        convertFroms.addAll(convertTo.keySet());
+        convertFroms.addAll(convertHeal.keySet());
+        convertFroms.addAll(convertBuff.keySet());
+        for (String from : convertFroms) {
+            double[] buff = convertBuff.getOrDefault(from, new double[]{1.0, 0});
+            conv.add(StringTag.valueOf(from + "|" + convertTo.getOrDefault(from, "")
+                    + "|" + convertHeal.getOrDefault(from, 0.0)
+                    + "|" + buff[0] + "|" + (int) buff[1]));
+        }
         flags.put("convert", conv);
         player.getPersistentData().put(FLAGS, flags);
 
@@ -397,6 +443,27 @@ public class PhotoSetEffects {
 
     private static void applySetDealtDamage(ServerPlayer player, LivingEntity target, LivingDamageEvent.Pre event) {
         CompoundTag flags = player.getPersistentData().getCompound(FLAGS);
+
+        // 转化类：转化后限时增伤（独立根键，不与每 tick 重写的 FLAGS 冲突）
+        var pd = player.getPersistentData();
+        long until = pd.getLong(CONVERT_DMG_UNTIL);
+        if (until > 0 && player.level().getGameTime() < until) {
+            float mult = pd.getFloat(CONVERT_DMG_MULT);
+            if (mult > 1.0f) event.setNewDamage(event.getNewDamage() * mult);
+        } else if (until != 0) {
+            pd.remove(CONVERT_DMG_UNTIL);
+            pd.remove(CONVERT_DMG_MULT);
+        }
+
+        // 玩家造成的 火焰/冰冻/凋零/中毒 伤害加成
+        var source = event.getSource();
+        for (String key : flags.getAllKeys()) {
+            if (!key.startsWith("dmg_element_")) continue;
+            String kind = key.substring("dmg_element_".length());
+            if (!matchesElementDamage(kind, source, target)) continue;
+            event.setNewDamage(event.getNewDamage() * flags.getFloat(key));
+        }
+
         for (String key : flags.getAllKeys()) {
             if (!key.startsWith("dmg_mod_")) continue;
             String setId = key.substring("dmg_mod_".length());
@@ -408,6 +475,35 @@ public class PhotoSetEffects {
             float mult = Float.parseFloat(flags.getString(key));
             event.setNewDamage(event.getNewDamage() * mult);
         }
+    }
+
+    /**
+     * 判定某次伤害是否属于「火焰 / 冰冻 / 凋零 / 中毒」四类。
+     * <p>
+     * 原版的中毒跳伤用的是 {@code magic} 伤害类型，无法只用类型区分，因此
+     * 「中毒」额外要求目标身上有中毒效果；「凋零」同理兼容凋零效果。
+     */
+    private static boolean matchesElementDamage(String kind, net.minecraft.world.damagesource.DamageSource source, LivingEntity target) {
+        return switch (kind) {
+            case "fire" -> source.is(DamageTypeTags.IS_FIRE);
+            case "freeze" -> source.is(DamageTypes.FREEZE);
+            case "wither" -> source.is(DamageTypes.WITHER) || source.is(DamageTypes.WITHER_SKULL)
+                    || target.hasEffect(MobEffects.WITHER);
+            case "poison" -> source.is(DamageTypes.MAGIC) && target.hasEffect(MobEffects.POISON);
+            default -> false;
+        };
+    }
+
+    /**
+     * 套装元素 DoT 增伤乘数（无对应套装效果时为 1.0）。由 {@code SoulDotHandler} 结算每跳时读取。
+     */
+    public static float getDotMultiplier(ServerPlayer player, ElementDamage element) {
+        if (player == null || element == null) return 1.0f;
+        CompoundTag flags = player.getPersistentData().getCompound(FLAGS);
+        String key = "dot_mult_" + element.getSerializedName();
+        if (!flags.contains(key)) return 1.0f;
+        float mult = flags.getFloat(key);
+        return mult <= 0.0f ? 1.0f : mult;
     }
 
     private static void applySetTakenDamage(ServerPlayer player, LivingDamageEvent.Pre event) {
@@ -471,18 +567,39 @@ public class PhotoSetEffects {
         if (flags.contains("convert", Tag.TAG_LIST)) {
             ListTag conv = flags.getList("convert", Tag.TAG_STRING);
             for (int i = 0; i < conv.size(); i++) {
-                String[] kv = conv.getString(i).split(":");
-                if (kv.length < 2) continue;
-                if (kv[0].equals(effectId)) {
-                    Holder<MobEffect> to = convEffect(kv[1]);
-                    if (to != null) {
-                        int amp = inst.getAmplifier();
-                        int dur = inst.getDuration();
-                        event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
-                        player.addEffect(new MobEffectInstance(to, dur, amp, inst.isAmbient(), inst.isVisible(), inst.showIcon()));
-                    }
-                    break;
+                // 格式：from|to|heal|dmgMult|seconds（to 可为空）
+                String[] kv = conv.getString(i).split("\\|", -1);
+                if (kv.length < 5) continue;
+                if (!kv[0].equals(effectId)) continue;
+
+                event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+
+                // 1) 转化为增益效果
+                Holder<MobEffect> to = convEffect(kv[1]);
+                if (to != null) {
+                    player.addEffect(new MobEffectInstance(to, inst.getDuration(), inst.getAmplifier(),
+                            inst.isAmbient(), inst.isVisible(), inst.showIcon()));
                 }
+
+                // 2) 转化时回血
+                try {
+                    double heal = Double.parseDouble(kv[2]);
+                    if (heal > 0) player.heal((float) heal);
+                } catch (NumberFormatException ignored) {
+                }
+
+                // 3) 转化时限时增伤（7~30 秒，+20%~40%）
+                try {
+                    double mult = Double.parseDouble(kv[3]);
+                    int seconds = Integer.parseInt(kv[4]);
+                    if (mult > 1.0 && seconds > 0) {
+                        var pd = player.getPersistentData();
+                        pd.putFloat(CONVERT_DMG_MULT, (float) mult);
+                        pd.putLong(CONVERT_DMG_UNTIL, player.level().getGameTime() + seconds * 20L);
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+                break;
             }
         }
     }

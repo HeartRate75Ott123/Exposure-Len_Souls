@@ -47,6 +47,7 @@ public class ModCreativeTabs {
                         output.accept(ModItems.VITAL_STRIKE_BALL.get());
                         output.accept(ModItems.SOUL_SEVER_BALL.get());
                         output.accept(ModItems.ABILITY_STEAL_BALL.get());
+                        output.accept(ModItems.WILD_GLIMPSE_BALL.get());
 
                         output.accept(ModItems.LENS_TIER_1.get());
                         output.accept(ModItems.LENS_TIER_2.get());
@@ -112,6 +113,9 @@ public class ModCreativeTabs {
                         // ---- 法师胸针 / 灵魂口哨（互斥新饰品） ----
                         output.accept(ModItems.MAGE_BROOCH.get());
                         output.accept(ModItems.SOUL_WHISTLE.get());
+                        output.accept(ModItems.HEART_OF_STONE.get());
+                        output.accept(ModItems.PHANTOM_CORE.get());
+                        output.accept(ModItems.PHANTOM_REMNANT.get());
 
                         // 摄魂术附魔书（通过参数查找注册表避免闪退）
                         var enchants = params.holders()

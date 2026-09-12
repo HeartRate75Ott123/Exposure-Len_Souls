@@ -207,12 +207,47 @@ public class DamageHandler {
             boolean isGytrinket = sourceEntity != null && sourceEntity.getClass().getName().contains("gytrinket");
             // DoT 跳伤豁免：正在结算的 DoT 元素属于目标弱点集 → 不吃武器匹配 ×0.1
             ElementDamage dotElem = SoulDotHandler.getApplyingDotElement();
-            if (needsMatch && !matches && !isGytrinket
+            // 克拉肯船炮豁免：block_factorys_bosses 的克拉肯船炮（kraken_cannon_item 发射的 cannonball）
+            // 属于「场景武器」，不受上面这条武器元素匹配惩罚，伤害照常结算。
+            boolean krakenCannon = isKrakenCannonball(event.getSource());
+            if (needsMatch && !matches && !isGytrinket && !krakenCannon
                     && !(dotElem != null && weaknesses.containsKey(dotElem))) {
                 float cap = event.getOriginalDamage() * 0.1f;
                 if (event.getNewDamage() > cap) event.setNewDamage(cap);
             }
         }
+    }
+
+    /**
+     * 是否为 block_factorys_bosses「克拉肯船炮」造成的伤害（用于豁免上面的 ×0.1 武器匹配惩罚）。
+     * <p>
+     * 该模组的炮弹实体是 {@code block_factorys_bosses:cannonball}，伤害类型是
+     * {@code block_factorys_bosses:cannonball_hit}（见其 data 包），由 {@code kraken_cannon_item}
+     * （大炮物品 / 船上的 CannonEntity）发射。三种特征任一命中即认定，全部按字符串比对，
+     * 未安装该模组时自然恒为 false。
+     */
+    private static boolean isKrakenCannonball(DamageSource source) {
+        if (source == null) return false;
+
+        var typeKey = source.typeHolder().unwrapKey();
+        if (typeKey.isPresent()) {
+            ResourceLocation id = typeKey.get().location();
+            if ("block_factorys_bosses".equals(id.getNamespace())
+                    && ("cannonball_hit".equals(id.getPath()) || "cannonball".equals(id.getPath())
+                        || "kraken_cannon_item".equals(id.getPath()))) {
+                return true;
+            }
+        }
+
+        for (Entity e : new Entity[]{source.getDirectEntity(), source.getEntity()}) {
+            if (e == null) continue;
+            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType());
+            if ("block_factorys_bosses".equals(id.getNamespace())
+                    && ("cannonball".equals(id.getPath()) || "kraken_cannon".equals(id.getPath()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 获取实体身上指定元素的灌注/镜魂 DoT 药水等级（无 = 0） */

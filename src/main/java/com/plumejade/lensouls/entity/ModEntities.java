@@ -66,6 +66,15 @@ public class ModEntities {
                     .updateInterval(2)
                     .build("level2_staff_boss"));
 
+    /** 虚影残像：死亡掉落托管容器（永存的 ItemEntity 子类，仅所有者可拾取） */
+    public static final DeferredHolder<EntityType<?>, EntityType<PhantomRemnantEntity>> PHANTOM_REMNANT =
+            ENTITIES.register("phantom_remnant", () -> EntityType.Builder.<PhantomRemnantEntity>of(
+                            PhantomRemnantEntity::new, MobCategory.MISC)
+                    .sized(0.5f, 0.5f)
+                    .clientTrackingRange(10)
+                    .updateInterval(20)
+                    .build("phantom_remnant"));
+
     public static void register(IEventBus modEventBus) {
         ENTITIES.register(modEventBus);
         modEventBus.addListener(ModEntities::registerAttributes);

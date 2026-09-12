@@ -113,6 +113,10 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
     private int meleeWindowEndTick;
     private int meleeEndTick;
     private boolean meleeDamaged;
+    /** 本次近战的挥击音效是否已在「攻击判定帧」播放（音效绑定判定，不绑定命中） */
+    private boolean meleeSounded;
+    /** 上一次实际播放的动作动画名：随机选段时排除它，保证相邻两次动作不重复 */
+    private String lastActionAnimName = "";
     /** 本次近战挥击落点是否成立：动画伤害窗口内目标在攻击距离（未中=整个窗口目标都不在范围）；
      *  未命中时 30% 概率切入 spike。不受无敌帧影响。 */
     private boolean meleeLanded;
@@ -304,15 +308,22 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
             }
             case ST_MELEE -> {
                 int elapsed = this.tickCount - meleeStartTick;
-                // 窗口内 + 目标仍在交互距离 → 挥击落点成立：施放伤害（无敌帧吞伤不计入"未命中"）
-                if (!meleeDamaged && elapsed >= meleeWindowStartTick && elapsed <= meleeWindowEndTick) {
-                    double d = horizontalDist(target);
-                    if (d <= MELEE_RANGE + target.getBbWidth() * 0.5D) {
-                        meleeDamaged = true;
-                        meleeLanded = true; // 挥击命中成立（动画窗口内目标在范围）
+                // 攻击判定窗口：音效在「判定帧」播放（不再等命中成立），伤害仍按范围内结算。
+                // 需求：音效优化，在攻击判定时播放音效，而不是命中后。
+                if (elapsed >= meleeWindowStartTick && elapsed <= meleeWindowEndTick) {
+                    if (!meleeSounded) {
+                        meleeSounded = true;
                         playBossSound(soundForMelee(meleeAnimName));
-                        if (this.doHurtTarget(target)) {
-                            meleeHits++;
+                    }
+                    // 窗口内 + 目标仍在交互距离 → 挥击落点成立：施放伤害（无敌帧吞伤不计入"未命中"）
+                    if (!meleeDamaged) {
+                        double d = horizontalDist(target);
+                        if (d <= MELEE_RANGE + target.getBbWidth() * 0.5D) {
+                            meleeDamaged = true;
+                            meleeLanded = true; // 挥击命中成立（动画窗口内目标在范围）
+                            if (this.doHurtTarget(target)) {
+                                meleeHits++;
+                            }
                         }
                     }
                 }
@@ -409,19 +420,21 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         }
     }
 
-    /** 开始一次近战（随机 hit1/hit2/hit3），记录窗口/时长 */
+    /** 开始一次近战（随机 hit1/hit2/hit3，且不与上一次动作重复），记录窗口/时长 */
     private void startMelee(Player target) {
-        MeleeAnim anim = Level2StaffBossAnimations.randomMelee(this.random);
+        MeleeAnim anim = Level2StaffBossAnimations.randomMelee(this.random, this.lastActionAnimName);
         this.getNavigation().stop();
 
         this.fightState = ST_MELEE;
         this.meleeAnimName = anim.name();
+        this.lastActionAnimName = anim.name();
         this.meleeStartTick = this.tickCount;
         this.meleeWindowStartTick = Math.round(anim.startSec() * 20f);
         this.meleeWindowEndTick = Math.round(anim.endSec() * 20f);
         // 动画播完（meleeEndTick）同一 tick 才允许衔接下一段，绝不在播完前提前触发
         this.meleeEndTick = Math.round(anim.lengthSec() * 20f) + this.tickCount;
         this.meleeDamaged = false;
+        this.meleeSounded = false;
         this.meleeLanded = false;
 
         triggerAction(anim.name());
@@ -441,13 +454,14 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.getNavigation().stop();
     }
 
-    /** 开始一次 spike（随机 spike_hit/spike_hit2），记录释放点 */
+    /** 开始一次 spike（随机 spike_hit/spike_hit2，且不与上一次动作重复），记录释放点 */
     private void startSpike() {
-        SpikeAnim anim = Level2StaffBossAnimations.randomSpike(this.random);
+        SpikeAnim anim = Level2StaffBossAnimations.randomSpike(this.random, this.lastActionAnimName);
         this.getNavigation().stop();
 
         this.fightState = ST_SPIKE;
         this.spikeAnimName = anim.name();
+        this.lastActionAnimName = anim.name();
         this.spikeStartTick = this.tickCount;
         this.spikeReleaseTick = this.tickCount + Math.round(anim.releaseSec() * 20f);
         // +1 tick：确保客户端动画完整播完再放下一段，避免掐断
@@ -463,6 +477,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.cameraEndTick = this.tickCount
                 + Math.round(Level2StaffBossAnimations.CAMERA_SHOOT_LENGTH_SEC * 20f);
         triggerAction(Level2StaffBossAnimations.CAMERA_SHOOT);
+        this.lastActionAnimName = Level2StaffBossAnimations.CAMERA_SHOOT;
         playBossSound(ModSounds.LEVEL2_STAFF_CAMERA_SHOOT.get());
     }
 

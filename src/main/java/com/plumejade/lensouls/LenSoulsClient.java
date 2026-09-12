@@ -124,6 +124,9 @@ public class LenSoulsClient {
         // N公司2级员工（GeckoLib，运行时 geckolib 由 mod 提供）
         event.registerEntityRenderer(ModEntities.LEVEL2_STAFF_BOSS.get(),
                 com.plumejade.lensouls.client.render.Level2StaffBossRenderer::new);
+        // 虚影残像（悬浮托管容器；自定义渲染器整体放大，便于远处辨识）
+        event.registerEntityRenderer(ModEntities.PHANTOM_REMNANT.get(),
+                com.plumejade.lensouls.client.render.PhantomRemnantRenderer::new);
     }
 
     /** 注册幻灵模型层定义 */

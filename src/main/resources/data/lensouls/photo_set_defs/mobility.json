@@ -1,0 +1,98 @@
+{
+  "tide_fang": {
+    "name": "潮汐之牙",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "env:water_breath",
+          "cond:water|speed_mult:3.5"
+        ]
+      }
+    ]
+  },
+  "starfire_ascend": {
+    "name": "星火升腾",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "env:water_breath",
+          "cond:water|speed_mult:2.8"
+        ]
+      }
+    ]
+  },
+  "wraith_veil": {
+    "name": "幽魂纱影",
+    "tiers": [
+      {
+        "count": 2,
+        "effects": [
+          "env:dark_invis",
+          "cond:night|speed_mult:2.8"
+        ]
+      }
+    ]
+  },
+  "sky_riders": {
+    "name": "翔空之翼",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "speed_mult:2.2",
+          "maxhp:0.1"
+        ]
+      }
+    ]
+  },
+  "astral_herd": {
+    "name": "星辉游徙",
+    "tiers": [
+      {
+        "count": 5,
+        "effects": [
+          "speed_mult:2.2",
+          "maxhp:0.15"
+        ]
+      }
+    ]
+  },
+  "beast_tamer": {
+    "name": "驯兽大师",
+    "tiers": [
+      {
+        "count": 6,
+        "effects": [
+          "speed_mult:2.5",
+          "maxhp:0.1"
+        ]
+      }
+    ]
+  },
+  "archaion_evasion": {
+    "name": "残影织网",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "dodge:0.08",
+          "speed_mult:1.7"
+        ]
+      }
+    ]
+  },
+  "archaion_speed": {
+    "name": "幽途疾行",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "speed_mult:2.2",
+          "env:water_breath"
+        ]
+      }
+    ]
+  }
+}

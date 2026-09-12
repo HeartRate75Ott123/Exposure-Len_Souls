@@ -108,6 +108,8 @@ public class LensoulsJeiPlugin implements IModPlugin {
                 Component.translatable("jei.lensouls.skill_ball.creative"));
         addSingleInfo(registration, ModItems.ABILITY_STEAL_BALL.get().getDefaultInstance(),
                 Component.translatable("jei.lensouls.skill_ball.creative"));
+        addSingleInfo(registration, ModItems.WILD_GLIMPSE_BALL.get().getDefaultInstance(),
+                Component.translatable("jei.lensouls.skill_ball.creative"));
 
         // ---- 相机镜头 ----
         addSingleInfo(registration, ModItems.LENS_TIER_1.get().getDefaultInstance(),

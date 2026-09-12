@@ -1,0 +1,31 @@
+{
+  "cataclysm:draugr": [
+    "wither_chain",
+    "wither_samsara"
+  ],
+  "cataclysm:elite_draugr": [
+    "wither_chain"
+  ],
+  "cataclysm:royal_draugr": [
+    "wither_chain"
+  ],
+  "legendary_monsters:withered_abomination": [
+    "wither_samsara"
+  ],
+  "minecraft:bee": [
+    "venom_twist"
+  ],
+  "minecraft:cave_spider": [
+    "venom_twist"
+  ],
+  "minecraft:silverfish": [
+    "venom_twist"
+  ],
+  "minecraft:spider": [
+    "venom_twist"
+  ],
+  "minecraft:wither_skeleton": [
+    "wither_chain",
+    "wither_samsara"
+  ]
+}

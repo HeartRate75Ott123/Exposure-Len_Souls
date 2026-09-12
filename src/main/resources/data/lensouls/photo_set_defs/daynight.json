@@ -1,0 +1,78 @@
+{
+  "twin_phase": {
+    "name": "昼夜双生",
+    "tiers": [
+      {
+        "count": 2,
+        "effects": [
+          "dot_mult:fire:1.8"
+        ],
+        "when": "day"
+      },
+      {
+        "count": 2,
+        "effects": [
+          "maxhp:0.3"
+        ],
+        "when": "night"
+      }
+    ]
+  },
+  "daybreak": {
+    "name": "破晓之誓",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "dmg_element:fire:2.8"
+        ],
+        "when": "day"
+      },
+      {
+        "count": 3,
+        "effects": [
+          "maxhp:0.25"
+        ],
+        "when": "night"
+      }
+    ]
+  },
+  "tide_clock": {
+    "name": "潮汐轮转",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "maxhp:0.15"
+        ],
+        "when": "day"
+      },
+      {
+        "count": 3,
+        "effects": [
+          "env:water_breath"
+        ],
+        "when": "night"
+      }
+    ]
+  },
+  "ember_cycle": {
+    "name": "烬火轮回",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "speed_mult:2.8"
+        ],
+        "when": "day"
+      },
+      {
+        "count": 3,
+        "effects": [
+          "immune_fire"
+        ],
+        "when": "night"
+      }
+    ]
+  }
+}

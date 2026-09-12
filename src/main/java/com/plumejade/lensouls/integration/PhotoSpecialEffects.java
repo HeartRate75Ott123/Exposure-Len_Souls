@@ -221,6 +221,54 @@ public class PhotoSpecialEffects {
         ATTRIBUTES.computeIfAbsent(id, k -> new ArrayList<>()).add(new AttributeEntry(a, name, v, op));
     }
 
+    // ── 命中率（照片饰品）：按功能性分档 ──
+
+    /**
+     * 弹幕类照片：佩戴后会发射投射物/召唤物（见 {@code BossPhotoProjHelper}）→ 命中率 -24%。
+     */
+    private static final Set<String> BARRAGE_PHOTOS = Set.of(
+            "cataclysm:ender_guardian", "cataclysm:ignis", "cataclysm:netherite_monstrosity",
+            "cataclysm:the_harbinger", "cataclysm:the_leviathan", "cataclysm:ancient_remnant",
+            "cataclysm:maledictus", "cataclysm:scylla",
+            "legendary_monsters:posessed_paladin", "legendary_monsters:cloud_golem",
+            "legendary_monsters:the_obliterator",
+            "archaion:last_of_deepslate",
+            "fdbosses:chesed", "fdbosses:malkuth", "fdbosses:geburah");
+
+    /** 弱弹幕类（小白 / 唤魔者）：只放一次性中低强度攻击 → -6% */
+    private static final Set<String> WEAK_BARRAGE_PHOTOS = Set.of("minecraft:skeleton", "minecraft:evoker");
+
+    /** 命中率档位：功能性越弱给得越高，用于抵扣弹幕类照片的惩罚。
+     * 因属性上限为 100%，单戴正向照片不会超过 100%，其价值正体现在抵扣上。
+     */
+    private static final double HIT_TIER_WEAKEST = 0.14;  // 纯生活类弱照片（复用 WEAK_SLOT_BONUS 名单）
+    private static final double HIT_TIER_WEAK = 0.12;     // 无有效描述
+    private static final double HIT_TIER_NORMAL = 0.10;   // 单条被动
+    private static final double HIT_TIER_STRONG = 0.07;   // 两条及以上（强功能）
+
+    /** 移速词条是否已完成统一调整（懒执行标志） */
+    private static volatile boolean speedTuned = false;
+
+    private static double hitChanceDelta(String entityId) {
+        if (WEAK_BARRAGE_PHOTOS.contains(entityId)) return -0.06;
+        if (BARRAGE_PHOTOS.contains(entityId)) return -0.24;
+        if (WEAK_SLOT_BONUS.containsKey(entityId)) return HIT_TIER_WEAKEST;
+        int lines = PhotographEffectRegistry.meaningfulLineCount(entityId);
+        if (lines <= 0) return HIT_TIER_WEAK;
+        if (lines == 1) return HIT_TIER_NORMAL;
+        return HIT_TIER_STRONG;
+    }
+
+    static {
+        // 每张照片挂一条命中率修饰符：基值 1.0 + ADD_MULTIPLIED_BASE → Curios 原生显示为百分比
+        for (String id : PhotographEffectRegistry.getAllEntityIds()) {
+            double delta = hitChanceDelta(id);
+            if (delta != 0.0) {
+                attr(id, ModAttributes.HIT_CHANCE.value(), "hit", delta, AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
+            }
+        }
+    }
+
     static {
         // ── Boss 被动属性 ──
         attr("cataclysm:ender_guardian", Attributes.MOVEMENT_SPEED.value(), "eg_speed", -0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
@@ -1049,11 +1097,58 @@ public class PhotoSpecialEffects {
     }
 
     /**
+     * 移速词条统一调整（懒执行，避免依赖 static 块书写顺序）。
+     * <p>
+     * 需求：单张照片的移速加成给到 <b>+17% ~ +67%</b> 且「慷慨一些、多给一些」。
+     * 规则：
+     * <ol>
+     *   <li>现有<b>正值</b> MOVEMENT_SPEED 条目按原强度抬升到 17%~67% 区间（原来多为 +5%~+15%）；</li>
+     *   <li>现有<b>负值</b>保留——那是刻意给强力照片配的缺点，不应被抹平；</li>
+     *   <li>完全没有移速条目的<b>弱照片</b>（复用 {@link #WEAK_SLOT_BONUS} 名单）补一条 +40%，作为功能性补偿。</li>
+     * </ol>
+     */
+    private static void tuneMovementSpeed() {
+        if (speedTuned) return;
+        speedTuned = true;
+        int raised = 0, added = 0;
+        for (String id : new ArrayList<>(ATTRIBUTES.keySet())) {
+            List<AttributeEntry> list = ATTRIBUTES.get(id);
+            if (list == null) continue;
+            boolean hasSpeed = false;
+            for (int i = 0; i < list.size(); i++) {
+                AttributeEntry ae = list.get(i);
+                if (ae.attribute() != Attributes.MOVEMENT_SPEED.value()) continue;
+                hasSpeed = true;
+                if (ae.amount() <= 0) continue;
+                list.set(i, new AttributeEntry(ae.attribute(), ae.modName(), boostFromOld(ae.amount()),
+                        AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+                raised++;
+            }
+            if (!hasSpeed && WEAK_SLOT_BONUS.containsKey(id)) {
+                list.add(new AttributeEntry(Attributes.MOVEMENT_SPEED.value(), "weak_spd", 0.40,
+                        AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+                added++;
+            }
+        }
+        com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoSpeed] 移速词条调整：{} 条抬升到 +17%~+67%，{} 条弱照片新增 +40%", raised, added);
+    }
+
+    /** 旧移速值（+3%~+15% 量级）→ 铺满新区间 +17%~+67%，保持相对强弱次序 */
+    private static double boostFromOld(double old) {
+        if (old <= 0.05) return 0.17;
+        if (old <= 0.08) return 0.30;
+        if (old <= 0.10) return 0.42;
+        if (old <= 0.12) return 0.55;
+        return 0.67;
+    }
+
+    /**
      * 构建某实体照片佩戴时应提供的属性修饰符（Curios 佩戴时驱动）。
      * 标准属性按（实体, 条目名）派生稳定 UUID（同种实体只生效一份、不同种可叠加）；
      * 元素弱点按（实体, 元素）派生稳定 UUID（同样去重、跨种叠加）。
      */
     public static Multimap<Holder<Attribute>, AttributeModifier> buildAttributeModifiers(String entityId) {
+        tuneMovementSpeed();
         Multimap<Holder<Attribute>, AttributeModifier> map = HashMultimap.create();
         List<AttributeEntry> list = ATTRIBUTES.get(entityId);
         if (list != null) {
@@ -1094,10 +1189,14 @@ public class PhotoSpecialEffects {
      * 若静态描述已提及某属性/元素，则跳过该行，避免 tooltip 重复。
      */
     public static List<Component> describeAttributes(String entityId, String skipText) {
+        tuneMovementSpeed();
         List<Component> lines = new ArrayList<>();
         List<AttributeEntry> list = ATTRIBUTES.get(entityId);
         if (list != null) {
             for (AttributeEntry ae : list) {
+                // 命中率不进手工摘要：它由 Curios 原生属性行渲染，且若计入会让
+                // 「无特殊效果」回退判定对弱照片失效（每张照片都至少挂了一条命中率）
+                if (ae.attribute() == ModAttributes.HIT_CHANCE.value()) continue;
                 Component nameComp = Component.translatable(ae.attribute().getDescriptionId());
                 String name = nameComp.getString();
                 if (skipText != null && skipText.contains(name)) {

@@ -119,6 +119,10 @@ public class ModItems {
     public static final DeferredItem<Item> ABILITY_STEAL_BALL = ITEMS.register("ability_steal_ball",
             () -> new SkillBallItem(AbilityType.ABILITY_STEAL, new Item.Properties().stacksTo(64)));
 
+    /** 见微知著能力球 */
+    public static final DeferredItem<Item> WILD_GLIMPSE_BALL = ITEMS.register("wild_glimpse_ball",
+            () -> new SkillBallItem(AbilityType.WILD_GLIMPSE, new Item.Properties().stacksTo(64)));
+
     // ---- 次元枪 ----
     public static final DeferredItem<Item> DIMENSIONAL_GUN = ITEMS.register("dimensional_gun",
             () -> new DimensionalGunItem(new Item.Properties().stacksTo(1).fireResistant()));
@@ -169,6 +173,17 @@ ITEMS.register("feather_abyss", () -> new FeatherAbyssItem(new Item.Properties()
 
     public static final DeferredItem<SoulWhistleItem> SOUL_WHISTLE =
             ITEMS.register("soul_whistle", () -> new SoulWhistleItem(new Item.Properties()));
+
+    // ---- 石之心（Curios 任意槽位饰品） ----
+    public static final DeferredItem<HeartOfStoneItem> HEART_OF_STONE =
+            ITEMS.register("heart_of_stone", () -> new HeartOfStoneItem(new Item.Properties()));
+
+    // ---- 虚影核心（Curios 任意槽位饰品） / 虚影残像（死亡掉落托管容器） ----
+    public static final DeferredItem<PhantomCoreItem> PHANTOM_CORE =
+            ITEMS.register("phantom_core", () -> new PhantomCoreItem(new Item.Properties()));
+
+    public static final DeferredItem<PhantomRemnantItem> PHANTOM_REMNANT =
+            ITEMS.register("phantom_remnant", () -> new PhantomRemnantItem(new Item.Properties()));
 
     // ---- 子弹物品（仅用于渲染弹射物模型） ----
     public static final DeferredItem<Item> OVERWORLD_BULLET = ITEMS.register("overworld_bullet",

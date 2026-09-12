@@ -1,0 +1,81 @@
+{
+  "block_factorys_bosses:kraken": [
+    "kraken_grip"
+  ],
+  "block_factorys_bosses:kraken_tentacle": [
+    "kraken_grip"
+  ],
+  "cataclysm:hippocamtus": [
+    "kraken_grip"
+  ],
+  "cataclysm:ignis": [
+    "blaze_crest",
+    "molten_oath"
+  ],
+  "cataclysm:ignited_berserker": [
+    "blaze_crest",
+    "ember_revenant",
+    "molten_oath"
+  ],
+  "cataclysm:ignited_revenant": [
+    "blaze_crest",
+    "ember_revenant"
+  ],
+  "eternal_starlight:yeti": [
+    "frozen_tundra"
+  ],
+  "legendary_monsters:beheaded_knight": [
+    "paladin_oath"
+  ],
+  "legendary_monsters:posessed_paladin": [
+    "paladin_oath"
+  ],
+  "legendary_monsters:resurrected_knight": [
+    "paladin_oath"
+  ],
+  "minecraft:axolotl": [
+    "abyss_whisper"
+  ],
+  "minecraft:blaze": [
+    "blaze_crest"
+  ],
+  "minecraft:cave_spider": [
+    "twin_spider"
+  ],
+  "minecraft:drowned": [
+    "abyss_whisper"
+  ],
+  "minecraft:guardian": [
+    "abyss_whisper"
+  ],
+  "minecraft:magma_cube": [
+    "molten_oath"
+  ],
+  "minecraft:pillager": [
+    "ravager_charge"
+  ],
+  "minecraft:polar_bear": [
+    "frozen_tundra"
+  ],
+  "minecraft:ravager": [
+    "ravager_charge"
+  ],
+  "minecraft:spider": [
+    "twin_spider"
+  ],
+  "minecraft:squid": [
+    "abyss_whisper"
+  ],
+  "minecraft:stray": [
+    "frozen_tundra"
+  ],
+  "minecraft:vindicator": [
+    "ravager_charge"
+  ],
+  "minecraft:wither_skeleton": [
+    "ember_revenant"
+  ],
+  "twilightforest:yeti": [
+    "frozen_tundra"
+  ]
+}

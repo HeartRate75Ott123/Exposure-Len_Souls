@@ -1,0 +1,49 @@
+{
+  "wither_samsara": {
+    "name": "凋朽轮回",
+    "tiers": [
+      {
+        "count": 3,
+        "effects": [
+          "convert_eff:wither:healing",
+          "convert_eff:slow:speed",
+          "convert_heal:wither:6",
+          "convert_buff:wither:30:12",
+          "convert_heal:slow:4",
+          "convert_buff:slow:20:8",
+          "dmg_element:wither:2.2"
+        ]
+      }
+    ]
+  },
+  "wither_chain": {
+    "name": "凋零连锁",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "convert_eff:wither:healing",
+          "convert_eff:slow:speed",
+          "dmg_element:wither:2.2",
+          "convert_heal:wither:5",
+          "convert_buff:wither:25:10"
+        ]
+      }
+    ]
+  },
+  "venom_twist": {
+    "name": "剧毒逆转",
+    "tiers": [
+      {
+        "count": 4,
+        "effects": [
+          "convert_eff:poison:healing",
+          "on_hit_effect:poison:0.15:60:0",
+          "convert_heal:poison:6",
+          "convert_buff:poison:30:12",
+          "dmg_element:poison:2.5"
+        ]
+      }
+    ]
+  }
+}

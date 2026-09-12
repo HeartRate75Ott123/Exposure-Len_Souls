@@ -2,10 +2,12 @@ package com.plumejade.lensouls.key;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.gui.SoulSelectOverlay;
 import com.plumejade.lensouls.item.ConverterItem;
 import com.plumejade.lensouls.network.ConverterMenuActivatePacket;
 import com.plumejade.lensouls.network.ConverterMenuRequestPacket;
+import com.plumejade.lensouls.network.ConverterModeSwitchPacket;
 import com.plumejade.lensouls.network.ConverterTriggerPacket;
 import com.plumejade.lensouls.network.PhotoOpenPacket;
 import net.minecraft.client.Minecraft;
@@ -31,6 +33,7 @@ import org.lwjgl.glfw.GLFW;
  *   <li>精准触发：长按 G 呼出镜魂选择菜单，松开选择</li>
  * </ul>
  * 手持转换器左键空气切换触发模式；模式文字显示在物品栏上方。
+ * 模式存于<b>转换器物品组件</b>（逐物品独立、随物品存档与同步），状态行也从组件读取。
  */
 @EventBusSubscriber(modid = LenSouls.MODID, value = Dist.CLIENT)
 public class KeyBindings {
@@ -39,9 +42,9 @@ public class KeyBindings {
     public static final String KEY_CONVERTER = "key.lensouls.converter";
     public static final String KEY_PHOTO_GUI = "key.lensouls.photo_gui";
 
-    public static final int MODE_FAST = 0;
-    public static final int MODE_PRECISE = 1;
-    private static final String MODE_TAG = "lensouls:converter_mode";
+    /** 触发模式常量落在公共类上（物品组件与 tooltip 共用），此处仅作别名 */
+    public static final int MODE_FAST = ModDataComponents.CONVERTER_MODE_FAST;
+    public static final int MODE_PRECISE = ModDataComponents.CONVERTER_MODE_PRECISE;
 
     /** 长按阈值（纳秒，300ms） */
     private static final long HOLD_THRESHOLD_NS = 300_000_000L;
@@ -61,14 +64,33 @@ public class KeyBindings {
 
     // ========== 触发模式 ==========
 
-    public static int getMode(Minecraft mc) {
-        if (mc.player == null) return MODE_FAST;
-        return mc.player.getPersistentData().getInt(MODE_TAG) == MODE_PRECISE ? MODE_PRECISE : MODE_FAST;
+    /** 找玩家身上的转换器（主手 → 副手 → 背包），与 G 键触发时服务端的查找口径一致 */
+    public static ItemStack findConverter(Minecraft mc) {
+        if (mc.player == null) return ItemStack.EMPTY;
+        ItemStack main = mc.player.getMainHandItem();
+        if (main.getItem() instanceof ConverterItem) return main;
+        ItemStack off = mc.player.getOffhandItem();
+        if (off.getItem() instanceof ConverterItem) return off;
+        for (ItemStack stack : mc.player.getInventory().items) {
+            if (stack.getItem() instanceof ConverterItem) return stack;
+        }
+        return ItemStack.EMPTY;
     }
 
-    private static void setMode(Minecraft mc, int mode) {
-        if (mc.player == null) return;
-        mc.player.getPersistentData().putInt(MODE_TAG, mode);
+    /**
+     * 读取触发模式：以<b>转换器物品组件</b>为准（逐物品独立、随物品存档与同步）。
+     * <p>
+     * 物品上还没有组件时（旧存档首次使用）回退读取旧版玩家 persistentData 值，
+     * 一旦切换过就会写入组件，此后一律以组件为准。
+     */
+    public static int getMode(Minecraft mc) {
+        ItemStack converter = findConverter(mc);
+        if (!converter.isEmpty() && ModDataComponents.hasConverterMode(converter)) {
+            return ModDataComponents.getConverterMode(converter);
+        }
+        if (mc.player == null) return MODE_FAST;
+        return mc.player.getPersistentData().getInt(ModDataComponents.LEGACY_MODE_TAG) == MODE_PRECISE
+                ? MODE_PRECISE : MODE_FAST;
     }
 
     @SubscribeEvent
@@ -134,7 +156,10 @@ public class KeyBindings {
         if (!(held.getItem() instanceof ConverterItem)) return;
 
         int mode = getMode(mc) == MODE_FAST ? MODE_PRECISE : MODE_FAST;
-        setMode(mc, mode);
+        // 模式写在物品组件上：本地乐观写入（保证紧接着的 G 键立刻用新模式），
+        // 同时上报服务端权威写入并同步回来
+        ModDataComponents.setConverterMode(held, mode);
+        PacketDistributor.sendToServer(new ConverterModeSwitchPacket(mode));
         Component keyName = CONVERTER_KEY.get().getTranslatedKeyMessage();
         mc.player.displayClientMessage(
                 Component.literal(mode == MODE_FAST

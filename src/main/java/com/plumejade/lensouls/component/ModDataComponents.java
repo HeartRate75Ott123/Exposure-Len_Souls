@@ -5,6 +5,7 @@ import com.plumejade.lensouls.LenSouls;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -51,6 +52,45 @@ public class ModDataComponents {
             register("copy_soul_sealed", builder -> builder
                     .persistent(Codec.BOOL)
                     .networkSynchronized(ByteBufCodecs.BOOL));
+
+    /**
+     * 转换器触发模式：{@link #CONVERTER_MODE_FAST} = 按 G 直接触发；
+     * {@link #CONVERTER_MODE_PRECISE} = 长按 G 呼出镜魂选择菜单。
+     * <p>
+     * 模式存在<b>物品组件</b>上——逐物品独立、随物品存档与网络同步，
+     * 不再放在玩家 persistentData（旧值仅用于迁移兜底，见 {@link #LEGACY_MODE_TAG}）。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> CONVERTER_MODE =
+            register("converter_mode", builder -> builder
+                    .persistent(Codec.INT)
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** 快速触发：按下 G 立即按顺序尝试激活镜魂 */
+    public static final int CONVERTER_MODE_FAST = 0;
+    /** 精准触发：按住 G 呼出镜魂选择菜单 */
+    public static final int CONVERTER_MODE_PRECISE = 1;
+
+    /** 旧版存放模式的玩家 persistentData 键；仅在物品上还没有组件时作迁移兜底读取 */
+    public static final String LEGACY_MODE_TAG = "lensouls:converter_mode";
+
+    /** 物品上是否已显式写入过模式组件 */
+    public static boolean hasConverterMode(ItemStack stack) {
+        return stack.has(CONVERTER_MODE.get());
+    }
+
+    /** 读取转换器触发模式（组件缺失 → 快速） */
+    public static int getConverterMode(ItemStack stack) {
+        Integer mode = stack.get(CONVERTER_MODE.get());
+        return mode != null && mode == CONVERTER_MODE_PRECISE
+                ? CONVERTER_MODE_PRECISE : CONVERTER_MODE_FAST;
+    }
+
+    /** 写入触发模式；值未变化时不写，避免无意义的组件更新与网络同步 */
+    public static void setConverterMode(ItemStack stack, int mode) {
+        int normalized = mode == CONVERTER_MODE_PRECISE ? CONVERTER_MODE_PRECISE : CONVERTER_MODE_FAST;
+        if (hasConverterMode(stack) && getConverterMode(stack) == normalized) return;
+        stack.set(CONVERTER_MODE.get(), normalized);
+    }
 
     private static <T> DeferredHolder<DataComponentType<?>, DataComponentType<T>> register(
             String name, UnaryOperator<DataComponentType.Builder<T>> builder) {

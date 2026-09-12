@@ -413,5 +413,8 @@
   "attribute.name.lensouls.dodge_chance": "闪避率",
   "photo_set.lensouls.archaion_evasion": "残影织网",
   "photo_set.lensouls.archaion_speed": "幽途疾行",
-  "photo_set.lensouls.fdbosses_damage": "僭律裁决"
+  "photo_set.lensouls.fdbosses_damage": "僭律裁决",
+  "item.lensouls.converter.mode": "§7触发模式：%s§7（左键空气切换）",
+  "item.lensouls.converter.mode.fast": "§a快速",
+  "item.lensouls.converter.mode.precise": "§a精准"
 }

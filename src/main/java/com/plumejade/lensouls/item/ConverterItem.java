@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.item;
 
+import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.gui.ConverterMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -48,6 +49,12 @@ public class ConverterItem extends Item {
         String keyName = getConverterKeyName();
         tooltip.add(Component.translatable("item.lensouls.converter.tooltip", keyName)
                 .withStyle(ChatFormatting.GRAY));
+        // 状态信息：当前触发模式（读转换器物品组件）
+        int mode = ModDataComponents.getConverterMode(stack);
+        tooltip.add(Component.translatable("item.lensouls.converter.mode",
+                Component.translatable(mode == ModDataComponents.CONVERTER_MODE_PRECISE
+                        ? "item.lensouls.converter.mode.precise"
+                        : "item.lensouls.converter.mode.fast")));
     }
 
     /** 获取转换器快捷键的当前键名（客户端动态读取，服务端回退到 "G"） */

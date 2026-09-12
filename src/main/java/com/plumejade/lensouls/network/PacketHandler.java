@@ -69,6 +69,13 @@ public class PacketHandler {
                 PhotoSwingPacket::handle
         );
 
+        // ---- 转换器触发模式切换 C2S（模式写在转换器物品组件上，服务端权威写入） ----
+        registrar.playToServer(
+                ConverterModeSwitchPacket.TYPE,
+                ConverterModeSwitchPacket.STREAM_CODEC,
+                ConverterModeSwitchPacket::handle
+        );
+
         // ---- 转换器镜魂选择菜单 C2S ----
         registrar.playToServer(
                 ConverterMenuRequestPacket.TYPE,

@@ -414,5 +414,8 @@
   "attribute.name.lensouls.dodge_chance": "Dodge Chance",
   "photo_set.lensouls.archaion_evasion": "Phantom Web",
   "photo_set.lensouls.archaion_speed": "Specter's Path",
-  "photo_set.lensouls.fdbosses_damage": "Usurper's Edict"
+  "photo_set.lensouls.fdbosses_damage": "Usurper's Edict",
+  "item.lensouls.converter.mode": "§7Trigger mode: %s§7 (left-click air to switch)",
+  "item.lensouls.converter.mode.fast": "§aFast",
+  "item.lensouls.converter.mode.precise": "§aPrecise"
 }

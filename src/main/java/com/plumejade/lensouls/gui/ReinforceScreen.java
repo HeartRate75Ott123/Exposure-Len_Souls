@@ -42,7 +42,7 @@ import java.util.Set;
 public class ReinforceScreen extends Screen implements MenuAccess<ReinforceMenu> {
 
     // ---- 参考图比例（单位：格子边长） ----
-    private static final float COL_PITCH = 84f / 74f;
+    // 参考图列距 84/74 ≈ 1.135 由 GRID_W_R 与列数推导（见 cellX），不再单独作为乘数列距使用
     private static final float ROW_PITCH = 91f / 74f;
     private static final float BOX_R = 158f / 74f;
     private static final float BOX_H_R = 156f / 74f;
@@ -171,16 +171,24 @@ public class ReinforceScreen extends Screen implements MenuAccess<ReinforceMenu>
                 scrollX, gridY, scrollW, gridH);
     }
 
-    private int colPitch() {
-        return Math.round(COL_PITCH * this.layout.cell());
-    }
-
     private int rowPitch() {
         return Math.round(ROW_PITCH * this.layout.cell());
     }
 
+    /**
+     * 第 col 列的左边缘。
+     * <p>
+     * 列距<b>不能</b>写成 {@code round(COL_PITCH * cell)} 再乘列号：那样 9 个列距各自取整后的累积误差
+     * 会让 {@code 9*pitch + cell} 超出 {@code gridW}（cell=20 时 9*23+20=227 &gt; gridW=224，
+     * cell=19/21/26~29/34~36 同样溢出），而滚动区裁剪矩形正是 {@code [gridX, gridX+gridW)}，
+     * 于是最右一列被切掉一条边 —— 表现就是"最后一列不是方形"。
+     * <p>
+     * 这里改为把可分配宽度 {@code gridW - cell} 平均摊到 9 个间隔上，最后一列的右边缘精确落在网格右边界：
+     * 既保证格子恒为 {@code cell × cell} 正方形，也不改动由 {@code gridW} 推导的搜索框/滚动条对位。
+     */
     private int cellX(int col) {
-        return this.layout.gridX() + col * colPitch();
+        int span = this.layout.gridW() - this.layout.cell();
+        return this.layout.gridX() + Math.round(col * span / (float) (COLS - 1));
     }
 
     private int cellY(int row) {

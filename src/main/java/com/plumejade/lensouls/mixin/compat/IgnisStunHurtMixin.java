@@ -8,7 +8,9 @@ import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * 焰魔（灾变 cataclysm:ignis）定身期间被动防御解除（走原版伤害流程）。
@@ -50,15 +52,16 @@ public abstract class IgnisStunHurtMixin {
 
     /**
      * 定身期间让护盾格挡判定返回 false，解除 {@code canBlockDamageSource} 格挡分支。
+     * <p>
+     * 该方法在 Ignis_Entity 里是 <b>private</b>：原来用 {@code @Redirect} 会因处理器签名
+     * （Mixin 要求静态处理器并把宿主实例作为第 0 个参数）被判定非法而整条注入失效
+     * （实测报错：expected (Ignis_Entity, DamageSource)Z, found (DamageSource)Z）。
+     * 改为在方法 HEAD 注入并直接改写返回值，与访问级别无关。
      */
-    @Redirect(
-            method = "hurt",
-            at = @At(value = "INVOKE",
-                    target = "Lcom/github/L_Ender/cataclysm/entity/AnimationMonster/BossMonsters/Ignis_Entity;canBlockDamageSource(Lnet/minecraft/world/damagesource/DamageSource;)Z",
-                    remap = false),
-            require = 0
-    )
-    private boolean lensouls$disableBlockWhenStunned(DamageSource source) {
-        return !StunPauseHelper.isStunPaused((Entity) (Object) this);
+    @Inject(method = "canBlockDamageSource", at = @At("HEAD"), cancellable = true, remap = false, require = 0)
+    private void lensouls$disableBlockWhenStunned(DamageSource source, CallbackInfoReturnable<Boolean> cir) {
+        if (StunPauseHelper.isStunPaused((Entity) (Object) this)) {
+            cir.setReturnValue(false);
+        }
     }
 }

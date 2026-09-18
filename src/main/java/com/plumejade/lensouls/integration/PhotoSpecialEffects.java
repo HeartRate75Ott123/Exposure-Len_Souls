@@ -1099,12 +1099,12 @@ public class PhotoSpecialEffects {
     /**
      * 移速词条统一调整（懒执行，避免依赖 static 块书写顺序）。
      * <p>
-     * 需求：单张照片的移速加成给到 <b>+17% ~ +67%</b> 且「慷慨一些、多给一些」。
+     * 需求：单张照片的移速加成给到 <b>+12% ~ +30%</b>（早期 +17%~+67%，此后两轮下调：先 14%~57%，再 12%~30%）。
      * 规则：
      * <ol>
-     *   <li>现有<b>正值</b> MOVEMENT_SPEED 条目按原强度抬升到 17%~67% 区间（原来多为 +5%~+15%）；</li>
+     *   <li>现有<b>正值</b> MOVEMENT_SPEED 条目按原强度抬升到 12%~30% 区间（原来多为 +5%~+15%）；</li>
      *   <li>现有<b>负值</b>保留——那是刻意给强力照片配的缺点，不应被抹平；</li>
-     *   <li>完全没有移速条目的<b>弱照片</b>（复用 {@link #WEAK_SLOT_BONUS} 名单）补一条 +40%，作为功能性补偿。</li>
+     *   <li>完全没有移速条目的<b>弱照片</b>（复用 {@link #WEAK_SLOT_BONUS} 名单）补一条 +20%，作为功能性补偿。</li>
      * </ol>
      */
     private static void tuneMovementSpeed() {
@@ -1125,21 +1125,21 @@ public class PhotoSpecialEffects {
                 raised++;
             }
             if (!hasSpeed && WEAK_SLOT_BONUS.containsKey(id)) {
-                list.add(new AttributeEntry(Attributes.MOVEMENT_SPEED.value(), "weak_spd", 0.40,
+                list.add(new AttributeEntry(Attributes.MOVEMENT_SPEED.value(), "weak_spd", 0.20,
                         AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
                 added++;
             }
         }
-        com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoSpeed] 移速词条调整：{} 条抬升到 +17%~+67%，{} 条弱照片新增 +40%", raised, added);
+        com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoSpeed] 移速词条调整：{} 条抬升到 +12%~+30%，{} 条弱照片新增 +20%", raised, added);
     }
 
-    /** 旧移速值（+3%~+15% 量级）→ 铺满新区间 +17%~+67%，保持相对强弱次序 */
+    /** 旧移速值（+3%~+15% 量级）→ 铺满新区间 +12%~+30%，保持相对强弱次序 */
     private static double boostFromOld(double old) {
-        if (old <= 0.05) return 0.17;
-        if (old <= 0.08) return 0.30;
-        if (old <= 0.10) return 0.42;
-        if (old <= 0.12) return 0.55;
-        return 0.67;
+        if (old <= 0.05) return 0.12;
+        if (old <= 0.08) return 0.16;
+        if (old <= 0.10) return 0.20;
+        if (old <= 0.12) return 0.25;
+        return 0.30;
     }
 
     /**

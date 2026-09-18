@@ -10,16 +10,23 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
 
 /**
- * 幻灵防误伤 + 穿透伤害。
+ * 幻灵防误伤 + 穿透伤害 + 召唤物效果赦免。
  * <p>
  * 防误伤：幻灵来源（借体 BOSS 本体、其召唤物、或其弹幕 owner）对玩家不造成任何伤害——
  * 在 LivingIncomingDamageEvent 阶段直接取消（含近战/接触/弹幕/召唤物），真正免伤且含击退。
  * 召唤者处于旁观者模式已天然免疫，此处额外拦截以防队友/敌队被借体 BOSS 及其召唤物波及。
  * <p>
+ * 召唤物特殊效果赦免（玩家）：借体 BOSS 的 AI 会召出它自己的随从（例：利维坦的牵引、暮色雪怪首领的减速），
+ * 这些随从即使不能锁定玩家，其 <b>范围/光环类特殊效果</b>仍可能落到玩家身上。因此在
+ * {@link MobEffectEvent.Applicable}（NeoForge 提供 {@code getEffectSource()}，可追溯到施法实体）
+ * 里，凡来源属于幻灵、目标为玩家、且效果非增益者一律 {@code DO_NOT_APPLY}；
+ * 另有 {@link com.plumejade.lensouls.mixin.PhantomPushGuardMixin} 拦截物理推动/牵引。
+ * <p>
  * 穿透伤害：仅借体 BOSS 本体每次命中非玩家时覆盖为固定穿透伤害
- * （按镜魂等级 1-5：10 / 18 / 21 / 35 / 37，无视护甲/伤害桶/单次上限）。
+ * （按镜魂等级 1-5：20 / 36 / 42 / 70 / 74，无视护甲/伤害桶/单次上限）。
  */
 public class PhantomDamageHandler {
 
@@ -32,8 +39,8 @@ public class PhantomDamageHandler {
                 || e.getPersistentData().getBoolean("lensouls:phantom_minion");
     }
 
-    /** 递归判定实体是否属幻灵来源：本体 / 召唤物 / 弹幕 owner */
-    private static boolean isPhantomSource(Entity e) {
+    /** 递归判定实体是否属幻灵来源：本体 / 召唤物 / 弹幕 owner（供效果与推动拦截共用） */
+    public static boolean isPhantomSource(Entity e) {
         if (e == null) return false;
         if (isPhantomEntity(e)) return true;
         if (e instanceof Projectile proj) {
@@ -52,6 +59,24 @@ public class PhantomDamageHandler {
         if (isPhantomDamageSource(event.getSource())) {
             event.setCanceled(true);
         }
+    }
+
+    /**
+     * 召唤物特殊效果对玩家赦免：来源属于幻灵、目标为玩家、且效果不是增益 → 不施加。
+     * <p>
+     * 覆盖「减速 / 牵引 / 虚弱 / 中毒」等一切药水效果形态的特殊效果；增益效果（若有）放行。
+     * 来源无法归属（{@code getEffectSource()} 为 null，例如无主范围云）时不拦截，避免误伤正常玩法。
+     */
+    @SubscribeEvent
+    public static void onEffectApplicable(MobEffectEvent.Applicable event) {
+        if (event.getEntity().level().isClientSide) return;
+        if (!(event.getEntity() instanceof Player)) return;
+        Entity source = event.getEffectSource();
+        if (source == null || !isPhantomSource(source)) return;
+        if (event.getEffectInstance() != null && event.getEffectInstance().getEffect().value().isBeneficial()) {
+            return;
+        }
+        event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
     }
 
     /** 递归判定伤害来源是否属幻灵：同时查直接来源与真实攻击者（getEntity），覆盖水花/弹幕 attrib 到 boss 的情形 */

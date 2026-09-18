@@ -1,0 +1,6 @@
+{
+  "_comment": "可被强化物品的黑名单：命中者不能作为被强化目标（GUI 快捷强化与工作台合成两条路径统一生效）。",
+  "blacklist": [
+    "lensouls:dimensional_hammer"
+  ]
+}

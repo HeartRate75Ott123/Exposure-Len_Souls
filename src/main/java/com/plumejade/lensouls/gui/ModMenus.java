@@ -39,6 +39,11 @@ public class ModMenus {
             MENUS.register("photo_album", () -> IMenuTypeExtension.create(
                     (IContainerFactory<AlbumMenu>) (id, inv, buf) -> new AlbumMenu(id, inv, findAlbum(inv.player))));
 
+    /** 次元强化界面（次元锤右键打开）：界面全部自绘，菜单负责玩家物品栏同步与权威结算 */
+    public static final DeferredHolder<MenuType<?>, MenuType<ReinforceMenu>> REINFORCE =
+            MENUS.register("reinforce", () -> IMenuTypeExtension.create(
+                    (IContainerFactory<ReinforceMenu>) (id, inv, buf) -> new ReinforceMenu(id, inv)));
+
     /**
      * 在玩家背包中查找第一个转换器物品。
      */

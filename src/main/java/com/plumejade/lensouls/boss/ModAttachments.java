@@ -25,6 +25,17 @@ public class ModAttachments {
             ATTACHMENT_TYPES.register("boss_toughness",
                     () -> AttachmentType.serializable(() -> new BossToughnessData(1)).build());
 
+    /**
+     * 浓雾的治愈回血时钟（见 {@link com.plumejade.lensouls.effect.BossHealEffect}）。
+     * <p>
+     * 以<b>实体绝对时间戳</b>记录「下一次可回血的 tick」，与效果实例的 duration 完全解耦，
+     * 刷新 buff（重设 duration）不会重置计时；非序列化（默认值 0 = 立即可回血，
+     * 但效果首次生效时会自行写入基准），无需同步、随实体一并销毁。
+     */
+    public static final Supplier<AttachmentType<BossHealTimer>> BOSS_HEAL_TIMER =
+            ATTACHMENT_TYPES.register("boss_heal_timer",
+                    () -> AttachmentType.builder(BossHealTimer::new).build());
+
     public static void register(IEventBus modEventBus) {
         ATTACHMENT_TYPES.register(modEventBus);
     }

@@ -16,7 +16,8 @@
     "PlayerSwingMixin",
     "EntitiesInFrameMixin",
     "EntityInvulnerableTimeAccessor",
-    "FoodDataMixin"
+    "FoodDataMixin",
+    "PhantomPushGuardMixin"
   ],
     "client": [
     "client.ItemRendererMixin",

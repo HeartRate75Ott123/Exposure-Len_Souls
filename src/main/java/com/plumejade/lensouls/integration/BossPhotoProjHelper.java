@@ -21,6 +21,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.lang.reflect.Method;
@@ -35,6 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * 触发信号由 mixin 提供（{@code Player#attack} / BetterCombat {@code ServerNetwork#handleAttackRequest}），
  * 每次完整挥砍开始调用 {@link #onSwing}。空手狂按 / 空挥均触发（BetterCombat 环境）。
+ * <p>
+ * 远程伤害命中同样触发（{@link #onRangedHit}）：玩家用弓箭 / 弩 / 三叉戟 / 次元枪子弹等
+ * 远程手段打中生物时，与挥击共用同一套判定与去重，不再局限于"必须先挥一下"。
  * 发射：玩家位置 + 玩家视线方向。所有弹射物以玩家为 shooter/caster（伤害归属玩家，不伤自身/队友）。
  */
 public class BossPhotoProjHelper {
@@ -77,6 +81,36 @@ public class BossPhotoProjHelper {
     /** 每次完整挥砍开始调用（由 Player#attack / BetterCombat handleAttackRequest mixin 触发）。
      *  {@code hitTarget} 为本次被攻击的实体（可为 null：空挥/BetterCombat 路径无目标时退化为最近敌人）。 */
     public static void onSwing(ServerPlayer player, Entity hitTarget) {
+        trigger(player, hitTarget);
+    }
+
+    /**
+     * 远程伤害命中触发（{@link LivingDamageEvent.Pre}，仅服务端）。
+     * <p>
+     * 玩家以远程手段命中生物时与挥击同等对待，逐次命中各掷一次骰：
+     * <ul>
+     *   <li>「远程」口径复用 {@link com.plumejade.lensouls.damage.RangedAttackHelper#isRanged}，
+     *       与照片的远程伤害加成 / 元素弹射物弱点判定保持一致（弓箭 / 弩 / 三叉戟 /
+     *       次元枪子弹 / 投掷物等，不含近战与直接命中）。</li>
+     *   <li>本模组自身弹幕（{@code lensouls:photo_proj}）命中的连锁不再触发，避免弹幕自我增殖。</li>
+     *   <li>自伤（自己打到自己）不算命中；命中判定已被 {@code HitChanceHandler} 取消的伤害
+     *       不会走到本事件，因此"打空"不会触发。</li>
+     * </ul>
+     */
+    @SubscribeEvent
+    public static void onRangedHit(LivingDamageEvent.Pre event) {
+        if (event.getEntity().level().isClientSide) return;
+        if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
+        if (event.getEntity() == player) return; // 自伤不算命中
+        if (!com.plumejade.lensouls.damage.RangedAttackHelper.isRanged(event.getSource())) return;
+        // 照片弹幕本身即为远程伤害：其命中不再回头触发弹幕（标记见 markAndSpawn）
+        Entity direct = event.getSource().getDirectEntity();
+        if (direct != null && direct.getPersistentData().getBoolean("lensouls:photo_proj")) return;
+        trigger(player, event.getEntity());
+    }
+
+    /** 弹幕判定核心：挥击与远程命中共用同一套 3 tick 去重 + 各 Boss 触发概率。 */
+    private static void trigger(ServerPlayer player, Entity hitTarget) {
         // 去重：BetterCombat 命中时会同时走原版 attack 与 handleAttackRequest，3 tick 内只触发一次
         Long last = LAST_SWING.get(player.getUUID());
         if (last != null && player.level().getGameTime() - last < 3) return;

@@ -63,6 +63,7 @@ public class LenSouls {
         com.plumejade.lensouls.recipe.DimensionalGunRecipes.register(modEventBus);
         com.plumejade.lensouls.recipe.CopySoulRecipes.register(modEventBus);
         com.plumejade.lensouls.recipe.PotionGlassPaneRecipes.register(modEventBus);
+        com.plumejade.lensouls.recipe.ReinforceRecipes.register(modEventBus);
         com.plumejade.lensouls.particle.ModParticleTypes.register(modEventBus);
         com.plumejade.lensouls.sound.ModSounds.register(modEventBus);
         PacketHandler.register(modEventBus);
@@ -103,6 +104,8 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotoSetEffects.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.SuppressHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.IgnisBrandHandler.class);
+        // ---- 浓雾的治愈（boss_heal）回血时钟：移除/到时清空，只保留「获得时起算」 ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.BossHealEffectHandler.class);
         // ---- 石之心（单次受伤上限 25% 最大生命，受到伤害 +17%） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.HeartOfStoneHandler.class);
         // ---- 虚影核心 / 虚影残像（死亡掉落托管容器） ----
@@ -133,6 +136,10 @@ public class LenSouls {
         // ---- 元素活性 tooltip（客户端物品 hover 提示） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.ElementActivityTooltipHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.StaffItemTooltipHandler.class);
+        // ---- 强化材料 tooltip（数据包驱动，多人同步） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.reinforce.ReinforceTooltipHandler.class);
+        // ---- 工作台强化配方：取出结果时整堆消耗原物品 ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.reinforce.ReinforceCraftHandler.class);
         // ---- 法师胸针 / 灵魂口哨效果 ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.BroochEffectHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.WhistlePhantomHandler.class);
@@ -176,6 +183,7 @@ public class LenSouls {
         event.addListener(new com.plumejade.lensouls.config.PhotoSetLoader());
         event.addListener(new com.plumejade.lensouls.config.PhotoSetDefs());
         event.addListener(new com.plumejade.lensouls.config.StaffItemLoader());
+        event.addListener(new com.plumejade.lensouls.reinforce.ReinforceDataLoader());
     }
 
     /**

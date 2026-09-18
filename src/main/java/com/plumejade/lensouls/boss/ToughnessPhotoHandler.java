@@ -31,6 +31,8 @@ public class ToughnessPhotoHandler {
             boolean playedSound = false;
 
             for (LivingEntity entity : entities) {
+                // 幻灵（借体 BOSS 及其召唤物）不参与削韧：玩家对幻灵不造成削韧伤害，也不出韧性条/音效
+                if (com.plumejade.lensouls.entity.PhantomDamageHandler.isPhantomEntity(entity)) continue;
                 boolean hasTier = BossTierLoader.getTier(entity) > 0;
                 boolean inManager = manager.has(entity);
 

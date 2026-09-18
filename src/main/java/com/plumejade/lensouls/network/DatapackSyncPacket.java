@@ -47,6 +47,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
     private final Map<String, PhotoSetDefs.SetDef> photoSetDefs;
     private final List<ResourceLocation> staffItems;
     private final List<ResourceLocation> bosses;
+    private final List<com.plumejade.lensouls.reinforce.ReinforceMaterial> reinforceMaterials;
+    private final java.util.Set<ResourceLocation> reinforceBlacklist;
 
     public DatapackSyncPacket(
             Map<ResourceLocation, Map<ElementDamage, Float>> weaknesses,
@@ -55,7 +57,9 @@ public class DatapackSyncPacket implements CustomPacketPayload {
             Map<ResourceLocation, List<String>> photoSetMembership,
             Map<String, PhotoSetDefs.SetDef> photoSetDefs,
             List<ResourceLocation> staffItems,
-            List<ResourceLocation> bosses) {
+            List<ResourceLocation> bosses,
+            List<com.plumejade.lensouls.reinforce.ReinforceMaterial> reinforceMaterials,
+            java.util.Set<ResourceLocation> reinforceBlacklist) {
         this.weaknesses = weaknesses;
         this.attackerElement = attackerElement;
         this.itemElementActivity = itemElementActivity;
@@ -63,6 +67,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         this.photoSetDefs = photoSetDefs;
         this.staffItems = staffItems;
         this.bosses = bosses;
+        this.reinforceMaterials = reinforceMaterials;
+        this.reinforceBlacklist = reinforceBlacklist;
     }
 
     /**
@@ -79,7 +85,9 @@ public class DatapackSyncPacket implements CustomPacketPayload {
                 PhotoSetLoader.getAll(),
                 PhotoSetDefs.allMap(),
                 StaffItemLoader.allStaffs(),
-                BossEntityLoader.allBosses());
+                BossEntityLoader.allBosses(),
+                com.plumejade.lensouls.reinforce.ReinforceDataLoader.allMaterials(),
+                com.plumejade.lensouls.reinforce.ReinforceDataLoader.allBlacklist());
     }
 
     private DatapackSyncPacket(RegistryFriendlyByteBuf buf) {
@@ -96,6 +104,11 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         List<ResourceLocation> bossList = new ArrayList<>(bossSize);
         for (int i = 0; i < bossSize; i++) bossList.add(buf.readResourceLocation());
         this.bosses = List.copyOf(bossList);
+        this.reinforceMaterials = com.plumejade.lensouls.reinforce.ReinforceMaterial.decodeAll(buf);
+        int blacklistSize = buf.readVarInt();
+        java.util.Set<ResourceLocation> blacklist = new java.util.LinkedHashSet<>();
+        for (int i = 0; i < blacklistSize; i++) blacklist.add(buf.readResourceLocation());
+        this.reinforceBlacklist = java.util.Set.copyOf(blacklist);
     }
 
     // ========== 编码 ==========
@@ -110,6 +123,9 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         for (ResourceLocation id : staffItems) buf.writeResourceLocation(id);
         buf.writeVarInt(bosses.size());
         for (ResourceLocation id : bosses) buf.writeResourceLocation(id);
+        com.plumejade.lensouls.reinforce.ReinforceMaterial.encodeAll(buf, reinforceMaterials);
+        buf.writeVarInt(reinforceBlacklist.size());
+        for (ResourceLocation id : reinforceBlacklist) buf.writeResourceLocation(id);
     }
 
     private static void encodeWeakness(RegistryFriendlyByteBuf buf,
@@ -261,6 +277,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
             PhotoSetDefs.setClientCache(packet.photoSetDefs);
             StaffItemLoader.setClientCache(packet.staffItems);
             BossEntityLoader.setClientCache(packet.bosses);
+            com.plumejade.lensouls.reinforce.ReinforceDataLoader.setClientCache(
+                    packet.reinforceMaterials, packet.reinforceBlacklist);
         });
     }
 }

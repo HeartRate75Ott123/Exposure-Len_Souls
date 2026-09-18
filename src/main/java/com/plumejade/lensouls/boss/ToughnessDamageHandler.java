@@ -77,6 +77,8 @@ public class ToughnessDamageHandler {
      * 例：白名单=all + 黑名单=[x] → 除 x 外全部触发；黑名单=all + 白名单=[x] → 仅 x 触发。
      */
     public static boolean isBoss(LivingEntity entity) {
+        // 幻灵（借体 BOSS 及其召唤物）一律不注册韧性：玩家对幻灵不造成削韧伤害
+        if (com.plumejade.lensouls.entity.PhantomDamageHandler.isPhantomEntity(entity)) return false;
         ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
         String idStr = id.toString();
         var wl = Config.TOUGHNESS_WHITELIST.get();

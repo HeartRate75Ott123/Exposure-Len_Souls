@@ -93,6 +93,7 @@ public class LenSoulsClient {
         event.register(ModMenus.CONVERTER_SELECT.get(), SoulSelectOverlay::new);
         event.register(ModMenus.PHOTO_GUI.get(), PhotoGuiScreen::new);
         event.register(ModMenus.PHOTO_ALBUM.get(), com.plumejade.lensouls.gui.AlbumScreen::new);
+        event.register(ModMenus.REINFORCE.get(), com.plumejade.lensouls.gui.ReinforceScreen::new);
     }
 
     /** 注册客户端扩展（显示元素灌注图标，隐藏原版粒子） */
@@ -151,6 +152,8 @@ public class LenSoulsClient {
     /** 注册核心着色器（镜魂描边 + mask） */
     private static void registerShaders(RegisterShadersEvent event) {
         ResourceProvider provider = event.getResourceProvider();
+
+        // 次元强化界面背景改用预渲染贴图（assets/lensouls/textures/gui/reinforce_background.png），不再需要着色器
 
         // 冻结描边 — 蒙版纯白着色器（NEW_ENTITY）
         try {
@@ -316,6 +319,9 @@ public class LenSoulsClient {
     private static void onClientLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 com.plumejade.lensouls.network.DatapackSyncRequestPacket.instance());
+        // 强化界面客户端偏好（收藏/开关/上次搜索）按存档或服务器重新加载
+        com.plumejade.lensouls.reinforce.ReinforceClientPrefs.loadForCurrentWorld();
+        com.plumejade.lensouls.reinforce.ReinforceClientData.clear();
     }
 
     private static void onGatherEffectTooltips(GatherEffectScreenTooltipsEvent event) {

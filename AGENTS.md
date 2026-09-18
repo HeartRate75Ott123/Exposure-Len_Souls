@@ -154,6 +154,7 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
 - 新属性 `lensouls:hit_chance`（默认 100%、上限 100%）：`damage/HitChanceHandler` 在 `LivingIncomingDamageEvent`（LOWEST）掷骰，未命中直接 cancel（完全无法造成伤害）。弹幕类照片 -24%、`minecraft:skeleton`/`evoker` -6%、其余 +7%~14%。
 - 套装定义按 7 类拆分为 `data/lensouls/photo_set_defs/{attack,defense,survival,mobility,conversion,daynight,balanced}.json`（`photo_set/membership.json` 同步拆分）；`cataclysm:lava_bat` 已从 JEI/能力窃取/套装配置中全部移除。
 - 新描述符：`dmg_element:<元素>:<x>`、`dot_mult:<元素>:<x>`、`speed_mult:<x>`（乘区）、`convert_heal:<x>`、`convert_buff:<x>`；转换期临时增益存**根键** `lensouls:convert_dmg_mult` / `lensouls:convert_dmg_until`（不能放 FLAGS，`applyPlan` 会重写它）。
+- **Boss 照片弹幕触发面（两条，共用 3 tick 去重）**：① 挥击信号（`PlayerSwingMixin` / `BetterCombatAttackMixin` / `MinecraftSwingMixin` 的 C2S 包）；② **远程伤害命中**（`BossPhotoProjHelper.onRangedHit`，`LivingDamageEvent.Pre` + `RangedAttackHelper.isRanged`，弓箭/弩/三叉戟/次元枪子弹等）。远程路必须跳过 `lensouls:photo_proj` 标记的自家弹幕（否则弹幕命中会自我增殖），并排除自伤；未通过 `HitChanceHandler` 掷骰的"打空"因事件不可达而天然不触发。
 
 ### 虚影核心 / 虚影残像（复刻 Enigmatic Legacy 超维容器）
 - 死亡结算必须放 `LivingDeathEvent`（此时背包完好）；`LivingDropsEvent` 只能当兜底——`dropEquipment()` 在 drops 之前就已清空背包与 Curios。
@@ -194,3 +195,58 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
 
 `ProjectileImmunityMixins` 现为 31 个嵌套静态类，全部由 `javap -c` 逐点核实；`lensouls.compat.mixins.json` 同步登记。
 远端验证方法：进游戏用弓射这些 boss，伤害应正常结算（不再反弹/免伤）。
+
+## 2026-09 需求批次（提示词222b）：次元强化系统
+
+### 一句话结构
+
+次元锤（`lensouls:dimensional_hammer`，16×64 四帧动图）右键 → `ReinforceMenu` + `ReinforceScreen`（全部自绘）
+→ 大方框选物（玩家物品栏页）→ 5×10 材料网格点击 → 服务端消耗 1 个材料 + 写入主手 ADD_VALUE 攻击伤害。
+
+### 关键文件
+
+| 文件 | 职责 |
+|------|------|
+| `reinforce/ReinforceDataLoader.java` | 数据包加载器：`data/lensouls/reinforcement/*.json`（黑名单 + 材料定义），顺序即 GUI 默认排列；`version()` 供客户端搜索索引重建 |
+| `reinforce/ReinforceMaterial.java` / `ReinforceModifier.java` | 材料 / 单条属性修饰符（attribute+amount+operation+slot，网络编解码 + tooltip 文本） |
+| `reinforce/ReinforceHelper.java` | 已强化列表组件读写、`ATTRIBUTE_MODIFIERS` 写入、可强化判定（两条路径共用） |
+| `reinforce/ReinforceInventoryScanner.java` | 三容器统计与消耗：玩家物品栏 → 饰品栏容器（`Capabilities.ItemHandler.ITEM`）→ 超越维度 |
+| `reinforce/BeyondDimensionsCompat.java` | 超越维度（`beyonddimensions`）纯反射兼容：网络存储 + 物质压缩球组件 |
+| `reinforce/ReinforceSearchContext.java` | 拼音搜索（内嵌 PinIn）+ 子串兜底，后台线程建索引 |
+| `reinforce/ReinforceClientPrefs.java` | 收藏 / 两个开关 / 上次搜索，单人存存档目录、多人存游戏目录 |
+| `reinforce/ReinforceCraftHandler.java` | 工作台「整堆吞掉原物品」：`PlayerEvent.ItemCraftedEvent` 里清空被强化物品槽位 |
+| `reinforce/pinyin/**` | 内嵌 PinIn 拼音库（MIT，upstream Towdium；由 JustEnoughCharacters/Remorphed 转手），包名改为 `com.plumejade.lensouls.reinforce.pinyin`，字典 `resources/com/plumejade/lensouls/reinforce/pinyin/data.txt`（302KB） |
+| `recipe/ReinforceRecipe.java` / `ReinforceRecipes.java` | 工作台配方（`lensouls:reinforce`）：任意物品 + 1 材料 → 完整副本，数量 = 原堆数量 |
+| `gui/ReinforceMenu.java` | 菜单：41 个**隐藏**玩家物品栏槽位（只为同步）+ 选中槽位 `ContainerData` + 服务端权威结算 + 数量下发 |
+| `gui/ReinforceScreen.java` | 主界面全自绘：大方框 / 搜索框 / 5×10 网格（收藏星、数量、已强化）/ 右上开关 / 滚动条。**版式按参考图逐像素实测还原**（见 `docs/强化界面-参考图规格.md`） |
+| `gui/ReinforceSelectScreen.java` | 选物界面：**独立屏幕**（不是主界面里叠一层），展示玩家物品栏 41 格，点选后返回主界面 |
+| `network/Reinforce{Select,Apply,Counts}Packet.java` | 选物 C2S / 强化 C2S / 数量 S2C，三个处理器全部 try/catch 兜底 |
+| `item/DimensionalHammerItem.java` | 右键 `openMenu`，贴图 `textures/item/dimensional_hammer.png(+.mcmeta)` |
+| `docs/强化界面-参考图规格.md` | 参考图规格：模块矩形 / 配色 / 6 条对齐约束 / 以格子为单位的换算公式 + 4 组窗口算例 |
+
+### 版式（参考图 1063×807 实测，单位 = 格子边长 k）
+
+- 唯一缩放单位 `k`；内容块固定 `11.892k × 9.162k`，整体居中：`k = clamp(floor(min((宽-12)/11.892, (高-12)/9.162)), 14, 40)`。
+- 大方框 `2.135k × 2.108k` 贴内容块左上；搜索条高 `0.662k`，**底边与方框底边齐平、右缘与网格右缘齐平**；
+  网格 `11.216k × 5.919k`，列距 `1.135k`、行距 `1.230k`（竖直比水平更透气）；滚动条宽 `0.324k`，在网格右侧 `0.351k`；
+  两个开关行高 `0.378k`、行距 `0.676k`，方块 `0.23k` 在标签右侧、右缘比网格右缘内缩 `0.27k`。
+- 配色只有五种：页面 `#1E1E1E`、模块 `#0F0F0F`、滑块 `#A7A7A7`、勾选绿 `#22FF46`、文字 `#FDFEFD`。
+  **无边框/无圆角/无渐变**——模块靠"深色块贴在浅底上"区分。
+
+### 必须知道的坑
+
+- **界面用 `AbstractContainerScreen` 但完全自绘**：`RegisterMenuScreensEvent.register` 要求屏幕实现 `MenuAccess<M>`，
+  纯 `Screen` 注册不过编译；因此继承 `AbstractContainerScreen` 覆写 `render`（不调 `super.render`，不渲染原版槽位），
+  `renderBg` 留空。41 个槽位坐标放在屏幕外（-10000），只承担「玩家背包同步」职责。
+- **没有这些槽位，服务端改背包物品不会同步到客户端**——原版只在当前打开的菜单槽位里同步玩家物品栏。
+- **`ContainerData` 自动双端同步**（`addDataSlots` + `SimpleContainerData`，`DataSlot.forContainer` 内部记录 prevValue），
+  选中槽位用它而不是自定义包；构造器里先 `set(0, -1)` 再 `addDataSlots`，保证两端初值一致。
+- **材料数量必须服务端算**：精妙背包内容物客户端只有「已同步过」的才有，超越维度客户端根本没有访问入口。
+- **工作台「整堆」只能靠 `ItemCraftedEvent`**：`ResultSlot.onTake` 固定每槽 `removeItem(1)`，
+  `getRemainingItems` 无法多消耗。事件在 `checkTakeAchievements`（= `onTake` 第一句）里触发，
+  此时结果堆**已经**从结果槽取出交给玩家，清空被强化物品槽位不会吞掉产物；随后消耗循环只看得到材料槽。
+  特殊配方 `getIngredients()` 为空，模组化自动合成器拿不到原料，不会绕过这条逻辑。
+- **`Registry.getOptional` 返回的是值不是 Holder**：属性要 `BuiltInRegistries.ATTRIBUTE.getHolder(id)`。
+- **物品默认属性修饰符的取法**：`stack.get(DataComponents.ATTRIBUTE_MODIFIERS)` 为空时用
+  `stack.getItem().getDefaultAttributeModifiers()`；**不要**用 `stack.forEachModifier`（它会把附魔加成也烤进组件）。
+- 拼音字典构建耗时数百毫秒 → 必须后台线程（`ensureLoadedAsync`），主线程先用子串兜底。

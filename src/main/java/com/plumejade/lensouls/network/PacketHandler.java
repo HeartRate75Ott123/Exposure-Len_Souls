@@ -241,6 +241,22 @@ public class PacketHandler {
                 DatapackSyncRequestPacket::handle
         );
 
+        // ---- 次元强化界面：选物 C2S / 强化 C2S / 材料持有量 S2C ----
+        registrar.playToServer(
+                ReinforceSelectPacket.TYPE,
+                ReinforceSelectPacket.STREAM_CODEC,
+                ReinforceSelectPacket::handle
+        );
+        registrar.playToServer(
+                ReinforceApplyPacket.TYPE,
+                ReinforceApplyPacket.STREAM_CODEC,
+                ReinforceApplyPacket::handle
+        );
+        registrar.playToClient(
+                ReinforceCountsPacket.TYPE,
+                ReinforceCountsPacket.STREAM_CODEC,
+                ReinforceCountsPacket::handle
+        );
         // ---- 数据包解析结果统一同步 S2C（弱点/活性/套装，玩家加入 + /reload 时） ----
         registrar.playToClient(
                 DatapackSyncPacket.TYPE,

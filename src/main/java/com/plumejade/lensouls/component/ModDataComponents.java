@@ -70,6 +70,18 @@ public class ModDataComponents {
     /** 精准触发：按住 G 呼出镜魂选择菜单 */
     public static final int CONVERTER_MODE_PRECISE = 1;
 
+    /**
+     * 已强化材料列表（物品组件）：记录该物品已经用哪些强化材料强化过。
+     * <p>
+     * 同一材料对同一物品只能强化一次——判定在 {@code ReinforceHelper.canApply}，
+     * 两条路径（GUI 快捷强化 / 工作台合成）共用。存 {@code namespace:path} 字符串，
+     * 随物品存档与网络同步。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.List<String>>> REINFORCED =
+            register("reinforced", builder -> builder
+                    .persistent(Codec.STRING.listOf())
+                    .networkSynchronized(ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list())));
+
     /** 旧版存放模式的玩家 persistentData 键；仅在物品上还没有组件时作迁移兜底读取 */
     public static final String LEGACY_MODE_TAG = "lensouls:converter_mode";
 

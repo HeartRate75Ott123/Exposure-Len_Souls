@@ -75,6 +75,10 @@ public class ModItems {
     public static final DeferredItem<Item> CONVERTER = ITEMS.register("converter",
             () -> new ConverterItem(new Item.Properties().stacksTo(1)));
 
+    // ---- 次元锤（右键打开次元强化界面） ----
+    public static final DeferredItem<Item> DIMENSIONAL_HAMMER = ITEMS.register("dimensional_hammer",
+            () -> new DimensionalHammerItem(new Item.Properties().stacksTo(1)));
+
     // ---- 饰品相册（9 格照片容器） ----
     public static final DeferredItem<Item> PHOTO_ALBUM = ITEMS.register("photo_album", () -> {
         net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();

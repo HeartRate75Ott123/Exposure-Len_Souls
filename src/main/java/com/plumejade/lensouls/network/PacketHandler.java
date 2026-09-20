@@ -257,6 +257,12 @@ public class PacketHandler {
                 ReinforceCountsPacket.STREAM_CODEC,
                 ReinforceCountsPacket::handle
         );
+        // ---- 照片套装面板排版调试开关（S2C，仅调试指令触发） ----
+        registrar.playToClient(
+                PhotoSetDebugPacket.TYPE,
+                PhotoSetDebugPacket.STREAM_CODEC,
+                PhotoSetDebugPacket::handle
+        );
         // ---- 数据包解析结果统一同步 S2C（弱点/活性/套装，玩家加入 + /reload 时） ----
         registrar.playToClient(
                 DatapackSyncPacket.TYPE,

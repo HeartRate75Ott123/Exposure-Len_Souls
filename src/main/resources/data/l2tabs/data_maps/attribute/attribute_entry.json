@@ -1,0 +1,34 @@
+{
+  "values": {
+    "lensouls:hit_chance": {
+      "intrinsic": 0.0,
+      "order": 11000,
+      "usePercent": true
+    },
+    "lensouls:dodge_chance": {
+      "intrinsic": 0.0,
+      "order": 11001,
+      "usePercent": true
+    },
+    "lensouls:fire_weakness": {
+      "intrinsic": 0.0,
+      "order": 11100,
+      "usePercent": true
+    },
+    "lensouls:water_weakness": {
+      "intrinsic": 0.0,
+      "order": 11101,
+      "usePercent": true
+    },
+    "lensouls:earth_weakness": {
+      "intrinsic": 0.0,
+      "order": 11102,
+      "usePercent": true
+    },
+    "lensouls:ender_weakness": {
+      "intrinsic": 0.0,
+      "order": 11103,
+      "usePercent": true
+    }
+  }
+}

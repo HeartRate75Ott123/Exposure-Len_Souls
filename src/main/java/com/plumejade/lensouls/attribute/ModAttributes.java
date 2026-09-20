@@ -56,12 +56,12 @@ public class ModAttributes {
         // 默认 1.0：弱点以 ADD_MULTIPLIED_BASE 百分比修饰叠加（0.12 → 显示 +12%），
         // 实际系数 = 属性值 - 1.0
         return ATTRIBUTES.register(name, () ->
-                new RangedAttribute("attribute.name.lensouls." + name, 1.0, 0.0, 10.0));
+                new RangedAttribute("attribute.name.lensouls." + name, 1.0, 0.0, 10.0).setSyncable(true));
     }
 
     private static DeferredHolder<Attribute, Attribute> register(String name, double base, double min, double max) {
         return ATTRIBUTES.register(name, () ->
-                new RangedAttribute("attribute.name.lensouls." + name, base, min, max));
+                new RangedAttribute("attribute.name.lensouls." + name, base, min, max).setSyncable(true));
     }
 
     public static void register(IEventBus modEventBus) {

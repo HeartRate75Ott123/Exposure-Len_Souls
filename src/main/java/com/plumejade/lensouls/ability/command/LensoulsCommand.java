@@ -230,6 +230,14 @@ public class LensoulsCommand {
                             return 1;
                         })
                 )
+                .then(Commands.literal("gui")
+                        .then(Commands.literal("photo_set")
+                                .then(Commands.literal("testopen")
+                                        .executes(ctx -> setPhotoSetDebug(ctx, true)))
+                                .then(Commands.literal("testfalse")
+                                        .executes(ctx -> setPhotoSetDebug(ctx, false)))
+                        )
+                )
                 .then(Commands.literal("dump")
                         .then(Commands.literal("mobs")
                                 .executes(LensoulsCommand::dumpMobs)
@@ -237,6 +245,27 @@ public class LensoulsCommand {
                 )
         );
 
+    }
+
+    /**
+     * {@code /lensouls gui photo_set testopen|testfalse}：照片套装面板排版调试开关。
+     * <p>
+     * 只对执行指令的玩家生效（S2C 单发）：开启后「照片效果」面板会额外塞入人造长文本，
+     * 用来检验分页是否按面板实际高度切页、超长套装块能否被拆页、超长单行是否被裁切。
+     */
+    private static int setPhotoSetDebug(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx,
+                                        boolean enable) {
+        ServerPlayer player = ctx.getSource().getPlayer();
+        if (player == null) {
+            ctx.getSource().sendFailure(Component.literal("§c只有玩家可以执行该调试指令"));
+            return 0;
+        }
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(
+                player, new com.plumejade.lensouls.network.PhotoSetDebugPacket(enable));
+        ctx.getSource().sendSuccess(() -> Component.literal(enable
+                ? "§a照片套装面板排版调试已开启（打开背包「照片效果」页查看长文本分页）"
+                : "§7照片套装面板排版调试已关闭"), true);
+        return 1;
     }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();

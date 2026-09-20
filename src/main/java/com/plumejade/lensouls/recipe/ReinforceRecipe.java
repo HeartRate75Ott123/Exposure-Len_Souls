@@ -24,8 +24,10 @@ import net.minecraft.world.level.Level;
  *     <li>同一材料对同一物品只能强化一次（已强化列表组件拦截）。</li>
  * </ul>
  * 输出数量 = 输入物品的整堆数量（动态生成，见 {@link #assemble}）；
- * 「整堆吞掉原物品」由 {@link com.plumejade.lensouls.reinforce.ReinforceCraftHandler}
- * 在工作台取出结果时清空原物品槽位实现（原版只会 removeItem(1)，无法整堆消耗）。
+ * 「整堆吞掉原物品」由 {@link com.plumejade.lensouls.mixin.ReinforceCraftConsumeMixin}
+ * 注入 {@code ResultSlot.onTake} 清空原物品槽位实现（原版只会 {@code removeItem(1)}，无法整堆消耗；
+ * 并且不能用 {@code ItemCraftedEvent}——它只在普通左键取出时派发，shift 快速移动拿不到）。
+ * 材料由 {@link #getRemainingItems} 返回全空，因此原版循环恰好消耗 1 个。
  */
 public class ReinforceRecipe extends CustomRecipe {
 

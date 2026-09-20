@@ -138,8 +138,6 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.StaffItemTooltipHandler.class);
         // ---- 强化材料 tooltip（数据包驱动，多人同步） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.reinforce.ReinforceTooltipHandler.class);
-        // ---- 工作台强化配方：取出结果时整堆消耗原物品 ----
-        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.reinforce.ReinforceCraftHandler.class);
         // ---- 法师胸针 / 灵魂口哨效果 ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.BroochEffectHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.WhistlePhantomHandler.class);

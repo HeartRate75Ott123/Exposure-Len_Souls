@@ -214,7 +214,7 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
 | `reinforce/BeyondDimensionsCompat.java` | 超越维度（`beyonddimensions`）纯反射兼容：网络存储 + 物质压缩球组件 |
 | `reinforce/ReinforceSearchContext.java` | 拼音搜索（内嵌 PinIn）+ 子串兜底，后台线程建索引 |
 | `reinforce/ReinforceClientPrefs.java` | 收藏 / 两个开关 / 上次搜索，单人存存档目录、多人存游戏目录 |
-| `reinforce/ReinforceCraftHandler.java` | 工作台「整堆吞掉原物品」：`PlayerEvent.ItemCraftedEvent` 里清空被强化物品槽位 |
+| `mixin/ReinforceCraftConsumeMixin.java` | 工作台「整堆吞掉原物品」：注入 `ResultSlot.onTake` HEAD 清空被强化物品槽位 |
 | `reinforce/pinyin/**` | 内嵌 PinIn 拼音库（MIT，upstream Towdium；由 JustEnoughCharacters/Remorphed 转手），包名改为 `com.plumejade.lensouls.reinforce.pinyin`，字典 `resources/com/plumejade/lensouls/reinforce/pinyin/data.txt`（302KB） |
 | `recipe/ReinforceRecipe.java` / `ReinforceRecipes.java` | 工作台配方（`lensouls:reinforce`）：任意物品 + 1 材料 → 完整副本，数量 = 原堆数量 |
 | `gui/ReinforceMenu.java` | 菜单：41 个**隐藏**玩家物品栏槽位（只为同步）+ 选中槽位 `ContainerData` + 服务端权威结算 + 数量下发 |
@@ -242,11 +242,63 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
 - **`ContainerData` 自动双端同步**（`addDataSlots` + `SimpleContainerData`，`DataSlot.forContainer` 内部记录 prevValue），
   选中槽位用它而不是自定义包；构造器里先 `set(0, -1)` 再 `addDataSlots`，保证两端初值一致。
 - **材料数量必须服务端算**：精妙背包内容物客户端只有「已同步过」的才有，超越维度客户端根本没有访问入口。
-- **工作台「整堆」只能靠 `ItemCraftedEvent`**：`ResultSlot.onTake` 固定每槽 `removeItem(1)`，
-  `getRemainingItems` 无法多消耗。事件在 `checkTakeAchievements`（= `onTake` 第一句）里触发，
-  此时结果堆**已经**从结果槽取出交给玩家，清空被强化物品槽位不会吞掉产物；随后消耗循环只看得到材料槽。
+- **工作台「整堆」必须在 `ResultSlot.onTake` 上做（不能用 `ItemCraftedEvent`）**：`ResultSlot.onTake` 固定每槽 `removeItem(1)`，
+  `getRemainingItems` 无法多消耗，所以「整堆吞掉原物品」只能在取走结果那一刻把原槽清空。
+  注入点选 `onTake` 的 HEAD（`ReinforceCraftConsumeMixin`）：此处输入容器完整、尚未发生任何消耗。
+  **不要退回 `ItemCraftedEvent`**：它由 `checkTakeAchievements` 派发，而外面套着 `if (removeCount > 0)`，
+  `removeCount` 只在 `ResultSlot.remove(int)` 里累加 —— 即普通左键取出那条路径；shift 快速移动走
+  `CraftingMenu.quickMoveStack → moveItemStackTo`（直接搬运 ItemStack，不经过 `ResultSlot.remove`），
+  事件根本不派发，槽位清不掉 → 「8 铁锭强化后得到 7 未强化 + 8 强化过的」。
+  `onTake` 在两条路径上都会被调用（快速移动那条传进去的结果堆是空的，但方法照常执行）。
   特殊配方 `getIngredients()` 为空，模组化自动合成器拿不到原料，不会绕过这条逻辑。
 - **`Registry.getOptional` 返回的是值不是 Holder**：属性要 `BuiltInRegistries.ATTRIBUTE.getHolder(id)`。
 - **物品默认属性修饰符的取法**：`stack.get(DataComponents.ATTRIBUTE_MODIFIERS)` 为空时用
   `stack.getItem().getDefaultAttributeModifiers()`；**不要**用 `stack.forEachModifier`（它会把附魔加成也烤进组件）。
 - 拼音字典构建耗时数百毫秒 → 必须后台线程（`ensureLoadedAsync`），主线程先用子串兜底。
+
+## 2026-09 需求批次（提示词：`新建 Microsoft Word 文档.docx`）
+
+### 1. 工作台强化配方「整堆消耗」失效（已修）
+- `ItemCraftedEvent` 由 `ResultSlot.checkTakeAchievements` 派发，外面套着 `if (removeCount > 0)`；
+  `removeCount` 只在 `ResultSlot.remove(int)` 里累加 = **只有普通左键取出**那条路径会派发事件，
+  shift 快速移动走 `moveItemStackTo`（直接搬运 ItemStack）→ 事件不派发 → 原槽只被 `removeItem(1)`
+  扣 1 个 → 「8 铁锭强化后得到 7 未强化 + 8 强化过的」。
+- 现由 `mixin/ReinforceCraftConsumeMixin` 注入 `ResultSlot.onTake` 的 HEAD 整堆清空原槽
+  （HEAD 处输入完整、两条路径都会经过；材料仍由原版循环恰好 -1，因为 `getRemainingItems` 返回全空）。
+  已删除原 `ReinforceCraftHandler` 与注册，**不要退回事件方案**。
+
+### 2. 照片套装面板分页（已修）+ 排版调试指令
+- l2tabs 的 `BaseTextScreen` 面板固定 `imageWidth × imageHeight = 176 × 166`（构造器写死，
+  `leftPos/topPos` 在 `init()` 里居中），正文从 `topPos + 6` 起、行高 10 → 实际可用约 15 行。
+  原实现写死 `LINES_PER_PAGE = 14`，而且**首页「通用效果」的行数没算进预算** → 首页必然溢出；
+  又没有裁切，文字直接画到面板外。
+- 现在：行数由面板几何推导；首页扣除通用效果行数；套装块优先不跨页、**单块超一页时拆页续排**；
+  正文区 `enableScissor` 兜底裁切。
+- 调试指令 `/lensouls gui photo_set testopen|testfalse`：服务端指令 + S2C `PhotoSetDebugPacket`
+  单发执行者 → 面板塞入 5 / 18 / 26 行人造文本（覆盖「跨页」与「超长拆页」），关闭即完全恢复。
+
+### 3. L2 数值面板显示自定义属性（已修）—— 关键是 NeoForge 数据映射
+- l2tabs 属性页取 `AttrDispEntry.get(entity)`；默认配置 `attributeSettings = COMMON` 时
+  **只显示登记在数据映射 `l2tabs:attribute_entry` 里的属性**（其它两种模式才会追加「有修饰符的属性」）。
+- NeoForge 数据映射的文件布局：`data/<数据映射命名空间>/data_maps/<注册表路径>/<数据映射路径>.json`，
+  类型 id 由**文件所在命名空间**决定 → 要往 l2tabs 的表里加条目，必须写进
+  `data/l2tabs/data_maps/attribute/attribute_entry.json`（本模组 jar 内即此路径）。
+- `DataMapLoader` 用 `FileToIdConverter.listMatchingResourceStacks` → **同 id 的多个包文件会被全部读取并合并**，
+  所以我们的文件与 l2tabs 自带的共存，不需要覆盖对方（跨模组扩展数据映射的正规做法）。
+- 条目字段：`{"intrinsic": 0.0, "order": 11000, "usePercent": true}`；`usePercent` 让面板按
+  `val*100` + `attribute.modifier.equals.1` 渲染成百分比；`order` 11000+ 排在原版（1000~10000）之后。
+- 属性本身早已通过 `EntityAttributeModificationEvent.add(EntityType.PLAYER, …)` 挂到玩家身上，
+  缺的只是这张显示表；属性名语言键 `attribute.name.lensouls.*` 已存在。
+- **自定义属性必须 `.setSyncable(true)`**（`Attribute` 的同步开关默认关闭，原版 `Attributes` 里 26 个属性逐个显式开启）。
+  不开的结果非常隐蔽：服务端修饰符照常生效（战斗结算在服务端），但 `ClientboundUpdateAttributesPacket` 永远不发这个属性，
+  客户端实例停在基值 → L2 数值面板/任何读 `player.getAttributeValue(...)` 的客户端界面都显示 100%（实测踩过）。
+
+### 4. 破韧描边在多子部件 boss 上「半红半白」（已修）
+- 暮色九头蛇头 `HydraHead`、娜迦体节 `NagaSegment` 都继承 `TFPart<T> extends PartEntity<T>`
+  （NeoForge 标准部件），是**独立渲染的实体**，会各自走一遍 `Entity.isCurrentlyGlowing()/getTeamColor()`；
+  而它们不是 `LivingEntity` → 原 mixin 只按本体解析状态 → 部件拿不到破定/霸体状态，颜色落回原版白
+  → 「上边三个头白边、下边身子红边」「娜迦头红、体节白」。
+- 现 `EntityBossOutlineMixin` 统一改为：`instanceof PartEntity<?>` 时用 `getParent()` 的父实体解析状态与配色
+  → 同一只 boss 的所有部件与本体同色同灭（末影龙等所有 `PartEntity` 一并覆盖）。
+- 注意：`参考项目的源码/[暮色森林]…` 这类含 `[` 的路径在 PowerShell 下必须用 `-LiteralPath`，
+  否则 `Get-ChildItem -Recurse` 被当通配符、扫描结果为空（本次踩过）。

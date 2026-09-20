@@ -23,10 +23,12 @@ import net.minecraft.world.level.Level;
  *     <li>强化材料：数据包 {@code reinforcement} 中配置过的物品；</li>
  *     <li>同一材料对同一物品只能强化一次（已强化列表组件拦截）。</li>
  * </ul>
- * 输出数量 = 输入物品的整堆数量（动态生成，见 {@link #assemble}）；
- * 「整堆吞掉原物品」由 {@link com.plumejade.lensouls.mixin.ReinforceCraftConsumeMixin}
- * 注入 {@code ResultSlot.onTake} 清空原物品槽位实现（原版只会 {@code removeItem(1)}，无法整堆消耗；
- * 并且不能用 {@code ItemCraftedEvent}——它只在普通左键取出时派发，shift 快速移动拿不到）。
+ * <b>输出数量恒为 1</b>（见 {@link #assemble}）：配方契约是「输入按每槽 1 个消耗、本方法给出这一份的产出」，
+ * 原版工作台、便携工作台（复用原版 {@code CraftingMenu}）、自动合成器与各模组自研合成逻辑都遵循它。
+ * 输出多于消耗就是复制，所以所有合成台一律「1 个材料 = 1 次强化」。
+ * <p>
+ * 「1 个材料 = 整堆强化」只由次元锤界面（{@code ReinforceMenu}）提供：它直接改槽位、由模组自己扣料，
+ * 不走合成配方，因此不受该契约限制。
  * 材料由 {@link #getRemainingItems} 返回全空，因此原版循环恰好消耗 1 个。
  */
 public class ReinforceRecipe extends CustomRecipe {
@@ -81,7 +83,13 @@ public class ReinforceRecipe extends CustomRecipe {
     }
 
     /**
-     * 动态输出：完整副本 + 材料属性，数量取输入整堆。
+     * 输出：完整副本 + 材料属性，<b>数量固定 1</b>。
+     * <p>
+     * <b>为什么不能输出整堆</b>：配方契约是「{@code assemble} 给出这一份配方的产出，输入按每槽 1 个消耗」。
+     * 原版工作台与模组合成台（便携工作台、精妙背包合成升级等）都按这个契约处理消耗——它们只扣 1 个原物品，
+     * 却会把 {@code assemble} 的数量整份交给玩家。若这里返回「原堆数量」，就等于「1 个原料换一整堆强化物」，
+     * 在这些站台上会变成恶性的物品大量复制（实测踩过）。整堆能力<b>只能</b>放在我们自己可控的取走路径上
+     * （见 {@link com.plumejade.lensouls.mixin.ReinforceCraftConsumeMixin}，仅原版 {@code ResultSlot} 的快速移动分支）。
      */
     @Override
     public ItemStack assemble(CraftingInput input, HolderLookup.Provider registries) {
@@ -89,7 +97,7 @@ public class ReinforceRecipe extends CustomRecipe {
         if (match == null) return ItemStack.EMPTY;
         ItemStack result = ReinforceHelper.createReinforced(match.base(), match.material().id());
         if (result.isEmpty()) return ItemStack.EMPTY;
-        result.setCount(Math.max(1, match.base().getCount()));
+        result.setCount(1);
         return result;
     }
 

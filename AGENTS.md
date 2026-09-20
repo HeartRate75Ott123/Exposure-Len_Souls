@@ -263,9 +263,22 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   `removeCount` 只在 `ResultSlot.remove(int)` 里累加 = **只有普通左键取出**那条路径会派发事件，
   shift 快速移动走 `moveItemStackTo`（直接搬运 ItemStack）→ 事件不派发 → 原槽只被 `removeItem(1)`
   扣 1 个 → 「8 铁锭强化后得到 7 未强化 + 8 强化过的」。
-- 现由 `mixin/ReinforceCraftConsumeMixin` 注入 `ResultSlot.onTake` 的 HEAD 整堆清空原槽
+- 现由 `mixin/ReinforceCraftConsumeMixin` 注入 `ResultSlot.onTake` 处理取走路径
   （HEAD 处输入完整、两条路径都会经过；材料仍由原版循环恰好 -1，因为 `getRemainingItems` 返回全空）。
   已删除原 `ReinforceCraftHandler` 与注册，**不要退回事件方案**。
+- **兼容性红线：`assemble` 的输出数量必须是 1**。配方契约是「这一份配方产出什么」，输入由合成台
+  按**每槽 1 个**消耗；原版工作台、便携工作台（复用原版 `CraftingMenu`）、自动合成器以及各模组自研
+  合成逻辑都遵循该契约。早期版本返回「原堆数量」，那些站台只扣 1 个原料却整份发货 →
+  **恶性的大量物品复制**（实测）。
+- **定案定价：所有合成台一律「1 个材料 = 1 次强化」**（玩家选定，1.4.90）。一度做过「原版 `ResultSlot`
+  上整堆、其它站台按件」，但那样站台之间价格不一致（玩家会问为什么模组工作台更贵），而且整堆要靠我们
+  替原版循环清空原槽、容易与别的配方串味 —— 该逻辑已全部移除：`ReinforceCraftConsumeMixin` 现在只做
+  「兜底校验 + 取证」两件事，不再清空任何槽位。
+- **「1 材料 = 整堆」只由次元锤界面（`ReinforceMenu`）提供**：它直接改槽位、模组自己扣料，不走合成配方。
+  这也是同类模组的惯例 —— 附魔灌注台（EnchantingInfuser）解包后只有 `InfuserMenu/InfuserScreen/InfuserBlock`、
+  **没有任何配方类**；KubeJS 的输入处理 `ModifyCraftingItemKubeEvent(grid, width, height, item, index)` 同样是
+  「按槽 1 个」的语义；vanilla 自己的升级先例也是 1:1（下界合金升级、盔甲纹饰）。⇒ 「消耗整堆」在原版/通用
+  配方契约里根本表达不出来，只能放在自研站台/自研界面上。
 
 ### 2. 照片套装面板分页（已修）+ 排版调试指令
 - l2tabs 的 `BaseTextScreen` 面板固定 `imageWidth × imageHeight = 176 × 166`（构造器写死，

@@ -79,12 +79,14 @@ public class PhotographEffectRegistry {
                 "§a挥击/远程命中时 20% 概率直接赋予目标 炽焰烙印1 效果",
                 "§a佩戴时赋予 火焰免疫 效果");
         add("cataclysm:netherite_monstrosity",
-                "§a挥击/远程命中时 12% 概率从目标头顶降下 3 块落石",
-                "§a落石：落地造成 等同攻击面板 的伤害并小幅击飞目标",
+                "§a挥击/远程命中时 12% 概率在目标脚下发动 地震践踏（半径 4 格）",
+                "§a地震践踏：范围内敌人受到 攻击面板 + min(攻击面板, 目标最大生命 8%) 的伤害并被上抛击飞",
+                "§a同时掀起碎石（纯视觉；伤害由践踏统一结算）",
                 "§a佩戴时受到的近战伤害 -12%");
         add("cataclysm:the_harbinger",
-                "§a挥击/远程命中时 12% 概率向视线方向发射 凋零激光束",
-                "§a凋零激光束：命中造成 等同攻击面板 的伤害并点燃目标 5 秒",
+                "§a挥击/远程命中时 12% 概率向视线方向射出 死亡激光",
+                "§a死亡激光：1 秒蓄力后射出 30 格贯穿射线，持续约 1.5 秒",
+                "§a每段判定造成 等同攻击面板 + 至多目标最大生命 2% 的伤害",
                 "§a佩戴时受到的凋零伤害 -50%",
                 "§a佩戴时远程攻击伤害 +12%",
                 "§c佩戴时近战伤害 -12%");
@@ -95,8 +97,8 @@ public class PhotographEffectRegistry {
                 "§a被命中时 20% 概率获得 海豚恩惠3 效果（持续 5 秒）",
                 "");
         add("cataclysm:ancient_remnant",
-                "§a挥击/远程命中时 12% 概率在目标脚下升起 岩碑阵（3 根；一字排开）",
-                "§a岩碑：1.5 秒后炸裂；对范围内目标造成 等同攻击面板 的魔法伤害",
+                "§a挥击/远程命中时 12% 概率在目标头顶召来 岩碑风暴（5 面，成环坠落）",
+                "§a岩碑：自约 14 格高空依次砸下，贯穿命中的敌人；落地碎裂造成 等同攻击面板 的伤害",
                 "§a佩戴时受到的近战伤害 -12%");
         add("cataclysm:maledictus",
                 "§a挥击/远程命中时 15% 概率朝视线方向散射 3 支 追踪灵魂箭",
@@ -105,7 +107,7 @@ public class PhotographEffectRegistry {
                 "§a佩戴时受到的魔法伤害 -12%");
         add("cataclysm:scylla",
                 "§a挥击/远程命中时 15% 概率掀起 3 道水波（扇形扩散）",
-                "§a水波：命中造成 等同攻击面板 的伤害、赋予 湿润1 效果并扑灭目标身上的火",
+                "§a水波：命中造成 等同攻击面板 的伤害、赋予 湿润1 效果并扑灭目标身上的火（击退已大幅减弱）",
                 "§a佩戴时受到的魔法伤害 -12%",
                 "");
         add("legendary_monsters:posessed_paladin",
@@ -297,7 +299,7 @@ public class PhotographEffectRegistry {
         add("legendary_monsters:lava_eater", "§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
         add("legendary_monsters:overgrown_colossus", "§a赋予 再生1 效果", "");
         add("legendary_monsters:endersent", "§a你受到的魔法伤害 -12%", "§c近战伤害 -5%");
-        add("legendary_monsters:the_obliterator", "§a你受到的所有来源伤害 -10%", "§a挥击/远程命中时 15% 概率向视线方向发射 湮灭激光", "§a湮灭激光：贯穿视线方向；命中造成 等同攻击面板 + 目标最大生命 2% 的伤害");
+        add("legendary_monsters:the_obliterator", "§a你受到的所有来源伤害 -10%", "§a挥击/远程命中时 15% 概率向视线方向发射 湮灭激光", "§a湮灭激光：30 格贯穿射线，持续 1.5 秒；每段判定造成 等同攻击面板 + 目标最大生命 2% 的伤害");
         add("legendary_monsters:frostbitten_golem", "§a免疫 冰冻 伤害", "§c你受到的 火 伤害 +12%");
         add("legendary_monsters:withered_abomination", "§a免疫 凋零 效果；§a近战攻击 +10%", "§c你受到的治疗量 -10%");
         add("legendary_monsters:skeletosaurus", "§a免疫 箭矢/弹射物 伤害", "");

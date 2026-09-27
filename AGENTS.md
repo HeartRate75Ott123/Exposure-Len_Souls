@@ -315,3 +315,175 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   → 同一只 boss 的所有部件与本体同色同灭（末影龙等所有 `PartEntity` 一并覆盖）。
 - 注意：`参考项目的源码/[暮色森林]…` 这类含 `[` 的路径在 PowerShell 下必须用 `-LiteralPath`，
   否则 `Get-ChildItem -Recurse` 被当通配符、扫描结果为空（本次踩过）。
+
+## 2026-09 需求批次（弹幕自增殖 / 韧性与兼容 / 复制之魂封印 / 减速铁板）
+
+### 1. 弹幕伤害不再回头掷弹幕触发（防「左脚踩右脚升天」）
+
+- 新 `util/PhotoProjMarker`（标记的单一事实来源）：`lensouls:photo_proj`（所有照片弹幕）
+  + `lensouls:photo_percent`（%maxHP 弹幕）。`mark/markAndSpawn/markPercentAndSpawn` 全部走它。
+- `BossPhotoProjHelper.onRangedHit` 改成**全链路**判定：`isBarrageDamage(DamageSource)` 同时看
+  直接实体与间接实体（间接实体是 `Player` 时排除，否则玩家自己的弓箭会被误判）。
+  **只查直接实体会漏**「爆炸/射线/召唤物代打」那类写法。
+- `trigger()` 三层闸：① `ThreadLocal` 重入保护（同刻命中/引爆不再递归触发）；
+  ② 原有 3 tick 去重；③ **高频触发熔断**：每玩家 10 tick 内最多 24 次触发额度，
+  超限直接忽略并最多每 30 秒 WARN 一次（`consumeRollBudget`）。这是给「某个漏标记的第三方弹幕
+  混进来形成回环」留的保险，不是正常玩法的手感限制（10 张 boss 照片狂点约 66 次/秒的**掷骰**里
+  实际触发远低于额度）。
+- **非 `markAndSpawn` 生成的第三方弹幕必须补标记**：`spawnGeburahRay`（fdbosses 法阵射线由对方
+  `summon` 自行入世）现在用新的 `markOnly(Object)` 补 `photo_proj`——它伤害归属玩家且原来不带标记，
+  是最可能形成回环的一处。
+
+### 2. 照片弹幕自伤保护（骷髅箭被反弹打回玩家）
+
+- 新 `handler/PhotoProjSafetyHandler`：`LivingIncomingDamageEvent`（HIGHEST，**无敌帧/护甲结算之前、可取消**）
+  里判定 `PhotoProjMarker.isSelfHit(...)` 或「标记弹幕命中任意玩家」→ `setCanceled(true)`。
+  用 `LivingIncomingDamageEvent` 而不是 `LivingDamageEvent.Pre`：后者只能把伤害置 0，击退与受击动画照旧。
+- 为什么不用 `LivingDamageEvent`：原版「自己的箭打自己」是合法行为（盾反），我们只掐**自己标记过的弹幕**，
+  普通弓箭/别的玩家射来的箭/灾变 boss 的弹幕一律不受影响。
+
+### 3. gytrinket（`com.gytrinket.gytrinket`）点射/连击兼容
+
+- 现象：该模组的 `ProjectileBurstManager.onEntityJoinLevel`（`EntityJoinLevelEvent`, HIGH）会把
+  **任何 owner 是 ServerPlayer 的 `Projectile`** 快照，并按玩家 `combo` 属性（= 已装备点射模块数 × 2）
+  每刻复制一份 → 我们的照片弹幕（三连箭/水波/火球…）被成倍复制。
+- 修法：`mixin/compat/GytrinketProjectileBurstMixin`，`@Inject(method = "onEntityJoinLevel", at = HEAD,
+  cancellable, require = 0)`，命中 `PhotoProjMarker.isBarrage` 即 `ci.cancel()`。用
+  `@Mixin(targets = "…")` 字符串目标（该模组不在编译依赖里，本机 `run/mods` 也没有它）+ `remap = false`；
+  配置 `required=false`，模组缺席时整条被跳过。**实测可编译**（`targets=` 对缺失类不会让 AP 失败）。
+- 刻意**不**用「给它打 `ProjectileBurstCopy` 标记」的取巧办法：那个标记会让对方在命中时清目标无敌帧、
+  标记无击退，并在首次碰撞后 1 刻把弹幕 `discard()` —— 等于换一种方式改我们的弹幕行为。
+- 对方还有一个 `ProjectileDamageHandler.onEntityJoinLevel` 会给玩家 owner 的 `AbstractArrow` 加成伤害
+  （无复制体标记判断）。本次**只掐复制（连击），不动伤害增幅**（用户诉求是「不要触发连击」）。
+
+### 4. 韧性系统：高频触发保护 + 空指针加固
+
+- `BossToughnessManager.hit()` 增加**同实体同 tick 去重**（`lastHitTick`，>64 条时按 200 tick 清理）：
+  拍照/要害打击/内部调用三路同刻并发时会重复发粒子音效包并重复累加。
+- 空指针的**结构性来源**是 `BuiltInRegistries.ENTITY_TYPE.getKey(type).toString()`：未注册类型
+  （第三方临时/伪造实体）会返回 `null`。已加固：`BossToughnessAttributes.entityId()`、
+  `ToughnessDamageHandler.isBoss`、`computeRequiredHits` 全部判空；`StunPauseHelper` 判 `entity/level == null`。
+- `ToughnessDamageHandler` 的 Pre/Post 整体 `try/catch`（100 tick 节流报错）：韧性检查绝不能把异常抛回
+  伤害结算链——高频触发下一次抛错会把整段实体刻带崩。
+- 顺带的性能修复：`broadcastAll()` 现在「内容签名未变且距上次广播 < 20 tick」就跳过，
+  且**空表也会广播一次**（客户端据此清掉已消失 boss 的残留韧性条；原来是直接 return）。
+
+### 5. 巨兽 / 遗魂弹幕重做（**关键教训：源码树 ≠ 运行时 jar**）
+
+> `参考项目的源码\灾变\gradle.properties` 是 **3.33**，而 `libs/cataclysm.jar` 与 `run/mods/[灾变]…`
+> 都是 **3.32**（两者 SHA256 相同）。`Ancient_Desert_Stele_Entity` 在两个版本里是**两套实现**：
+> 3.33 `extends Entity`（有 `setImpactDamage/setImpactRadius` 落地 AoE），3.32 `extends Projectile`
+> （**没有** AoE，`onHitBlock` 空实现，伤害只来自每 tick 的移动射线命中实体）。
+> **按 3.33 源码改会写出一堆在实机上不存在的方法**，所以改灾变交互前必须
+> `javap -p -cp libs/cataclysm.jar <类>` 核对真实签名。
+
+- `Cm_Falling_Block_Entity`（`entity/effect/`）是**零伤害的纯视觉实体**（只有 `tick/move`，
+  没有 `hurt/explode/setOwner/setDamage`；`extends Entity` 连 `setOwner` 都没有）。
+  灾变本体的伤害在**调用方**：`Netherite_Monstrosity_Entity.spawnBlocks` 里另有一段
+  1×1 竖直 AABB + `mobAttack`。旧照片版只搬了装饰物 → 「看着砸下来却一点伤害没有」，这也是
+  「召唤掉落方块很鸡肋」的字面根因。
+- 现 `spawnFallingBlocks`（1.4.93 重做）：从「3 块装饰落石」升级为**本体招牌技能「地震践踏」**——
+  照抄 `EarthQuake` 口径，以最近敌人为中心 4 格半径内全部结算
+  `面板 + min(面板, 目标最大生命 × 0.08)`（0.08 = `CMCommonConfig.NetheriteMonstrosity.SmashHpdamage`）、
+  朝外上抛（本体 `launch(entity, 2.0D, 0.6D)`），伤害走 `playerAttack`；
+  掀地落石改成**纯视觉**（5 块撒在圈内，不再单独结算，避免同一目标被算两次）；
+  落点也从「玩家视线前 3 格」改成敌人脚下。本体还有破盾 120t 与狂暴点燃 6s，照片版刻意不做
+  （我们的弹幕不伤玩家，破盾无意义）。
+- 现 `spawnDesertStele`（1.4.93 重做）：从「视线前 3 面」升级为**岩碑风暴**——以敌人为中心画
+  半径 1.2~2.0 的环、5 面碑 warmup 1/3/5/7/9 依次砸下（本体是 144 个风车阵的缩水版）。
+  **必须高空生成**：3.32 里石碑贴地生成时，warmup 结束后第一个移动 tick 的射线（起点=脚底）
+  就打中脚下方块 → `onHitBlock`（空）→ `onHit()` 放音效粒子后 `discard()` ⇒ 伤害恒为 0
+  ——这是与韧性减伤、命中率完全无关的独立根因（实测「打无韧性目标也不掉血」即此）。
+- 注意：两只 boss 在 `run/config` 里 `toughDamageReduction=0.8` 且各需 9 次拍照破韧，
+  **破韧前一切弹幕伤害只剩 20%**——排查「弹幕没伤害」时要先把这条独立原因排除。
+
+### 6. 斯库拉照片击退减弱
+
+- `Wave_Entity.attackEntities(strength, x, z)` 的 `strength` 只用于击退（`adjustedStrength`），
+  本体固定传 `1.5`，水波存活 60 tick、每 tick 结算一次 → 3 道水波是持续推挤。
+- `mixin/compat/ScyllaWaveKnockbackMixin`：`@ModifyVariable(argsOnly, index = 1)` 把标记过的
+  照片水波 strength × 0.35（约 −65% 击退），伤害/湿润完全不动。
+
+### 7. 复制之魂封印扩展到终端与精妙背包
+
+- 新 `handler/CopySoulSealHandler`：`CopySoulItem.inventoryTick` 改为读**缓存的**佩戴标志
+  （`shouldSeal`，10 tick 刷新）——原实现每个复制之魂**每 tick** 查 3 次 Curios（`findFirstCurio` 会遍历全部饰品槽）。
+  周期（20 tick，`tickCount % 20`）扫描：物品栏 41 格 → 物品栏/饰品栏里容器类物品的内容物 → 超越维度。
+  只在「戴着禁复制羽毛」或「上次确实在容器里封过东西」时才扫，平时一个判断就返回。
+- `CurioChangeEvent` 触发一次即时对齐（摘下/戴上羽毛最多晚 1 tick），不用等周期档。
+- **精妙背包**（`Capabilities.ItemHandler.ITEM` 注册在 Item 上，与所在槽位无关）：
+  内容物在 `BackpackStorage extends SavedData`（按 `sophisticatedcore:storage_uuid` 键），
+  `serializeNBT` 写的是缓存的槽位 NBT ⇒ **必须 `setStackInSlot` 回写**，就地改实例重进世界就丢；
+  回写会自动 `saveInventory → setDirty`，不需要自己 markDirty。
+  边界：能力在 `getContentsUuid()` 为空时返回 0 槽 `EmptyItemHandler`（只读不建），
+  兜底走反射 `BackpackWrapper.fromStack(stack).getInventoryHandler()`（会惰性补 UUID）。
+  取能力必须用槽位里的**活** ItemStack：传副本会让对方新建一份 wrapper（其缓存是 ItemStack 身份语义），
+  一个背包出现两份内存态会互相脏写。
+- **超越维度**：`getStorage()` 是 `unmodifiableList(AbstractList)` 的**只读活视图**
+  （每次 `get(i)` 现造 `KeyAmount` record），底层 `slotIndex` 删除时**换尾** ⇒
+  **先快照、再按键写回**（`AbstractUnorderedStackHandler.setAmountByKey`）。
+  **绝不能缓存升序下标再逐个 `setStackDirectly`**：同网络 ≥2 条待改时第二笔会写到别的条目上。
+  `ItemStackKey.getReadOnlyStack()` 是 key 的共享缓存（数量强制为 1）→ 必须 `copy()` → 改组件 →
+  `new ItemStackKey(copy)`（改组件 = 换 key，数量在 `KeyAmount.amount()` 上，原样保留）。
+  封印方向可以对所有网络做；**解封方向必须先查该网络全部在线成员**——只要还有成员戴着禁复制羽毛
+  就不能解封（终端是共享的）。句柄缺失时封印降级为「只处理随身压缩球」，不影响统计/消耗。
+
+### 8. 减速铁板（`lensouls:slow_iron_plate`）
+
+- 4 铁锭无序合成 1 块；`handler/SlowIronPlateHandler` 每 10 tick 扫**玩家物品栏 41 格**计数，
+  每块 `ADD_MULTIPLIED_TOTAL -10%` 移速，上限 −90%（10 块封顶，避免 −100% 把自己锁死到走不动）。
+- 只扫物品栏：饰品栏、精妙背包内容物、超越维度终端**一律不计**（收进容器即无副作用）。
+- 性能：目标是「修饰符现值与目标值不一致才写」——属性修饰符写入会走
+  `ClientboundUpdateAttributesPacket`，每 tick 重写就是网络风暴；且**不用「上次数量」缓存**，
+  而是直接读回属性实例上的修饰符（死亡重生会重建属性实例，缓存会残留脏值导致减速丢失）。
+
+### 9. 贴图
+
+- `soul_whistle.png` / `mage_brooch.png` 用桌面 `杂项\贴图\灵魂骨哨.png` / `法师胸针.png` 覆盖；
+  新物品 `slow_iron_plate.png` 来自同目录 `减速铁板.png`（均 16×16）。
+
+### 10. 夺魂索命（`soul_sever`）削减下限 50%
+
+- `ability/handler/SoulSeverHandler`：原来是无下限的「当前生命 ×10%~20%」削减，能一路磨到死。
+  现加 `SEVER_FLOOR_RATIO = 0.5f`：
+  ① **目标生命 ≤ 最大生命 ×50% 时判定直接失败**（不掷骰、不放雷霆音效/冲击波，只走失败音效 + 0.5s 冷却）；
+  ② 成功那一刀夹在 `max(下限, 当前 - 削减量)`，**最多削到半血，绝不穿透**。
+  语义变成「控场：把目标打到半血」，不会自己打死人；能力详情文本（zh_cn/en_us）同步补了两行说明。
+
+### 12. 湮灭构造体 / 先驱者弹幕重做（`1.4.94`）——两条都是「用错了实体 / 传错了参数」
+
+- **湮灭构造体：射线很短**。`AnnihilationBeamEntity` 的**长度就是构造参数最后一个 `r`**（同步字段
+  `B_RADIUS`），而 `calculateEndPos()` 里写死
+  `float r = caster instanceof Player ? B_RADIUS / 2 : B_RADIUS;`
+  （`javap -c` 在实机 jar 2.1.20 上确认：`instanceof Player` → `B_RADIUS` → `fdiv`）。
+  旧版传 `r = 3.0f` ⇒ 玩家 caster 实际只有 **1.5 格**射线，所以「像没打出去」。
+  官方玩家武器 `AtomSplitterItem` 是构造后 `setRadius(30)`（玩家 → 15 格），boss 本体传 5~30。
+  现传 `ANNIHILATION_BEAM_REACH = 60` → **30 格**，并在构造后补一次 `setRadius`（构造器里
+  `calculateEndPos()` 跑在 `setRadius` 之前）。伤害口径照抄本体
+  `getDamage() + maxHealth × (getHpDamage() × 0.01)`（`Hpdamage` 是百分数）。
+- **先驱者：用错了实体**。旧版是 `Laser_Beam_Entity`——那是先驱者**普通远程攻击**的小型激光弹
+  （`extends Projectile` + `accelerationPower`/`getInertia()`，本质是快弹丸），怎么摆都不显眼。
+  本体的招牌是 `Death_Laser_Beam_Entity`（`The_Harbinger_Entity` 死亡激光状态里
+  `new Death_Laser_Beam_Entity(..., 60, DeathLaserdamage, DeathLaserHpdamage)`）：
+  `RADIUS = 30` **常量**（固定 30 格贯穿）、`tickCount > 20` 才开始结算（1 秒蓄力预警）、
+  命中盒 `inflate(1,1,1)`、伤害 `damage + min(damage, maxHealth × Hpdamage × 0.01)`、每 tick 一次
+  （由 `photo_percent` 的 10tick 节流兜住）。
+  **安全点**：本体 powered 时会 `setFire(true)`，开了会在命中地面处**生火**，照片版一律不发火。
+  3.32 jar 签名已 `javap` 核实：`(EntityType, Level, LivingEntity, double, double, double, float, float, int, float, float)`。
+- **改完形态必须同步改玩家可见描述**：照片效果的文案在 `integration/PhotographEffectRegistry.add(bossId, …)`
+  里**硬编码中文**（不在 lang 文件里，也不是数据包）。本次跟着改版的 5 条：
+  巨兽（落石 → 地震践踏）、先驱者（凋零激光束 → 死亡激光，并删掉「点燃 5 秒」）、
+  遗魂（脚下岩碑阵 → 头顶岩碑风暴）、湮灭构造体（补「30 格贯穿 / 1.5 秒 / 每段判定」）、
+  斯库拉（补「击退已大幅减弱」）。**以后再调弹幕形态，记得一起改这里**。
+
+### 13. 交付
+
+- 版本 `1.4.91`（本批次主体）→ `1.4.92`（夺魂索命下限）→ `1.4.93`（巨兽「地震践踏」/ 遗魂「岩碑风暴」）
+  → `1.4.94`（湮灭构造体长射线 / 先驱者死亡激光）→ `1.4.95`（描述跟进）→ `1.4.96`（三条实机复核修正）：
+  `.\gradlew.bat build` 通过（只剩既有的 JEI 弃用 API 警告）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.4.96.jar`（5,877,677 字节），
+  MD5 `6C7112CC0B059057046943A6411287F8`。**1.4.91 ~ 1.4.95 作废，别分发**。
+- 排查口径教训：**别拿「韧性减伤 80%」去解释弹幕没伤害**——用户实测的是**无韧性目标**，
+  弹幕照样不掉血；灾变这两个弹幕的零伤害在源码层面就是结构性事实（见第 5 节）。
+- 同类教训（第 12 节）：**弹幕「不明显/很短」先怀疑参数与实体选型**，而不是数值。
+  两个 boss 的「射线长度」分别在 `B_RADIUS`（且玩家 caster 会被 /2）与「选错实体」上。

@@ -28,26 +28,39 @@ public class ToughnessDamageHandler {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDamagePre(LivingDamageEvent.Pre event) {
-        if (event.getEntity().level().isClientSide) return;
-        if (!(event.getEntity() instanceof LivingEntity target)) return;
-        if (event.getOriginalDamage() <= 0f) return;
+        try {
+            if (event.getEntity().level().isClientSide) return;
+            if (!(event.getEntity() instanceof LivingEntity target)) return;
+            if (event.getOriginalDamage() <= 0f) return;
 
-        BossToughnessManager manager = BossToughnessManager.getInstance();
+            BossToughnessManager manager = BossToughnessManager.getInstance();
 
-        // ── 1. BOSS 自动注册 ──
-        if (!manager.has(target) && isBoss(target)) {
-            manager.register(target);
-        }
+            // ── 1. BOSS 自动注册 ──
+            if (!manager.has(target) && isBoss(target)) {
+                manager.register(target);
+            }
 
-        // ── 2. 韧性减伤 ──
-        if (manager.has(target)) {
-            float currentDamage = event.getNewDamage();
-            float reduced = manager.applyDamageReduction(target, currentDamage);
-            if (reduced != currentDamage) {
-                event.setNewDamage(reduced);
+            // ── 2. 韧性减伤 ──
+            if (manager.has(target)) {
+                float currentDamage = event.getNewDamage();
+                float reduced = manager.applyDamageReduction(target, currentDamage);
+                if (reduced != currentDamage) {
+                    event.setNewDamage(reduced);
+                }
+            }
+        } catch (Exception e) {
+            // 韧性检查绝不能把异常抛回伤害结算链（高频触发下一旦抛错，整段伤害流程/实体刻都会被带崩）。
+            // 同一时刻只报一次，避免刷屏。
+            long now = event.getEntity().level().getGameTime();
+            if (now - lastErrorTick > 100L) {
+                lastErrorTick = now;
+                LenSouls.LOGGER.error("[Toughness] 韧性减伤结算异常（已吞掉，不影响本次伤害）", e);
             }
         }
     }
+
+    /** 韧性异常日志节流用的 gameTime */
+    private static volatile long lastErrorTick = Long.MIN_VALUE;
 
     /**
      * 定身期间统计玩家造成的实际伤害（{@link LivingDamageEvent.Post}：伤害已生效）。
@@ -55,13 +68,21 @@ public class ToughnessDamageHandler {
      */
     @SubscribeEvent
     public static void onLivingDamagePost(LivingDamageEvent.Post event) {
-        if (event.getEntity().level().isClientSide) return;
-        if (!(event.getEntity() instanceof LivingEntity target)) return;
-        if (event.getNewDamage() <= 0f) return;
-        // 只统计玩家造成的伤害（getEntity 为最终来源，投射物归属射手）
-        if (!(event.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer)) return;
+        try {
+            if (event.getEntity().level().isClientSide) return;
+            if (!(event.getEntity() instanceof LivingEntity target)) return;
+            if (event.getNewDamage() <= 0f) return;
+            // 只统计玩家造成的伤害（getEntity 为最终来源，投射物归属射手）
+            if (!(event.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer)) return;
 
-        BossToughnessManager.getInstance().addStunDamage(target, event.getNewDamage());
+            BossToughnessManager.getInstance().addStunDamage(target, event.getNewDamage());
+        } catch (Exception e) {
+            long now = event.getEntity().level().getGameTime();
+            if (now - lastErrorTick > 100L) {
+                lastErrorTick = now;
+                LenSouls.LOGGER.error("[Toughness] 定身伤害累计异常（已吞掉）", e);
+            }
+        }
     }
 
     /**
@@ -77,9 +98,11 @@ public class ToughnessDamageHandler {
      * 例：白名单=all + 黑名单=[x] → 除 x 外全部触发；黑名单=all + 白名单=[x] → 仅 x 触发。
      */
     public static boolean isBoss(LivingEntity entity) {
+        if (entity == null || entity.getType() == null) return false;
         // 幻灵（借体 BOSS 及其召唤物）一律不注册韧性：玩家对幻灵不造成削韧伤害
         if (com.plumejade.lensouls.entity.PhantomDamageHandler.isPhantomEntity(entity)) return false;
         ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        if (id == null) return false; // 未注册类型：不注册韧性（原实现在此处空指针）
         String idStr = id.toString();
         var wl = Config.TOUGHNESS_WHITELIST.get();
         var bl = Config.TOUGHNESS_BLACKLIST.get();

@@ -73,9 +73,40 @@ public class BossPhotoProjHelper {
         TRIGGER.put("fdbosses:geburah", 0.12f);
     }
 
+    /**
+     * 弹幕判定重入保护：触发过程中（弹幕同刻命中、连锁引爆等）再次请求触发一律忽略。
+     * 这是阻断「触发 → 弹幕 → 命中 → 再触发」自增殖的最后一道保险，与
+     * {@link com.plumejade.lensouls.util.PhotoProjMarker} 的标记判定互补。
+     */
+    private static final ThreadLocal<Boolean> IN_TRIGGER = ThreadLocal.withInitial(() -> false);
+
+    /**
+     * 高频触发保护：每个玩家在 {@link #ROLL_WINDOW_TICKS} 内最多掷
+     * {@link #ROLL_BUDGET} 次弹幕触发。
+     * <p>
+     * 正常情况下限流打不到：挥击本身有 3tick 去重，10 张 boss 照片狂点也就 ~66 次/秒。
+     * 这个额度（24 次/10tick = 48 次/秒…按窗口节流）是给异常增殖留的熔断：
+     * 一旦某个非标记弹幕（第三方模组的激光/法阵）混进来形成回环，这里会先熔断，
+     * 而不是让实体数量指数爆炸后再由韧性检查/网络同步去撞空指针。
+     */
+    private static final int ROLL_WINDOW_TICKS = 10;
+    private static final int ROLL_BUDGET = 24;
+    /** UUID → [窗口起点 gameTime, 本窗口已用额度]（仅服务端主线程访问） */
+    private static final Map<java.util.UUID, long[]> ROLL_STATE = new java.util.concurrent.ConcurrentHashMap<>();
+    /** UUID → 上次「触发超限」告警的 gameTime（30 秒一次，避免刷屏） */
+    private static final Map<java.util.UUID, Long> LAST_CAP_WARN = new java.util.concurrent.ConcurrentHashMap<>();
+
     /** 清理指定玩家的挥击去重记录（切档/登出时调用，避免跨会话 tick 残留导致 boss 弹幕被卡死） */
     public static void clearSwing(java.util.UUID uuid) {
         LAST_SWING.remove(uuid);
+        ROLL_STATE.remove(uuid);
+        LAST_CAP_WARN.remove(uuid);
+    }
+
+    /** 登出即清干净：三张表都按玩家 UUID 记账，不清就是慢性内存增长 */
+    @SubscribeEvent
+    public static void onLoggedOut(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        clearSwing(event.getEntity().getUUID());
     }
 
     /** 每次完整挥砍开始调用（由 Player#attack / BetterCombat handleAttackRequest mixin 触发）。
@@ -102,20 +133,56 @@ public class BossPhotoProjHelper {
         if (event.getEntity().level().isClientSide) return;
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         if (event.getEntity() == player) return; // 自伤不算命中
+        // 照片弹幕本身即为远程伤害：其命中不再回头触发弹幕（全链路标记判定，见 PhotoProjMarker）
+        if (com.plumejade.lensouls.util.PhotoProjMarker.isBarrageDamage(event.getSource())) return;
         if (!com.plumejade.lensouls.damage.RangedAttackHelper.isRanged(event.getSource())) return;
-        // 照片弹幕本身即为远程伤害：其命中不再回头触发弹幕（标记见 markAndSpawn）
-        Entity direct = event.getSource().getDirectEntity();
-        if (direct != null && direct.getPersistentData().getBoolean("lensouls:photo_proj")) return;
         trigger(player, event.getEntity());
     }
 
     /** 弹幕判定核心：挥击与远程命中共用同一套 3 tick 去重 + 各 Boss 触发概率。 */
     private static void trigger(ServerPlayer player, Entity hitTarget) {
+        // 重入保护：本次触发过程中（同刻命中/引爆）产生的伤害不再触发新一轮弹幕
+        if (Boolean.TRUE.equals(IN_TRIGGER.get())) return;
+
+        long now = player.level().getGameTime();
         // 去重：BetterCombat 命中时会同时走原版 attack 与 handleAttackRequest，3 tick 内只触发一次
         Long last = LAST_SWING.get(player.getUUID());
-        if (last != null && player.level().getGameTime() - last < 3) return;
-        LAST_SWING.put(player.getUUID(), player.level().getGameTime());
+        if (last != null && now - last < 3) return;
+        // 高频触发保护（熔断）：异常增殖时先掐掉触发，避免实体/网络/韧性检查被灌爆
+        if (!consumeRollBudget(player, now)) return;
+        LAST_SWING.put(player.getUUID(), now);
 
+        IN_TRIGGER.set(true);
+        try {
+            triggerInner(player, hitTarget);
+        } finally {
+            IN_TRIGGER.set(false);
+        }
+    }
+
+    /** 高频触发额度：窗口内超限即拒绝，并最多每 30 秒告警一次。 */
+    private static boolean consumeRollBudget(ServerPlayer player, long now) {
+        long[] state = ROLL_STATE.computeIfAbsent(player.getUUID(), k -> new long[] {now, 0L});
+        if (now - state[0] >= ROLL_WINDOW_TICKS) {
+            state[0] = now;
+            state[1] = 0L;
+        }
+        if (state[1] >= ROLL_BUDGET) {
+            Long warned = LAST_CAP_WARN.get(player.getUUID());
+            if (warned == null || now - warned > 600L) {
+                LAST_CAP_WARN.put(player.getUUID(), now);
+                com.plumejade.lensouls.LenSouls.LOGGER.warn(
+                        "[PhotoBoss] 弹幕触发频率超限，本窗口内已忽略后续触发（玩家 {}，{} 次/{} tick）",
+                        player.getName().getString(), ROLL_BUDGET, ROLL_WINDOW_TICKS);
+            }
+            return false;
+        }
+        state[1]++;
+        return true;
+    }
+
+    /** 真正的触发逻辑（已在外层完成重入/去重/限流）。 */
+    private static void triggerInner(ServerPlayer player, Entity hitTarget) {
         LivingEntity target = hitTarget instanceof LivingEntity le ? le : null;
 
         // 套装弹幕钩子：从玩家 persistent 读取 barrage_trigger / barrage_dmg
@@ -149,7 +216,7 @@ public class BossPhotoProjHelper {
                 case "cataclysm:ender_guardian" -> spawnVoidRune(player);
                 case "cataclysm:ignis" -> spawnIgnisFireballs(player);
                 case "cataclysm:netherite_monstrosity" -> spawnFallingBlocks(player);
-                case "cataclysm:the_harbinger" -> spawnLaserBeam(player);
+                case "cataclysm:the_harbinger" -> spawnDeathLaser(player);
                 case "cataclysm:the_leviathan" -> spawnAbyssBlast(player);
                 case "cataclysm:ancient_remnant" -> spawnDesertStele(player);
                 case "cataclysm:maledictus" -> spawnPhantomArrows(player);
@@ -226,31 +293,171 @@ public class BossPhotoProjHelper {
         }
     }
 
-    /** 下界合金巨兽：掀地落石 ×3（5 点伤害 + 击飞） */
+    /** 地震践踏半径（本体 {@code EarthQuake(6.25)}，照片版收窄一层） */
+    private static final double QUAKE_RADIUS = 4.0D;
+    /** 本体 {@code CMCommonConfig.NetheriteMonstrosity.SmashHpdamage = 0.08}：额外附带目标最大生命 8% */
+    private static final float QUAKE_HP_PART = 0.08F;
+    /** 践踏掀起的装饰落石数量 */
+    private static final int QUAKE_DEBRIS = 5;
+
+    /**
+     * 下界合金巨兽：<b>地震践踏</b>（照抄本体 {@code Netherite_Monstrosity_Entity.EarthQuake}）
+     * + 掀地落石（纯视觉）。
+     * <p>
+     * 为什么是这个形态（对着 3.32 jar 反编译核实过）：
+     * <ul>
+     *   <li>{@code Cm_Falling_Block_Entity} 是<b>零伤害的装饰实体</b>（全类只有 {@code tick/move}，
+     *       没有 hurt/explode/setOwner/setDamage）；本体从来是「装饰物 + 另一段独立 AABB 伤害」两件事。
+     *       旧照片版只搬了装饰物 ⇒ 落石砸下来<b>一点血都不掉</b>，这就是「鸡肋」的字面根因。</li>
+     *   <li>本体真正的招牌是 {@code EarthQuake(6.25)}：{@code getBoundingBox().inflate(6.25)} 内全部结算
+     *       {@code ATTACK_DAMAGE + min(ATTACK_DAMAGE, 目标最大生命 × 0.08)}，命中后上抛
+     *       （{@code launch(entity, 2.0, 0.6)}）、破盾 120t、狂暴时点燃 6s。照片版照这个口径做成
+     *       <b>以敌人为中心的地震</b>，只是把半径收到 4 格、去掉点燃。</li>
+     *   <li>落点从「玩家视线前 3 格」改成<b>最近敌人脚下</b>（找不到才退回视线前方）——
+     *       原来的固定落点几乎总是砸在空地上。</li>
+     * </ul>
+     * 伤害走 {@code playerAttack} 归属玩家（吃摄魂/元素/套装加成，不算远程、不会回头触发弹幕）；
+     * 落石只做视觉，<b>不再单独结算</b>，避免同一个目标被「践踏 + 石柱」结算两次。
+     */
     private static void spawnFallingBlocks(ServerPlayer player) {
         Level level = player.level();
         Vec3 look = player.getViewVector(1.0F);
+        LivingEntity target = findNearestNonPlayer(player, 16.0);
+
+        // 践踏中心：最近敌人脚下；没有敌人则落在视线前 4 格地面
+        double cx, cz, fromY;
+        if (target != null) {
+            cx = target.getX();
+            cz = target.getZ();
+            fromY = target.getY();
+        } else {
+            cx = player.getX() + look.x * 4.0;
+            cz = player.getZ() + look.z * 4.0;
+            fromY = player.getY();
+        }
+        double gy = findGroundY(level, cx, fromY, cz);
+        if (gy < level.getMinBuildHeight() + 1) return;
+
+        // ── ① 地震践踏：范围内全部结算「面板 + min(面板, 目标最大生命 8%)」并上抛 ──
+        float panel = playerFinalDamage(player);
+        net.minecraft.world.phys.AABB quake = new net.minecraft.world.phys.AABB(
+                cx - QUAKE_RADIUS, gy - 1.5D, cz - QUAKE_RADIUS,
+                cx + QUAKE_RADIUS, gy + 3.0D, cz + QUAKE_RADIUS);
+        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, quake)) {
+            if (e == player || e instanceof net.minecraft.world.entity.player.Player) continue;
+            if (!e.isAlive()) continue;
+            float dmg = panel + Math.min(panel, e.getMaxHealth() * QUAKE_HP_PART);
+            e.invulnerableTime = 0;
+            if (e.hurt(player.damageSources().playerAttack(player), dmg)) {
+                // 本体 launch(entity, 2.0D, 0.6D)：水平朝外推 + 上抛
+                double dx = e.getX() - cx;
+                double dz = e.getZ() - cz;
+                double d2 = Math.max(dx * dx + dz * dz, 0.001D);
+                e.push(dx / d2 * 2.0D, 0.6D, dz / d2 * 2.0D);
+                e.hurtMarked = true;
+            }
+        }
+
+        // ── ② 掀地落石：纯视觉（本体同款装饰实体），撒在践踏圈内 ──
         BlockState block = Blocks.NETHERRACK.defaultBlockState();
-        for (int i = 0; i < 3; i++) {
-            double ox = (level.random.nextDouble() - 0.5) * 3.0;
-            double oz = (level.random.nextDouble() - 0.5) * 3.0;
-            double x = player.getX() + look.x * 3.0 + ox;
-            double z = player.getZ() + look.z * 3.0 + oz;
-            double y = player.getEyeY() + 6.0;
-            var fb = new com.github.L_Ender.cataclysm.entity.effect.Cm_Falling_Block_Entity(level, x, y, z, block, 20);
-            fb.setPos(x, y, z);
-            fb.push(0, -0.5 + level.random.nextDouble() * 0.2, 0);
+        for (int i = 0; i < QUAKE_DEBRIS; i++) {
+            double ang = level.random.nextDouble() * Math.PI * 2.0;
+            double r = level.random.nextDouble() * QUAKE_RADIUS * 0.8;
+            double x = cx + Math.cos(ang) * r;
+            double z = cz + Math.sin(ang) * r;
+            double y = findGroundY(level, x, gy, z);
+            if (y < level.getMinBuildHeight() + 1) continue;
+            var fb = new com.github.L_Ender.cataclysm.entity.effect.Cm_Falling_Block_Entity(level, x, y, z, block, 10);
+            fb.push(0, 0.2 + level.random.nextGaussian() * 0.04, 0);
             markAndSpawn(fb);
         }
+
+        // 本体 EarthQuake 也播爆炸音；旧照片版整段静音
+        level.playSound(null, cx, gy, cz, net.minecraft.sounds.SoundEvents.GENERIC_EXPLODE,
+                net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.15f);
     }
 
-    /** 先驱者：凋零激光束（4 点伤害 + 点燃 5s） */
-    private static void spawnLaserBeam(ServerPlayer player) {
+    /** 死亡激光存活 tick（本体 {@code setDuration(60)}，照片版收一半，20tick 蓄力另计） */
+    private static final int DEATH_LASER_TICKS = 30;
+    /** 额外附加的目标最大生命百分比（本体 {@code DeathLaserHpdamage}，口径 damage + min(damage, maxHealth × p × 0.01)） */
+    private static final float DEATH_LASER_HP_PERCENT = 2.0F;
+
+    /**
+     * 先驱者：<b>死亡激光</b>（本体招牌 {@code Death_Laser_Beam_Entity}，30 格贯穿射线）。
+     * <p>
+     * <b>旧版为什么「不明显」</b>：旧版发射的是 {@code Laser_Beam_Entity}——那是先驱者
+     * <b>普通远程攻击</b>用的小型激光弹（`The_Harbinger_Entity.performRangedAttack` 里的 laser 分支，
+     * 伤害 {@code Harbinger.Laserdamage}），它 {@code extends Projectile}、带
+     * {@code accelerationPower} 与惯性，本质是「一颗飞得快的小弹丸」，怎么摆都不显眼。
+     * 本体的招牌是 <b>death laser</b>：{@code The_Harbinger_Entity} 死亡激光状态里
+     * {@code new Death_Laser_Beam_Entity(..., 60, DeathLaserdamage, DeathLaserHpdamage)}。
+     * <p>
+     * 现用法照抄本体（3.32 jar javap 核实签名
+     * {@code (EntityType, Level, LivingEntity, double, double, double, float, float, int, float, float)}）：
+     * <ul>
+     *   <li>{@code RADIUS = 30} 是<b>常量</b>——射线固定 30 格，贯穿；</li>
+     *   <li>{@code tickCount > 20} 才开始结算（本体那 1 秒蓄力，正好配死亡激光的预警音）；</li>
+     *   <li>伤害 {@code getDamage() + min(getDamage(), target.getMaxHealth() * Hpdamage * 0.01)}，
+     *       每 tick 沿射线判定一次，由 {@code PhotoPercentDamageThrottleHandler} 的 10tick 节流兜住
+     *       （本弹幕带 {@code photo_percent} 标记，且该实体的伤害源把<b>光束本身</b>作为直接实体，
+     *       所以节流与 {@code BossProjHurtMixin} 清无敌帧都正常生效）；</li>
+     *   <li>判定盒 {@code inflate(1,1,1)} —— 射线很「粗」，不容易从怪身边擦过去；</li>
+     *   <li>安全：<b>不</b>调 {@code setFire(true)}（本体只在 powered 时开，开了会在命中地面处
+     *       <b>生火</b>，属于地形副作用，照片版一律不发火）；</li>
+     *   <li><b>朝向同步</b>：本体 {@code tick()} 每 tick 用 {@code caster.yHeadRot/getXRot()} 刷
+     *       {@code renderYaw/renderPitch} 给<b>客户端渲染</b>，而<b>服务端判定</b>用的是构造时定死的
+     *       {@code getYaw()/getPitch()}（玩家 caster 不会走 {@code updateWithHarbinger()}）。
+     *       于是「挥砍后转头」会出现光柱视觉跟着摆、伤害留在原线的错位。这里在
+     *       {@link #syncDeathLaserAim} 里每 tick 用同一个公式把服务端 yaw/pitch 也同步过去
+     *       —— 效果就是一条<b>跟着你视线扫射</b>的死亡激光，与客户端所见一致。</li>
+     * </ul>
+     * 射线方向由我们传入（服务端用 {@code getYaw()/getPitch()}）；客户端按施法者头部朝向渲染，
+     * 玩家挥砍瞬间两者一致，随后由 {@link #syncDeathLaserAim} 持续对齐。
+     */
+    private static void spawnDeathLaser(ServerPlayer player) {
         Level level = player.level();
-        Vec3 look = player.getViewVector(1.0F);
-        var beam = new com.github.L_Ender.cataclysm.entity.projectile.Laser_Beam_Entity(player, look, level, playerFinalDamage(player));
-        beam.setPos(player.getX(), player.getEyeY(), player.getZ());
-        markAndSpawn(beam);
+        float yaw = (float) ((player.getYRot() + 90.0) * Math.PI / 180.0);
+        float pitch = (float) (-player.getXRot() * Math.PI / 180.0);
+        float dmg = playerFinalDamage(player);
+        var beam = new com.github.L_Ender.cataclysm.entity.projectile.Death_Laser_Beam_Entity(
+                com.github.L_Ender.cataclysm.init.ModEntities.DEATH_LASER_BEAM.get(),
+                level, player,
+                player.getX(), player.getEyeY(), player.getZ(),
+                yaw, pitch,
+                DEATH_LASER_TICKS,          // duration：结算 tick 数（另有 20 tick 蓄力）
+                dmg,                        // damage：玩家面板
+                DEATH_LASER_HP_PERCENT);    // Hpdamage：最大生命百分比
+        markPercentAndSpawn(beam);
+        PLAYER_DEATH_LASERS.add(new DeathLaserLink(player.getUUID(), new java.lang.ref.WeakReference<>(beam)));
+    }
+
+    /** 玩家发射的死亡激光：记录 (施法者, 光束) 以便每 tick 同步判定朝向 */
+    private record DeathLaserLink(java.util.UUID caster,
+                                  java.lang.ref.WeakReference<com.github.L_Ender.cataclysm.entity.projectile.Death_Laser_Beam_Entity> beam) {}
+
+    private static final java.util.List<DeathLaserLink> PLAYER_DEATH_LASERS =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /**
+     * 把服务端判定朝向同步到施法者头部（公式与本体 {@code tick()} 里给渲染用的那一份完全一致：
+     * {@code yaw = (yHeadRot + 90) * π/180}、{@code pitch = -xRot * π/180}）。
+     * 光束消失/施法者下线即从表里摘掉。
+     */
+    private static void syncDeathLaserAim(net.minecraft.server.MinecraftServer server) {
+        if (PLAYER_DEATH_LASERS.isEmpty()) return;
+        var playerList = server.getPlayerList();
+        for (var it = PLAYER_DEATH_LASERS.iterator(); it.hasNext(); ) {
+            DeathLaserLink link = it.next();
+            var beam = link.beam().get();
+            if (beam == null || beam.isRemoved()) {
+                it.remove();
+                continue;
+            }
+            ServerPlayer caster = playerList == null ? null : playerList.getPlayer(link.caster());
+            if (caster == null || !caster.isAlive()) continue;
+            beam.setYaw((float) ((caster.yHeadRot + 90.0) * Math.PI / 180.0));
+            beam.setPitch((float) (-caster.getXRot() * Math.PI / 180.0));
+        }
     }
 
     /** 利维坦：深渊裂缝激光（8+5%生命，2s 后从裂缝射出） */
@@ -268,22 +475,82 @@ public class BossPhotoProjHelper {
         markPercentAndSpawn(blast);
     }
 
-    /** 远古遗魂：岩碑阵 ×3（8 点魔法伤害） */
+    /** 岩碑风暴的碑数（本体一次技能撒 8×16+16=144 个，照片版收成一轮 5 面） */
+    private static final int STELE_COUNT = 5;
+    /** 岩碑坠落高度（本体在「天花板之下、约 bossY+17」生成，这里按地形自适应） */
+    private static final int STELE_FALL_HEIGHT = 14;
+
+    /**
+     * 远古遗魂：<b>岩碑风暴</b>——5 面沙岩碑从目标头顶高空成环坠落，贯穿命中。
+     * <p>
+     * <b>为什么必须重做</b>（对已安装的<b>灾变 3.32 jar</b> 反编译核实；注意
+     * {@code 参考项目的源码\灾变} 是 3.33 源码树，两版实现不同）：
+     * <ul>
+     *   <li>3.32 的 {@code Ancient_Desert_Stele_Entity extends Projectile}，<b>没有</b>落地 AoE
+     *       （{@code setImpactDamage}/{@code setImpactRadius} 是 3.33 才加的，写上去编不过），
+     *       {@code onHitBlock} 是空实现，伤害<b>只</b>来自每 tick 的移动射线命中实体；</li>
+     *   <li>旧照片版用 {@code findGroundY} 把石碑<b>贴地</b>生成 ⇒ warmup 结束后第一个移动 tick
+     *       的射线（起点是脚底）立刻打中脚下的方块 → {@code onHitBlock}（空）→ {@code onHit()} →
+     *       放个音效粒子就 {@code discard()} ⇒ <b>伤害恒为 0</b>，与韧性减伤、命中率都无关；</li>
+     *   <li>本体用法是从目标 Y 向上扫到 {@code min(maxBuildHeight, bossY+20)}，在<b>约 17 格高空</b>
+     *       生成、{@code delay = 1..16} 分批砸落（一次 144 个）。</li>
+     * </ul>
+     * 现在：以敌人为中心画一圈半径 1.2~2.0 的落点，出生高度取
+     * {@link #findAirSpawnY}（天花板之下的最高空气位，洞穴战不会卡进方块），warmup 1/3/5/7/9
+     * 依次砸下（岩碑风暴的「分批」感），伤害直接用玩家攻击面板（3.32 不会像 3.33 那样额外 ×0.6）。
+     */
     private static void spawnDesertStele(ServerPlayer player) {
         Level level = player.level();
-        Vec3 eye = player.getEyePosition();
         Vec3 look = player.getViewVector(1.0F);
         float yawRad = (float) (player.getYRot() * Math.PI / 180.0);
-        for (int i = 0; i < 3; i++) {
-            double side = (i - 1) * 1.5;
-            double px = eye.x + look.x * 4.0 - look.z * side;
-            double pz = eye.z + look.z * 4.0 + look.x * side;
-            double py = findGroundY(level, px, eye.y, pz);
+        float dmg = playerFinalDamage(player);
+        LivingEntity target = findNearestNonPlayer(player, 16.0);
+        double bx, bz, by;
+        if (target != null) {
+            bx = target.getX();
+            bz = target.getZ();
+            by = target.getY();
+        } else {
+            Vec3 eye = player.getEyePosition();
+            bx = eye.x + look.x * 4.0;
+            bz = eye.z + look.z * 4.0;
+            by = player.getY();
+        }
+        for (int i = 0; i < STELE_COUNT; i++) {
+            // 环形落点（风车阵的原版味道），带一点随机偏移免得每次都一模一样
+            double ang = (Math.PI * 2.0 / STELE_COUNT) * i + level.random.nextDouble() * 0.3;
+            double r = 1.2 + level.random.nextDouble() * 0.8;
+            double px = bx + Math.cos(ang) * r;
+            double pz = bz + Math.sin(ang) * r;
+            double py = findAirSpawnY(level, px, pz, by, STELE_FALL_HEIGHT);
             if (py < level.getMinBuildHeight() + 1) continue;
             var stele = new com.github.L_Ender.cataclysm.entity.projectile.Ancient_Desert_Stele_Entity(
-                    level, px, py, pz, yawRad, 30, playerFinalDamage(player), player);
+                    level, px, py, pz, yawRad, 1 + i * 2, dmg, player);
+            // 3.32 的 DAMAGE 是同步数据：构造后再显式设一次，避免版本差异导致 0 伤害
+            try { stele.setDamage(dmg); } catch (Throwable ignored) {}
             markAndSpawn(stele);
         }
+    }
+
+    /**
+     * 找一个「天花板之下的最高空气位」作为坠落弹幕的出生点：从 {@code fromY + maxRise} 向下
+     * 找连续两格空气的位置；洞穴/室内会自然落到天花板正下方，保证石碑真的能往下飞，
+     * 而不是卡在石头里第一个 tick 就判定撞方块消失。
+     *
+     * @return 出生 Y；找不到返回极小值
+     */
+    private static double findAirSpawnY(Level level, double x, double z, double fromY, int maxRise) {
+        int bx = (int) Math.floor(x);
+        int bz = (int) Math.floor(z);
+        int top = Math.min((int) Math.floor(fromY) + maxRise, level.getMaxBuildHeight() - 3);
+        int bottom = (int) Math.floor(fromY) + 3;
+        for (int y = top; y >= bottom; y--) {
+            BlockPos pos = new BlockPos(bx, y, bz);
+            if (level.isEmptyBlock(pos) && level.isEmptyBlock(pos.above())) {
+                return y;
+            }
+        }
+        return level.getMinBuildHeight() - 1;
     }
 
     /** 咒翼灵骸：追踪灵魂箭 ×3（3.5 点幽灵伤害） */
@@ -370,7 +637,42 @@ public class BossPhotoProjHelper {
         return m > 0 ? base * m : base;
     }
 
-    /** 湮灭构造体：湮灭激光（等同攻击面板 + 目标最大生命 2%，贯穿视线方向） */
+    /** 湮灭激光的射线长度：本体对「玩家 caster」会再砍一半，所以传 60 → 实际 30 格 */
+    private static final float ANNIHILATION_BEAM_REACH = 60.0F;
+    /** 激光存活 tick（本体 DURATION：每 tick 沿射线做一次实体判定，到点 discard） */
+    private static final int ANNIHILATION_BEAM_TICKS = 30;
+    /** 额外附加的目标最大生命百分比（本体 {@code Hpdamage} 是百分数：damage + maxHealth × Hpdamage × 0.01） */
+    private static final float ANNIHILATION_BEAM_HP_PERCENT = 2.0F;
+
+    /**
+     * 湮灭构造体：湮灭激光（贯穿长射线，面板 + 目标最大生命 2%，贯穿视线方向）。
+     * <p>
+     * <b>旧版「射线很短」的根因</b>（对实机 jar `legendary_monsters-2.1.20` 的
+     * {@code AnnihilationBeamEntity} 逐字节核实）：射线长度<b>就是</b>构造参数里的最后一个
+     * {@code r}（同步字段 {@code B_RADIUS}），而 {@code calculateEndPos()} 里写死了
+     * <pre>float r = caster instanceof Player ? B_RADIUS / 2 : B_RADIUS;   // 字节码：instanceof Player → fdiv</pre>
+     * ——玩家当 caster 时还会<b>再砍一半</b>。旧版传的是 {@code r = 3.0f} ⇒ 实际射线只有
+     * <b>1.5 格</b>，于是「看着像没打出去」。官方玩家武器 {@code AtomSplitterItem} 是构造后
+     * {@code setRadius(30)}（玩家 → 15 格），boss 本体传 5~30（非玩家不砍半）。
+     * 照片版取 60 → <b>30 格</b>，拿到正版观感。
+     * <p>
+     * 伤害口径照抄本体 {@code tick()}：{@code getDamage() + target.getMaxHealth() * (getHpDamage() * 0.01)}。
+     * <p>
+     * <b>两条必须知道的实机事实</b>（均对实机 jar 2.1.20 反编译核实，别照直觉写）：
+     * <ul>
+     *   <li>这条射线的伤害源把<b>玩家</b>当作直接实体（{@code ModDamageTypes.causeAnnihilationDamage}
+     *       的实现是 {@code new DamageSource(holder, caster, caster)}，**完全忽略传入的射线实体**）。
+     *       因此 {@code PhotoPercentDamageThrottleHandler} 与 {@code BossProjHurtMixin}（都按
+     *       {@code getDirectEntity()} 找标记）对<b>它都不生效</b>，实际节流来自原版无敌帧
+     *       （{@code invulnerableTime = 20}）→ 30 tick 的射线大约只结算 2 次，数值不失控；
+     *       同时也说明它<b>不会</b>回头触发弹幕（{@code RangedAttackHelper.isRanged} 要求
+     *       {@code !isDirect()}，而这里就是直接命中）。</li>
+     *   <li>{@code onAddedToLevel()} 会给非 quad 射线附赠一串爆点
+     *       （{@code spawnExplosions(8, 2, 射线长/π)}，且 Player 平视时几乎必触发）——射线越长爆点越多，
+     *       每个 8.0 伤害 + 2 发 6.0 小弹且<b>伤害写死无法缩放</b>。已用
+     *       {@code ObliteratorBeamNoAutoExplosionMixin} 对带 {@code photo_proj} 的射线掐掉这次调用。</li>
+     * </ul>
+     */
     private static void spawnAnnihilationLaser(ServerPlayer player) {
         if (!com.plumejade.lensouls.entity.BossPhantomType.OBLITERATOR.isModLoaded()) return;
         Level level = player.level();
@@ -381,7 +683,20 @@ public class BossPhotoProjHelper {
         var beam = new net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.AnnihilationBeamEntity(
                 (EntityType<? extends net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.AnnihilationBeamEntity>) beamType,
                 level, player, player.getX(), player.getEyeY(), player.getZ(),
-                yaw, pitch, 40, dmg, 2.0f, 1, false, 0.0f, 0.0f, 0.0f, false, 3.0f);
+                yaw, pitch,
+                ANNIHILATION_BEAM_TICKS,        // duration：存活 tick
+                dmg,                            // damage：玩家面板
+                ANNIHILATION_BEAM_HP_PERCENT,   // Hpdamage：最大生命百分比
+                1,                              // delay：起手延迟
+                false,                          // isQuad：玩家版走单道长射线（true 是本体四向风车）
+                0.0f,                           // followSpeed：0 = 不扫射
+                0.0f,                           // additionalRotation
+                0.0f,                           // turnBackAtDurationPrecentage
+                false,                          // rightTurnFirst
+                ANNIHILATION_BEAM_REACH);       // r：射线长度（玩家会 /2 → 30 格）
+        // 构造器里 calculateEndPos() 在 setRadius(r) 之前跑过一次，这里补一次让第 0 tick 就是全长
+        // （官方玩家武器 AtomSplitterItem 也是构造后 setRadius）
+        try { beam.setRadius(ANNIHILATION_BEAM_REACH); } catch (Throwable ignored) {}
         markPercentAndSpawn(beam);
     }
 
@@ -538,7 +853,9 @@ public class BossPhotoProjHelper {
             Vec3 dir = origin.subtract(player.getEyePosition()).normalize();
             Class<?> cls = Class.forName("com.finderfeed.fdbosses.content.entities.geburah.casts.GeburahRayCastingCircle");
             Method summon = cls.getMethod("summon", Level.class, Vec3.class, Vec3.class);
-            summon.invoke(null, level, origin, dir);
+            Object circle = summon.invoke(null, level, origin, dir);
+            // 该法阵由 fdbosses 自行加入世界，我们只补标记：命中时不得再回头掷弹幕触发
+            markOnly(circle);
         } catch (Exception ex) {
             com.plumejade.lensouls.LenSouls.LOGGER.warn("[PhotoBoss] 法阵射线弹幕失败", ex);
         }
@@ -582,6 +899,8 @@ public class BossPhotoProjHelper {
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         long now = event.getServer().getTickCount();
+        // 玩家死亡激光：判定朝向持续跟随施法者视线（否则光柱视觉在摆、伤害留在原线）
+        syncDeathLaserAim(event.getServer());
         // 超时清理不自删的临时实体（动能力场墙）
         if (!DISCARD_AT.isEmpty()) {
             DISCARD_AT.entrySet().removeIf(entry -> {
@@ -641,7 +960,7 @@ public class BossPhotoProjHelper {
 
     /** 打上照片弹幕标记后加入世界（供 BossProjHurtMixin 清目标无敌帧） */
     private static void markAndSpawn(net.minecraft.world.entity.Entity entity) {
-        entity.getPersistentData().putBoolean("lensouls:photo_proj", true);
+        com.plumejade.lensouls.util.PhotoProjMarker.mark(entity, false);
         entity.level().addFreshEntity(entity);
     }
 
@@ -650,7 +969,18 @@ public class BossPhotoProjHelper {
      * BossProjHurtMixin 仅对带该标记的弹幕做 10tick 内置间隔（同目标命中节流）。
      */
     private static void markPercentAndSpawn(net.minecraft.world.entity.Entity entity) {
-        entity.getPersistentData().putBoolean("lensouls:photo_percent", true);
-        markAndSpawn(entity);
+        com.plumejade.lensouls.util.PhotoProjMarker.mark(entity, true);
+        entity.level().addFreshEntity(entity);
+    }
+
+    /**
+     * 只打标记、不加入世界——给「由第三方模组的 summon 方法内部自行加入世界」的弹幕用。
+     * 漏掉这一步的弹幕（例如 fdbosses 的法阵射线）伤害归属玩家且不带标记，
+     * 命中时会被当成普通远程伤害再掷一次弹幕触发 → 触发/弹幕回环。
+     */
+    private static void markOnly(Object maybeEntity) {
+        if (maybeEntity instanceof net.minecraft.world.entity.Entity entity) {
+            com.plumejade.lensouls.util.PhotoProjMarker.mark(entity, false);
+        }
     }
 }

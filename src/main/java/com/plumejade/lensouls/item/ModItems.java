@@ -157,6 +157,10 @@ public class ModItems {
     public static final DeferredItem<CopySoulItem> COPY_SOUL = ITEMS.register("copy_soul",
             () -> new CopySoulItem(new Item.Properties()));
 
+    // ---- 减速铁板（躺在物品栏里就 -10% 移速/块，见 SlowIronPlateHandler） ----
+    public static final DeferredItem<SlowIronPlateItem> SLOW_IRON_PLATE = ITEMS.register("slow_iron_plate",
+            () -> new SlowIronPlateItem(new Item.Properties()));
+
     // ---- 羽·元素觉醒者（Curios 任意槽位饰品） ----
     public static final DeferredItem<FeatherElementRiseItem> FEATHER_ELEMENTRISE =
             ITEMS.register("feather_elementrise", () -> new FeatherElementRiseItem(new Item.Properties()));

@@ -145,6 +145,12 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.SoulDotHandler.class);
         // ---- 照片弹幕 maxHP% 伤害 10tick 内置间隔 ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.PhotoPercentDamageThrottleHandler.class);
+        // ---- 照片弹幕自伤/误伤保护（反弹打回玩家自身） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.PhotoProjSafetyHandler.class);
+        // ---- 减速铁板（物品栏每块 -10% 移速，每 10tick 扫一次） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.SlowIronPlateHandler.class);
+        // ---- 复制之魂封印的全容器扫描（精妙背包内容物 + 超越维度终端） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.CopySoulSealHandler.class);
 
         // BOSS 韧性 — 伤害减免 + 自动注册事件处理器
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.ToughnessDamageHandler.class);

@@ -52,22 +52,32 @@ public class BossToughnessAttributes {
 
     /** 获取实体削韧次数（默认 5） */
     public static int getRequiredHits(Entity entity) {
-        String id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
-        ToughnessConfig c = OVERRIDES.get(id);
+        ToughnessConfig c = OVERRIDES.get(entityId(entity));
         return c != null ? c.requiredHits() : com.plumejade.lensouls.Config.TOUGHNESS_DEFAULT_HITS.get();
     }
 
     /** 获取实体定身 tick（默认 200 = 10 秒） */
     public static int getStunDurationTicks(Entity entity) {
-        String id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
-        ToughnessConfig c = OVERRIDES.get(id);
+        ToughnessConfig c = OVERRIDES.get(entityId(entity));
         return c != null ? c.stunDurationTicks() : com.plumejade.lensouls.Config.TOUGH_STUN_DURATION_TICKS.get();
     }
 
     /** 获取实体削韧间隔 tick（默认 60 = 3 秒） */
     public static int getInvincibleTicks(Entity entity) {
-        String id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
-        ToughnessConfig c = OVERRIDES.get(id);
+        ToughnessConfig c = OVERRIDES.get(entityId(entity));
         return c != null ? c.invincibleTicks() : 60;
+    }
+
+    /**
+     * 实体 ID 字符串；查不到（未注册类型 / 实体为空）返回空串。
+     * <p>
+     * 原实现直接 {@code BuiltInRegistries.ENTITY_TYPE.getKey(type).toString()}：
+     * 高频触发时若混进一个未注册类型的实体（第三方模组的临时/伪造实体），
+     * {@code getKey} 返回 null → {@code toString()} 空指针，韧性检查整条链随之炸掉。
+     */
+    private static String entityId(Entity entity) {
+        if (entity == null || entity.getType() == null) return "";
+        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        return id == null ? "" : id.toString();
     }
 }

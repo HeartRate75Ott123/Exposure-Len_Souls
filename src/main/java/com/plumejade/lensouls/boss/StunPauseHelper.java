@@ -21,6 +21,7 @@ public final class StunPauseHelper {
      * 时间定格定身期间客户端实体照常 tick 会造成拉扯，同样跳过。
      */
     public static boolean isStunPaused(Entity entity) {
+        if (entity == null || entity.level() == null) return false;
         if (entity.level().isClientSide) {
             return BossToughnessClientCache.isStunned(entity.getId())
                     || com.plumejade.lensouls.ability.client.ClientFreezeCache.isFrozen(entity.getId());
@@ -35,6 +36,7 @@ public final class StunPauseHelper {
      * 实体是否处于破刹（韧性清空）——清除无敌帧专用（时间定格不清）。
      */
     public static boolean isToughnessBroken(Entity entity) {
+        if (entity == null || entity.level() == null) return false;
         if (entity.level().isClientSide) {
             return BossToughnessClientCache.isStunned(entity.getId());
         }

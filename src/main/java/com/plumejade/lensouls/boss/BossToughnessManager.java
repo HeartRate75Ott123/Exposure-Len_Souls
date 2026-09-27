@@ -37,6 +37,19 @@ public class BossToughnessManager {
     /** entity UUID → toughness */
     private final Map<UUID, BossToughnessData> dataMap = new ConcurrentHashMap<>();
 
+    /**
+     * 高频触发保护：同一实体在同一 gameTick 内只结算一次削韧。
+     * <p>
+     * 削韧入口有三条（拍照 {@link ToughnessPhotoHandler}、要害打击、指令/内部调用），
+     * 高频触发（弹幕连击 + 拍照）时同刻重复进入会重复发粒子/音效包并重复累加；
+     * 这里按 (实体, tick) 去重。条目每 200 tick 清理一次，不会无限增长。
+     */
+    private final Map<UUID, Long> lastHitTick = new ConcurrentHashMap<>();
+
+    /** 上次广播的签名 + tick：内容未变时跳过广播（每 20 tick 仍强制一次，保证新玩家能收到） */
+    private long lastBroadcastSignature = Long.MIN_VALUE;
+    private long lastBroadcastTick = Long.MIN_VALUE;
+
     public static BossToughnessManager getInstance() { return INSTANCE; }
 
     // ========== 韧性数据 API ==========
@@ -86,8 +99,14 @@ public class BossToughnessManager {
     }
 
     public BossToughnessData hit(LivingEntity entity, @javax.annotation.Nullable net.minecraft.server.level.ServerPlayer player) {
+        if (entity == null || entity.level() == null) return null;
         BossToughnessData data = dataMap.get(entity.getUUID());
         if (data == null) return null;
+
+        // 高频触发保护：同一实体同一 tick 只结算一次（防弹幕连击期间重复广播/重复累加）
+        long now = entity.level().getGameTime();
+        Long lastTick = lastHitTick.put(entity.getUUID(), now);
+        if (lastTick != null && lastTick == now) return data;
 
         if (data.isBroken()) return data;
 
@@ -207,7 +226,20 @@ public class BossToughnessManager {
     // ========== Tick 驱动 ==========
 
     public void tick() {
-        if (dataMap.isEmpty()) return;
+        if (dataMap.isEmpty()) {
+            // 数据清空后仍要把「空表」广播一次，清掉客户端残留的韧性条
+            broadcastAll();
+            return;
+        }
+
+        // 高频触发保护用的 (实体, tick) 去重表清理（每 200 tick 一次，避免长期累积）
+        if (lastHitTick.size() > 64) {
+            MinecraftServer cleanupServer = ServerLifecycleHooks.getCurrentServer();
+            if (cleanupServer != null) {
+                long nowTick = cleanupServer.getTickCount();
+                lastHitTick.entrySet().removeIf(e -> nowTick - e.getValue() > 200L);
+            }
+        }
 
         List<UUID> pendingStunEnd = new ArrayList<>();
         List<UUID> pendingResetSound = new ArrayList<>();
@@ -300,6 +332,8 @@ public class BossToughnessManager {
     public void broadcastAll() {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server == null) return;
+        var playerList = server.getPlayerList();
+        if (playerList == null) return;
 
         // 收集所有在线实体的韧性数据
         List<ToughnessEntry> allEntries = new ArrayList<>();
@@ -315,10 +349,17 @@ public class BossToughnessManager {
             }
         }
 
-        if (allEntries.isEmpty()) return;
+        // 内容未变 + 距上次广播不到 20 tick → 跳过：Boss 发呆时省掉每 tick 一次的全量包，
+        // 而 20 tick（1 秒）的兜底重发保证中途加入的玩家一定能收到。
+        long now = server.getTickCount();
+        long signature = allEntries.hashCode() * 31L + allEntries.size();
+        if (signature == lastBroadcastSignature && now - lastBroadcastTick < 20L) return;
+        lastBroadcastSignature = signature;
+        lastBroadcastTick = now;
 
+        // 空表也要发：客户端据此清掉已消失 Boss 的残留韧性条
         ToughnessSyncPacket packet = new ToughnessSyncPacket(allEntries);
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+        for (ServerPlayer player : playerList.getPlayers()) {
             PacketDistributor.sendToPlayer(player, packet);
         }
     }
@@ -327,7 +368,10 @@ public class BossToughnessManager {
 
     /** 计算击破韧性需要的削韧次数，优先查 per-entity 覆盖配置，否则返回默认值。 */
     public static int computeRequiredHits(LivingEntity entity) {
-        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        // 注册表里查不到的类型（未注册/被移除的自定义实体）getKey 会返回 null，直接走默认值
+        ResourceLocation id = entity == null || entity.getType() == null
+                ? null : BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        if (id == null) return Config.TOUGHNESS_DEFAULT_HITS.get();
         String idStr = id.toString();
 
         // 1. 配置文件覆盖：格式 "modid:entityid:count"

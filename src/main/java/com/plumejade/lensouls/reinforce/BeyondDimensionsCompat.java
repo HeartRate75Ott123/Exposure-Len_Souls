@@ -43,6 +43,11 @@ public final class BeyondDimensionsCompat {
     private static Method getUnifiedStorage;
     private static Method getStorage;
     private static Method extractBySlot;
+    /** 可选（封印功能用）：以下任一取不到时封印降级为「只处理随身压缩球」，其余功能不受影响 */
+    private static Method setAmountByKey;
+    private static Method getAllNetsFromPlayer;
+    private static Method getNetPlayers;
+    private static Method onChange;
     private static Method keyAccessor;
     private static Method amountAccessor;
     private static Method getReadOnlyStack;
@@ -50,6 +55,7 @@ public final class BeyondDimensionsCompat {
     private static Method getComponent;
     private static Method setComponent;
     private static java.lang.reflect.Constructor<?> keyAmountConstructor;
+    private static java.lang.reflect.Constructor<?> itemStackKeyConstructor;
 
     private BeyondDimensionsCompat() {
     }
@@ -112,6 +118,152 @@ public final class BeyondDimensionsCompat {
     }
 
     // ========== 内部实现 ==========
+
+    /**
+     * 给超越维度里的复制之魂打 / 摘「禁复制封印」。
+     * <p>
+     * 三个必须踩对的点（全部对着实际安装的 0.7.24 jar 核实过）：
+     * <ol>
+     *   <li>{@code getStorage()} 是<b>只读活视图</b>（{@code Collections.unmodifiableList} +
+     *       每次 {@code get(i)} 现造 {@code KeyAmount}），而 {@code KeyAmount} 是不可变 record
+     *       ——所以只能<b>先快照、再按键写回</b>；</li>
+     *   <li>写回<b>必须按键</b>（{@code setAmountByKey}）：底层 {@code slotIndex} 用的是
+     *       「换尾删除」，按 index 连续改写会漏掉被搬到当前位置的那条；</li>
+     *   <li>{@code getReadOnlyStack()} 返回的是<b>共享缓存实例</b>（数量被强制置 1），
+     *       改它不会改存档、还会污染后续所有读取——要改必须先 {@code copy()}，
+     *       再用 {@code new ItemStackKey(改好的副本)} 换 key（改组件 = 换 key）。</li>
+     * </ol>
+     * 解封方向额外一条：终端网络是<b>共享</b>的（同一网络的多个玩家看到同一份）。只要该网络
+     * 还有在线成员戴着禁复制羽毛，就不能把魂解封（否则戴羽毛的玩家顺手就能复制）。
+     *
+     * @return 是否真的改动了任何条目
+     */
+    public static boolean sealCopySouls(Player player, boolean seal, List<ItemStack> carried) {
+        if (!ensureReady()) return false;
+        boolean changed = false;
+
+        // 1) 网络存储（可能同时属于多个网络）
+        for (Object net : allNets(player)) {
+            if (net == null) continue;
+            if (!seal && netHasFeatherMember(player, net)) continue; // 共享网络：有人还戴着就不解封
+            Object unified = invoke(getUnifiedStorage, net);
+            if (unified == null) continue;
+            Object listed = invoke(getStorage, unified);
+            if (!(listed instanceof List<?> live)) continue;
+
+            // 活视图：必须先整体快照，遍历中改存储不会抛 CME，只会静默错乱
+            List<Object> snapshot = new ArrayList<>(live);
+            boolean netChanged = false;
+            for (Object entry : snapshot) {
+                if (entry == null) continue;
+                Object oldKey = keyOf(entry);
+                if (oldKey == null) continue;
+                ItemStack updated = reseal(stackOf(entry), seal);
+                if (updated == null) continue;
+                Object newKey = newItemStackKey(updated);
+                if (newKey == null) continue;
+                long amount = amountOf(entry);
+                if (amount <= 0L) continue;
+                // 按键替换：先清零旧键（换尾删除会重排索引，按 index 写回必然错位）
+                invoke(setAmountByKey, unified, oldKey, 0L);
+                invoke(setAmountByKey, unified, newKey, amount);
+                netChanged = true;
+            }
+            if (netChanged) {
+                invoke(onChange, unified);
+                changed = true;
+            }
+        }
+
+        // 2) 随身物质压缩球（数据组件 istack_slots，组件直接写在活 ItemStack 上即可持久化）
+        for (ItemStack holder : carried) {
+            List<Object> entries = componentEntries(holder);
+            if (entries.isEmpty()) continue;
+            List<Object> replaced = new ArrayList<>(entries.size());
+            boolean localChanged = false;
+            for (Object entry : entries) {
+                ItemStack updated = reseal(stackOf(entry), seal);
+                Object newEntry = null;
+                if (updated != null) {
+                    Object key = newItemStackKey(updated);
+                    if (key != null) newEntry = newKeyAmount(key, amountOf(entry));
+                }
+                if (newEntry == null) {
+                    replaced.add(entry);
+                    continue;
+                }
+                replaced.add(newEntry);
+                localChanged = true;
+            }
+            if (localChanged) {
+                invoke(setComponent, holder, replaced);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    /** 玩家所属的全部维度网络；取不到 {@code getAllNetFromPlayer} 时退回主网络。 */
+    private static List<Object> allNets(Player player) {
+        List<Object> nets = new ArrayList<>(2);
+        if (getAllNetsFromPlayer != null) {
+            Object value = invoke(getAllNetsFromPlayer, null, player);
+            if (value instanceof List<?> list) {
+                nets.addAll(list);
+                return nets;
+            }
+        }
+        Object primary = invoke(getPrimaryNetFromPlayer, null, player);
+        if (primary != null) nets.add(primary);
+        return nets;
+    }
+
+    /** 该网络是否还有在线成员戴着禁复制羽毛（戴着则禁止解封）。 */
+    private static boolean netHasFeatherMember(Player player, Object net) {
+        if (getNetPlayers == null) return false;
+        Object members = invoke(getNetPlayers, net);
+        if (!(members instanceof java.util.Set<?> set)) return false;
+        var server = player.getServer();
+        if (server == null) return false;
+        var playerList = server.getPlayerList();
+        if (playerList == null) return false;
+        for (Object id : set) {
+            if (!(id instanceof java.util.UUID uuid)) continue;
+            var online = playerList.getPlayer(uuid);
+            if (online != null && com.plumejade.lensouls.handler.CopySoulSealHandler.wearsForbiddenFeather(online)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 需要改封印时返回「改好的副本」，不需要改返回 null。
+     * 只处理本模组的复制之魂；其它物品连组件都不碰。
+     * {@code stored} 可能是共享缓存实例，因此一律 copy 后再改。
+     */
+    private static ItemStack reseal(ItemStack stored, boolean seal) {
+        if (stored == null || stored.isEmpty()) return null;
+        if (stored.getItem() != com.plumejade.lensouls.item.ModItems.COPY_SOUL.get()) return null;
+        boolean sealed = stored.has(com.plumejade.lensouls.component.ModDataComponents.COPY_SOUL_SEALED.get());
+        if (sealed == seal) return null;
+        ItemStack copy = stored.copy();
+        if (seal) {
+            copy.set(com.plumejade.lensouls.component.ModDataComponents.COPY_SOUL_SEALED.get(), true);
+        } else {
+            copy.remove(com.plumejade.lensouls.component.ModDataComponents.COPY_SOUL_SEALED.get());
+        }
+        return copy;
+    }
+
+    private static Object newItemStackKey(ItemStack stack) {
+        if (itemStackKeyConstructor == null) return null;
+        try {
+            return itemStackKeyConstructor.newInstance(stack);
+        } catch (ReflectiveOperationException e) {
+            return null;
+        }
+    }
 
     /** 读取物质压缩球组件里的条目；其它物品返回空列表。 */
     private static List<Object> componentEntries(ItemStack stack) {
@@ -228,6 +380,19 @@ public final class BeyondDimensionsCompat {
                 amountAccessor = keyAmountClass.getMethod("amount");
                 getReadOnlyStack = itemKeyClass.getMethod("getReadOnlyStack");
                 keyAmountConstructor = keyAmountClass.getConstructor(stackKeyClass, long.class);
+
+                // 封印功能专用的句柄：单独 try，缺任何一个都不影响上面的统计/消耗
+                try {
+                    Class<?> abstractHandlerClass = Class.forName(
+                            "com.wintercogs.beyonddimensions.api.storage.handler.impl.AbstractUnorderedStackHandler");
+                    setAmountByKey = abstractHandlerClass.getMethod("setAmountByKey", stackKeyClass, long.class);
+                    onChange = handlerClass.getMethod("onChange");
+                    itemStackKeyConstructor = itemKeyClass.getConstructor(net.minecraft.world.item.ItemStack.class);
+                    getAllNetsFromPlayer = netClass.getMethod("getAllNetFromPlayer", Player.class);
+                    getNetPlayers = netClass.getMethod("getPlayers");
+                } catch (ReflectiveOperationException | RuntimeException ignored) {
+                    // 旧版本缺符号：封印只覆盖随身压缩球
+                }
 
                 Object holder = componentsClass.getField("ISTACK_SLOTS").get(null);
                 Object type = holder.getClass().getMethod("get").invoke(holder);

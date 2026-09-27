@@ -99,6 +99,9 @@ public class ModCreativeTabs {
                         // ---- 复制之魂 ----
                         output.accept(ModItems.COPY_SOUL.get());
 
+                        // ---- 减速铁板 ----
+                        output.accept(ModItems.SLOW_IRON_PLATE.get());
+
                         // ---- 羽·元素觉醒者 ----
                         output.accept(ModItems.FEATHER_ELEMENTRISE.get());
 

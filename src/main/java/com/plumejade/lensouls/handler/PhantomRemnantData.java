@@ -266,6 +266,20 @@ public final class PhantomRemnantData {
 
     /**
      * 优先放回原槽位；原槽位被新拾取的东西占用时，退回该容器内的空位，最后才交给调用方掉在原地。
+     * <p>
+     * <b>饰品兼容性加固（修复「照片回来进背包而非 photograph 槽位」）：</b>
+     * <ul>
+     *   <li><b>标识符解析从最后一个冒号倒着取</b>。旧实现 {@code split(":")} 取
+     *       {@code parts[1]} 当槽位 id，遇到带命名空间的标识符
+     *       （如 {@code lensouls:photograph}，{@code CuriosIntegration} 自己就兼容这种）
+     *       会解析成 {@code lensouls} → {@code getCurios().get()} 返回 null →
+     *       整段饰品归还失败，物品漏进背包；</li>
+     *   <li>每一步放回前都过 {@code stacks.isItemValid()}（Curios 内部会走
+     *       {@code CuriosApi.isStackValid} + 注册谓词），不再无脑塞——
+     *       避免把照片塞进戒指之类的错误槽位；</li>
+     *   <li>同组空位失败后，追加<b>跨容器</b>兜底：任何其它 Curios 槽位，
+     *       只要校验通过就收下（照片会自动找到另一个模组提供的照片槽）。</li>
+     * </ul>
      */
     private static boolean place(ServerPlayer player, Inventory inv, String slot, ItemStack stack) {
         if (slot != null && slot.startsWith("inv:")) {
@@ -275,22 +289,44 @@ public final class PhantomRemnantData {
                 return true;
             }
         } else if (slot != null && slot.startsWith("curio:")) {
-            String[] parts = slot.split(":");
-            if (parts.length >= 3) {
-                int idx = parseInt(parts[2]);
-                var curios = CuriosApi.getCuriosInventory(player);
-                if (curios.isPresent()) {
-                    var handler = curios.get().getCurios().get(parts[1]);
-                    if (handler != null) {
-                        var stacks = handler.getStacks();
-                        if (idx >= 0 && idx < stacks.getSlots() && stacks.getStackInSlot(idx).isEmpty()) {
-                            stacks.setStackInSlot(idx, stack);
-                            return true;
-                        }
-                        for (int i = 0; i < stacks.getSlots(); i++) {
-                            if (stacks.getStackInSlot(i).isEmpty()) {
-                                stacks.setStackInSlot(i, stack);
+            // 标识符可能自带冒号（lensouls:photograph），所以从最后一个冒号切分：
+            // "curio:<identifier>:<index>" —— identifier 允许包含冒号，index 一定在末尾
+            int last = slot.lastIndexOf(':');
+            if (last > "curio:".length()) {
+                int idx = parseInt(slot.substring(last + 1));
+                String identifier = slot.substring("curio:".length(), last);
+                if (idx >= 0) {
+                    var curios = CuriosApi.getCuriosInventory(player);
+                    if (curios.isPresent()) {
+                        // 1) 原槽位（空 + 校验通过）
+                        var handler = curios.get().getCurios().get(identifier);
+                        if (handler != null) {
+                            var stacks = handler.getStacks();
+                            if (idx < stacks.getSlots() && stacks.getStackInSlot(idx).isEmpty()
+                                    && stacks.isItemValid(idx, stack)) {
+                                stacks.setStackInSlot(idx, stack);
                                 return true;
+                            }
+                            // 2) 同组内的空位（校验通过才放，不无脑塞）
+                            for (int i = 0; i < stacks.getSlots(); i++) {
+                                if (stacks.getStackInSlot(i).isEmpty() && stacks.isItemValid(i, stack)) {
+                                    stacks.setStackInSlot(i, stack);
+                                    return true;
+                                }
+                            }
+                        }
+                        // 3) 跨容器兜底：任何其它 Curios 槽位，校验通过即收
+                        //    （照片可落到另一个模组提供的 photograph 槽；
+                        //     普通饰品也能被其它兼容槽位接住）
+                        for (var entry : curios.get().getCurios().entrySet()) {
+                            if (entry.getKey().equals(identifier)) continue;
+                            var otherStacks = entry.getValue().getStacks();
+                            for (int i = 0; i < otherStacks.getSlots(); i++) {
+                                if (otherStacks.getStackInSlot(i).isEmpty()
+                                        && otherStacks.isItemValid(i, stack)) {
+                                    otherStacks.setStackInSlot(i, stack);
+                                    return true;
+                                }
                             }
                         }
                     }

@@ -260,14 +260,16 @@ public class BossPhotoProjHelper {
         markAndSpawn(rune);
     }
 
-    /** 玩家周围指定范围内最近的非玩家 LivingEntity（排除玩家自身） */
+    /** 玩家周围指定范围内最近的非玩家 LivingEntity（排除玩家自身；跳过第三方辅助作战单位） */
     private static LivingEntity findNearestNonPlayer(ServerPlayer player, double radius) {
         LivingEntity best = null;
         double bestDist = radius * radius;
         for (net.minecraft.world.entity.Entity e : player.level().getEntitiesOfClass(
                 net.minecraft.world.entity.LivingEntity.class,
                 player.getBoundingBox().inflate(radius),
-                en -> !(en instanceof net.minecraft.world.entity.player.Player) && en.isAlive())) {
+                en -> !(en instanceof net.minecraft.world.entity.player.Player) && en.isAlive()
+                        // gytrinket 无人机/蜂群/僚机不算目标，否则「最近敌人」会被随行的无人机抢走
+                        && !com.plumejade.lensouls.util.PhotoTargetFilter.isIgnored(en))) {
             double d = player.distanceToSqr(e);
             if (d < bestDist) {
                 bestDist = d;
@@ -419,10 +421,11 @@ public class BossPhotoProjHelper {
         float yaw = (float) ((player.getYRot() + 90.0) * Math.PI / 180.0);
         float pitch = (float) (-player.getXRot() * Math.PI / 180.0);
         float dmg = playerFinalDamage(player);
+        Vec3 origin = beamOrigin(player);
         var beam = new com.github.L_Ender.cataclysm.entity.projectile.Death_Laser_Beam_Entity(
                 com.github.L_Ender.cataclysm.init.ModEntities.DEATH_LASER_BEAM.get(),
                 level, player,
-                player.getX(), player.getEyeY(), player.getZ(),
+                origin.x, origin.y, origin.z,
                 yaw, pitch,
                 DEATH_LASER_TICKS,          // duration：结算 tick 数（另有 20 tick 蓄力）
                 dmg,                        // damage：玩家面板
@@ -442,15 +445,20 @@ public class BossPhotoProjHelper {
      * 把服务端判定朝向同步到施法者头部（公式与本体 {@code tick()} 里给渲染用的那一份完全一致：
      * {@code yaw = (yHeadRot + 90) * π/180}、{@code pitch = -xRot * π/180}）。
      * 光束消失/施法者下线即从表里摘掉。
+     * <p>
+     * <b>崩溃教训（1.5.3 修复）</b>：{@code PLAYER_DEATH_LASERS} 是 {@link java.util.concurrent.CopyOnWriteArrayList}，
+     * 其迭代器 {@code COWIterator.remove()} **恒抛 UnsupportedOperationException**——
+     * 1.4.96~1.5.2 里这里写的是 {@code it.remove()}，先驱者死亡激光**结算完的那一刻**
+     * （{@code beam.isRemoved()}）就触发实机服务端 tick 崩溃（crash-2026-09-29）。
+     * 修法：for-each 走 COW 快照遍历，移除用 {@code list.remove(link)}（COW 支持）。
      */
     private static void syncDeathLaserAim(net.minecraft.server.MinecraftServer server) {
         if (PLAYER_DEATH_LASERS.isEmpty()) return;
         var playerList = server.getPlayerList();
-        for (var it = PLAYER_DEATH_LASERS.iterator(); it.hasNext(); ) {
-            DeathLaserLink link = it.next();
+        for (DeathLaserLink link : PLAYER_DEATH_LASERS) {
             var beam = link.beam().get();
             if (beam == null || beam.isRemoved()) {
-                it.remove();
+                PLAYER_DEATH_LASERS.remove(link);
                 continue;
             }
             ServerPlayer caster = playerList == null ? null : playerList.getPlayer(link.caster());
@@ -637,6 +645,31 @@ public class BossPhotoProjHelper {
         return m > 0 ? base * m : base;
     }
 
+    /** 光束起点相对眼睛的横向偏移（格）：往玩家右手挪，让相机不再正好压在光束轴上 */
+    private static final double BEAM_ORIGIN_RIGHT = 0.35;
+    /** 光束起点相对眼睛的下移（格） */
+    private static final double BEAM_ORIGIN_DOWN = 0.15;
+
+    /**
+     * 光束类弹幕（湮灭激光 / 死亡激光）的生成点：从眼睛往「右手 0.35 / 下 0.15」偏一点。
+     * <p>
+     * <b>为什么必须偏</b>：这两种光束的几何就是「若干张<b>包含光束轴</b>的面片」（见
+     * {@code AnnihilationBeamCrossRenderMixin} 里的复算），而相机在光束轴上时<b>同时落在那几张面片里</b>，
+     * 投影只剩一条线——玩家第一人称几乎看不到光束本体。原版的光束看着立体，是因为看的人（玩家看 BOSS 的光束）
+     * 本来就站在轴外；我们这条光束的发射者就是观察者本人，只能把起点从眼睛里挪出来。
+     * <p>
+     * 伤害代价可忽略：射线只是横移 0.35 格，30 格射程上约 0.7°，且两个光束的命中盒都带 {@code inflate(1,1,1)}。
+     */
+    private static Vec3 beamOrigin(ServerPlayer player) {
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getViewVector(1.0F).normalize();
+        Vec3 right = look.cross(new Vec3(0, 1, 0));
+        if (right.lengthSqr() < 1.0E-6) {
+            right = new Vec3(1.0, 0.0, 0.0);   // 正上/正下看时叉积退化，随便给个方向即可
+        }
+        return eye.add(right.normalize().scale(BEAM_ORIGIN_RIGHT)).add(0.0, -BEAM_ORIGIN_DOWN, 0.0);
+    }
+
     /** 湮灭激光的射线长度：本体对「玩家 caster」会再砍一半，所以传 60 → 实际 30 格 */
     private static final float ANNIHILATION_BEAM_REACH = 60.0F;
     /** 激光存活 tick（本体 DURATION：每 tick 沿射线做一次实体判定，到点 discard） */
@@ -680,9 +713,10 @@ public class BossPhotoProjHelper {
         float yaw = (float) ((player.getYRot() + 90.0) * Math.PI / 180.0);
         float pitch = (float) (-player.getXRot() * Math.PI / 180.0);
         float dmg = playerFinalDamage(player);
+        Vec3 origin = beamOrigin(player);
         var beam = new net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.AnnihilationBeamEntity(
                 (EntityType<? extends net.miauczel.legendary_monsters.entity.AnimatedMonster.Projectile.AnnihilationBeamEntity>) beamType,
-                level, player, player.getX(), player.getEyeY(), player.getZ(),
+                level, player, origin.x, origin.y, origin.z,
                 yaw, pitch,
                 ANNIHILATION_BEAM_TICKS,        // duration：存活 tick
                 dmg,                            // damage：玩家面板

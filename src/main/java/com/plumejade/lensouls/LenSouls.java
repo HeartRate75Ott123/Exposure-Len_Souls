@@ -67,6 +67,8 @@ public class LenSouls {
         com.plumejade.lensouls.particle.ModParticleTypes.register(modEventBus);
         com.plumejade.lensouls.sound.ModSounds.register(modEventBus);
         PacketHandler.register(modEventBus);
+        // 其它模组物品的最大堆叠上限 → 64（声明式改默认组件 + mixin 兜可损坏物品，见 handler 注释）
+        modEventBus.addListener(com.plumejade.lensouls.handler.ItemStackSizeHandler::onModifyDefaultComponents);
 
         // 能力选择 GUI（LDLib2 服务端菜单，客户端与服务端共同构建 UI 树）
         AbilityGuiHolder.register();
@@ -151,6 +153,8 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.SlowIronPlateHandler.class);
         // ---- 复制之魂封印的全容器扫描（精妙背包内容物 + 超越维度终端） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.CopySoulSealHandler.class);
+        // ---- 弱点透镜照片：双持右键装机 / 耐久 100 / tooltip ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.WeaknessLensHandler.class);
 
         // BOSS 韧性 — 伤害减免 + 自动注册事件处理器
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.ToughnessDamageHandler.class);

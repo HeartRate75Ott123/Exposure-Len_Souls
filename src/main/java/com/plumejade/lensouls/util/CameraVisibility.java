@@ -22,9 +22,15 @@ import java.util.List;
  *   <li><b>射程</b>：硬距离上限（{@link #maxCaptureDistance()}，可配置）。Exposure 原生的
  *       {@code calculateVisibleDistance} 只按焦距折算，长焦镜头下会放到数十格，导致
  *       「超远视锥内的全部生物」被认到。</li>
- *   <li><b>遮挡</b>：从相机到目标包围盒多个采样点做 {@code COLLIDER} 射线，遇方块即止
- *       （{@link #hasClearSight}）。Exposure 原生只采样「眼睛」单点，会绕角透墙。</li>
+ *   <li><b>遮挡</b>：从相机到目标包围盒<b>多个身体采样点</b>做 {@code COLLIDER} 射线，遇方块即止
+ *       （{@link #hasClearSightTo}）：<b>任一采样点</b>在视锥内且视线通畅即算拍到。
+ *       采样点从脚到头排列（脚底优先），因此「上半身被方块挡住、只露脚／下半身」也能拍进去；
+ *       整只被墙挡住时所有采样点都不通，依然拍不到（不会退化成透墙）。</li>
  * </ol>
+ * <p>
+ * 注意区分两个口径：{@link #hasClearSight} 是「只认身体中心」的严格版，仍供
+ * {@link AimTargetUtil}（要害打击/断魂的瞄准）使用——那里刻意要求中心可见，避免隔墙锁头；
+ * 拍照捕捉走的是 {@link #isVisible} 的多点采样版。
  * <p>
  * 消费方：{@code EntitiesInFrameMixin}（弱点透镜/能力窃取/时间定格/韧性选取的公共来源）、
  * {@link AimTargetUtil}（要害打击/断魂）、Field Guide 图鉴扫描。
@@ -75,26 +81,29 @@ public final class CameraVisibility {
     // ==================== 遮挡 ====================
 
     /**
-     * 「遇方块就停止，不要透墙」——相机到目标是否存在无遮挡视线。
+     * 「遇方块就停止，不要透墙」——相机到<b>目标包围盒中心</b>是否存在无遮挡视线（严格版）。
      * <p>
-     * <b>以目标包围盒中心为准，单射线判定。</b>这一点是必须的，而不是保守选择：
-     * Exposure 原生的 {@code hasLineOfSight} 只打「相机 → 实体<b>眼睛</b>」一根射线，
-     * 且该检测<b>与我们是否混入无关、始终执行</b>。因此一个"整只被墙挡住"的生物
-     * 根本进不到画面列表里；能被拍到的必然是<b>眼睛那根射线是通的</b>（露头、从门缝/窗口），
-     * 而它的身体其实在墙后。所以只要沿用「眼睛可见即合格」，问题永远修不掉——
-     * 必须改成要求<b>身体中心</b>可见，才等价于玩家直觉里的"这只怪在墙后，不该被拍到"。
+     * <b>只供瞄准类判定（{@link AimTargetUtil}）使用</b>，拍照捕捉请用
+     * {@link #isVisible}（多采样、脚底优先）。这里要求身体中心可见是刻意的：
+     * 要害打击/断魂不该隔着墙锁头。
      * <p>
      * 相机自身卡在方块内时（贴墙/埋方块）跳过遮挡判定，否则会全盲。
      */
     public static boolean hasClearSight(Level level, Vec3 cameraPos, Entity target) {
         if (level == null || cameraPos == null || target == null) return false;
+        return hasClearSightTo(level, cameraPos, target, target.getBoundingBox().getCenter());
+    }
 
-        // 相机卡在碰撞体里：不做遮挡判定（否则全部目标都会被判为被挡住）
+    /**
+     * 「遇方块就停止」的<b>单点</b>视线判定：相机 → {@code sample} 之间没有碰撞体方块即算通畅。
+     * <p>
+     * 相机自身卡在碰撞体里时（贴墙/埋在方块中）不做遮挡判定，否则会全盲。
+     */
+    public static boolean hasClearSightTo(Level level, Vec3 cameraPos, Entity context, Vec3 sample) {
+        if (level == null || cameraPos == null || sample == null) return false;
         if (!level.noCollision(new AABB(cameraPos, cameraPos).inflate(1.0E-4))) return true;
-
-        Vec3 center = target.getBoundingBox().getCenter();
-        if (cameraPos.distanceToSqr(center) < 1.0E-8) return true;
-        return isRayClear(level, cameraPos, center, target);
+        if (cameraPos.distanceToSqr(sample) < 1.0E-8) return true;
+        return isRayClear(level, cameraPos, sample, context);
     }
 
     /** 单段「相机 → 采样点」碰撞体射线；MISS = 畅通。 */
@@ -114,8 +123,11 @@ public final class CameraVisibility {
     public static boolean isVisible(Level level, Vec3 cameraPos, Vec3 lookDir,
                                     double halfAngleDeg, double maxDistance, Entity target) {
         if (level == null || cameraPos == null || lookDir == null || target == null) return false;
+        // 第三方辅助作战单位（gytrinket 无人机/蜂群/僚机）一律不算拍摄目标。
+        // 过滤发生在「逐个候选」这一层，调用方自然会继续看下一个生物（见 PhotoTargetFilter）。
+        if (PhotoTargetFilter.isIgnored(target)) return false;
 
-        if (isSampleVisible(level, cameraPos, lookDir, halfAngleDeg, maxDistance, target, target.getEyePosition())) {
+        if (isEntityVisible(level, cameraPos, lookDir, halfAngleDeg, maxDistance, target)) {
             return true;
         }
 
@@ -123,7 +135,7 @@ public final class CameraVisibility {
         if (parts != null) {
             for (PartEntity<?> part : parts) {
                 if (part == null || !part.isAlive()) continue;
-                if (isSampleVisible(level, cameraPos, lookDir, halfAngleDeg, maxDistance, part, part.getEyePosition())) {
+                if (isEntityVisible(level, cameraPos, lookDir, halfAngleDeg, maxDistance, part)) {
                     return true;
                 }
             }
@@ -131,11 +143,36 @@ public final class CameraVisibility {
         return false;
     }
 
-    private static boolean isSampleVisible(Level level, Vec3 cameraPos, Vec3 lookDir, double halfAngleDeg,
-                                           double maxDistance, Entity occlusionTarget, Vec3 coneSample) {
-        if (!inCone(cameraPos, lookDir, halfAngleDeg, coneSample)) return false;
-        if (!inRange(cameraPos, occlusionTarget, maxDistance)) return false;
-        return hasClearSight(level, cameraPos, occlusionTarget);
+    /**
+     * 身体采样比例（相对包围盒高度，从脚到头）。
+     * <p>
+     * <b>脚底优先</b>：生物上半身被方块挡住、只露出脚或下半身时也要能拍到——这正是「拍脚底」的需求。
+     * 整只被墙挡住时所有采样点都不通，依然拍不到（不会退化成透墙）。
+     * 命中即返回：视线通畅的正常情况第一个采样点就通过，只有真被挡时才逐点退让，平均射线数仍接近 1 根。
+     */
+    private static final double[] BODY_SAMPLE_FRACTIONS = {0.08D, 0.28D, 0.5D, 0.72D};
+
+    /** 单个实体（或子部件）：射程 → 逐身体采样点（视锥 + 视线）→ 眼睛（补「细高生物只露头」）。 */
+    private static boolean isEntityVisible(Level level, Vec3 cameraPos, Vec3 lookDir, double halfAngleDeg,
+                                           double maxDistance, Entity entity) {
+        if (!inRange(cameraPos, entity, maxDistance)) return false;
+
+        AABB box = entity.getBoundingBox();
+        double cx = (box.minX + box.maxX) * 0.5D;
+        double cz = (box.minZ + box.maxZ) * 0.5D;
+        double height = box.getYsize();
+        for (double fraction : BODY_SAMPLE_FRACTIONS) {
+            Vec3 sample = new Vec3(cx, box.minY + height * fraction, cz);
+            if (!inCone(cameraPos, lookDir, halfAngleDeg, sample)) continue;
+            if (hasClearSightTo(level, cameraPos, entity, sample)) return true;
+        }
+
+        // 眼睛单独再试一次：细高生物「只露头」时，头部比 0.72 高度更高
+        Vec3 eye = entity.getEyePosition();
+        if (inCone(cameraPos, lookDir, halfAngleDeg, eye) && hasClearSightTo(level, cameraPos, entity, eye)) {
+            return true;
+        }
+        return false;
     }
 
     /**

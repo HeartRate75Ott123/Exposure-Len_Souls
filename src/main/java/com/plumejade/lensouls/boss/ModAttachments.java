@@ -36,6 +36,22 @@ public class ModAttachments {
             ATTACHMENT_TYPES.register("boss_heal_timer",
                     () -> AttachmentType.builder(BossHealTimer::new).build());
 
+    /**
+     * 照片弹幕标记的<b>客户端可见通道</b>（单一事实来源见
+     * {@link com.plumejade.lensouls.util.PhotoProjMarker}）。
+     * <p>
+     * 弹幕标记原本只写实体 {@code persistentData}——那份数据<b>不随实体同步到客户端</b>
+     * （NeoForge 只在实体存档写入/读取里用它），所以客户端渲染器读不到「这是不是我们的弹幕」。
+     * 这里注册一个<b>同步布尔附件</b>：服务端 {@code setData} + {@code syncData} 之后由
+     * NeoForge {@code AttachmentSync} 发给追踪该实体的客户端；实体刚开始被追踪时
+     * （{@code syncInitialEntityAttachments}）也会补发初值，所以「生成即标记再入世」这条顺序是安全的。
+     * 弹幕都是瞬态实体，不需要序列化（不写 {@code serialize}）。
+     */
+    public static final Supplier<AttachmentType<Boolean>> PHOTO_PROJ =
+            ATTACHMENT_TYPES.register("photo_proj",
+                    () -> AttachmentType.<Boolean>builder(() -> false)
+                            .sync(net.minecraft.network.codec.ByteBufCodecs.BOOL).build());
+
     public static void register(IEventBus modEventBus) {
         ATTACHMENT_TYPES.register(modEventBus);
     }

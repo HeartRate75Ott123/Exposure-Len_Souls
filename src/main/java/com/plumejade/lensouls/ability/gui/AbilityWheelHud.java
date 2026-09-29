@@ -47,8 +47,14 @@ public class AbilityWheelHud {
     /** 满窗口（≥5 能力）时边缘行保留的透明度（不足 5 个时边缘淡出到底，见 onRenderGui） */
     private static final float EDGE_ALPHA_FULL = 0.30f;
 
+    /** 潜行+滚轮在「单能力」下的切换冷却：状态更新后 0.5s 内不再接受滚轮指令（防连滚循环切不回来） */
+    private static final long TOGGLE_COOLDOWN_MS = 500L;
+
     private static final String KEY_HINT = "gui.lensouls.ability.hint";
     private static final String KEY_HINT_OPEN = "gui.lensouls.ability.hint_open";
+
+    /** 滚轮在单能力下最近一次成功切换的时间戳（Util.getMillis()；0 = 尚未切换过） */
+    private static long lastToggleAtMs = 0L;
 
     /** 能力球物品图标缓存（按枚举序，懒加载：registry 就绪后首次渲染时填充） */
     private static final ItemStack[] ICONS = new ItemStack[AbilityType.values().length];
@@ -75,8 +81,28 @@ public class AbilityWheelHud {
         if (delta == 0) return;
 
         List<AbilityType> list = getUnlockedList();
-        // 仅一个能力时滚动无效，保持固定
-        if (list.size() <= 1) return;
+        if (list.isEmpty()) return; // 一个能力都没解锁：滚轮放回原版热栏，维持原行为
+        // ── 单能力：滚轮 = 选中 ↔ 未选中 切换（不滚动列表）──
+        // 0.5s 冷却防连滚：滚轮一档就是一次状态翻转，若不加冷却，快速连续滚动会
+        // 选中→取消→选中…原地循环，等不到想要的稳定态
+        if (list.size() <= 1) {
+            long now = net.minecraft.Util.getMillis();
+            if (now - lastToggleAtMs < TOGGLE_COOLDOWN_MS) return;
+            // 与多能力分支同口径：该语境下滚轮已被模组接管，不放给原版热栏
+            event.setCanceled(true);
+            ItemStack cam = CameraInputHandler.getWieldedCamera(mc.player);
+            if (cam.isEmpty()) return;
+            AbilityType type = list.get(0);
+            AbilityType current = CameraAbilityStore.getSelectedType(cam);
+            // 已选中 → 取消选中（-1）；未选中 → 选中。
+            // 本地镜像即时翻转而不等服务端回声（换机播种同款原则）：冷却窗口内的
+            // 下一次滚轮要读最新状态，否则会读到旧态又翻回去
+            int target = current != null && current == type ? -1 : type.ordinal();
+            lastToggleAtMs = now;
+            PacketDistributor.sendToServer(new AbilitySelectPacket(target));
+            ClientAbilityCache.setHeldCameraSelected(target);
+            return;
+        }
         // 取消原版事件：阻止热栏滚动
         event.setCanceled(true);
 

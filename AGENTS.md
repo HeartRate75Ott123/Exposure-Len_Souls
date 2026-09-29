@@ -487,3 +487,635 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   弹幕照样不掉血；灾变这两个弹幕的零伤害在源码层面就是结构性事实（见第 5 节）。
 - 同类教训（第 12 节）：**弹幕「不明显/很短」先怀疑参数与实体选型**，而不是数值。
   两个 boss 的「射线长度」分别在 `B_RADIUS`（且玩家 caster 会被 /2）与「选错实体」上。
+
+### 14. 本批次（`1.4.97`）：荒厄遗咒真伤 / gytrinket 不干扰拍照 / 拍脚底也能捕捉
+
+- **羽·荒厄遗咒：每次伤害的 30% 视为真伤**（`1.4.98` 按需求订正口径）
+  - **不是概率触发**：每一次伤害都按比例拆分 —— `最终 = D×0.30 + (D−D×0.30)×(1 − 韧性减伤)`，
+    即「三成真伤不吃韧性减伤、七成照常结算」。1.4.97 我先做成了「30% 概率整段免减伤」，
+    按用户澄清已改（顺带删掉了掷骰与那份 (攻击者,目标,tick) 缓存，逻辑更简单）。
+  - 实现：`FeatherHardmanHandler.TRUE_DAMAGE_SHARE = 0.30f` +
+    `trueDamageShare(target, source)`（佩戴者造成、非自伤时返回该比例，否则 0）；
+    `ToughnessDamageHandler.onLivingDamagePre`（`EventPriority.HIGHEST`，最先跑）里
+    `truePart = D×share` 原样保留、其余交给 `applyDamageReduction`。
+    护甲与其它模组的减伤不受影响（它们在本事件之前已结算）。
+  - 文案 `item.lensouls.feather_hardman.desc5`（zh/en）与类 javadoc 同步更新。
+- **拍照/瞄准无视第三方辅助作战单位（gytrinket 无人机/蜂群/僚机）**（`1.4.98`）
+  - 需求：这些单位跟着玩家满天飞，会抢走「照片主体」与弹幕的「最近敌人」，
+    要忽略它们**并继续选取它后面的生物**。
+  - 关键事实：它们在对方模组里的公共父类是
+    `com.gytrinket.gytrinket.core.entity.construct.AbstractConstructEntity extends PathfinderMob`
+    ——**是 LivingEntity**，所以不能靠「非生物」筛掉，必须显式按类忽略。
+  - 实现：`util/PhotoTargetFilter.isIgnored(entity)`——按**包名前缀**
+    `com.gytrinket.gytrinket.core.entity.construct.` 判定（drone / swarm / wingman 三个子包都在其下，
+    以后新增第四种 construct 自动覆盖），比较结果按 `Class` 缓存、`ModList` 查询也缓存，模组没装直接短路。
+    接入三处目标选取：`CameraVisibility.isVisible`（拍照画面列表 = `EntitiesInFrameMixin` 的收口）、
+    `AimTargetUtil.isAimedAt`（准星/要害打击）、`BossPhotoProjHelper.findNearestNonPlayer`（弹幕选敌）。
+    本类只回答"是不是忽略"、**不做选取**，所以"继续选下一个"由调用方的候选遍历自然完成。
+- **gytrinket 不再干扰拍照**（对着对方源码逐点核实；**两处机制我先前写错过，已按实情订正**）
+  - 门槛谓词：`AttackModeClientUtil.hasActiveItem(...)` 查的是**光点核心存储（`PlayerStore`，27 槽）
+    + Curios 饰品栏**——**不含原版物品栏，也与主手拿什么无关**。所以「手持相机时前置条件天然不成立」
+    **不成立**：装了充能模块的玩家手持相机照样被卷进去。
+  - 具体副作用（仅装了模块时）：`MouseHandlerMixin` 在**任何一次右键按下**都调
+    `startChargingFromRightButton()` → 服务端 `ChargedAttackManager.startItemUseCharge` 因相机不在它的
+    武器白名单里而施加**临时 -3.0 攻速**修饰符并每 tick 抛 `ChargedAttackEvent`（Exposure 相机正是
+    「长按右键开取景器」）；左键侧 `startCharging()` + 松开的 `releaseAttack()` 会做矩形光束索敌后
+    `gameMode.attack(...)`——**「对着空气点一下切能力」会额外打出一记真实近战**。
+  - 修法：`GytrinketCameraChargeMixin`（compat 配置的 **client** 数组）对两个入口
+    `startCharging` / `startChargingFromRightButton` 做 HEAD cancel——**主手或副手拿着相机时不进入充能**。
+    它同时消掉上面三件事（幽灵近战 / -3.0 攻速与事件 / `continueAttack` 被 cancel）。
+    `targets` 字符串 + `remap=false` + `require=0`；服务端无需改动（充能启动全依赖客户端包）。
+  - **已知残留（刻意保留）**：对方的 `startAttack` 里 `cir.setReturnValue(false)` 在 `startCharging()`
+    **之外**，所以相机在手点左键**没有原版挥击动作/动画**。我们的照片弹幕信号不受影响（见下条）。
+    要去掉残留，正确做法是覆写它的门槛谓词 `hasChargedAttackItem()`/`hasAssaultItem()`（相机在手返回 false），
+    **不要** mixin 它的 mixin 类、不要 `@Redirect setReturnValue`、不要覆写 `isCharging()`（会状态失配）。
+  - **Mixin 顺序备忘（重要，别再想当然）**：`CallbackInfoReturnable.setReturnValue` 内部会 `cancel()`，
+    同注入点上**更靠后的回调会被跳过**——「同点多个 `@Inject` 一定都会跑」是**错的**。
+    我们的 `MinecraftSwingMixin`（lensouls，无 priority = 1000）之所以没被 gytrinket（999）掐掉，
+    是因为**优先级数字小者先应用、先插入者埋在下面**，而 HEAD 取的是「活指令表首指令」，
+    ⇒ 在 HEAD 处**后应用（数字大）者先执行**：`[lensouls][gytrinket+cancel][原版体]`。
+    顺带：对方源码里「priority 999 早于 Better Combat 默认 1000」这句注释在 HEAD 处也是反的
+    （Better Combat 源码里根本没有 `startAttack`/`continueAttack` 注入，无实际后果）。
+  - 官方开关：**没有**能让它忽略相机的配置/数据包/标签。`charged_attack.itemUseChargeWhitelist` 只能去掉
+    -3.0 攻速副作用（且因 `Config.onLoad` 的 `initialized` 守卫，`/reload` 不重载、要重启）；
+    `gytrinket_ui_overrides.json` 是全局废掉模块（可 `/reload`，但是"一刀切"）。
+- **拍生物脚底也能捕捉**（`util/CameraVisibility`）
+  - 原实现：视锥按**眼睛**采样，遮挡按**包围盒中心**单射线——上半身被方块挡住时中心不通 ⇒ 拍不到。
+  - 现改为**多身体采样点**：`BODY_SAMPLE_FRACTIONS = {0.08, 0.28, 0.5, 0.72}`（相对包围盒高度，
+    **脚底优先**）+ 眼睛兜底；**任一采样点「在视锥内且视线通畅」即算拍到**。
+    整只被墙挡住时所有采样点都不通，依然拍不到（不会退化成透墙）；命中即返回，平均射线数仍接近 1。
+  - `hasClearSight`（只认中心）**保留给 `AimTargetUtil`**（要害打击/断魂的瞄准）——那里刻意要求中心可见，
+    避免隔墙锁头；拍照捕捉走新的 `isVisible` / `hasClearSightTo`。改这两个口径时别互相覆盖。
+
+### 15. 交付
+
+- 版本 `1.4.91` → `1.4.96`（见第 13 节）→ `1.4.97` → `1.4.98`
+  （荒厄遗咒真伤改成**每次伤害的 30%**、拍照无视 gytrinket 无人机/蜂群/僚机、
+  gytrinket 充能不干扰相机、拍脚底也能捕捉）：
+  `.\gradlew.bat build` 通过（只剩既有的 JEI 弃用 API 警告）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.4.98.jar`（5,881,492 字节），
+  MD5 `7A4A8B09370D8EFBED2FBE571844B6FC`。**1.4.91 ~ 1.4.97 作废，别分发**。
+- 已推送：`bc6c3d9`（虚影核心饰品槽解析）、`b2627a4`（弹幕/韧性/封印/减速铁板批次）→ `origin/main`。
+  本节（1.4.97 / 1.4.98）**尚未提交**，等指示。
+
+## 2026-09 需求批次（`1.4.99`）：弱点透镜革新（右键装机 / 耐久 100 / 记录弱点）
+
+### 16. 需求三条
+
+1. **双持右键放入/更换**：弱点透镜照片与**任意附魔摄魂术的物品**（**排除两个相机**）双持时，
+   照片在副手或主手都行，右键即把照片装进另一手物品的「剑槽」（此前只能按键开 GUI）。
+   已有照片则**更换**，旧照片退回背包。
+2. **耐久 100**：照片可生效 100 次，归零即销毁。
+3. **记录弱点**：拍照时识别主体的弱点元素写进照片；装到武器上时该武器**视为该元素的 2 级武器活性**
+   （武器自身 `item_element_activity` 等级更高则按自身的）。
+
+### 17. 实现落点
+
+| 位置 | 职责 |
+|------|------|
+| `util/WeaknessLensPhoto` | 全部口径与常量：照片/武器 NBT 键、耐久、弱点识别、装机读写、`inspect/inspectActive`、活性取 max |
+| `handler/WeaknessLensHandler` | 三个事件：`RightClickItem`（双持放入/更换）、`LivingDamageEvent.Pre`(LOWEST，耐久扣减与销毁)、`ItemTooltipEvent` |
+| `mixin/compat/PhotographInstallMixin` | 客户端：装机右键时**不要打开 Exposure 照片查看界面** |
+| `ability/AbilityBehavior.writePhotoData` | `WEAKNESS_LENS` 分支：写 `lensouls:weakness_element` + `lensouls:durability=100` |
+| `damage/DamageHandler` / `damage/ElementBypassHelper` | 武器活性取 max(自身, 照片 2 级)；**武器匹配 ×0.1 惩罚**也要认这条活性 |
+| `handler/ElementActivityTooltipHandler` | 武器活性 tooltip 走 `WeaknessLensPhoto.getActivityLevel`（随照片实时变化） |
+| `gui/PhotoGuiMenu` / `event/EnchantmentRemovalListener` | 同步新键 `SoulPhotoWeakness`；GUI 装机时补齐并写回照片的元素 tag |
+| `client/WeaknessLensDurabilityDecorator`（+ `LenSoulsClient.registerItemDecorations`） | 物品栏里的耐久条（NeoForge `RegisterItemDecorationsEvent`），满耐久不画 |
+
+- NBT：照片 `lensouls:weakness_element` / `lensouls:durability`；武器 `SoulPhotoStack`（**数量固定 1**）
+  / `SoulPhotoEntityId`（旧键沿用）/ `SoulPhotoWeakness`（新）。
+- 旧照片/旧存档缺键时的兜底：耐久缺省 = 满；记录元素缺省 = 按 `SoulPhotoEntityId` 到
+  `entity_weakness` 反查，并在下次装机时补写回照片。
+- 「生效」口径（扣 1 点耐久）= 该次伤害里照片确实参与了：**对照片主体增伤**，或**它赋予的元素活性命中了目标弱点**。
+  打空（命中率没过 / 伤害 ≤ 0）与没参与的一刀都不扣；归零 → 清空武器上的照片三项键 + 动作栏提示 + `ITEM_BREAK`。
+
+### 18. 必须记住的坑（本次逐字节确认）
+
+- **`PhotographItem.use` 在客户端直接开照片查看界面**（`ClientGUI.openPhotographsScreenFromItem`）并返回
+  `success`。装机右键必然踩到 ⇒ 必须有 `PhotographInstallMixin` 掐掉，否则每次装机都先弹一张照片界面
+  （服务端那侧已被事件取消，客户端只在 `use` 里）。
+- 该 mixin 必须返回 **`success` 而不是 `pass`**：原版 `Minecraft.startUseItem` 是
+  `for (InteractionHand hand : InteractionHand.values())` 的**双手循环**，
+  结果 `consumesAction()` 才 `return`，否则继续把这次右键交给**另一只手**——`pass` 会顺带触发目标物品
+  自己的右键效果（`compiledWithNeoForge_*.jar` 的 `Minecraft.startUseItem` offset 442~502 已核对）。
+- `MultiPlayerGameMode.useItem` 的预测 lambda（`lambda$useItem$5`）顺序是
+  `new ServerboundUseItemPacket` → `CommonHooks.onItemRightClick`（**客户端也会发 `RightClickItem`！**）
+  → `stack.use(...)` → 返回 packet 交给 `startPrediction` 发送。所以服务端处理器必须 `isClientSide` 守卫，
+  客户端那条路只能靠 mixin。
+- 同一次右键会在主手、副手各派发一次 `RightClickItem` ⇒ 处理器**只认「照片那一手」**
+  （`player.getItemInHand(event.getHand())` 是弱点透镜照片），另一手是目标；再加同 tick 去重兜底。
+- 装机时照片**必须 `copyWithCount(1)` 存进武器**：照片可堆叠，若连数量一起存，武器上那份会变成一整堆。
+- 「识别弱点」只认 `entity_weakness` 里**显式配置**的元素：`DataPackLoader.getWeakness` 对未配置元素给
+  0.1 兜底，用它识别等于「任何生物都有弱点」，那不是识别。排除 `PROJECTILE`（其活性来自投射物，不是武器）。
+  倍率最高者胜；**平手按 `ElementDamage.values()` 声明顺序取前者**——`getAllWeaknesses` 返回的 Map
+  迭代顺序不确定，不能靠 `Map.Entry` 遍历决定。
+- 照片提供的活性**必须与增伤同口径要求摄魂术**（`inspectActive`）：装机时需要附魔，但砂轮祛魔后武器 NBT
+  还在；不查附魔会留下「祛了魔照样吃 2 级活性」的口子（增伤侧 `PhotoDamageHandler` 本来就查附魔）。
+- 热路径零分配：`inspect` 走 `CustomData.contains("SoulPhotoStack")` 先判存在，再 `copyTag()`；
+  否则「拿普通武器（甚至带弹药/强化 NBT 的武器）打人」会在每个伤害事件复制整份 NBT。
+- `DamageHandler` 的**武器匹配 ×0.1 惩罚**（目标有显式弱点但武器活性不匹配 → 最终伤害砍到 10%）
+  必须把照片活性算进去，否则装照片反而被这条惩罚吃掉。
+- 键名一律走 `WeaknessLensPhoto` 常量（`SoulPhotoStack` / `SoulPhotoEntityId` / `SoulPhotoWeakness`），
+  避免再次出现「改了一处、另一处还在读旧字面量」。
+- **耐久条不要用原版 `DataComponents.DAMAGE`**：原版对带耐久组件的物品强制 `stackSize = 1`，
+  照片会立刻变成不可堆叠，而照片堆叠是既有玩法（`StackedPhotographsItem`、时空回溯按堆查找都依赖它）。
+  正确做法是自绘：耐久存 `lensouls:durability`，条由 `client/WeaknessLensDurabilityDecorator`
+  （NeoForge `RegisterItemDecorationsEvent`，只在 `LenSoulsClient` 的 mod 总线注册，客户端专属）绘制，
+  口径照抄 `ItemRenderer.renderBar`（13×2 像素、+2/+13、底色纯黑、前景 HSV 绿→红、**满耐久不画**）。
+  该事件在 `RegisterClientReloadListenersEvent`/`RegisterRenderers` 之后由 `ItemDecoratorHandler.init()` 触发，
+  所以 `Exposure.Items.PHOTOGRAPH.get()` 此时已可用（1.9.18 实机 jar 已 `javap` 核对字段存在）。
+
+### 19. 交付
+
+- 版本 `1.4.99`：`.\gradlew.bat build` 通过（只剩既有的 JEI 弃用 API 警告）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.4.99.jar`（5,897,454 字节），
+  MD5 `29582365B518E7A27E77F5FB6E3A7E55`。**1.4.91 ~ 1.4.98 作废，别分发**。
+- 描述跟进：`ability.lensouls.weakness_lens.detail`（zh/en）重写；新增 9 个 lang 键
+  （照片耐久 / 记录弱点 / 装机提示 / 武器已装照片 / 照片赋予活性 / 三条动作栏消息）。
+- 未提交（与 1.4.97 / 1.4.98 一并等待指示）。
+- **待实机验证**：双持右键装机（含照片在主手/副手两种顺序、相机不被拦截、照片查看界面不弹出）、
+  100 次耐久递减与销毁提示、武器 tooltip 上的「火 II」与照片记录元素一致性。
+
+## 需求批次（`1.5.0` → `1.5.1`）：把四个第三方物品的堆叠上限改成 64
+
+### 20. 需求与实现（`1.5.1` 为最终口径）
+
+- 需求：`legendary_monsters:anchor_handle`、`fdbosses:chesed_trophy/malkuth_trophy/geburah_trophy`
+  最大堆叠 1 → **64**。全部四个物品最终都走**声明式** `ModifyDefaultComponentsEvent`
+  （`handler/ItemStackSizeHandler`，mod 总线），`MAX_STACK_SIZE=64`。
+  **没有 mixin**：中间版搞的 `mixin/StackSizeItemStackMixin`（`ItemStack#getMaxStackSize`
+  覆盖 + `hurtAndBreak` 耐久重置）在 `1.5.1` 已**删除**（类与 `lensouls.mixins.json` 登记项都撤）。
+  以下反编译结论保留，因为它们是这条路的判据。
+- **为什么 `anchor_handle` 直改会炸（反编译 `Item$Properties.validateComponents`）**：
+  它是 `AnchorHandleItem extends SwordItem`（2.1.20 实机 jar 确认），原版 `TieredItem`
+  构造器调 `properties.durability(250)` → **同时写入 MAX_DAMAGE=250 / DAMAGE=0 / MAX_STACK_SIZE=1**。
+  NeoForge 事件落地时走 `Item.modifyDefaultComponentsFrom` → `validateComponents`：
+  **`map.has(DAMAGE) && getOrDefault(MAX_STACK_SIZE,1) > 1` → 直接
+  `IllegalStateException("Item cannot have both durability and be stackable")`**⇒
+  原版禁止「有耐久 + 可堆叠」。`1.5.0` 曾用 mixin 绕开并配耐久重置；`1.5.1` 按用户口径改走
+  **删除 DAMAGE 组件**（`builder.remove(DataComponents.DAMAGE)` + `MAX_STACK_SIZE=64`）：
+  - 校验不再成立（`has(DAMAGE)=false`）→ 启动即可生效；只摘 DAMAGE、**保留 MAX_DAMAGE=250**，
+    其它模组按 MAX_DAMAGE 判「是武器」的逻辑不受影响；
+  - `isDamageableItem() = has(MAX_DAMAGE) && !has(UNBREAKABLE) && has(DAMAGE)` ⇒ false
+    → `hurtAndBreak` 进门即 return ⇒ **无耐久、永不磨损**，也没了耐久条。
+- **无耐久后「拆堆/并堆」才真正自洽（用户问出来的关键）**：耐久值是**每一堆一个整数**，
+  拆堆会把 damage 分量整份复制到每一小堆（大堆现存的充裕耐久被成倍复制 = 变相白嫖），
+  并堆则反过来会**吞掉**多余耐久；原版正是明白这一点才强制 `durability ⇒ stackSize=1`。
+  声明式「保留耐久 + 可堆叠」无论怎么补丁都绕不开这层语义——**把耐久摘掉是唯一干净解**。
+  （中间版的耐久重置补丁只能保「整堆不连爆」，拆/并的账没法算平，所以弃用。）
+- 三个 fdbosses 奖杯 = 无耐久 `BlockItem`（`new Item.Properties().stacksTo(1)`，
+  `javap -c` 已核对），事件补丁直接过校验，无需额外处理。
+- 顺带确认（防踩）：
+  - `BuiltInRegistries.ITEM` 是 **DefaultedRegistry**，缺条目时 `get()` 返回 `minecraft:air`
+    而不是 null——判存在必须用 `containsKey`。
+  - `fdbosses`（逆卡巴拉 3.2）不在本机 `run/mods`，参考包在
+    `参考项目的源码\[逆卡巴拉：觉醒] fdbosses-3.2-1.21.1.jar`，反编译在
+    `参考项目的源码\decompiled\fdbosses`；`javap -p -c` 已核对三件奖杯的注册名与构造。
+  - 该事件是 `IModBusEvent`（mod 总线），在 `LenSouls` 构造器里 `modEventBus.addListener` 注册；
+    触发时机在 `GameData.postRegisterEvents` 内、注册表冻结前，物品皆已注册。
+    补丁最终走 `Item.modifyDefaultComponentsFrom`，会**再过一次** `validateComponents`
+    所以「先摘 DAMAGE 再改堆叠」要在同一个 patch 里做（顺序无关，补丁容器是同一个）。
+
+### 21. 交付
+
+- `1.4.99`（弱点透镜批次，5,897,454 字节 / MD5 `29582365B518E7A27E77F5FB6E3A7E55`）
+  → `1.5.0`（堆叠 64 的第一版 + ItemStack mixin，5,901,796 字节 /
+  MD5 `277CBD68B0C83CAE6F4E8C7C6E871FE7`）→ **`1.5.1`（最终）**：
+  anchor_handle 改为**移除耐久**（永不磨损）、四个物品全部声明式堆叠 64、
+  删除 `StackSizeItemStackMixin`（文件与 `lensouls.mixins.json` 登记项都撤）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.1.jar`（5,900,383 字节），
+  MD5 `5F0A43B32287BC953913302182FDC6AC`。**1.4.91 ~ 1.5.0 作废，别分发**。
+- 待实机验证：四件物品创造栏拖出 64 堆叠；anchor_handle 挥砍不再掉耐久（tooltip 无耐久条）。
+
+## 需求批次（`1.5.2`）：单能力的潜行+滚轮 = 选中↔未选切换
+
+- 修改点只有一处：`ability/gui/AbilityWheelHud.onMouseScrolled` 的 `list.size() <= 1` 分支。
+  原行为：直接 return（滚轮放回原版热栏）。现为：
+  - **不滚列表**，只在「选中 ↔ 未选中」翻转：相机 NBT 里记录了该唯一能力 → 发
+    `AbilitySelectPacket(-1)`（协议本就支持，`CameraAbilityStore.clearSelected`）；
+    未选中 → 发该能力 ordinal。当前态读 `CameraAbilityStore.getSelectedType(cam)`（本地 NBT，零延迟）。
+  - **0.5s 冷却**（`TOGGLE_COOLDOWN_MS=500`，`Util.getMillis()`，字段 `lastToggleAtMs`）：
+    只有**成功切换**才计入冷却（被冷却拦下的滚轮不刷新起点）。
+  - 发包同时**本地镜像即时翻转** `ClientAbilityCache.setHeldCameraSelected(target)`（换机播种同款
+    原则）：冷却窗口结束后下一次滚轮必须读到最新态，依赖 ~100ms 的 NBT 同步回声不够快也不可靠。
+    S2C 回声再 set 同值，幂等。
+  - **该分支取消原版事件**（不放热栏）：潜行+手持相机的滚轮已被模组接管，同一滚动既翻转能力态
+    又切热栏会造成误操作；多能力分支原本就 `setCanceled(true)`，语义就此统一。
+    **刻意保留**：`list.isEmpty()`（一个能力都没解锁）时早退、**不放回**取消逻辑→ 滚轮照滚热栏
+    （同多能力下未拿相机的口径）；`getUnlockedList()` 同空返回，原来就走 `size()<=1` 分支，
+    新代码必须在这个分支里防 `list.get(0)` 越界。
+- 不影响面：多能力滚动路径一字未动；GUI 内滚动（`mc.screen != null` 早退）不受影响；
+  没拿相机时本 handler 在 `getWieldedCamera` 判空处就返回，热栏照滚；
+  GUI 点击卡片切换/取消选中、左键打开界面都不受影响。
+- 交付：`C:/Users/volans/Desktop/lensouls-1.5.2.jar`（5,900,657 字节），
+  MD5 `391EF9E0D6ACB82F383349E5DF7B5EB0`。**1.4.91 ~ 1.5.1 作废，别分发**。
+- 待实机验证：单能力下潜行滚轮的翻转 + 0.5s 内连滚只动作一次；多能力下滚动不受影响。
+
+## 需求批次（`1.5.3`）：先驱者弹幕实机崩溃（CopyOnWriteArrayList 迭代器 remove）
+
+### 22. 崩溃定位（crash-2026-09-29_15.00.59-server.txt）
+
+- 现象：玩家实机（整合包装的是 1.4.96）触发**先驱者照片弹幕 → 服务端 tick 崩溃**：
+  `java.lang.UnsupportedOperationException: null` at
+  `CopyOnWriteArrayList$COWIterator.remove`
+  ← `BossPhotoProjHelper.syncDeathLaserAim(:453)`
+  ← `BossPhotoProjHelper.onServerTick(:903)`（`ServerTickEvent.Post` 直抛 `fireServerTickPost` → 整服崩）。
+- **触发时机不是发射，而是结算完**：`syncDeathLaserAim` 清理分支 `beam.isRemoved()`
+  （死亡激光 30 tick 到期消失，或 WeakReference 被 GC）→ `it.remove()`。
+  即**弹幕正常播完的那一 tick 必炸**——表现为「弹幕崩溃」，实际是列表清理炸。
+- **根因**：`PLAYER_DEATH_LASERS` 是 `CopyOnWriteArrayList`，其迭代器
+  `COWIterator.remove()` **恒抛 UnsupportedOperationException**（COW 的写走
+  `list.add/remove` 内部锁 + 整表复制，迭代器只读）。1.4.95 引入死亡激光同步时写成
+  `for (var it = ...; it.hasNext(); ) { ... it.remove(); }` → 每发激光到期必炸一次。
+  **1.5.2 及之前的现行源码同样带雷**（不是旧版本残留，是同一段代码活着）。
+- **修法（1.5.3）**：for-each 走 COW 快照遍历，移除改 `PLAYER_DEATH_LASERS.remove(link)`
+  （COW 支持；`removeIf` 也行）。**别退回 `iterator.remove()`**。
+- **排查面**：全库 `CopyOnWriteArrayList/Set` 仅此一处；其余 8 处 `.iterator()` 全是
+  普通 `ArrayList`/`HashMap`（支持 remove），逐一确认无同类隐患。
+- 教训：`ServerTickEvent.Post` 一炸就是「Exception in server tick loop」整服崩；
+  弹幕这类**每 tick 结算 + 定期清表**的逻辑，集合类型必须与迭代方式匹配——
+  `ConcurrentLinkedQueue`（`poll`）或普通 `ArrayList`（单线程）都行，唯独 COW 不能配迭代器 remove。
+
+### 23. 交付
+
+- 版本 `1.5.3`：`.\gradlew.bat build` 通过；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.3.jar`（5,900,620 字节），
+  MD5 `54B3A092DFDC77CD0CD12015FC67968E`。**1.4.91 ~ 1.5.2 作废，别分发**。
+- **待实机验证**：先驱者照片弹幕完整放完一轮（死亡激光 30 tick 到期消失）不再崩溃、
+  服务端日志无 `UnsupportedOperationException`。
+  **注意**：实机装的是 1.4.96，必须换成 1.5.3 才含本次修复（1.5.1 的 anchor_handle 摘耐久、
+  1.5.2 的单能力滚轮翻转也一并在这份里）。
+
+## 需求批次（`1.5.4`）：磁铁吸复制之魂进终端 → 之前的复制之魂消失
+
+### 24. 根因（对着 0.7.24 完整源码核实，非 jar 猜测）
+
+- 用户实测：超越维度的**网络磁铁**把地上的复制之魂吸进终端网络存储后，**终端里已存的复制之魂少了**。
+- **直接根因**：`BeyondDimensionsCompat.sealCopySouls` 的网络迁移是
+  「`setAmountByKey(oldKey, 0)` 清零旧键 + `setAmountByKey(newKey, 快照量)` 写新键」，
+  而 `AbstractUnorderedStackHandler.setAmountByKey` 是**绝对量覆盖写**（storage.put(key, target)），
+  **不是合并**。终端网络是共享的，`UnifiedStorage` 默认零策略 `RemoveZero`（清零=删条目）——
+  新键下已有的封印存量被覆盖成本次迁移量 ⇒ 之前的封印复制之魂凭空减少。
+  复现面：维度磁铁（`NetMagnetItem.workContent` → `storage.insert(itemKey, count, false)` 按键合并）、
+  网络馈送器、restocker、其他玩家——任何往网络里放复制之魂的行为都会踩。
+- **为什么说「补羽毛标签代码不够牢固」是对的**：封印 sweep 原本只考虑了自己这一个写者，
+  没有考虑共享网络上的并发写入者；快照-写回之间网络内容随时可变。
+- 修法（`sealCopySouls` 网络路径重写）：
+  1. 快照仍用于**枚举候选键**，数量只当"计划迁移量"；
+  2. 每条写前用**新反射句柄 `getStackByKey`**（`IStackHandler` 接口，0.7.24 有）重读
+     两键的**活值**：`oldLive <= 0` → 旧键已被别人动过，本轮跳过；
+  3. **先加后减**：`setAmountByKey(newKey, newLive + moved)` → 返回值 = 实际写入量
+     （新键槽容量不足时会被钳制到 capacity）→ 按 `actual = applied - newLive` 扣旧键
+     `setAmountByKey(oldKey, oldLive - actual)`；
+  4. 反射失败/异常 → 返回 0 → actual 为负 → 跳过，**绝不盲目覆盖写**；容量满 → 本轮不动，
+     下一轮 sweep 以活值幂等收敛。顺序**必须先加后减**：先减后加在容量不足时会把魂"减没了"。
+  5. 缺 `getStackByKey` 句柄（更旧版本）→ 网络封印整体降级为**不动**（日志 debug 提示），
+     绝不退回覆盖写。
+- 解封方向同一路径自动受益（newKey=未封印键同样合并，不覆盖别的玩家放的未封印存量）；
+  `netHasFeatherMember` 的解封守卫不变。
+- **顺带核实的结构事实（防再猜）**：
+  - 调用链 `UnifiedStorage extends UnorderedStackHandlerRemoveZero extends AbstractUnorderedStackHandler`
+    ⇒ `setAmountByKey`（Abstract 声明）与 `getStackByKey`（`IStackHandler` 接口）**在 unified 实例上
+    反射调用都合法**；0.7.24 默认零策略 = `REMOVE_ON_ZERO`（清零即删条目）。
+  - `ItemStackKey.equals/hashCode` 走 `isSameTypeSameComponents`（完整组件 patch 参与，
+    内部有 equalsByte 缓存）⇒ 封印/未封印复制之魂是**两个独立网络条目**，磁铁按键合并不串键。
+  - 磁铁默认 `HopperNBTMode.DENY`（`hasExtraComponents` 过滤）：带灵魂 UUID 组件的复制之魂
+    默认**不会被吸**，用户开了 NBT 允许/过滤后才吸——所以这个 bug 只在特定配置下出现。
+- `CopySoulSealHandler` 本体（触发链/缓存/sweep 频率）复查无缺陷，本次不改。
+
+### 25. 交付
+
+- 版本 `1.5.4`：`.\gradlew.bat build` 通过；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.4.jar`（5,901,016 字节），
+  MD5 `920F887977BA137CD938885929526DA3`。**1.4.91 ~ 1.5.3 作废，别分发**。
+- **待实机验证**：终端里放一摞封印复制之魂 + 戴羽毛 → 开磁铁吸若干地上的复制之魂进网络
+  → 20 tick 内 sweep 后：**原有封印魂数量不减**，新吸进来的被补上封印；
+  反向（摘羽毛解封）同理不覆盖别人的未封印魂。
+
+## 需求批次（`1.5.5`）：`curios:photograph` 缺引用报错（整条 tag 加载失败）
+
+### 26. 根因（对着 exposure_polaroid 1.1.5 的源码 + jar 逐条核实）
+
+- 现象（实机日志 `【摄影奇境】Photo Wanderer\logs\latest.log`）：
+  `Couldn't load tag curios:photograph as it is missing following references:` /
+  `exposure_polaroid:instant_photograph (from mod/lensouls)`。这是**整条 tag 加载失败**，
+  不是"少一个成员"——tag 压根不进注册表（每次资源重载 + KubeJS 各报一次）。
+- 直接原因：`data/curios/tags/item/photograph.json` 列了一个**不存在的物品 id**。
+  报错里的来源写 `mod/lensouls` 是因为 TagLoader 的 `source` 是**列出条目的数据包**
+  （`EntryWithSource.toString()`），不是物品所属模组，别读成"拍立得模组提供的"。
+- 逐条证据（1.1.5，与 `run/mods`、整合包 mods 里的 jar 同一个）：
+  - 物品注册只有 `instant_camera` / `instant_color_slide` / `instant_black_and_white_slide` /
+    `high_sensitivity_instant_{color,black_and_white}_slide`（`ExposurePolaroid` 源码 +
+    对 jar 内 class 做字符串扫描，`instant_photograph` 一次都没出现）；
+  - `assets/exposure_polaroid/lang/en_us.json` **没有** `item.exposure_polaroid.instant_photograph` 键；
+  - 拍立得出片就是 `Exposure.Items.PHOTOGRAPH.get()`（`InstantCameraItem` 第 290 行
+    `new ItemStack(Exposure.Items.PHOTOGRAPH.get())` + `PHOTOGRAPH_FRAME`/`PHOTOGRAPH_TYPE` 组件）
+    ⇒ 就是 `exposure:photograph`，**本来就写在 tag 第一行**，那个 id 纯属多余且有害。
+- 连带功能影响（真正要修的东西）：`CuriosIntegration.onCurioCanEquip` 靠 `stack.is(PHOTOGRAPH_TAG)`
+  放行。tag 缺失 ⇒ `lensouls:entity_photograph` / `photo_album`（没有旧
+  `lensouls:photograph_curio` 标记的那些）一路落到 `TriState.FALSE`，**照片装不进照片栏**
+  （shift 快速转移 / 装备事件路径；槽位自身的 `lensouls:photo_curio` 谓词是另一条路，不受影响）。
+- 修法：改成**可选条目** `{"id": "exposure_polaroid:instant_photograph", "required": false}`
+  （与 `enchantable/cameras.json` 同款）。原版语义已反编译确认（`net.minecraft.tags.TagEntry.build`）：
+  `T t = lookup.element(id); if (t == null) return !this.required;`
+  ⇒ 可选条目缺失时**算构建成功**、不进 missing 列表，tag 照常加载；
+  将来拍立得真新增该物品也会自动纳入。**别用 `"replace": false` 顶替**（`replace` 管的是
+  是否清空已有条目，与缺引用无关），**也别直接删**（删掉就丢前向兼容）。
+  条目格式的合法性同样反编译确认：`FULL_CODEC` = `id` 字段 + `required` 可选布尔（默认 true）。
+- `CuriosIntegration` 里那条 key 判断保留（前向兼容），只加了一句注释说明
+  「1.1.5 的拍立得照片就是 `exposure:photograph`」。
+
+### 27. 交付
+
+- 版本 `1.5.5`：`.\gradlew.bat build` 通过；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.5.jar`（5,901,040 字节），
+  MD5 `D52D07FD24BFCC8FF8C3AD448719871C`。**1.4.91 ~ 1.5.4 作废，别分发**。
+  已开箱核验：jar 内 `data/curios/tags/item/photograph.json` 为可选条目版本，
+  `META-INF/neoforge.mods.toml` 内 `version="1.5.5"`。
+- **待实机验证**：启动日志里 `curios:photograph` 的 `Couldn't load tag` 消失；
+  带镜魂数据的照片能 shift 进照片栏。
+- **不是我们的报错**（同一条日志里的邻居）：`youkaisfeasts:wine` 缺 `kaleidoscope_tavern:*`
+  （`source=mod/kaleidoscope_compat`）——整合包装了 kaleidoscope_compat 却没装 kaleidoscope_tavern，
+  属对方模组问题。
+- 同日志另有一条非致命告警：`@ModifyConstant conflict. Skipping
+  lensouls.mixins.json:client.GunBowAnimationMixin ... already redirected by morearrows`——
+  morearrows 抢了同一个 `@ModifyConstant`（弓动画除数），我们的拉弓动画速度对齐在该包里失效，
+  与本次报错无关，暂不处理。
+
+## 需求批次（`1.5.6`）：湮灭激光 / 死亡激光照片弹幕「纸片」→ 立体光束
+
+### 28. 根因（两个模组的渲染器是**同一套写法**，对实机 jar 逐字节核实）
+
+- 现象（用户）：湮灭构造体与先驱者的照片弹幕，本体（BOSS 发的那道）是立体光束，我们（玩家发的）是**纸片**。
+- 两个渲染器开头都是同一行：
+  `clearerView = caster instanceof Player && Minecraft.getInstance().player == caster
+  && Minecraft.getInstance().options.getCameraType() == CameraType.FIRST_PERSON;`
+  （传奇怪物 `AnnihilationBeamRenderer`、灾变 `Death_Laser_beam_Renderer`；字段名 `clearerView` 两边
+  都经 `javap -p -c` 确认，setter 处都是 `getCameraType()` + `CameraType.FIRST_PERSON` 比较）
+- 这一个标志同时管三件事，**它才是「立体 vs 纸片」的唯一开关**：
+  1. `renderBeam`：为真 → **只画一面**四边形，且不做「±(相机俯仰+90°) 绕光束轴滚转」对齐；
+     为假 → **两面对插** + 滚转对齐，这才是本体那种体积感。
+     发射瞬间视线沿光束轴（那张面与视线共面、看不见），**之后随手转视角就会看到它是一张大平板**——
+     正是用户描述的「纸片」。
+  2. `renderStart`：为真 → 跳过「起点贴脸光斑」。那个四边形是 camera-facing 的、起手位置就在相机上，
+     画出来会糊住整屏；这是原版给「第一人称自己开的光束」留的保护。
+  3. `drawBeam` 起点偏移（真 −1 / 假 0）。
+- 本体发激光时 caster 是 BOSS（非玩家）⇒ 永远走「立体」分支；我们的弹幕 caster 是玩家且在第一人称
+  ⇒ 永远走「纸片」分支。**与伤害、时长、radius 参数全都无关，纯粹是 caster 类型触发的渲染分支。**
+
+### 29. 修法（只改客户端渲染，两处 compat mixin）
+
+- 新增 `mixin/compat/AnnihilationBeamCrossRenderMixin`、`mixin/compat/DeathLaserCrossRenderMixin`
+  （登记进 `lensouls.compat.mixins.json` 的 **client** 数组）：
+  `@Inject(method = "render", require = 0, at = @At(value = "INVOKE", target = "…renderBeam:(FFFILcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;I)V"))`
+  → 处理器拿到实体，判定「是我们标记过的弹幕」后把 `@Shadow private boolean clearerView;` 置 **false**。
+- **注入点必须选在 `renderBeam` 调用之前，而不是 render 开头**：`renderStart` 已经带着原值跑过了
+  （玩家 caster 时为 true → 贴脸光斑照旧跳过），于是**既拿到立体光束、又不会让起点光斑糊满屏幕**。
+  改这个注入点位置前先想清楚这条（LM 的 `render()` 里 renderStart 在 renderBeam 之前，已 javap 核实；
+  灾变那边 `render()` 压根不调 `renderStart`，那是个死方法）。
+- `require = 0` + 字符串 `targets` + `remap = false`：对方缺席或改内部方法名时整条静默跳过。
+  注入点字符串**逐字对着 javap 描述符**写，并做了交叉校验：目标 class 常量池里确实存在
+  `renderBeam:(FFFILcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;I)V`，
+  我们 mixin class 里的 target 字符串与之逐字节一致，且 `clearerView` 字段两边都存在。
+- **只认我们自己的弹幕**：官方玩家武器 `AtomSplitterItem` 也是玩家当 caster（同样吃「纸片」分支），
+  本 mixin 刻意不碰它——判定走 `PhotoProjMarker.isBarrage`。
+
+### 30. 顺带修掉的结构性问题：照片弹幕标记以前**到不了客户端**
+
+- `PhotoProjMarker` 原来只写实体 `persistentData`，而 **NeoForge 的 `persistentData` 不随实体同步**
+  （反编译 `Entity` 只有存档读写 + getter，没有任何下发路径）。所以「客户端渲染器按标记区分我们的弹幕」
+  这条路以前是**不成立**的——现有 `isBarrage` 调用点恰好全在服务端，才一直没暴露。
+- 新注册**同步布尔附件** `lensouls:photo_proj`（`boss/ModAttachments.PHOTO_PROJ`：
+  `AttachmentType.<Boolean>builder(() -> false).sync(ByteBufCodecs.BOOL).build()`）：
+  - `mark()` 照旧写 persistentData（服务端逻辑 + 存档持久化，行为不变）**并** `setData` + `syncData`；
+  - `isBarrage()` 先看附件，客户端直接返回（顺带省掉每帧一次 NBT 复制），服务端再兜底 persistentData。
+  - 时序已核实：`mark()` 发生在 `addFreshEntity` **之前**，此刻实体还没进追踪表，
+    `ChunkMap.getPlayersWatching(Entity)` 按 `entityMap.get(id)` 查 → 返回 `List.of()`，
+    所以那一刻的 `syncData` 是**无害空操作**（不会给客户端发未知实体的包、不刷 WARN）；
+    真正下发的是实体开始被追踪时的
+    `ServerEntity.sendPairingData → AttachmentSync.syncInitialEntityAttachments`
+    （客户端 `SyncAttachmentsPayload` 对未知实体只是 WARN 不抛错，我们这条路径也不会出现未知实体）。
+
+### 31. 交付
+
+- 版本 `1.5.6`：`.\gradlew.bat build` 通过；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.6.jar`（5,903,847 字节），
+  MD5 `CF5F900735BF3FFE0CE437C4CBFBDF46`。**1.4.91 ~ 1.5.5 作废，别分发**。
+- **待实机验证**：发射湮灭激光 / 死亡激光后**随手把视角转开**，应看到两面对插的立体光束
+  （不再是单张大平板）；第一人称正对光束看仍是细线（正常，面与视线共面）；
+  死亡激光的红黄闪电、末端光斑、伤害与时长不变；官方玩家武器（原子分裂者）的光束观感保持原样。
+- 刻意没做：没把弹幕生成点往前挪（光束仍从相机位置发出），没动任何伤害/时长/radius 参数——
+  本次只改渲染分支；若之后嫌「光束从眼睛里冒出来」再单独调生成点。
+
+## 需求批次（`1.5.7`）：套装 tooltip 成员名单动态识别（已装 → 绿）
+
+### 32. 需求与实现
+
+- 需求（用户）：照片 tooltip 的套装效果加动态识别——玩家安装对应照片后，灰色显示为绿色。
+  口径已确认（用户选「成员名逐个变绿」）：成员清单行**逐个成员染色，已装=绿、未装=灰**，行尾给 `已装 X/N` 进度。
+- 「已装」判定 = **Curios 照片栏 + 相册内容物**（与「照片效果」面板同一套统计），且
+  **当前悬停的这张照片算已装**——否则在背包里悬停一张没装的照片，会显示它自己「缺失」。
+- 落点：
+  - `integration/PhotoSetRegistry.appendTooltip`：那一行由「一个 §7 灰字面量」改为 `MutableComponent` 逐名拼接
+    （`集齐 ` + 每个成员一个 sibling（绿/灰）+ ` 照片，触发效果` + ` 已装 X/N`）；进度未达标用 `DARK_GRAY`、
+    达标转 `GREEN`。
+  - 新增 common 侧 `PhotoSetRegistry.collectInstalledEntities(Player)` / `countInstalledBossPhotos(Player)`
+    （方法体即原 `client.tabs.PhotoSetClient` 的 `collectGearEntities` / `countBossPhotos`），
+    `PhotoSetClient` 改为**纯转发** ⇒ tooltip 与面板共用一份口径，**不要再写第二份**否则两边会漂移。
+    Curios 是 `implementation` 硬依赖（`CuriosIntegration` 无条件注册），所以 common 侧直接引用 CuriosApi 是安全的。
+  - 新增私有 `norm(String)`：实体 id 过 `ResourceLocation.parse` 归一化（补默认命名空间），
+    「成员清单 ↔ 已装照片」两侧都归一化后再比。
+  - 首领套（`boss_barrage`）没有成员名单：保留 `N 张首领`，进度用已装首领照片**种类数**（同 Boss 多张只算一次），
+    悬停的这张若是首领照片且尚未装就 +1（预览才准）。
+- 进度分母 `need`：普通套装取该套装的**最低档**张数（多档套装的语义是「还差几张触发第一档」）；
+  首领套取**最高档**（沿用原逻辑）。
+- 边界：`ItemTooltipEvent.getEntity()` 在**启动期建搜索树时是 null**（javadoc 明写），Curios 也可能出问题 ⇒
+  收集整体 `try/catch (Throwable)`，`viewer == null` 时**完全退化成老行为**（全灰、无进度）。
+  着色一律用**独立 Component + `withStyle`**，不再往字面量里塞 `§` 码——老代码每处 `§` 码都恰好与 `withStyle`
+  同色，一旦哪天冲突（`§a` 套在 GRAY 组件里到底谁赢）会很难查。
+- 未动：效果行的类型配色（红/绿/蓝/紫）、`（Shift 查看套装效果）`提示行、「照片效果」面板。
+
+### 33. 交付
+
+- 版本 `1.5.7`：`.\gradlew.bat build` 通过（中途一次编译失败：新局部变量 `line` 与下方档位循环里的
+  `Component line = effectLine(eff)` 重名，改名 `head` 后通过）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.7.jar`（5,904,193 字节），
+  MD5 `20346DAC33DB94363E615AD36D642C23`。**1.4.91 ~ 1.5.6 作废，别分发**。
+- 字节核验：`PhotoSetRegistry.class` 含 `collectInstalledEntities` / `countInstalledBossPhotos` / `norm`
+  与 `集齐 `、` 已装 ` 两个字面量；`PhotoSetClient.class` 只剩转发（不再引用 Curios API）且三个公开方法都在；
+  TOML `version="1.5.7"`。
+- **待实机验证**：装 2 张「苍白猎魂」（三件套）→ 悬停该套任意照片并按 Shift：两个名字绿、第三个灰、
+  行尾 `已装 2/3`（未达标暗灰、达标绿）；一张没装时全灰 + `已装 0/3`；首领套显示 `已装 X/N 张首领`。
+
+## 需求批次（`1.5.8`）：光束「纸片」的真正根因（1.5.6 白改了）+ 离线 mixin 自检工具
+
+### 34. 为什么 1.5.6 一点用都没有：mixin 压根没 apply
+
+- 用户实测「还是纸片」。查整合包日志（`latest.log`，装的确实是 1.5.7）：
+  `Mixin apply for mod lensouls failed lensouls.compat.mixins.json:AnnihilationBeamCrossRenderMixin ...`
+  `Caused by: InvalidMemberDescriptorException: Invalid name: renderBeam:`
+- **根因是我写的 `@At` target 选择器语法错了**：我照抄了 **javap 的显示格式**
+  `...AnnihilationBeamRenderer;renderBeam:(FFFIL...)V`——那是 javap 自己的写法、**带冒号**。
+  Mixin 的选择器是 `Lowner;name(args)ret`，**方法没有冒号**；**只有字段**才是 `Lowner;name:Desc`
+  （所以 `clearerView:Z` 那种带冒号反而是对的）。带冒号时 Mixin 把方法名解析成 `renderBeam:`，
+  抛 `InvalidMemberDescriptorException`，**整个 mixin apply 失败**——镜头上看起来就是「改了跟没改一样」。
+- 教训：`@At` target 一律**手写**，或在交付前用下面的自检工具过一遍；**永远不要从 javap 输出里复制粘贴**。
+
+### 35. 真正该改的是什么：光源几何（用真 JOML 复算，不是读源码猜）
+
+- 光束本体 = 若干张**包含光束轴**的面片（`drawBeam` 把四边形撑在光束轴的局部 XY 平面上；
+  复算确认局部 +Y 映射到世界方向 = `calculateEndPos` 口径的瞄准方向）。
+  渲染器开头那行 `clearerView = caster instanceof Player && ... FIRST_PERSON` 决定画几张：
+  - `false`（BOSS 发的那种）：两张，各绕光束轴滚转 ±(相机俯仰+90°)；
+  - `true`（玩家自己发的）：**只画一张且不滚转**——法线恒为 `(0,-1,0)`，就是一张**水平大平板**。
+- **复算出来的关键事实**：那两张面片的夹角随相机俯仰变化，
+  **0° → 0.0°（完全重合）**、30° → 60°、45° → 90°、**90° → 0.0°（又重合）**。
+  ⇒ **原作那套 ±(俯仰+90) 本身就是退化的**：平视/俯视时两张面片重合、只有斜着看才成十字。
+  所以**光把 `clearerView` 置 false 是不够的**（1.5.6 就算 apply 成功也只是把纸从"横放"变"竖放"）。
+- 最终修法（两件事缺一不可）：
+  1. `@Inject` 在 `renderBeam` 调用点前把 `clearerView` 置 false（走"两面对插"分支；
+     放在这个位置而非 render 开头，是因为 `renderStart` 已带着原值跑过 ⇒ 起手那个 camera-facing
+     光斑照旧跳过、不会糊满屏幕）；
+  2. `@ModifyArg` 把两张面片的滚转角**钉成 ±45°**（恒定正交十字，不再随俯仰退化）：
+     LM 的 `MathUtils.quatFromRotationXYZ`（**ordinal 3/4**，该方法里共 5 处调用，前 3 处是基础位姿）、
+     灾变 3.32 的 `Quaternionf.rotationY`（**ordinal 0/1**，共 2 处；注意它第一张传的是**弧度**却忘了乘
+     π/180，是原作 bug，被我们一并绕开）。
+- **相机不能再压在光束轴上**：面片都包含光束轴 ⇒ 相机在轴上时同时落在面片里，投影只剩一条线
+  （这就是第一人称几乎看不见自己光束的原因）。所以两个光束的生成点从眼睛挪到
+  「右手 0.35 / 下 0.15」（`BossPhotoProjHelper.beamOrigin`）：伤害射线只横移 0.35 格
+  （30 格射程上约 0.7°，且两个光束命中盒都带 `inflate(1,1,1)`），但玩家第一人称立刻能看到十字截面。
+- 判定仍只认 `PhotoProjMarker.isBarrage`。实体只在 `render` 签名里、`@ModifyArg` 挂在 `renderBeam` 上
+  拿不到实体 ⇒ 新增客户端静态开关 `client/render/PhotoBeamRenderFlag`（渲染线程单线程；
+  每次 `render` 在调 `renderBeam` 前都会重写，不是自己的光束写 false）。
+- 这两处 mixin 由 `require = 0` 改为 **`require = 1`**：以后对方改内部方法名会在日志里**大声报错**，
+  而不是静默不生效（静默正是这次连着两版白改的原因之一）。
+
+### 36. `tools/MixinSelfCheck.java`：交付前必跑的离线自检
+
+- 作用（跑在**已构建的 jar** 上，所以数的是运行字节码，不受源码树版本差异影响）：
+  1. 用 Mixin 自己的 `TargetSelector.parseAndValidate` 校验每个 `@At target`
+     —— 直接抓「带冒号」这类语法错（本次事故）；
+  2. 把 target 解析成 `Lowner;name(args)ret`，到 mixin 目标类的对应方法里数匹配的 INVOKE 条数，
+     并检查 `ordinal` 是否越界 —— 抓「ordinal 数错 / 注入点不存在」。
+- 运行方式（`<mix>`=sponge-mixin jar、`<asm>`/`<asm-tree>`=ASM jar，都在 Gradle 缓存里）：
+  ```
+  javac -proc:none -cp "<mix>;<asm>;<asm-tree>" -d build/mixincheck tools/MixinSelfCheck.java
+  $env:MIXIN_CHECK_VERBOSE='1'   # 想看成每条的命中条数就设它
+  java -cp "<mix>;<asm>;<asm-tree>;build/mixincheck" MixinSelfCheck \
+       build/libs/lensouls-<版本>.jar libs/legendary_monsters.jar libs/cataclysm.jar <joml.jar>
+  ```
+  退出码非 0 = 有 target 会 apply 期失败，**别交付**。当前结果：47 条 target、语法错误 0、注入点错误 0。
+- 工具本身踩的两个坑（已修，别重犯）：
+  - **注解保留级别**：Mixin 的 `@Mixin` 是 **CLASS 保留**（在 `RuntimeInvisibleAnnotations`），
+    `@Inject`/`@ModifyArg`/`@At` 是 RUNTIME（`RuntimeVisibleAnnotations`）⇒ 只读 visible 会一条都读不到；
+  - **方法描述符必须带返回类型**：`Lowner;name(args)ret` 里 `name(` 之后整段都是描述符，
+    截到 `)` 会让**所有**检查误报「找不到」（我第一版就这样，39 个假失败）。
+
+### 37. 交付
+
+- 版本 `1.5.8`：`.\gradlew.bat build` 通过；`tools/MixinSelfCheck` 全绿（47 条 target）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.8.jar`（5,905,494 字节），
+  MD5 `12E3BEED8CCCD6C5BD375217662ACA55`。**1.4.91 ~ 1.5.7 作废，别分发**。
+- 字节核验：jar 内两个 mixin 类 + `PhotoBeamRenderFlag` 都在；选择器字符串**无冒号**
+  （`renderBeam(FFFIL...`；旧写法 `renderBeam:(FFFIL...` 已不存在）；
+  `quatFromRotationXYZ(FFFZ)Lorg/joml/Quaternionf;`、`rotationY(F)Lorg/joml/Quaternionf;` 目标都在；
+  `BossPhotoProjHelper` 含 `beamOrigin`；TOML `version="1.5.8"`。
+- **待实机验证**：发射湮灭激光 / 死亡激光 → 应看到**正交十字的立体光束**（不再是单张平板），
+  而且**平视、抬头、低头看都是十字**（旧版那套 ±(俯仰+90) 在这些角度会退化成一张）；
+  光束从手侧一点发出、伤害与时长不变；官方玩家武器（原子分裂者）与 BOSS 本体的光束观感保持原样。
+
+## 需求批次（`1.5.9`→`1.5.10`）：光束改为「信标同款 4 面方管」+ 时间定格定身的提前解冻
+
+### 38. 光束几何定案（用户纠偏：不是正交十字，是「信标光束那种四面包围的立方体」）
+
+- 用户口径：原作光束看起来像**信标光束那种四面包围的立方体**，「四面」可能不严谨，但**不是正交十字**。
+  据此把我们的光束本体直接画成**信标同款几何**：绕轴 0°/90°/180°/270° 的 **4 张面**围成方管。
+- 关键对照证据（原版 `BeaconRenderer.renderPart`）：信标光束每方向连画 **4 个 `renderQuad`**
+  （四角 x1z1→x2z2→x4z4→x3z3 围成一圈方管）✓ 这就是「四面包围」的几何本体；
+  而 LM/灾变的光束体只有 **2 张面**（`drawBeam` 只发 4 顶点 = 1 张面，`renderBeam` 调 2 次，
+  jar 字节码逐条核实），LM 的三个光束渲染器（`AnnihilationBeamRenderer`/`EnergyBeamRender2d` 等）
+  结构完全相同，**没有**四面画法可抄。
+- 贴图事实（放大像素核对）：光束体每帧是 **20×1 像素的对称渐变条**（边缘绿、中心白，帧号越大越粗，
+  是「出现动画」）；原版信标贴图则是整张噪声渐变、每个面都映射整条。
+- **实现（1.5.9 起改名 Box）**：`mixin/compat/AnnihilationBeamBoxRenderMixin` /
+  `DeathLaserBoxRenderMixin`（`Cross` 两个已删，`lensouls.compat.mixins.json` client 数组同步改名）：
+  - 保留 `@Inject`（renderBeam 调用点前）：打标 + 我们的光束把 `clearerView` 置 false
+    （让 `renderBeam` 里两处 `drawBeam` 调用执行；`renderStart` 已带原值跑过 → 起手光斑照旧跳过）；
+  - **`@Redirect` ordinal 0 的 `drawBeam`**：我们的光束 → 抵消调用方刚施加的滚转（LM 用**度**、
+    灾变第一张是**弧度**且忘了乘 π/180）后连画 4 面（0/90/180/270）；别人的光束 → 原样调用；
+  - **`@Redirect` ordinal 1 的 `drawBeam`**：我们的光束 → 跳过（方管已完整）；别人的 → 原样调用。
+  - **`@Redirect` 处理器签名**（Mixin javadoc 官方规则，照抄例子
+    `barProxy(Foo someObject, int abc, int def)`）：**接收者类型必须在参数最前**
+    （`drawBeam` 是 target 自己的 private 方法、接收者是 `this`，也要写）；
+  - **`@Shadow` 私有方法**：带 `throw new AssertionError()` 方法体即可（shadow 方法不会被拷贝，
+    只重映射调用点；`conformVisibility` 只要求可见性不低于目标，private 对 private 正好）。
+- 自检：`tools/MixinSelfCheck` 全绿（47 条 target；两个 Box mixin 的 `Inject renderBeam` 命中 1、
+  `Redirect drawBeam` 命中 2、ordinal 0/1 均有效）。
+- `beamOrigin`（右手 0.35 / 下 0.15 的手部偏移）沿用——相机不压在光束轴上，方管从手侧发出。
+
+### 39. 时间定格定身：16% 阈值提前解冻（伤害免伤口径**保留**）
+
+- 需求两条：
+  1. **时间定格的定身也模仿破韧做「16% 伤害阈值提前退出」**：定身期间累计实体实际受到的伤害
+     （`LivingDamageEvent.Post`，只统计玩家造成的），达到「最大生命 × `toughStunBreakDamagePercent`
+     （默认 0.16，与破定共用同一配置项）」→ **提前解冻这一个实体**（其余照旧），并广播剩余定身集。
+  2. ~~时间定格定身不吃韧性免伤~~ → **用户纠正：恰恰要保留免伤**（定格 ≠ 破定，对面还剩韧性就照常免伤）。
+     我第一版做反了（在 `applyDamageReduction` 里旁路了），1.5.9 未交付即纠回，1.5.10 落地正确口径。
+- 落点：
+  - `ability/util/TimeFreezeManager`：新增 `accumulatedDamage`（Int2FloatOpenHashMap，键=实体 id，
+    freeze/unfreeze 时清空）+ `addFreezeDamage(entity, amount)`（累计达标 → `unfreezeEntity(id)`：
+    移出定身集 + `broadcast(true)` 广播剩余集）+ `unfreeze()` 同步清空累计表；
+  - `boss/ToughnessDamageHandler.onLivingDamagePost`：在既有 `addStunDamage` 之后加一行
+    `TimeFreezeManager.addFreezeDamage(target, event.getNewDamage())`（同一套守卫：
+    服务端 / LivingEntity / 伤害>0 / 来源是 ServerPlayer）；
+  - `boss/BossToughnessManager.applyDamageReduction`：**不加**任何定格旁路（javadoc 写明口径）。
+- 语义细节：累计的是 `Post` 的 `getNewDamage()` = 减伤后实际伤害（与韧性定身的 `addStunDamage`
+  同口径）；16% 是该实体自身最大生命的比例；阈值 ≤0 时该功能关闭。
+
+### 40. 交付
+
+- 版本 `1.5.10`：`.\gradlew.bat build` 通过；`tools/MixinSelfCheck` 全绿；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.10.jar`（5,907,384 字节），
+  MD5 `176F63D2E755DE623286CFDA60179B63`。**1.4.91 ~ 1.5.9 作废，别分发**（1.5.9 未交付即作废）。
+- 字节核验：TOML `version="1.5.10"`；client 数组为 Box 两个名字、旧 Cross 类已不在 jar；
+  `TimeFreezeManager` 含 `addFreezeDamage`/`accumulatedDamage`；`ToughnessDamageHandler` 含钩子；
+  `BossToughnessManager` **不含** `isEntityFrozen`（免伤旁路已移除）。
+- **待实机验证**：
+  - 光束：发射湮灭激光 / 死亡激光 → 应是**四面封闭的方管**（信标那种），平视/俯视都是；
+    BOSS 本体与原子分裂者的光束观感不变；
+  - 时间定格：定格期间打 BOSS → 伤害仍按剩余韧性比例免伤（不旁路）；同一实体累计实伤达
+    最大生命 16% → 该实体提前解冻（其余仍定身到 100 tick 到期）。
+
+## 需求批次（`1.5.11`）：弹射物弱点的武器匹配惩罚细化
+
+### 41. 需求与实现
+
+- 用户口径：**弹射物打中 → 额外增伤；非弹射物不吃亏**（即"弹射物弱点不该触发『非匹配弱点 → 10%』的武器匹配惩罚"）。
+- 现状核实（先说清哪些本来就对，避免重复修）：
+  - **"只有弹射物弱点"的怪物对非弹射物攻击从不惩罚**——`DamageHandler` 武器匹配块里 `needsMatch`
+    只统计非弹射物弱点（`if (weakElem == PROJECTILE) continue;`），git 里 `cc4a268` 就是为此改的；
+  - 本次真正修掉的是**两个相邻缺口**（都会造成"吃亏"）：
+    1. **0 值占位弱点照样触发惩罚**：弱点表形如 `{fire: 0, projectile: 1.5}` 时，`fire` 倍率为 0、
+       本来就不提供任何增伤，却把 `needsMatch` 置真 → 非火武器整刀被拦成 10%。
+       修法：`needsMatch` 只统计**倍率 > 0** 的非弹射物弱点（0 值条目跳过）。
+    2. **{某元素 + 弹射物} 弱点的怪物，弹射物命中反被砍成 10%**：弹射物弱点的活性是隐含 1.0
+       （本次攻击是弹射物/远程即满足），但武器匹配检查只看"武器有没有其它弱点元素活性" →
+       弓箭打 {火 + 弹射物} 的怪 = 不匹配 = 整发箭伤害 ×0.1，弹射物增伤被惩罚吃掉。
+       修法：`matches` 初始值 = `rangedHit && weaknesses.getOrDefault(PROJECTILE, 0) > 0`——
+       弹射物命中自带匹配（前提是目标确实显式配了弹射物弱点）。
+- `rangedHit` 从弹射物增伤段上提为局部变量复用（`RangedAttackHelper.isRanged(source) || isGunBullet`）。
+- 保持不变：`isGytrinket` / 克拉肯船炮 / DoT 跳伤三类豁免；空手与无元素武器对"有元素弱点"目标仍拦截；
+  非 player 攻击方本就不进此惩罚块。
+
+### 42. 交付
+
+- 版本 `1.5.11`：`.\gradlew.bat build` 通过；`tools/MixinSelfCheck` 全绿（47 条 target）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.11.jar`（5,907,546 字节），
+  MD5 `AB89E312B636E689BD3D2ED5731B80FC`。**1.4.91 ~ 1.5.10 作废，别分发**。
+- 字节核验：TOML `version="1.5.11"`；`DamageHandler.class` 含 `rangedHit` 与 `getOrDefault`
+  （弹射物命中自带匹配的新逻辑）。
+- **待实机验证**：
+  - 只有弹射物弱点的怪物：弹射物命中 = 基础伤害 + 弹射物弱点增伤；剑/魔法等非弹射物攻击 = 全额（无 10% 拦截）；
+  - {火 + 弹射物} 双弱点怪物：弓箭命中 = 全额 + 弹射物增伤（不再 ×0.1）；非火武器近战仍按原口径 ×0.1
+    （除非武器带火活性/弱点透镜照片）；
+  - 0 值占位条目（`"fire": 0`）不再把非火武器拦成 10%。

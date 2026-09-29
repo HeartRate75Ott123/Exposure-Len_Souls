@@ -43,6 +43,10 @@ public class ElementBypassHelper {
         ResourceLocation weaponId = BuiltInRegistries.ITEM.getKey(weapon.getItem());
         ResourceLocation targetId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
 
+        // 弱点透镜照片提供的 2 级活性同样算武器活性（与 DamageHandler 同一口径）
+        ElementDamage lensElement = com.plumejade.lensouls.util.WeaknessLensPhoto
+                .inspectActive(weapon, target.level().registryAccess()).element();
+
         // 破定状态：韧性条打爆（定身中）时元素武器可突破单次上限
         boolean broken = false;
         var mgr = com.plumejade.lensouls.boss.BossToughnessManager.getInstance();
@@ -56,6 +60,9 @@ public class ElementBypassHelper {
             if (!DataPackLoader.getAllWeaknesses(targetId).containsKey(element)) continue;
 
             int level = ItemElementActivityLoader.getLevel(weaponId, element);
+            if (lensElement == element) {
+                level = Math.max(level, com.plumejade.lensouls.util.WeaknessLensPhoto.ACTIVITY_LEVEL);
+            }
             if (level <= 0) continue;
 
             // 破定期间 + 有弱点 → 绕过单次伤害上限（不限活性等级）

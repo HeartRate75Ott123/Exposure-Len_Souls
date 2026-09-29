@@ -42,10 +42,11 @@ public class EnchantmentRemovalListener {
         if (data == null) return;
 
         var tag = data.copyTag();
-        if (!tag.contains("SoulPhotoStack")) return;
+        if (!tag.contains(com.plumejade.lensouls.util.WeaknessLensPhoto.WEAPON_PHOTO)) return;
 
         var access = player.registryAccess();
-        ItemStack photo = ItemStack.parseOptional(access, tag.getCompound("SoulPhotoStack"));
+        ItemStack photo = ItemStack.parseOptional(access,
+                tag.getCompound(com.plumejade.lensouls.util.WeaknessLensPhoto.WEAPON_PHOTO));
         if (photo.isEmpty()) return;
 
         // 返还到玩家背包
@@ -54,8 +55,9 @@ public class EnchantmentRemovalListener {
         }
 
         // 清除武器上的照片数据
-        tag.remove("SoulPhotoStack");
-        tag.remove("SoulPhotoEntityId");
+        tag.remove(com.plumejade.lensouls.util.WeaknessLensPhoto.WEAPON_PHOTO);
+        tag.remove(com.plumejade.lensouls.util.WeaknessLensPhoto.WEAPON_ENTITY);
+        tag.remove(com.plumejade.lensouls.util.WeaknessLensPhoto.WEAPON_ELEMENT);
         weaponStack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 
     }

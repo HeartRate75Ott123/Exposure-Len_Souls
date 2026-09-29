@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.ability;
 
 import com.plumejade.lensouls.ability.util.TemporalSnapshot;
+import com.plumejade.lensouls.util.WeaknessLensPhoto;
 import io.github.mortuusars.exposure.world.camera.frame.Frame;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -75,6 +76,16 @@ public final class AbilityBehavior {
                 if (player != null) {
                     tag.put("lensouls:snapshot", TemporalSnapshot.capture(player).toTag());
                 }
+            }
+            case WEAKNESS_LENS -> {
+                // 弱点透镜：识别照片主体的弱点元素并记进照片——装到武器上时该武器获得
+                // 该元素的 2 级武器活性（武器自身更高则按自身的），见 util/WeaknessLensPhoto。
+                var weak = WeaknessLensPhoto.weaknessElementOf(WeaknessLensPhoto.subjectEntityId(frame));
+                if (weak != null) {
+                    tag.putString(WeaknessLensPhoto.PHOTO_ELEMENT, weak.getSerializedName());
+                }
+                // 耐久：可生效 100 次，用完即销毁
+                tag.putInt(WeaknessLensPhoto.PHOTO_DURABILITY, WeaknessLensPhoto.MAX_DURABILITY);
             }
             case WILD_GLIMPSE -> {
                 // 见微知著：把画面中的生物写进照片，作「记录到的生物」凭据

@@ -11,6 +11,7 @@ import com.plumejade.lensouls.handler.FeatherAbyssHandler;
 import com.plumejade.lensouls.handler.SoulDotHandler;
 import com.plumejade.lensouls.integration.PhotoSpecialEffects;
 import com.plumejade.lensouls.network.ElementSpiralPacket;
+import com.plumejade.lensouls.util.WeaknessLensPhoto;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -66,6 +67,13 @@ public class DamageHandler {
         ResourceLocation attackerId = attacker != null
                 ? BuiltInRegistries.ENTITY_TYPE.getKey(attacker.getType()) : null;
 
+        // 弱点透镜照片：装上武器后视为「照片记录元素」的 2 级武器活性（武器自身更高则按自身的）。
+        // 一次读出供整轮元素循环复用（伤害结算全服热路径，不逐元素重复解析武器 NBT）。
+        WeaknessLensPhoto.Installed weaponLens = isPlayer
+                ? WeaknessLensPhoto.inspectActive(player.getMainHandItem(), level.registryAccess())
+                : WeaknessLensPhoto.Installed.NONE;
+        ElementDamage lensElement = weaponLens.element();
+
         // 次元枪子弹固有元素（模组内设计，活性固定 2.0）
         ElementDamage bulletElement = null;
         if (source.getDirectEntity() instanceof com.plumejade.lensouls.entity.GunBulletEntity gunBullet) {
@@ -89,8 +97,10 @@ public class DamageHandler {
             float activitySum = 0f;
 
             if (isPlayer) {
-                attackerLevel = ItemElementActivityLoader.getLevel(weaponId, element);
-                activitySum += ItemElementActivityLoader.getActivity(weaponId, element);
+                int baseLevel = ItemElementActivityLoader.getLevel(weaponId, element);
+                int lensLevel = lensElement == element ? WeaknessLensPhoto.ACTIVITY_LEVEL : 0;
+                attackerLevel = Math.max(baseLevel, lensLevel);
+                activitySum += ElementDamage.getActivityByLevel(attackerLevel);
             } else if (attacker != null) {
                 attackerLevel = AttackerElementLoader.getLevel(attackerId, element);
                 activitySum += AttackerElementLoader.getActivity(attackerId, element);
@@ -167,7 +177,8 @@ public class DamageHandler {
         // 触发口径 = 远程（活体攻击方的非直接命中或 IS_PROJECTILE），对齐「远程伤害加成词条」对远程伤害的定义。
         // 次元枪子弹不再算投射物（解除 AlphaYeti 类远程免疫），但其本身满足远程判定；isGunBullet 仅作无主/边界兜底。
         boolean isGunBullet = source.getDirectEntity() instanceof com.plumejade.lensouls.entity.GunBulletEntity;
-        if (RangedAttackHelper.isRanged(source) || isGunBullet) {
+        boolean rangedHit = RangedAttackHelper.isRanged(source) || isGunBullet;
+        if (rangedHit) {
             float projWeakness = DataPackLoader.getWeakness(entityId, ElementDamage.PROJECTILE);
             totalBonusMultiplier += projWeakness;
             if (projWeakness > 0f) emitSpiralParticle(level, target, ElementDamage.PROJECTILE);
@@ -184,17 +195,25 @@ public class DamageHandler {
             event.setNewDamage(current + current * totalBonusMultiplier);
         }
 
-        // 弱点武器匹配：目标有弱点但玩家武器元素（item_activity / 次元枪子弹元素）不匹配任一“非弹射物”弱点
-        // → 最终伤害拦截为原始的 10%（空手 / 普通无元素武器同样拦截）
-        // 弹射物弱点（PROJECTILE）活性隐含 1.0，无需武器匹配，不触发此惩罚
+        // 弱点武器匹配：目标有「非弹射物」弱点（倍率 > 0）但玩家武器元素（item_activity / 次元枪子弹元素）
+        // 不匹配任一 → 最终伤害拦截为原始的 10%（空手 / 普通无元素武器同样拦截）
+        // 弹射物弱点（PROJECTILE）活性隐含 1.0：本次攻击本身就是弹射物/远程命中即视为匹配（不吃武器匹配惩罚）；
+        // 「只有弹射物弱点」的怪物对非弹射物攻击也从不触发此惩罚（needsMatch 不统计弹射物与 0 值占位条目）
         if (!level.isClientSide && isPlayer) {
             Map<ElementDamage, Float> weaknesses = DataPackLoader.getAllWeaknesses(entityId);
             boolean needsMatch = false;
-            boolean matches = false;
+            // 弹射物命中自带匹配：只要目标显式配了弹射物弱点（倍率 > 0），弹射物命中就视为命中弱点，
+            // 不再因「武器没有其它弱点元素活性」把整发弹射物伤害拦成 10%（弹射物增伤不被惩罚吃掉）
+            boolean matches = rangedHit
+                    && weaknesses.getOrDefault(ElementDamage.PROJECTILE, 0f) > 0f;
             for (ElementDamage weakElem : weaknesses.keySet()) {
-                if (weakElem == ElementDamage.PROJECTILE) continue;   // 弹射物弱点无需武器匹配
+                if (weakElem == ElementDamage.PROJECTILE) continue;   // 弹射物弱点无需武器匹配（见上）
+                if (weaknesses.get(weakElem) <= 0f) continue;        // 0 值占位弱点：无增伤也不要求武器匹配
                 needsMatch = true;
-                if (weaponId != null && ItemElementActivityLoader.getLevel(weaponId, weakElem) > 0) {
+                // 武器活性（含弱点透镜照片提供的 2 级活性）匹配任一弱点即不算「不匹配」
+                int weaponLevel = weaponId == null ? 0 : ItemElementActivityLoader.getLevel(weaponId, weakElem);
+                if (lensElement == weakElem) weaponLevel = Math.max(weaponLevel, WeaknessLensPhoto.ACTIVITY_LEVEL);
+                if (weaponLevel > 0) {
                     matches = true;
                     break;
                 }

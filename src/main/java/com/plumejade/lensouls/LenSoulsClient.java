@@ -57,6 +57,7 @@ public class LenSoulsClient {
         modEventBus.addListener(LenSoulsClient::registerLayers);
         modEventBus.addListener(LenSoulsClient::registerShaders);
         modEventBus.addListener(LenSoulsClient::registerParticleProviders);
+        modEventBus.addListener(LenSoulsClient::registerItemDecorations);
 
         // 客户端游戏事件（RenderLevelStageEvent）
         NeoForge.EVENT_BUS.register(SpatialWarpOutlineRenderer.class);
@@ -96,9 +97,19 @@ public class LenSoulsClient {
         event.register(ModMenus.REINFORCE.get(), com.plumejade.lensouls.gui.ReinforceScreen::new);
     }
 
+    /**
+     * 弱点透镜照片的耐久条（NeoForge item decorator）。
+     * <p>
+     * 刻意**不用**原版耐久组件：那会让照片不可堆叠，而照片堆叠是既有玩法。
+     */
+    private static void registerItemDecorations(
+            net.neoforged.neoforge.client.event.RegisterItemDecorationsEvent event) {
+        event.register(io.github.mortuusars.exposure.Exposure.Items.PHOTOGRAPH.get(),
+                new com.plumejade.lensouls.client.WeaknessLensDurabilityDecorator());
+    }
+
     /** 注册客户端扩展（显示元素灌注图标，隐藏原版粒子） */
-    private static void registerClientExtensions(RegisterClientExtensionsEvent event) {
-        IClientMobEffectExtensions visible = new IClientMobEffectExtensions() {
+    private static void registerClientExtensions(RegisterClientExtensionsEvent event) {        IClientMobEffectExtensions visible = new IClientMobEffectExtensions() {
             @Override
             public boolean isVisibleInInventory(MobEffectInstance instance) { return true; }
             @Override

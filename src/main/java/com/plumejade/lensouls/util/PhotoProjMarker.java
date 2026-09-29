@@ -37,15 +37,29 @@ public final class PhotoProjMarker {
         CompoundTag tag = entity.getPersistentData();
         tag.putBoolean(PHOTO_PROJ, true);
         if (percent) tag.putBoolean(PHOTO_PERCENT, true);
+        // 客户端可见通道：persistentData 不随实体同步，客户端渲染逻辑（弹幕「立体光束」修正）
+        // 必须靠这个同步附件（见 ModAttachments.PHOTO_PROJ）。重复标记不再发一遍同步包。
+        if (!entity.getData(com.plumejade.lensouls.boss.ModAttachments.PHOTO_PROJ)) {
+            entity.setData(com.plumejade.lensouls.boss.ModAttachments.PHOTO_PROJ, true);
+            entity.syncData(com.plumejade.lensouls.boss.ModAttachments.PHOTO_PROJ);
+        }
     }
 
     public static void mark(Entity entity) {
         mark(entity, false);
     }
 
-    /** 实体本身是不是本模组的照片弹幕 */
+    /**
+     * 实体本身是不是本模组的照片弹幕。
+     * <p>
+     * 双端可用：先看<b>同步附件</b>（客户端唯一能看到的通道），再兜底服务端 {@code persistentData}
+     * （存档往返后附件会丢，标记还在）。
+     */
     public static boolean isBarrage(Entity entity) {
         if (entity == null) return false;
+        if (entity.getData(com.plumejade.lensouls.boss.ModAttachments.PHOTO_PROJ)) return true;
+        // 客户端实体只可能拿到同步附件（persistentData 不下发），提前返回还能省掉每帧一次 NBT 复制
+        if (entity.level().isClientSide()) return false;
         CompoundTag tag = entity.getPersistentData();
         return tag.getBoolean(PHOTO_PROJ) || tag.getBoolean(PHOTO_PERCENT);
     }

@@ -41,6 +41,9 @@ public class CuriosIntegration {
         if (key.equals("lensouls:entity_photograph") || key.equals("lensouls:photo_album")) {
             return true;
         }
+        // 注意：拍立得 1.1.5 没有独立物品，拍立得出片就是 exposure:photograph（带 PHOTOGRAPH_FRAME /
+        // PHOTOGRAPH_TYPE 组件，见 InstantCameraItem 源码 new ItemStack(Exposure.Items.PHOTOGRAPH.get())）；
+        // exposure_polaroid:instant_photograph 只是为将来可能新增的物品留的前向兼容键（tag 里标了 required:false）。
         if (key.equals("exposure:photograph") || key.equals("exposure_polaroid:instant_photograph")) {
             return hasLensoulsPhotoData(stack);
         }

@@ -4,18 +4,25 @@ import com.plumejade.lensouls.config.AttackerElementLoader;
 import com.plumejade.lensouls.config.PhotoSetDefs;
 import com.plumejade.lensouls.config.PhotoSetLoader;
 import com.plumejade.lensouls.damage.ElementDamage;
+import com.plumejade.lensouls.item.PhotoAlbumItem;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
+import top.theillusivec4.curios.api.CuriosApi;
+import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -116,6 +123,92 @@ public class PhotoSetRegistry {
         return out;
     }
 
+    /**
+     * 收集玩家「已安装」的照片主体实体 id（Curios 照片栏 + 相册内容物，按实体去重）。
+     * <p>
+     * 与「照片效果」面板同口径（相册里收着的照片也算已装）。原实现是
+     * {@code client.tabs.PhotoSetClient#collectGearEntities} 的方法体，为了让 common 侧的
+     * tooltip（{@link #appendTooltip}）复用同一份逻辑而搬到这里，客户端那边改为转发——
+     * <b>不要再写第二份</b>，否则 tooltip 与面板的「已装」口径会漂移。
+     */
+    public static List<String> collectInstalledEntities(Player player) {
+        List<String> ids = new ArrayList<>();
+        if (player == null) return ids;
+        try {
+            CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
+                for (var stacksHandler : handler.getCurios().values()) {
+                    IDynamicStackHandler stackHandler = stacksHandler.getStacks();
+                    for (int i = 0; i < stackHandler.getSlots(); i++) {
+                        ItemStack stack = stackHandler.getStackInSlot(i);
+                        if (stack.isEmpty()) continue;
+                        if (stack.getItem() instanceof PhotoAlbumItem) {
+                            ItemContainerContents contents =
+                                    stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
+                            for (ItemStack photo : contents.nonEmptyItems()) addPhotoEntity(ids, photo);
+                            continue;
+                        }
+                        addPhotoEntity(ids, stack);
+                    }
+                }
+            });
+        } catch (Throwable ignored) {
+        }
+        return ids;
+    }
+
+    private static void addPhotoEntity(List<String> ids, ItemStack photo) {
+        String id = PhotographEffectRegistry.getStolenEntity(photo);
+        if (id == null) id = PhotographEffectRegistry.getElementEntity(photo);
+        if (id == null) return;
+        String n = norm(id);
+        if (!ids.contains(n)) ids.add(n);
+    }
+
+    /** 玩家已安装的 Boss 照片<b>种类</b>数（同 Boss 多张只算一次，与首领套张数统计同口径） */
+    public static int countInstalledBossPhotos(Player player) {
+        if (player == null) return 0;
+        Set<String> seen = new HashSet<>();
+        int n = 0;
+        try {
+            var handlerOpt = CuriosApi.getCuriosInventory(player);
+            if (handlerOpt.isEmpty()) return 0;
+            for (var sh : handlerOpt.get().getCurios().values()) {
+                IDynamicStackHandler stacks = sh.getStacks();
+                for (int i = 0; i < stacks.getSlots(); i++) {
+                    ItemStack stack = stacks.getStackInSlot(i);
+                    if (stack.isEmpty()) continue;
+                    if (stack.getItem() instanceof PhotoAlbumItem) {
+                        ItemContainerContents contents =
+                                stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
+                        for (ItemStack photo : contents.nonEmptyItems()) {
+                            if (bossPhotoSeen(photo, seen)) n++;
+                        }
+                    } else if (bossPhotoSeen(stack, seen)) {
+                        n++;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return n;
+    }
+
+    private static boolean bossPhotoSeen(ItemStack stack, Set<String> seen) {
+        if (!PhotographEffectRegistry.isBossPhoto(stack)) return false;
+        String ent = PhotographEffectRegistry.getPhotoEntity(stack);
+        return ent != null ? seen.add(norm(ent)) : true;
+    }
+
+    /** 实体 id 归一化（补默认命名空间 / 统一写法），供「成员清单 ↔ 已安装照片」比对 */
+    private static String norm(String id) {
+        if (id == null) return "";
+        try {
+            return ResourceLocation.parse(id).toString();
+        } catch (Exception e) {
+            return id;
+        }
+    }
+
     /** 在照片 tooltip 中追加套装归属（含四元素抑制顶部块、译名表头、逐行配色） */
     public static void appendTooltip(ItemTooltipEvent event, String entityId) {
         Set<String> setIds = new LinkedHashSet<>(getSets(entityId));
@@ -151,16 +244,57 @@ public class PhotoSetRegistry {
             if (def == null) continue;
             event.getToolTip().add(Component.literal("§a[ " + def.name() + " ]").withStyle(ChatFormatting.GREEN));
             if (!shift) continue;
-            // 成员译名表头（首领套按实际张数显示）
+            // 成员译名表头（首领套按实际张数显示）+ 动态识别：已安装的成员名绿色、未安装灰色，行尾给进度
             List<String> members = getMembers(setId);
-            String names;
-            if (setId.equals("boss_barrage")) {
-                int need = def.tiers().stream().mapToInt(t -> t.count()).max().orElse(1);
-                names = need + " 张首领";
-            } else {
-                names = members.stream().map(PhotoSetRegistry::entityName).toList().stream().collect(java.util.stream.Collectors.joining("/"));
+            Player viewer = event.getEntity();
+            Set<String> owned = Set.of();
+            boolean dynamic = false;
+            try {
+                if (viewer != null) {
+                    owned = new HashSet<>(collectInstalledEntities(viewer));
+                    dynamic = true;
+                }
+            } catch (Throwable ignored) {
             }
-            event.getToolTip().add(Component.literal("  §7集齐 " + names + " 照片，触发效果").withStyle(ChatFormatting.GRAY));
+            // 正在看的这张也算已装：否则在背包里悬停一张照片，会显示它自己「还没装」
+            Set<String> shown = new HashSet<>(owned);
+            shown.add(norm(entityId));
+
+            int need = def.tiers().stream().mapToInt(PhotoSetDefs.Tier::count).min().orElse(1);
+            MutableComponent head = Component.literal("  ").withStyle(ChatFormatting.GRAY)
+                    .append(Component.literal("集齐 ").withStyle(ChatFormatting.GRAY));
+            if (setId.equals("boss_barrage")) {
+                need = def.tiers().stream().mapToInt(PhotoSetDefs.Tier::count).max().orElse(1);
+                head.append(Component.literal(need + " 张首领").withStyle(ChatFormatting.GRAY));
+            } else {
+                for (int i = 0; i < members.size(); i++) {
+                    if (i > 0) head.append(Component.literal("/").withStyle(ChatFormatting.DARK_GRAY));
+                    String memberId = members.get(i);
+                    head.append(Component.literal(entityName(memberId))
+                            .withStyle(shown.contains(norm(memberId)) ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+                }
+            }
+            head.append(Component.literal(" 照片，触发效果").withStyle(ChatFormatting.GRAY));
+            if (dynamic) {
+                int have;
+                if (setId.equals("boss_barrage")) {
+                    have = countInstalledBossPhotos(viewer);
+                    // 悬停的这张（若是首领照片且还没装）一起算进去，预览才准
+                    if (stack != null && PhotographEffectRegistry.isBossPhoto(stack)
+                            && !owned.contains(norm(entityId))) {
+                        have++;
+                    }
+                } else {
+                    have = 0;
+                    for (String memberId : members) {
+                        if (shown.contains(norm(memberId))) have++;
+                    }
+                }
+                have = Math.min(have, need);
+                head.append(Component.literal(" 已装 " + have + "/" + need)
+                        .withStyle(have >= need ? ChatFormatting.GREEN : ChatFormatting.DARK_GRAY));
+            }
+            event.getToolTip().add(head);
             for (PhotoSetDefs.Tier t : def.tiers()) {
                 String whenPrefix = t.when() != null ? "§e" + condCn(t.when()) + "：" : "";
                 for (String eff : t.effects()) {

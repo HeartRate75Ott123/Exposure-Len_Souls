@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.reinforce;
 
+import com.plumejade.lensouls.LenSouls;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -22,7 +23,15 @@ import java.util.Set;
  *     <li>随身容器：物质压缩球（{@code beyonddimensions:matter_compress_ball}），
  *         内容物存于数据组件 {@code beyonddimensions:istack_slots}（{@code List<KeyAmount>}）。</li>
  * </ul>
- * 一切符号都按已安装 jar（0.7.24）核实；取不到时静默降级，不影响其余两个容器。
+ * 一切符号都按已安装 jar（0.7.24）与其**完整源码**核实；取不到时静默降级，不影响其余两个容器。
+ * <p>
+ * <b>1.5.4 修复「磁铁吸复制之魂进终端 → 之前的复制之魂消失」</b>：
+ * {@code sealCopySouls} 的网络迁移原来是「清零旧键 + 覆盖写新键=快照量」，而
+ * {@code setAmountByKey} 是<b>绝对量覆盖写</b>。终端网络共享，维度磁铁
+ * （{@code NetMagnetItem.workContent} → {@code storage.insert(itemKey, count, false)} 按键合并）
+ * / 馈送器 / 其他玩家随时会往两个键里放东西 ⇒ 新键下的<b>已有存量被覆盖成本次迁移量</b>。
+ * 现改为合并式迁移：写前 {@code getStackByKey} 重读两键活值，新键写「活值+迁移量」、
+ * 旧键扣「实际迁移量」（以 setAmountByKey 返回值核对，容量不足部分下轮幂等收敛）。
  */
 public final class BeyondDimensionsCompat {
 
@@ -45,6 +54,8 @@ public final class BeyondDimensionsCompat {
     private static Method extractBySlot;
     /** 可选（封印功能用）：以下任一取不到时封印降级为「只处理随身压缩球」，其余功能不受影响 */
     private static Method setAmountByKey;
+    /** 按 key 读当前数量的活值（封印迁移的写前重读用；取不到则网络封印整体降级为不动，绝不覆盖写） */
+    private static Method getStackByKey;
     private static Method getAllNetsFromPlayer;
     private static Method getNetPlayers;
     private static Method onChange;
@@ -148,6 +159,12 @@ public final class BeyondDimensionsCompat {
             if (!seal && netHasFeatherMember(player, net)) continue; // 共享网络：有人还戴着就不解封
             Object unified = invoke(getUnifiedStorage, net);
             if (unified == null) continue;
+            if (getStackByKey == null) {
+                // 缺"按 key 读活值"句柄：合并式迁移做不了，宁可不动也绝不覆盖写（覆盖写=丢存量）
+                LenSouls.LOGGER.debug(
+                        "[CopySoulSeal] 缺 getStackByKey 句柄，网络封印降级为不动（避免覆盖写丢存量）");
+                continue;
+            }
             Object listed = invoke(getStorage, unified);
             if (!(listed instanceof List<?> live)) continue;
 
@@ -162,11 +179,24 @@ public final class BeyondDimensionsCompat {
                 if (updated == null) continue;
                 Object newKey = newItemStackKey(updated);
                 if (newKey == null) continue;
-                long amount = amountOf(entry);
-                if (amount <= 0L) continue;
-                // 按键替换：先清零旧键（换尾删除会重排索引，按 index 写回必然错位）
-                invoke(setAmountByKey, unified, oldKey, 0L);
-                invoke(setAmountByKey, unified, newKey, amount);
+
+                // ── 写前重读活值（快照只是一份"计划"，数量以此刻的存储为准）──
+                // 终端网络是共享的：维度磁铁吸掉落物 / 馈送器 / 其他玩家随时可能往这两个键合并。
+                // setAmountByKey 是绝对量覆盖写，照抄快照量会把新键下的存量覆盖掉（磁铁丢魂根因）。
+                long oldLive = amountOf(invoke(getStackByKey, unified, oldKey));
+                if (oldLive <= 0L) continue; // 旧键已被别人清空/搬走：本轮不动，下轮按新快照收敛
+                long moved = Math.min(amountOf(entry), oldLive);
+
+                long newLive = amountOf(invoke(getStackByKey, unified, newKey));
+
+                // 先加新键（合并），返回值 = 实际写入量（新键槽容量不足时会被钳制）；
+                // 反射失败/异常 → 0 → actual 为负 → 跳过本轮（绝不盲目覆盖写）
+                long applied = amountOf(invoke(setAmountByKey, unified, newKey, newLive + moved));
+                long actual = applied - newLive;
+                if (actual <= 0L) continue; // 容量已满：本轮不动，下轮再试
+
+                // 按实际迁移量扣旧键（可能剩一小部分，下一轮 sweep 幂等收敛）
+                invoke(setAmountByKey, unified, oldKey, oldLive - actual);
                 netChanged = true;
             }
             if (netChanged) {
@@ -386,6 +416,7 @@ public final class BeyondDimensionsCompat {
                     Class<?> abstractHandlerClass = Class.forName(
                             "com.wintercogs.beyonddimensions.api.storage.handler.impl.AbstractUnorderedStackHandler");
                     setAmountByKey = abstractHandlerClass.getMethod("setAmountByKey", stackKeyClass, long.class);
+                    getStackByKey = handlerClass.getMethod("getStackByKey", stackKeyClass);
                     onChange = handlerClass.getMethod("onChange");
                     itemStackKeyConstructor = itemKeyClass.getConstructor(net.minecraft.world.item.ItemStack.class);
                     getAllNetsFromPlayer = netClass.getMethod("getAllNetFromPlayer", Player.class);

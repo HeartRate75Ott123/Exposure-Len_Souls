@@ -5,6 +5,7 @@
   "refmap": "lensouls.compat.mixins.refmap.json",
   "mixins": [
     "PolaroidFixMixin",
+    "PhotographInstallMixin",
     "BetterCombatServerAttackMixin",
     "BetterCombatAttackMixin",
     "StackedPhotoStackingMixin",
@@ -68,7 +69,10 @@
     "ProjectileImmunityMixins$WadjetHurt"
   ],
   "client": [
-    "BetterCombatRangeMixin"
+    "BetterCombatRangeMixin",
+    "GytrinketCameraChargeMixin",
+    "AnnihilationBeamBoxRenderMixin",
+    "DeathLaserBoxRenderMixin"
   ],
   "injectors": {
     "defaultRequire": 0

@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.ability.util;
 
+import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.network.FreezeSyncPacket;
 import com.plumejade.lensouls.boss.BossToughnessData;
@@ -41,6 +42,9 @@ public class TimeFreezeManager {
     private UUID sourcePlayerId;
     private int remainingTicks;
     private final IntOpenHashSet frozenEntities = new IntOpenHashSet();
+    /** 定身期间每个实体实际受到的伤害累计（键 = 实体 id，供「伤害达标提前解冻」用） */
+    private final it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap accumulatedDamage =
+            new it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap();
     private final java.util.Random random = new java.util.Random();
 
     private TimeFreezeManager() {
@@ -53,6 +57,7 @@ public class TimeFreezeManager {
         this.sourcePlayerId = source.getUUID();
         this.remainingTicks = 100;
         frozenEntities.clear();
+        accumulatedDamage.clear();
         for (LivingEntity e : entitiesInFrame) {
             if (e == null || e.isRemoved()) continue;
             if (e instanceof Player) continue;
@@ -87,6 +92,37 @@ public class TimeFreezeManager {
         }
     }
 
+    /**
+     * 定身期间统计实体实际受到的伤害；累计达到「最大生命 × {@code toughStunBreakDamagePercent}（默认 16%）」
+     * 时<b>提前解冻这一个实体</b>——完全模仿韧性定身的同款阈值
+     * （见 {@link BossToughnessManager#addStunDamage}，共用同一配置项）。
+     * <p>
+     * 由 {@link com.plumejade.lensouls.boss.ToughnessDamageHandler#onLivingDamagePost} 在
+     * {@code LivingDamageEvent.Post}（伤害已生效）调用，且只统计玩家造成的伤害。
+     * <b>注意口径：时间定格定身期间韧性减伤照常生效</b>（用户明确要求：定格 ≠ 破定，
+     * 对面还剩韧性就照常免伤），所以这里累计的是减伤后实际打出来的伤害。
+     */
+    public void addFreezeDamage(LivingEntity entity, float amount) {
+        if (server == null || amount <= 0f) return;
+        int id = entity.getId();
+        if (!frozenEntities.contains(id)) return;
+        double percent = Config.TOUGH_STUN_BREAK_DAMAGE_PERCENT.get();
+        if (percent <= 0) return;
+        float total = accumulatedDamage.addTo(id, amount) + amount;
+        float threshold = (float) (entity.getMaxHealth() * percent);
+        if (total >= threshold) {
+            unfreezeEntity(id);
+        }
+    }
+
+    /** 提前解冻单个实体（其余照旧），并广播剩余定身集给客户端。 */
+    private void unfreezeEntity(int id) {
+        if (!frozenEntities.remove(id)) return;
+        accumulatedDamage.remove(id);
+        LenSouls.LOGGER.debug("[TimeFreeze] 实体 {} 定身期间伤害达标，提前解冻", id);
+        broadcast(true);
+    }
+
     /** 当前是否处于时间定格。 */
     public boolean isFrozen() {
         return server != null;
@@ -107,6 +143,7 @@ public class TimeFreezeManager {
     private void unfreeze() {
         if (server == null) return;
         frozenEntities.clear();
+        accumulatedDamage.clear();
         server = null;
         sourcePlayerId = null;
         remainingTicks = 0;

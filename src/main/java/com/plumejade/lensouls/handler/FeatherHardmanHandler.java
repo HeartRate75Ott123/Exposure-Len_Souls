@@ -28,6 +28,7 @@ import top.theillusivec4.curios.api.CuriosApi;
  *   <li>基础护甲值 +10（transient 属性修饰符，20 tick 幂等维持，摘下移除）</li>
  *   <li>受到伤害 +75%（LivingDamageEvent.Pre 受害者为佩戴者）</li>
  *   <li>造成伤害 +125%（LivingDamageEvent.Pre 伤害来源为佩戴者）</li>
+ *   <li><b>造成伤害时，其中的 30% 视为真伤</b>（不吃目标的 BOSS 韧性减伤），其余 70% 照常结算</li>
  *   <li>药水活性无效：每 20 tick 清除全部水火土末影活性效果（含自己喝的）</li>
  *   <li>攻击对敌人有 35% 概率附加随机原版负面效果，等级 1~20 随机、持续 5 秒</li>
  *   <li>每 60 秒自身获得随机原版负面效果 10 秒（计时器持久化在 PlayerPersisted 子键，掉线不丢）</li>
@@ -43,6 +44,24 @@ public class FeatherHardmanHandler {
     public static final float DAMAGE_DEALT_MULTIPLIER = 4.0f;
     /** 基础护甲值加成 */
     public static final int ARMOR_BONUS = 10;
+    /** 每次伤害中「真伤」的占比：这部分完全不吃目标的韧性减伤，其余部分照常结算 */
+    public static final float TRUE_DAMAGE_SHARE = 0.30f;
+
+    /**
+     * 本次伤害里「真伤」的比例：由佩戴荒厄遗咒的玩家造成时返回 {@link #TRUE_DAMAGE_SHARE}，否则 0。
+     * <p>
+     * 由 {@link com.plumejade.lensouls.boss.ToughnessDamageHandler} 在应用韧性减伤时调用
+     * （它在 {@code EventPriority.HIGHEST}，是最先跑的一批）。结算口径：
+     * <pre>最终 = D × share + (D − D × share) × (1 − 韧性减伤)</pre>
+     * 也就是「<b>三成真伤、七成照常吃韧性减伤</b>」——<b>不是概率触发</b>，每一次伤害都按这个比例拆分；
+     * 护甲与其它模组的减伤不受影响（它们在本事件之前就已结算）。
+     */
+    public static float trueDamageShare(LivingEntity target, net.minecraft.world.damagesource.DamageSource source) {
+        if (target == null || source == null) return 0f;
+        if (!(source.getEntity() instanceof ServerPlayer player)) return 0f;
+        if (target == player) return 0f;
+        return hasHardman(player) ? TRUE_DAMAGE_SHARE : 0f;
+    }
     /** 攻击附加负面效果概率（35%） */
     public static final int DEBUFF_PROC_PERCENT = 35;
     /** 攻击附加负面效果时长：5 秒 */

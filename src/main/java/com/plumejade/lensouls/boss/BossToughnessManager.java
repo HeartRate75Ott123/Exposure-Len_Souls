@@ -217,6 +217,8 @@ public class BossToughnessManager {
 
     /** 应用减伤到伤害值 */
     public float applyDamageReduction(LivingEntity entity, float damage) {
+        // 注意：时间定格定身期间【仍然】照常吃韧性减伤（用户明确要求的口径：
+        // 定格不是破定，未破定就该按剩余韧性比例免伤）；提前解冻阈值统计的也是减伤后的实际伤害
         float reduction = getDamageReduction(entity);
         if (reduction <= 0) return damage;
         float result = damage * (1.0f - reduction);

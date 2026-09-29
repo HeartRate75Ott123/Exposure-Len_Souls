@@ -40,10 +40,13 @@ public class ToughnessDamageHandler {
                 manager.register(target);
             }
 
-            // ── 2. 韧性减伤 ──
+            // ── 2. 韧性减伤（荒厄遗咒：每次伤害里 30% 视为真伤，不吃这套减伤）──
             if (manager.has(target)) {
                 float currentDamage = event.getNewDamage();
-                float reduced = manager.applyDamageReduction(target, currentDamage);
+                float share = com.plumejade.lensouls.handler.FeatherHardmanHandler
+                        .trueDamageShare(target, event.getSource());
+                float truePart = currentDamage * share;                 // 真伤：原样保留
+                float reduced = truePart + manager.applyDamageReduction(target, currentDamage - truePart);
                 if (reduced != currentDamage) {
                     event.setNewDamage(reduced);
                 }
@@ -76,6 +79,9 @@ public class ToughnessDamageHandler {
             if (!(event.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer)) return;
 
             BossToughnessManager.getInstance().addStunDamage(target, event.getNewDamage());
+            // 时间定格定身：同口径统计伤害，达标提前解冻该实体（共用 toughStunBreakDamagePercent 阈值）
+            com.plumejade.lensouls.ability.util.TimeFreezeManager.getInstance()
+                    .addFreezeDamage(target, event.getNewDamage());
         } catch (Exception e) {
             long now = event.getEntity().level().getGameTime();
             if (now - lastErrorTick > 100L) {

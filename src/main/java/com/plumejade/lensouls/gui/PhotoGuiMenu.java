@@ -1,8 +1,10 @@
 package com.plumejade.lensouls.gui;
 
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
 import com.plumejade.lensouls.integration.ExposureHelper;
+import com.plumejade.lensouls.util.WeaknessLensPhoto;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -74,9 +76,9 @@ public class PhotoGuiMenu extends AbstractContainerMenu {
         CustomData data = weaponStack.get(DataComponents.CUSTOM_DATA);
         if (data == null) return;
         CompoundTag tag = data.copyTag();
-        if (tag.contains("SoulPhotoStack")) {
+        if (tag.contains(WeaknessLensPhoto.WEAPON_PHOTO)) {
             var access = player.registryAccess();
-            photoSlot.setItem(0, ItemStack.parseOptional(access, tag.getCompound("SoulPhotoStack")));
+            photoSlot.setItem(0, ItemStack.parseOptional(access, tag.getCompound(WeaknessLensPhoto.WEAPON_PHOTO)));
         }
     }
 
@@ -86,19 +88,28 @@ public class PhotoGuiMenu extends AbstractContainerMenu {
         CompoundTag tag = weaponStack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 
         if (photo.isEmpty()) {
-            tag.remove("SoulPhotoStack");
-            tag.remove("SoulPhotoEntityId");
+            tag.remove(WeaknessLensPhoto.WEAPON_PHOTO);
+            tag.remove(WeaknessLensPhoto.WEAPON_ENTITY);
+            tag.remove(WeaknessLensPhoto.WEAPON_ELEMENT);
         } else {
             var access = player.registryAccess();
             CompoundTag photoTag = new CompoundTag();
-            tag.put("SoulPhotoStack", photo.save(access, photoTag));
+            tag.put(WeaknessLensPhoto.WEAPON_PHOTO, photo.save(access, photoTag));
 
-            // 读取实体 ID
+            // 读取实体 ID + 该主体的弱点元素（照片自身没记录时按实体弱点数据补齐并写回照片）
             ResourceLocation entityId = ExposureHelper.getEntityId(photo, access);
             if (entityId != null) {
-                tag.putString("SoulPhotoEntityId", entityId.toString());
+                tag.putString(WeaknessLensPhoto.WEAPON_ENTITY, entityId.toString());
+                ElementDamage element = WeaknessLensPhoto.resolveElement(photo, entityId);
+                if (element != null) {
+                    tag.putString(WeaknessLensPhoto.WEAPON_ELEMENT, element.getSerializedName());
+                    WeaknessLensPhoto.recordElementIfAbsent(photo, element);
+                } else {
+                    tag.remove(WeaknessLensPhoto.WEAPON_ELEMENT);
+                }
             } else {
-                tag.remove("SoulPhotoEntityId");
+                tag.remove(WeaknessLensPhoto.WEAPON_ENTITY);
+                tag.remove(WeaknessLensPhoto.WEAPON_ELEMENT);
             }
         }
         weaponStack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
@@ -167,7 +178,7 @@ public class PhotoGuiMenu extends AbstractContainerMenu {
         CustomData data = weaponStack.get(DataComponents.CUSTOM_DATA);
         if (data == null) return null;
         CompoundTag tag = data.copyTag();
-        return tag.contains("SoulPhotoEntityId") ? tag.getString("SoulPhotoEntityId") : null;
+        return tag.contains(WeaknessLensPhoto.WEAPON_ENTITY) ? tag.getString(WeaknessLensPhoto.WEAPON_ENTITY) : null;
     }
 
     /**
@@ -178,8 +189,8 @@ public class PhotoGuiMenu extends AbstractContainerMenu {
         CustomData data = weaponStack.get(DataComponents.CUSTOM_DATA);
         if (data == null) return false;
         CompoundTag tag = data.copyTag();
-        if (!tag.contains("SoulPhotoStack", net.minecraft.nbt.Tag.TAG_COMPOUND)) return false;
-        var opt = ItemStack.parseOptional(access, tag.getCompound("SoulPhotoStack"));
+        if (!tag.contains(WeaknessLensPhoto.WEAPON_PHOTO, net.minecraft.nbt.Tag.TAG_COMPOUND)) return false;
+        var opt = ItemStack.parseOptional(access, tag.getCompound(WeaknessLensPhoto.WEAPON_PHOTO));
         return !opt.isEmpty() && ExposureHelper.isSwordSlotSuitable(opt);
     }
 }

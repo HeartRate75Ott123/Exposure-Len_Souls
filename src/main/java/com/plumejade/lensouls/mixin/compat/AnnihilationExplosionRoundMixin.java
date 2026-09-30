@@ -55,7 +55,15 @@ public class AnnihilationExplosionRoundMixin {
         this.lensouls$spawnRound = AnnihilationBurstClock.currentRound();
     }
 
-    @Redirect(method = "tick", require = 1, at = @At(value = "GETFIELD",
+    // ⚠ 注入点标识符必须是 "FIELD"，不是 "GETFIELD"。
+    // Mixin 的内置注入点里只有 FIELD（同时覆盖 GETFIELD / PUTFIELD 两类指令），
+    // 写成 "GETFIELD" 会被当成「自定义注入点类名」去 findClass，抛
+    // InvalidInjectionException: GETFIELD is not a valid injection point specifier
+    // ——而 compat 配置是 required:false / require:0，所以失败只会留一条 WARN，
+    // 整个「爆点收尾对齐轮边界」的功能静默失效（实测日志已验证过这个症状）。
+    // 本例 tick() 里对 lifetime 只有一次 GETFIELD（PUTFIELD 在 <init>，不在此方法内），
+    // 因此 FIELD 只会匹配一处，require = 1 能过。
+    @Redirect(method = "tick", require = 1, at = @At(value = "FIELD",
             target = "Lnet/miauczel/legendary_monsters/Particle/custom/AnnihilationExplosion;lifetime:I"))
     private int lensouls$holdUntilRoundEnd(AnnihilationExplosion self) {
         if (AnnihilationBurstClock.currentRound() <= this.lensouls$spawnRound) {

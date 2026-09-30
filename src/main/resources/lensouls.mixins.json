@@ -19,7 +19,10 @@
     "EntityInvulnerableTimeAccessor",
     "FoodDataMixin",
     "PhantomPushGuardMixin",
-    "PhantomKillCreditMixin"
+    "PhantomKillCreditMixin",
+    "PhantomMoveTargetAccessor",
+    "PhantomFadeSyncMixin",
+    "BlessingCrystalMixin"
   ],
     "client": [
     "client.ItemRendererMixin",
@@ -38,7 +41,6 @@
     "client.LevelRendererMixin",
     "client.MinecraftSwingMixin",
     "client.BossHealthOverlayMixin",
-    "client.ClientboundBossEventPacketAccessor",
     "client.PhantomRemnantScaleMixin",
     "client.AnnihilationExplosionClockMixin"
   ],

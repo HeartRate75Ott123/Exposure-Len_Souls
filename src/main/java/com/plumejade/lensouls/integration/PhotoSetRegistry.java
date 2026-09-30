@@ -256,10 +256,10 @@ public class PhotoSetRegistry {
                 }
             } catch (Throwable ignored) {
             }
-            // 正在看的这张也算已装：否则在背包里悬停一张照片，会显示它自己「还没装」
-            Set<String> shown = new HashSet<>(owned);
-            shown.add(norm(entityId));
-
+            // 严格口径（1.5.20 用户纠偏）：染色与「已装 X/N」都只用**真实已装**
+            // （Curios 照片栏 + 相册内容物）。**不要**退回「正在悬停的这张也算已装」的预览写法
+            // （1.5.7 曾这么写）——那会让 JEI / 背包里任何一张还没装的照片，自己那一格永远点绿，
+            // 等于谎报已装；JEI 那条路径 `getEntity()` 常常是 null，连进度行都不显示，绿得更没道理。
             int need = def.tiers().stream().mapToInt(PhotoSetDefs.Tier::count).min().orElse(1);
             MutableComponent head = Component.literal("  ").withStyle(ChatFormatting.GRAY)
                     .append(Component.literal("集齐 ").withStyle(ChatFormatting.GRAY));
@@ -271,7 +271,7 @@ public class PhotoSetRegistry {
                     if (i > 0) head.append(Component.literal("/").withStyle(ChatFormatting.DARK_GRAY));
                     String memberId = members.get(i);
                     head.append(Component.literal(entityName(memberId))
-                            .withStyle(shown.contains(norm(memberId)) ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+                            .withStyle(owned.contains(norm(memberId)) ? ChatFormatting.GREEN : ChatFormatting.GRAY));
                 }
             }
             head.append(Component.literal(" 照片，触发效果").withStyle(ChatFormatting.GRAY));
@@ -279,15 +279,10 @@ public class PhotoSetRegistry {
                 int have;
                 if (setId.equals("boss_barrage")) {
                     have = countInstalledBossPhotos(viewer);
-                    // 悬停的这张（若是首领照片且还没装）一起算进去，预览才准
-                    if (stack != null && PhotographEffectRegistry.isBossPhoto(stack)
-                            && !owned.contains(norm(entityId))) {
-                        have++;
-                    }
                 } else {
                     have = 0;
                     for (String memberId : members) {
-                        if (shown.contains(norm(memberId))) have++;
+                        if (owned.contains(norm(memberId))) have++;
                     }
                 }
                 have = Math.min(have, need);

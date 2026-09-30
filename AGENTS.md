@@ -1295,3 +1295,31 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   `@Unique` 字段 `lensouls$spawnRound:J` 在位。
 - **待实机验证**：湮灭激光命中地面时爆点整团随共享时钟翻滚；光束消失后，那一坨**把当前这一整轮放完**
   才在轮边界一起消失（不再中途截断），且整段时间密度不塌。
+
+## 需求批次（`1.5.25`）：照片套装 tooltip「按件点亮」改成严格口径
+
+### 49. 悬停的那张照片不再冒充已装
+
+- 用户口径：「照片套装按件点亮有问题，我在 JEI 拿到的版本，没装上时 tooltip 已经对该照片点绿」
+  → 追问后选「严格口径：没装就是灰」。
+- 根因（1.5.7 当时是**刻意**写的，见第 32 节）：
+  ```java
+  Set<String> shown = new HashSet<>(owned);
+  shown.add(norm(entityId));   // 「正在看的这张也算已装」
+  ```
+  再加上首领套的 `have++` 预览 ⇒ **悬停任何一张照片，它自己那一格永远绿**。
+  JEI 里 `ItemTooltipEvent.getEntity()` 常常是 null（NeoForge javadoc：启动期建搜索树即 null），
+  那条路径虽然跳过「已装 X/N」，但**强制点绿那一步照样执行** ⇒ JEI 看没拿到的照片也是绿的。
+- 改法（`integration/PhotoSetRegistry.appendTooltip`）：删掉 `shown` 与首领套 `+1` 预览；
+  成员名与 `已装 X/N` 一律只读**真实已装**（Curios 照片栏 + 相册内容物，
+  `collectInstalledEntities` / `countInstalledBossPhotos`）；`viewer == null` 时全灰且不显示进度
+  （与 1.5.7 的退化口径一致）。代码里留了「**不要**退回预览写法」的注释，防止以后又手滑加回去。
+- 交付：版本 `1.5.25`（**工作区当时叠着另一路 1.5.20~1.5.24 的未提交改动**——幻灵淡出 /
+  BlessingCrystal / BossHealthOverlay 等；本次编辑是唯一晚于 1.5.24 构建时刻（02:59:40）的改动，
+  所以 `1.5.25` 内容 = `1.5.24` + 本次修复）：`.\gradlew.bat build` 通过；
+  `tools/MixinSelfCheck` 全绿（**54** 条 target，另一路新增的 7 条也一起过了）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.25.jar`（5,931,351 字节），
+  MD5 `581ABFBFF0DF363EF6B5E9116FD23A06`；`PhotoSetRegistry.class` 27,288 → **27,169** 字节
+  （预览逻辑删干净）。桌面上的 `1.5.24` 由另一路交付、**不含本次修复**，别拿它验这一条。
+- **待实机验证**：背包 / JEI 里悬停一张**没装**的照片 → 它自己那一格是灰的、行尾 `已装 X/N` 不虚高；
+  把同一张装进 Curios 照片栏（或收进相册）后再悬停 → 变绿且 X 加一。

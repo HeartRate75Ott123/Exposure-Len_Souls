@@ -16,6 +16,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.monster.Phantom;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import com.plumejade.lensouls.entity.SwarmPhantomFade;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.EvokerFangs;
 import net.minecraft.world.entity.projectile.Arrow;
@@ -28,6 +29,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.lang.reflect.Method;
@@ -213,6 +215,10 @@ public class BossPhotoProjHelper {
     private static void triggerInner(ServerPlayer player, Entity hitTarget) {
         LivingEntity target = hitTarget instanceof LivingEntity le ? le : null;
 
+        // 「玩家刚打中的目标」：在掷骰之前记录，所以即使这一刀没掷中弹幕概率，
+        // 已经召唤出来的幻翼也会改扑这个新目标（需求：幻翼优先攻击玩家新打到的）。
+        rememberHit(player, target);
+
         // 套装弹幕钩子：从玩家 persistent 读取 barrage_trigger / barrage_dmg
         CompoundTag setFlags = player.getPersistentData().getCompound("lensouls:set_flags");
         int barrageExtra = setFlags.getInt("barrage_trigger");
@@ -296,6 +302,10 @@ public class BossPhotoProjHelper {
      * 也排除<b>驯服生物</b>：弹幕是「打面前那个敌人」的选敌逻辑，主人身边的狗会挤进这条逻辑里
      * 被当成敌人（即使伤害随后被 {@code PhotoProjSafetyHandler} 免掉，弹幕仍会对着它放技能、
      * 施加减益与击退）。既不选它、也不打它才是干净的做法。
+     * <p>
+     * 也排除<b>本模组自己召唤的幻影幻翼</b>（{@link #isSwarmPhantom}）：它们是 {@code LivingEntity}
+     * 且就飞在玩家与目标旁边，是这个方法里「最近的生物」。空挥路径（{@code hit == null}）与
+     * 目标死亡后的兜底选敌都会经过这里，不排除就会「新一批幻翼把上一批当敌人打」。
      */
     private static LivingEntity findNearestNonPlayer(ServerPlayer player, double radius) {
         LivingEntity best = null;
@@ -306,6 +316,8 @@ public class BossPhotoProjHelper {
                 en -> !(en instanceof net.minecraft.world.entity.player.Player) && en.isAlive()
                         // 驯服生物是玩家宠物，不作为弹幕目标
                         && !com.plumejade.lensouls.entity.PhantomDamageHandler.isTamedPet(en)
+                        // 自家召唤的幻翼不是敌人（否则幻翼会互殴）
+                        && !isSwarmPhantom(en)
                         // gytrinket 无人机/蜂群/僚机不算目标，否则「最近敌人」会被随行的无人机抢走
                         && !com.plumejade.lensouls.util.PhotoTargetFilter.isIgnored(en))) {
             double d = player.distanceToSqr(e);
@@ -859,6 +871,12 @@ public class BossPhotoProjHelper {
      *       （{@code groundY - 1}），实体所在方块非空气 ⇒ 完全不走 fire 分支；
      *       观感上正好是「从地面射向你的紫色光柱」。这与本仓库先驱者激光刻意不
      *       {@code setFire(true)} 是同一类地形副作用，必须避开。</li>
+     *   <li>{@code hurt()} 通过 {@code isInvulnerableTo} 之后会
+     *       {@code explode(..., 6.0F, false, ExplosionInteraction.BLOCK)}
+     *       ——<b>炸玩家 + 炸地形</b>。所以水晶必须完全免疫：{@code setInvulnerable(true)}
+     *       挡不住创造玩家与 {@code BYPASSES_INVULNERABILITY}，最终防线是
+     *       {@code BlessingCrystalMixin} 对本标记的 {@code hurt} 直接置 false。
+     *       两处都要打标记，mixin 只认标记。</li>
      * </ol>
      */
     private static void spawnDragonCrystals(ServerPlayer player) {
@@ -888,6 +906,10 @@ public class BossPhotoProjHelper {
             EndCrystal crystal = new EndCrystal(level, cx, groundY - 1.0, cz);
             crystal.setBeamTarget(beamTarget);
             crystal.setShowBottom(false);
+            // 免疫：setInvulnerable 挡住常规伤害；标记交给 BlessingCrystalMixin 兜住
+            // 创造玩家与 BYPASSES_INVULNERABILITY（否则一刀就是 6.0 破坏方块的爆炸）
+            crystal.setInvulnerable(true);
+            com.plumejade.lensouls.util.BlessingCrystalMarker.mark(crystal);
             level.addFreshEntity(crystal);
             ids.add(crystal.getUUID());
             // 兜底：本类正常到期会收走，这里防的是玩家下线/世界卸载等中断路径
@@ -923,24 +945,81 @@ public class BossPhotoProjHelper {
 
     // ========== 幻术师：幻影围攻 ==========
 
-    /** 幻翼存续 tick（60 = 3 秒） */
-    private static final int SWARM_TICKS = 60;
+    /** 幻翼存续 tick —— 口径在 {@link SwarmPhantomFade}（5 秒 + 末尾 1.5 秒渐隐） */
+    private static final int SWARM_TICKS = SwarmPhantomFade.DURATION_TICKS;
     /** 每次召唤的幻翼数 */
     private static final int SWARM_COUNT = 3;
     /** 幻翼生成时相对锚点的散布半径（格） */
     private static final double SWARM_SPREAD = 2.5D;
     /** 接触伤害判定距离（平方；2.5 格） */
     private static final double SWARM_HIT_DIST_SQR = 6.25D;
-    /** 追击寻路刷新间隔（tick）：寻路自带限流，逐 tick 重算只是浪费 */
-    private static final int SWARM_NAVI_INTERVAL = 2;
+    /** 换目标的最小间隔（tick）：避免每刻重算"最近敌人" */
+    private static final int SWARM_RETARGET_INTERVAL = 10;
+    /** 「玩家刚打中的目标」保留时长（tick） */
+    private static final int LAST_HIT_TTL = 100;
+
+    /**
+     * 本模组召唤的幻影幻翼标记（实体 persistentData 键）。
+     * <p>
+     * <b>为什么必须有这个标记</b>：幻翼本身是 {@code LivingEntity}，飞在玩家和目标旁边，
+     * 是「最近的生物」。而空挥路径（{@code hit == null}）与目标死亡后的兜底选敌都会退化成
+     * {@link #findNearestNonPlayer}，不排除自家召唤物就会选到上一批幻翼 ⇒
+     * <b>新一批幻翼把上一批当敌人打</b>（实测症状）。玩家顺手打到自家幻翼时，
+     * 经由 {@code LAST_HIT} 也会产生同一条误伤链。
+     * <p>
+     * 只用一个 persistentData 键、且所有读取点都在本类内，刻意<b>不复用</b>幻灵系统的
+     * {@code lensouls:phantom_minion}：那套标记会连带触发幻灵专属的穿透伤害、
+     * 目标硬拦截与击杀归属改写，语义不同，不该混用。
+     */
+    private static final String SWARM_PHANTOM_TAG = "lensouls:photo_swarm_phantom";
+
+    /** 是不是本模组召唤的幻翼（自家作战单位，永远不作为弹幕目标） */
+    private static boolean isSwarmPhantom(net.minecraft.world.entity.Entity e) {
+        return e != null && e.getPersistentData().getBoolean(SWARM_PHANTOM_TAG);
+    }
+
+    /** 玩家最近一次命中的敌人（触发点写入，弹幕选敌用） */
+    private record LastHit(java.util.UUID entity, long tick) {}
+    private static final Map<java.util.UUID, LastHit> LAST_HIT = new ConcurrentHashMap<>();
+
+    /**
+     * 记录玩家刚打中的敌人 —— 幻翼会优先扑这个目标。
+     * <p>
+     * 刻意用 {@code level.getGameTime()} 而不是 {@code server.getTickCount()}：后者是另一个计数器
+     * （两者只差一个常量偏移，但混用就变成拿两个时钟做差）。这里必须与
+     * {@link #resolveLastHit} 同源。
+     */
+    private static void rememberHit(ServerPlayer player, LivingEntity hit) {
+        if (hit == null || hit instanceof net.minecraft.world.entity.player.Player) return;
+        // 自家召唤的幻翼不算「玩家新打到的敌人」，否则打到自家幻翼会让整队掉头互殴
+        if (isSwarmPhantom(hit)) return;
+        if (com.plumejade.lensouls.util.PhotoTargetFilter.isIgnored(hit)) return;
+        LAST_HIT.put(player.getUUID(), new LastHit(hit.getUUID(), player.level().getGameTime()));
+    }
+
+    /** 解出玩家刚打中且仍然有效的目标（超时/已死/换维度/变玩家/是自家召唤物都视为无效） */
+    private static LivingEntity resolveLastHit(ServerPlayer player, ServerLevel level) {
+        LastHit lh = LAST_HIT.get(player.getUUID());
+        if (lh == null) return null;
+        if (level.getGameTime() - lh.tick() > LAST_HIT_TTL) {
+            LAST_HIT.remove(player.getUUID());
+            return null;
+        }
+        if (level.getEntity(lh.entity()) instanceof LivingEntity le && le.isAlive()
+                && !(le instanceof net.minecraft.world.entity.player.Player)
+                && !isSwarmPhantom(le)) {
+            return le;
+        }
+        return null;
+    }
 
     private record SwarmPhantom(ServerLevel level, java.util.UUID phantom, java.util.UUID caster,
-                                java.util.UUID anchor, long expireTick, float dmg) {}
+                                java.util.UUID anchor, long expireTick, float dmg, long nextRetarget) {}
     private static final List<SwarmPhantom> SWARM_PHANTOMS = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     /**
      * 幻术师：<b>幻影围攻</b> —— 在被攻击的敌人身边召出 3 只幻翼，幻翼锁定该敌人<b>主动追击</b>，
-     * 接触即造成等同攻击面板的伤害。
+     * 接触即造成等同攻击面板的伤害。玩家中途打到新目标时，幻翼会改扑新目标。
      * <p>
      * 「只打敌人、不打玩家」是对着 {@code Phantom.registerGoals()} 的实机字节码
      * （{@code javap -c} 核实）做的 —— 原版注册的是：
@@ -957,13 +1036,31 @@ public class BossPhotoProjHelper {
      * {@code GoalSelector.removeAllGoals(Predicate)} 也只有这一个重载 ——
      * 两者都不需要 mixin，也不需要反射。
      * <p>
-     * <b>不能用 setNoAi(true) 代替</b>：{@code PathNavigation.tick()} 位于
-     * {@code Mob.serverAiStep()} 内部，关掉 AI 会把寻路一起停掉，幻翼就成了原地摆拍
-     * （本项目 {@code StunPauseHelper} 的定身正是靠这一点生效）。保留 AI、只摘 goal，
-     * 寻路照跑，由 {@link #runPhantomSwarms} 每 2 tick 调一次 {@code moveTo} 驱动真正的三维飞行。
+     * <b>飞行与姿态：必须喂 {@code moveTargetPoint}，交给原版控制器</b>
+     * （对着实机字节码逐条核实，前两版都在这里翻过车）：
+     * <ol>
+     *   <li>寻路（{@code getNavigation().moveTo(...)}）<b>完全无效</b>：幻翼的 {@code moveControl}
+     *       是它自己的 {@code Phantom$PhantomMoveControl}，不是 {@code FlyingMob} 默认的
+     *       {@code FlyingMoveControl}；而 {@code FlyingMoveControl} 的 MOVE_TO 分支只给
+     *       {@code setYya} 赋值、从不设 {@code setZza}，加上 {@code FlyingMob.travel} 的
+     *       {@code moveRelative} 倍率写死 {@code 0.02f}（不读 {@code getSpeed()}），
+     *       水平位移恒为 0 —— 所以第一版「摘 goal + moveTo」的幻翼只是原地上下晃。</li>
+     *   <li>自己写 {@code setDeltaMovement} <b>同样不行</b>：{@code PhantomMoveControl.tick()}
+     *       是<b>唯一</b>设置 {@code setYRot}/{@code setXRot} 的地方，绕过它就等于「delta 指向目标、
+     *       而偏航俯仰永远停在生成时的 0」——实机表现正是「固定朝向、身子朝上」。</li>
+     *   <li>正解：只写私有的 {@code moveTargetPoint}（见 {@code PhantomMoveTargetAccessor}），
+     *       由原版控制器自己算偏航（{@code atan2(dz,dx)}，每 tick 转 4°）与俯仰、
+     *       并以 {@code speed}（航向对齐后向 1.8 加速 = 俯冲）合成速度。姿态因此天然正确。</li>
+     *   <li>{@code PhantomLookControl.tick()} 是<b>空实现</b>，{@code setLookAt(...)} 对幻翼毫无作用，
+     *       不要再用它控制朝向。</li>
+     * </ol>
      * <p>
-     * <b>范围限定</b>：只对这里 {@code addFreshEntity} 的那 3 只动手 —— 没有 mixin、没有全局注册，
-     * 全世界的幻术师、幻翼、自然生成物一律不受影响。
+     * 也<b>不用 setNoAi(true)</b>：那会连 {@code serverAiStep()} 一起停掉，而
+     * {@code moveControl.tick()} / {@code lookControl.tick()} 正在其中——幻翼就彻底不动了。
+     * 保留 AI、只摘 goal，正好让原版控制器接管飞行。
+     * <p>
+     * <b>范围限定</b>：只对这里 {@code addFreshEntity} 的那 3 只动手 —— 摘的是这两个实体实例的
+     * goal，accessor 只写我们自己的目标点；全世界的幻术师、幻翼、自然生成物一律不受影响。
      * <p>
      * 伤害走 {@code playerAttack}（<b>近战</b>伤害类型），因此不会被
      * {@code onRangedHit} 的 {@code RangedAttackHelper.isRanged} 认成远程 ⇒
@@ -972,10 +1069,13 @@ public class BossPhotoProjHelper {
     private static void spawnPhantomSwarm(ServerPlayer player, LivingEntity hit) {
         LivingEntity anchor = hit != null ? hit : findNearestNonPlayer(player, 16.0);
         if (anchor == null || anchor instanceof net.minecraft.world.entity.player.Player) return;
+        // 自家召唤物不是敌人：打到自家幻翼（或它恰好是"最近生物"）时不要再召一批去打它
+        if (isSwarmPhantom(anchor)) return;
         if (!(player.level() instanceof ServerLevel level) || level.getServer() == null) return;
 
         float dmg = playerFinalDamage(player);
-        long expireTick = level.getServer().getTickCount() + SWARM_TICKS;
+        long now = level.getServer().getTickCount();
+        long expireTick = now + SWARM_TICKS;
 
         for (int i = 0; i < SWARM_COUNT; i++) {
             Phantom ph = EntityType.PHANTOM.create(level);
@@ -985,14 +1085,20 @@ public class BossPhotoProjHelper {
                     anchor.getY() + 2.2 + i * 0.3,
                     anchor.getZ() + Math.sin(a) * SWARM_SPREAD);
             ph.setPhantomSize(2 + i);
-            // 不调 finalizeSpawn：1.21.1 该方法签名已是
-            // (ServerLevelAccessor, DifficultyInstance, MobSpawnType, SpawnGroupData)，
-            // 而幻翼无装备、尺寸上面已显式指定，省掉这一层没必要的依赖。
+            // 不调 finalizeSpawn：1.21.1 它的实现末尾会 setPhantomSize(0)（javap 核实），
+            // 会把上面显式设的体型抹掉；幻翼又无装备，本来也不需要它。
             ph.targetSelector.removeAllGoals(g -> true);
             ph.goalSelector.removeAllGoals(g -> true);
+            // 打上「自家召唤物」标记：必须在 addFreshEntity 之前，否则入世那一刻可能已被别处选敌扫到
+            ph.getPersistentData().putBoolean(SWARM_PHANTOM_TAG, true);
+            // 同步槽（标记 + 不透明度）也要在入世前写好，让生成包就带上它们
+            SwarmPhantomFade.mark(ph);
+            // 首帧就要有目标点，否则 moveTargetPoint 还是默认的 Vec3.ZERO，
+            // 第一个 tick 会朝世界原点扑一下
+            setSwarmTargetPoint(ph, anchor);
             level.addFreshEntity(ph);
             SWARM_PHANTOMS.add(new SwarmPhantom(level, ph.getUUID(), player.getUUID(),
-                    anchor.getUUID(), expireTick, dmg));
+                    anchor.getUUID(), expireTick, dmg, now));
             DISCARD_AT.put(ph.getUUID(), expireTick);
         }
     }
@@ -1012,11 +1118,16 @@ public class BossPhotoProjHelper {
                 continue;
             }
 
-            // 锚点失效（死了/被移除/换了维度）→ 就近换一个敌人；换不到就地收回
-            LivingEntity anchor = s.level().getEntity(s.anchor()) instanceof LivingEntity le ? le : null;
-            if (anchor == null || !anchor.isAlive()
-                    || anchor instanceof net.minecraft.world.entity.player.Player) {
-                anchor = findNearestNonPlayer(caster, 16.0);
+            boolean stale = now >= s.nextRetarget();
+            LivingEntity anchor;
+            if (stale) {
+                // 优先级：玩家刚打中的目标 > 原锚点（还活着）> 附近最近的敌人 > 收回
+                anchor = resolveLastHit(caster, s.level());
+                if (anchor == null) {
+                    LivingEntity recorded = isSelectableAnchor(s.level().getEntity(s.anchor()))
+                            ? (LivingEntity) s.level().getEntity(s.anchor()) : null;
+                    anchor = recorded != null ? recorded : findNearestNonPlayer(caster, 16.0);
+                }
                 if (anchor == null) {
                     ph.discard();
                     DISCARD_AT.remove(s.phantom());
@@ -1024,15 +1135,33 @@ public class BossPhotoProjHelper {
                     continue;
                 }
                 SWARM_PHANTOMS.set(i, new SwarmPhantom(s.level(), s.phantom(), s.caster(),
-                        anchor.getUUID(), s.expireTick(), s.dmg()));
+                        anchor.getUUID(), s.expireTick(), s.dmg(), now + SWARM_RETARGET_INTERVAL));
+            } else {
+                // 两次重算之间沿用缓存锚点；它一旦失效就本轮立刻重算
+                net.minecraft.world.entity.Entity cached = s.level().getEntity(s.anchor());
+                if (!isSelectableAnchor(cached)) {
+                    SWARM_PHANTOMS.set(i, new SwarmPhantom(s.level(), s.phantom(), s.caster(),
+                            s.anchor(), s.expireTick(), s.dmg(), now));
+                    continue;
+                }
+                anchor = (LivingEntity) cached;
             }
 
-            ph.setTarget(anchor);
-            if (now % SWARM_NAVI_INTERVAL == 0) {
-                ph.getNavigation().moveTo(anchor, 1.0D);
-            }
+            if (ph.getTarget() != anchor) ph.setTarget(anchor);
+
+            // ── 飞行：只喂目标点，位移/偏航/俯仰全部交给原版 Phantom$PhantomMoveControl ──
+            // 不要在这里写 setDeltaMovement，也不要 setLookAt（PhantomLookControl.tick 是空实现）。
+            setSwarmTargetPoint(ph, anchor);
+
+            // ── 渐隐：余命进入末尾 1.5 秒后逐 tick 由不透明线性降到全透明 ──
+            // 只在服务端算、写同步槽；客户端渲染时直接读（见 SwarmPhantomFade 的说明）。
+            SwarmPhantomFade.tickAlpha(ph, (int) (s.expireTick() - now));
 
             if (ph.distanceToSqr(anchor) < SWARM_HIT_DIST_SQR) {
+                // 最后一道闸：真到了结算这一步再确认一次锚点合法。
+                // 幻翼互殴的伤害源是 playerAttack(caster)（直接实体是玩家，不是幻翼），
+                // 所以伤害侧认不出「自己人打自己人」——这里与 onSwarmPhantomIncomingDamage 是两道拦截。
+                if (!isSelectableAnchor(anchor)) continue;
                 anchor.invulnerableTime = 0;
                 anchor.hurt(caster.damageSources().playerAttack(caster), s.dmg());
                 ph.swing(InteractionHand.MAIN_HAND);
@@ -1040,6 +1169,66 @@ public class BossPhotoProjHelper {
                         SoundSource.NEUTRAL, 1.0F, 1.2F);
             }
         }
+    }
+
+    /**
+     * 把飞行目标点写进原版幻翼的私有字段 {@code moveTargetPoint}，让
+     * {@code Phantom$PhantomMoveControl} 自己换算成偏航 / 俯仰 / 速度。
+     * <p>
+     * 取眼睛高度 + 0.4 而不是脚底：与另外三只的生成高度、以及「扑脸」的观感一致。
+     */
+    private static void setSwarmTargetPoint(Phantom ph, LivingEntity anchor) {
+        ((com.plumejade.lensouls.mixin.PhantomMoveTargetAccessor) (Object) ph)
+                .lensouls$setMoveTargetPoint(
+                        new Vec3(anchor.getX(), anchor.getEyeY() + 0.4D, anchor.getZ()));
+    }
+
+    /**
+     * 自家召唤的幻翼不受<b>玩家来源</b>的伤害：近战、横扫之刃、弓箭、照片弹幕、以及玩家召唤物的代打
+     * 全部免除（需求：玩家不要误伤幻翼）。
+     * <p>
+     * 用 {@link LivingIncomingDamageEvent}（可取消、且在无敌帧/护甲结算之前）而不是
+     * {@code LivingDamageEvent}：后者只能把伤害置 0，击退与受击动画照旧。与
+     * {@code PhotoProjSafetyHandler} 同一口径。
+     * <p>
+     * 沿 {@code Projectile.getOwner()} 链查，是因为照片弹幕与「召唤物代打」的真实攻击者
+     * 藏在 owner 上，只看直接实体会漏（这一点与 {@code PhotoProjMarker.isBarrageDamage} 同款教训）。
+     * <p>
+     * <b>顺带兜住了「幻翼互殴」</b>：幻翼打幻翼用的伤害源是 {@code playerAttack(caster)}，
+     * 造成者正是玩家 ⇒ 这里必然取消。选敌逻辑是主防线，这条是结构性兜底。
+     */
+    @SubscribeEvent
+    public static void onSwarmPhantomIncomingDamage(LivingIncomingDamageEvent event) {
+        if (event.getAmount() <= 0f) return;
+        if (!isSwarmPhantom(event.getEntity())) return;
+        if (isPlayerCaused(event.getSource())) event.setCanceled(true);
+    }
+
+    /** 该伤害是否可追溯到玩家（直接实体 / 造成者，各自再沿弹射物 owner 链向上） */
+    private static boolean isPlayerCaused(net.minecraft.world.damagesource.DamageSource source) {
+        return isPlayerChain(source.getDirectEntity()) || isPlayerChain(source.getEntity());
+    }
+
+    /** 沿弹射物 owner 链向上找玩家；限深防自引用 */
+    private static boolean isPlayerChain(Entity start) {
+        Entity e = start;
+        for (int depth = 0; e != null && depth < 8; depth++) {
+            if (e instanceof net.minecraft.world.entity.player.Player) return true;
+            e = e instanceof Projectile proj ? proj.getOwner() : null;
+        }
+        return false;
+    }
+
+    /**
+     * 该实体能不能当幻翼的锚点：活着、非玩家、<b>且不是本模组自己召唤的幻翼</b>。
+     * <p>
+     * 三处选敌（生成、重算、缓存校验）共用同一口径——分别手写判断正是第一版出现
+     * 「幻翼互殴」的原因：只要漏掉任意一处，自家幻翼就会从那一处流进来。
+     */
+    private static boolean isSelectableAnchor(net.minecraft.world.entity.Entity e) {
+        return e instanceof LivingEntity le && le.isAlive()
+                && !(le instanceof net.minecraft.world.entity.player.Player)
+                && !isSwarmPhantom(le);
     }
 
     // ========== archaion / fdbosses 兼容弹幕（运行时反射，可选 mod 缺席时优雅跳过）==========

@@ -8,6 +8,7 @@ import com.plumejade.lensouls.ability.client.ItemRenderTracker;
 import com.plumejade.lensouls.ability.client.StatusGlintBufferSource;
 import com.plumejade.lensouls.client.phantom.ClientPhantomHandler;
 import com.plumejade.lensouls.client.phantom.PhantomBufferSource;
+import com.plumejade.lensouls.entity.SwarmPhantomFade;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -83,6 +84,14 @@ public abstract class EntityRenderDispatcherMixin {
         Entity root = resolveRoot(entity);
         if (ItemRenderTracker.isRenderingItem()) {
             renderer.render(entity, rotationYaw, partialTicks, poseStack, buffer, packedLight);
+            return;
+        }
+        // 幻术师照片召唤的幻影幻翼：alpha 逐 tick 由服务端同步（末尾渐隐到全透明）。
+        // 放在状态光效判定之前，让渐隐永远胜过其它渲染包装——否则被冻结/上光效时淡出会失效。
+        Float swarmAlpha = SwarmPhantomFade.alphaOrNull(root);
+        if (swarmAlpha != null) {
+            renderer.render(entity, rotationYaw, partialTicks, poseStack,
+                    new PhantomBufferSource(buffer, swarmAlpha), packedLight);
             return;
         }
         StatusGlintBufferSource.State state = StatusGlintBufferSource.resolveState(root);

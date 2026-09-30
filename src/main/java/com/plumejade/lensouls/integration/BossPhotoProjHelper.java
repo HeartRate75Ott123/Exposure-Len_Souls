@@ -710,8 +710,15 @@ public class BossPhotoProjHelper {
 
     /** 湮灭激光的射线长度：本体对「玩家 caster」会再砍一半，所以传 60 → 实际 30 格 */
     private static final float ANNIHILATION_BEAM_REACH = 60.0F;
-    /** 激光存活 tick（本体 DURATION：每 tick 沿射线做一次实体判定，到点 discard） */
-    private static final int ANNIHILATION_BEAM_TICKS = 30;
+    /**
+     * 激光存活 tick（本体 DURATION：每 tick 沿射线做一次实体判定，到点 discard）。
+     * <p>
+     * 取 <b>36 = 3 个「爆点动画整轮」</b>：命中点的爆点一轮 = 5 帧 × 120 ms = 12 tick
+     * （{@code client/render/AnnihilationBurstClock}）。原值 30 = 2.5 轮，光束会在半轮上结束；
+     * 用户要求「至少等这轮动画放完再结束生命」，所以本体寿命对齐到整轮边界
+     * （配合 {@code mixin/compat/AnnihilationExplosionRoundMixin} 让收尾那一整轮也放完）。
+     */
+    private static final int ANNIHILATION_BEAM_TICKS = 36;
     /** 额外附加的目标最大生命百分比（本体 {@code Hpdamage} 是百分数：damage + maxHealth × Hpdamage × 0.01） */
     private static final float ANNIHILATION_BEAM_HP_PERCENT = 2.0F;
 

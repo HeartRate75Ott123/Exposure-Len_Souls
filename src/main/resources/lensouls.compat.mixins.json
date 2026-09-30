@@ -72,7 +72,8 @@
     "BetterCombatRangeMixin",
     "GytrinketCameraChargeMixin",
     "AnnihilationBeamCrossRenderMixin",
-    "DeathLaserCrossRenderMixin"
+    "DeathLaserCrossRenderMixin",
+    "AnnihilationExplosionRoundMixin"
   ],
   "injectors": {
     "defaultRequire": 0

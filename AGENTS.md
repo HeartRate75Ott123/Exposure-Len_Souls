@@ -1214,3 +1214,84 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
 - **待实机验证**：平视/抬头/低头看都是正交十字（不再退化成一张）；爆点 0.6 秒一涨一缩持续动、
   消失时照旧收束；`B` 键开关的动作栏提示与动态键名、关掉后不再触发弹幕；幻灵击杀算玩家；
   狗/猫等驯服生物不再被弹幕误伤。
+
+## 需求批次（`1.5.18`）：湮灭激光命中地面的「爆点」不再定格（共享时钟帧）
+
+### 47. 真凶不是光束收尾面片，而是 `annihilation_explosion` 粒子
+
+- 用户口径：截图里那团**绿色穹顶**才是他说的「爆点」，「不是紧贴地面那个」，贴图认成
+  `annihilation_explosion_3.png` —— **认对了**（第 45 节改的 `renderEnd` 帧号是光束自己的收尾面片，与它无关，保留）。
+- 追查过程（全部对着实机 jar 2.1.20）：
+  - `AnnihilationExplosionEntity` / `AnnihilationGroundNukeStrikeEntity` / `AnnihilationGeyserEntity`
+    都 `extends INoRendererEntity` ⇒ **没有自己的渲染器**，画面全是粒子；
+  - 命中判定在光束自己身上：`AnnihilationBeamEntity.tick()` 里 `if (blockSide != null) spawnExplosionParticles(5)`
+    —— **每 tick 一次**（只要还插在方块上）；
+  - `spawnExplosionParticles(int)`：`for (i < count)` 循环，5 个 `ModParticles.ANNIHILATION_EXPLOSION` 全部
+    `addParticle` 在**同一个命中点**（后三个参数是速度，而 `AnnihilationExplosion` 的构造器把速度丢了
+    ⇒ 粒子**完全不移动**，`tick()` 里只把 xo/yo/zo 抄一遍）；
+  - `AnnihilationExplosion`：`lifetime = 12`、`quadSize = 2.0`、每 tick `setSpriteFromAge()` 按**自己的年龄**
+    在 8 张 `annihilation_explosion_*` 里挑帧（`index = age × 7 ÷ 12`，整数除法 ⇒ 实际只走得到 0~6）；
+  - ⇒ 命中点同时叠着 ~60 个「年龄各不相同」的粒子，统计上是一个**恒定混合** ⇒ 看着定格；
+    光束消失、生成停下后，剩下的粒子才把最后几帧走完（用户原话：「只在消失时有动画，前边的生命都是静帧」）。
+- 修法（把挑帧的**年龄**换成**共享时钟**）：`client/render/AnnihilationBurstClock`
+  + `mixin/client/AnnihilationExplosionClockMixin`：
+  - 落点是原版 `TextureSheetParticle.setSpriteFromAge(SpriteSet)` 方法体里的
+    `sprites.get(this.age, this.lifetime)`，用 `@ModifyArg(index = 0)` 改 age
+    （javap 核实 vanilla 该方法的字节码就这一处 `SpriteSet.get(II)` 调用）；
+  - 用**原版类**做宿主是为了不必碰 protected 的 `setSprite`（否则要 `@Shadow` 继承成员或加 invoker）；
+    判定按**类名惰性解析**（`Class.forName(name, false, loader)` + `isInstance`），
+    LM 缺席时永远 false、纹理帧原样放行 ⇒ 放在主配置 `lensouls.mixins.json` 的 client 数组里；
+  - 伪年龄查表 `{4, 6, 7, 9, 11}` ↔ 帧 `{2,3,4,5,6}`（反解自 `index = age × (size−1) ÷ lifetime`，
+    size = 8、lifetime = 12），**跳过帧 0/1**（一个亮点、一个星芒：同步后整团一起换帧，落在那两帧上
+    穹顶会几乎看不见）；每帧 120 ms ⇒ 一轮 0.6 秒（用户选定口径）；
+  - **粒子真实 `age` 不动** ⇒ 生命周期/移除时机/数量/位置/伤害全不受影响；
+    对照片弹幕与 BOSS 本体自己放的湮灭激光**一律生效**（同一套粒子）。
+- 交付：版本 `1.5.18`：`.\gradlew.bat build` 通过；`tools/MixinSelfCheck` 全绿（47 条 `targets` 项；
+  本条用的是 `@Mixin(TextureSheetParticle.class)` 按类引用，工具按设计跳过 → 已手工 javap 核对注入点）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.18.jar`（5,923,277 字节），
+  MD5 `165F41D5AC6318A6A90B2C91ED90A49E`。**1.5.17 作废，别分发**。
+- 字节核验：TOML `version="1.5.18"`；`lensouls.mixins.json` client 数组含
+  `client.AnnihilationExplosionClockMixin`；实读注解为
+  `@Mixin(TextureSheetParticle.class)` +
+  `@ModifyArg(method="setSpriteFromAge", target="Lnet/minecraft/client/particle/SpriteSet;get(II)Lnet/minecraft/client/renderer/texture/TextureAtlasSprite;", index=0)`。
+- **待实机验证**：湮灭激光打在地面/方块上时，那团绿色爆点应**整团一起**在
+  「实心环 → 虚线环 → 翻滚消散」之间 0.6 秒一轮循环，而不是定格到消失才动。
+
+### 48. 收尾对齐整轮（`1.5.19`）：光束寿命 3 整轮 + 爆点只死在轮边界
+
+- 用户口径（1.5.18 之后）：**「做个优化，至少等这轮动画放完再结束生命」** → 追问后选「两个都做」。
+- 时间线事实：爆点一轮 = 5 帧 × 120 ms = 600 ms = **12 tick**；而照片弹幕的湮灭激光本体原本
+  `ANNIHILATION_BEAM_TICKS = 30`（= 2.5 轮）⇒ 光束本体在整轮中途结束，收尾永远是「截动画」。
+- 两处落点：
+  1. `BossPhotoProjHelper.ANNIHILATION_BEAM_TICKS` 30 → **36**（= 3 × 12 tick），本体寿命对齐整轮边界
+     （命中判定窗口随之 +6 tick，用户已知晓）；
+  2. 新 `mixin/compat/AnnihilationExplosionRoundMixin`：只改 `AnnihilationExplosion.tick()` 里那次
+     `lifetime` 读取 ——
+     - 还在粒子出生那一轮 → 返回 `Integer.MAX_VALUE - 1`：**不许死**，于是 `setSpriteFromAge`
+       照常每 tick 执行、帧继续跟着共享时钟走（这点必须保住，否则第二轮起粒子会冻在最后一帧）；
+     - 已跨过轮边界 → 返回真实寿命 `AnnihilationBurstClock.BURST_LIFETIME = 12`：年龄 ≥ 12 的粒子
+       这时才一起消失。
+     合起来：粒子寿命落在 **12~24 tick** 且**只会在轮边界上消失** ⇒ 光束停止补粒子后，那一坨把
+     当前这一整轮（含最后的消散帧）放完才收尾；密度也不会出现「刚跨轮就空掉」的锯齿
+     （出生轮的粒子还活着，同点同帧互相重叠，观感与 1.5.18 一致）。
+  - 出生轮号用 `@Unique private long lensouls$spawnRound`（`@Inject(method = "<init>", at = @At("RETURN"))` 写入）。
+- **关键字节码坑（差点写错）**：LM 的常量池把继承来的成员记成了**它自己的类**：
+  `#7 = Fieldref …Particle/custom/AnnihilationExplosion.lifetime:I`、
+  `#69 = Methodref …AnnihilationExplosion.remove:()V`。所以 `@At` 的 target **必须**照抄
+  `Lnet/miauczel/legendary_monsters/Particle/custom/AnnihilationExplosion;lifetime:I`；
+  写成 `Lnet/minecraft/client/particle/Particle;lifetime:I` 会一条都匹配不上（`require = 1` 会当场报错）。
+  另核实：`tick()` 里 `lifetime` 只读 1 次（offset 36）、`age` 只读 1 次（读的是自增前的值，
+  语义是 `if (age >= lifetime)`）；vanilla 的 `setSpriteFromAge` 自己读真 `lifetime`(12)，
+  所以第 47 节那张伪年龄查表（`age × 7 ÷ 12`）不受影响。
+- **自检口径提醒**：`tools/MixinSelfCheck` 对**字段选择器**只做语法校验
+  （`parseMemberRef` 只解析方法选择器，字段会 `continue` 跳过存在性检查），所以字段注入点要自己
+  `javap -v` 对常量池 owner —— 本次已核。
+- 交付：版本 `1.5.19`：`.\gradlew.bat build` 通过；`tools/MixinSelfCheck` 全绿；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.19.jar`（5,924,417 字节），
+  MD5 `ABF45A99C8B9CCD9C8FD3B950D4B2BF7`。**1.5.18 及更早作废，别分发**。
+- 字节核验：TOML `version="1.5.19"`；compat json client 数组含 `AnnihilationExplosionRoundMixin`；
+  `AnnihilationBurstClock` 含 `ROUND_MILLIS` / `BURST_LIFETIME` / `currentRound`；
+  mixin 内 `@At` target 字符串实读为 `Lnet/miauczel/legendary_monsters/Particle/custom/AnnihilationExplosion;lifetime:I`，
+  `@Unique` 字段 `lensouls$spawnRound:J` 在位。
+- **待实机验证**：湮灭激光命中地面时爆点整团随共享时钟翻滚；光束消失后，那一坨**把当前这一整轮放完**
+  才在轮边界一起消失（不再中途截断），且整段时间密度不塌。

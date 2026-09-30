@@ -1,16 +1,24 @@
 package com.plumejade.lensouls.entity;
 
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.damagesource.DamageSource;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
+
+import java.util.UUID;
 
 /**
  * 幻灵防误伤 + 穿透伤害 + 召唤物效果赦免。
@@ -27,16 +35,30 @@ import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
  * <p>
  * 穿透伤害：仅借体 BOSS 本体每次命中非玩家时覆盖为固定穿透伤害
  * （按镜魂等级 1-5：20 / 36 / 42 / 70 / 74，无视护甲/伤害桶/单次上限）。
+ * <p>
+ * 击杀归属：幻灵本体、它召出的随从、以及它们射出的弹幕，杀死的怪都算<b>召唤者玩家</b>的击杀
+ * （{@link #resolveOwnerUUID} 是归属的唯一事实来源，写入点见 {@code BossPhantomManager}）。
+ * 伤害数值、穿透伤害、韧性减伤一概不变，<b>只改归属</b>。
  */
 public class PhantomDamageHandler {
 
     private static final int[] PEN_DAMAGE = {20, 36, 42, 70, 74};
 
+    // ---- persistentData 键（写入点：BossPhantomManager；读法统一走本类常量）----
+    /** 借体 BOSS 本体标记 */
+    public static final String PHANTOM_TAG = "lensouls:phantom";
+    /** 借体 BOSS 演出期间召出的随从标记 */
+    public static final String PHANTOM_MINION_TAG = "lensouls:phantom_minion";
+    /** 幻灵本体与随从都写入的召唤者玩家 UUID（击杀归属的事实来源） */
+    public static final String PHANTOM_OWNER_TAG = "lensouls:phantom_owner";
+    /** 幻灵镜魂等级 1-5，决定穿透伤害档位 */
+    public static final String PHANTOM_LEVEL_TAG = "lensouls:phantom_level";
+
     /** 实体本身是否是幻灵（借体 boss 本体 / 召唤物），用于幻灵之间不互殴的隔离判断 */
     public static boolean isPhantomEntity(Entity e) {
         if (e == null) return false;
-        return e.getPersistentData().getBoolean("lensouls:phantom")
-                || e.getPersistentData().getBoolean("lensouls:phantom_minion");
+        CompoundTag tag = e.getPersistentData();
+        return tag.getBoolean(PHANTOM_TAG) || tag.getBoolean(PHANTOM_MINION_TAG);
     }
 
     /** 递归判定实体是否属幻灵来源：本体 / 召唤物 / 弹幕 owner（供效果与推动拦截共用） */
@@ -47,6 +69,131 @@ public class PhantomDamageHandler {
             return isPhantomSource(proj.getOwner());
         }
         return false;
+    }
+
+    /**
+     * 驯服生物（狼、猫、鹦鹉、马…）：玩家宠物，<b>不算敌人</b>。
+     * <p>
+     * 三处共用同一口径，避免「幻灵打狗 / 弹幕打狗 / 幻灵把狗当最近敌人」各写各的判断：
+     * 幻灵选敌（{@code BossPhantomManager}）、照片弹幕误伤保护（{@code PhotoProjSafetyHandler}）。
+     * <p>
+     * 只看 {@code isTame()} 不看主人：弹幕的免伤口径是「所有驯服生物一律免疫」，
+     * 选敌则本来就该绕开任何宠物（不分是谁的）。
+     */
+    public static boolean isTamedPet(Entity e) {
+        return e instanceof TamableAnimal tame && tame.isTame();
+    }
+
+    /**
+     * 该伤害的召唤者玩家 UUID——<b>击杀归属的唯一事实来源</b>。
+     * <p>
+     * 沿「直接实体 → 真实攻击者」两路查，各自再沿 {@code Projectile.getOwner()} 链递归，
+     * 因为幻灵的伤害有三种落法：本体近战（直接实体=本体）、本体远程（直接实体=它射出的弹）、
+     * 随从（直接实体=随从，或随从射出的弹）。只查直接实体会漏掉后两种。
+     * <p>
+     * {@code owner} 为 null 表示「不是幻灵造成的」，调用方据此原样处理。
+     */
+    public static UUID resolveOwnerUUID(DamageSource source) {
+        if (source == null) return null;
+        UUID id = ownerOfChain(source.getDirectEntity());
+        if (id != null) return id;
+        return ownerOfChain(source.getEntity());
+    }
+
+    /** 同 {@link #resolveOwnerUUID(DamageSource)}，但从任意实体出发（供只拿到实体的调用方使用） */
+    public static UUID resolveOwnerUUID(Entity start) {
+        return ownerOfChain(start);
+    }
+
+    /** 沿弹射物 owner 链向上找幻灵标记实体；限深防自引用（幻灵弹 owner 指向自己）导致的死循环 */
+    private static UUID ownerOfChain(Entity start) {
+        Entity e = start;
+        for (int depth = 0; e != null && depth < 8; depth++) {
+            CompoundTag tag = e.getPersistentData();
+            if (tag.getBoolean(PHANTOM_TAG) || tag.getBoolean(PHANTOM_MINION_TAG)) {
+                return tag.hasUUID(PHANTOM_OWNER_TAG) ? tag.getUUID(PHANTOM_OWNER_TAG) : null;
+            }
+            e = e instanceof Projectile proj ? proj.getOwner() : null;
+        }
+        return null;
+    }
+
+    /** 解析召唤者并取到在线的 {@link ServerPlayer}（离线＝幻灵残留，归属无处可落） */
+    public static ServerPlayer resolveOwnerPlayer(DamageSource source) {
+        UUID id = resolveOwnerUUID(source);
+        if (id == null) return null;
+        var server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) return null;
+        return server.getPlayerList().getPlayer(id);
+    }
+
+    /**
+     * 把幻灵造成的死亡事件的 {@code DamageSource} 改写成「召唤者玩家造成」，其余原样保留。
+     * <p>
+     * 只换<b>造成者</b>（{@code getEntity()}），<b>直接实体</b>（{@code getDirectEntity()}）保持幻灵/
+     * 幻灵的弹原样：自家那套读直接实体的判定（{@code isSelfHit}、{@code isBarrageDamage}、
+     * 穿透伤害档位、伤害类型标签）因此完全不受影响。
+     * <p>
+     * <b>为什么非改不可</b>：1.21.1 的 {@code DamageSource} 是不可变的，而 NeoForge 既没给
+     * {@code LivingDamageEvent.Pre} 提供换 source 的口子（{@code DamageContainer.source} 是
+     * {@code final} 无 setter）、也已经移除了 {@code LivingAttackEvent}，所以事件里根本改不动它。
+     * 只能 mixin {@code CommonHooks.onLivingDeath} 在构造事件时换。
+     * <p>
+     * <b>为什么只在死亡时换</b>：击杀类检测（FTB Quests 走 Architectury 的
+     * {@code EntityEvent.LIVING_DEATH}、判 {@code source.getEntity() instanceof ServerPlayer}）
+     * 全都只在这一刻取 source。只要在这换，击杀就算玩家的；
+     * 而 {@code LivingDamageEvent} 阶段拿到的仍是原始 source，元素活性、命中率掷骰、
+     * 韧性减伤、口哨 -80%、弹幕远程命中触发等十几处「玩家造成」的判定一律维持原样。
+     * <p>
+     * 唯一代价：「累计造成 N 点伤害」类的任务不统计幻灵伤害（击杀类照常）。
+     * <p>
+     * 非幻灵来源、受害者是玩家、召唤者已离线、或本来就是该玩家 → 原样返回。
+     */
+    public static DamageSource creditOwner(DamageSource source, LivingEntity victim) {
+        if (source == null || victim == null) return source;
+        if (victim instanceof Player) return source;   // 不改玩家的死亡归属
+        ServerPlayer owner = resolveOwnerPlayer(source);
+        if (owner == null || source.getEntity() == owner) return source;
+        return new DamageSource(source.typeHolder(), source.getDirectEntity(), owner,
+                source.getSourcePosition());
+    }
+
+    /**
+     * 幻灵击杀的<b>掉落与经验</b>归属玩家。
+     * <p>
+     * 与 {@link #creditOwner} 是同一件事的两半，缺一不可：那边改的是事件携带的
+     * {@code DamageSource}（给击杀类检测看），这边补的是实体身上的 {@code lastHurtByPlayer}
+     * （给掉落/经验看）——后者在 {@code actuallyHurt} 阶段就按<b>原始</b> source 算过了
+     * （那时造成者是幻灵，值为 null），改写事件 source 追溯不到它。
+     * <p>
+     * 掉落与经验的<b>真正判定源</b>正是 {@code lastHurtByPlayer}/{@code lastHurtByPlayerTime}——
+     * {@code LivingEntity.die} 的顺序是 {@code CommonHooks.onLivingDeath(→ LivingDeathEvent)} →
+     * {@code getKillCredit()} → {@code dropAllDeathLoot()}（用 {@code lastHurtByPlayerTime > 0} 与
+     * {@code LAST_DAMAGE_PLAYER}）→ {@code dropExperience()}（同样查 {@code lastHurtByPlayer}），
+     * 全程不跨 tick。
+     * <p>
+     * ⇒ 在本事件里 {@code setLastHurtByPlayer} 来得及生效，且恰好把击杀分算给玩家：
+     * 战利品（含 {@code LAST_DAMAGE_PLAYER} 与玩家幸运）、经验球、击杀分（{@code MOB_KILLS}）、
+     * {@code LivingDropsEvent#isRecentlyHit()} 全部按玩家算。
+     * <p>
+     * {@code setLastHurtByPlayer} 会把计时器设成 {@code tickCount} 而非原版的 100，
+     * 但死亡当刻就被消费、中间不 tick，实际无影响——不需要为此加 accessor mixin。
+     * <p>
+     * 事件里的 source 已被 mixin 换过（造成者是玩家），但直接实体仍是幻灵，
+     * 所以 {@link #resolveOwnerPlayer} 照旧从直接实体解析，不会失效。
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingDeath(LivingDeathEvent event) {
+        if (event.getEntity().level().isClientSide) return;
+        LivingEntity victim = event.getEntity();
+        if (victim instanceof Player) return;   // 不改玩家的死亡归属
+        if (isPhantomEntity(victim)) return;    // 幻灵互殴（本就已被防住），不再叠一层
+
+        ServerPlayer owner = resolveOwnerPlayer(event.getSource());
+        if (owner == null || owner == victim) return;
+
+        victim.setLastHurtByPlayer(owner);
+        victim.setLastHurtByMob(owner);
     }
 
     /** 防误伤：幻灵来源（直接来源或真实攻击者，含弹幕 owner）对玩家全免；幻灵之间也不互殴（幻灵来源同样不可伤其他幻灵）。 */
@@ -107,12 +254,12 @@ public class PhantomDamageHandler {
         if (attacker == null) return;
 
         // 仅借体 BOSS 本体穿透；召唤物按正常伤害结算
-        if (!attacker.getPersistentData().getBoolean("lensouls:phantom")) return;
+        if (!attacker.getPersistentData().getBoolean(PHANTOM_TAG)) return;
 
         // 玩家已在 LivingIncomingDamageEvent 拦截，此处仅处理非玩家
         if (event.getEntity() instanceof Player) return;
 
-        int level = attacker.getPersistentData().getInt("lensouls:phantom_level");
+        int level = attacker.getPersistentData().getInt(PHANTOM_LEVEL_TAG);
         if (level < 1 || level > 5) level = 1;
         event.setNewDamage(PEN_DAMAGE[level - 1]);
     }

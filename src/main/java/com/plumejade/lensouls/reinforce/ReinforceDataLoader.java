@@ -54,6 +54,10 @@ import java.util.Set;
  * </pre>
  * 键名以 {@code _} 开头的项被忽略（便于写注释）。
  * <p>
+ * <b>不变量：所有强化材料都不能作为被强化目标。</b>加载时会把全部材料 ID 并入黑名单集合
+ * （因此对材料而言 {@link #isBlacklisted(ResourceLocation)} 与 {@link #isMaterial} 恒为 true），
+ * 两条强化路径、选物界面的红蒙版与服务端的拒绝提示都只查黑名单，合并这一处即全覆盖。
+ * <p>
  * 材料在列表中的顺序 = JSON 中的书写顺序（GUI 的默认排列；收藏项由客户端提到最前）。
  */
 public class ReinforceDataLoader extends SimpleJsonResourceReloadListener {
@@ -149,10 +153,17 @@ public class ReinforceDataLoader extends SimpleJsonResourceReloadListener {
             }
         }
 
+        // 强化材料一律不能作为被强化目标：把全部材料 ID 并入黑名单。
+        // 必须放在解析循环之后——这样任何来源的材料都覆盖得到，不只是本模组 materials.json 里那些，
+        // 其它整合包/附属包写在 data/<ns>/reinforcement/*.json 里的材料同样自动被拦。
+        // 合并这一处即全覆盖：两条强化路径（GUI 快捷强化 / 工作台合成）、选物界面的红蒙版、
+        // 服务端的拒绝提示本来就只查 isBlacklisted()。材料仍可照常当材料使用，只是不能再当目标。
+        newBlacklist.addAll(newMaterials.keySet());
+
         materials = newMaterials;
         blacklist = newBlacklist;
         VERSION.incrementAndGet();
-        LenSouls.LOGGER.info("[Reinforce] Loaded {} materials, {} blacklisted items{}",
+        LenSouls.LOGGER.info("[Reinforce] Loaded {} materials (all auto-blocked as targets), {} blacklisted items{}",
                 materials.size(), blacklist.size(), badModifiers > 0 ? " (" + badModifiers + " invalid modifiers skipped)" : "");
     }
 

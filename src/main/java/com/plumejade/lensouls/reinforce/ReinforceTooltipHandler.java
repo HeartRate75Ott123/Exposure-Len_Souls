@@ -26,16 +26,21 @@ public class ReinforceTooltipHandler {
 
         ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
         ReinforceMaterial material = ReinforceDataLoader.getMaterial(itemId);
-        if (material != null && !material.modifiers().isEmpty()) {
-            tooltip.add(Component.translatable("item.lensouls.reinforce.material_header")
-                    .withStyle(ChatFormatting.DARK_GRAY));
-            for (ReinforceModifier modifier : material.modifiers()) {
-                tooltip.add(Component.literal(" ").append(modifier.describe())
-                        .append(" ").append(modifier.slotSuffix()));
+        if (material != null) {
+            if (!material.modifiers().isEmpty()) {
+                tooltip.add(Component.translatable("item.lensouls.reinforce.material_header")
+                        .withStyle(ChatFormatting.DARK_GRAY));
+                for (ReinforceModifier modifier : material.modifiers()) {
+                    tooltip.add(Component.literal(" ").append(modifier.describe())
+                            .append(" ").append(modifier.slotSuffix()));
+                }
+                for (String line : material.desc()) {
+                    tooltip.add(Component.literal(line).withStyle(ChatFormatting.GRAY));
+                }
             }
-            for (String line : material.desc()) {
-                tooltip.add(Component.literal(line).withStyle(ChatFormatting.GRAY));
-            }
+            // 材料一律不能作为被强化目标（加载时已并入黑名单），显式说明原因——
+            // 否则玩家看到钻石这类材料在选物界面带红蒙版、点了只提示「该物品不可强化」，很难自己推出规则。
+            tooltip.add(Component.translatable("item.lensouls.reinforce.not_target"));
         }
 
         int used = ReinforceHelper.usedCount(stack);

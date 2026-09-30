@@ -1119,3 +1119,98 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   - {火 + 弹射物} 双弱点怪物：弓箭命中 = 全额 + 弹射物增伤（不再 ×0.1）；非火武器近战仍按原口径 ×0.1
     （除非武器带火活性/弱点透镜照片）；
   - 0 值占位条目（`"fire": 0`）不再把非火武器拦成 10%。
+
+## 需求批次（`1.5.12`~`1.5.15`）：弹幕开关 / 击杀归属 / 驯服宠物免伤（随行改动，与 1.5.17 一起交付）
+
+### 43. 三条诉求与落点
+
+- **照片弹幕开关（默认 `B` 键，玩家级，架构照搬转换器的模式切换：客户端上报 + 服务端权威 + 动态键名提示）**：
+  - `util/BarrageToggle`：状态落玩家 `persistentData`（键 `lensouls:barrage_enabled`），**键不存在 = 开启**
+    —— 老存档与没切过的玩家手感一律不变。与转换器模式的唯一结构差异：转换器模式挂在**物品组件**（逐物品、
+    随物品走），弹幕没有载体物品，所以落玩家数据（NeoForge 会写进玩家存档，重进游戏记得选择）。
+  - `key/KeyBindings` 新增 `BARRAGE_KEY`（`key.lensouls.barrage`，默认 `GLFW_KEY_B`，`KeyConflictContext.IN_GAME`）：
+    按下 → 本地乐观翻转 `client/ClientBarrageState`（保证提示即时）→ C2S `BarrageTogglePacket` →
+    服务端权威翻转 + 回发 S2C `BarrageStatePacket`（登录时补发对齐）。裁决点在 `BossPhotoProjHelper.trigger`。
+  - 提示显示在**物品栏上方**（`displayClientMessage(..., true)` 动作栏）：`§a弹幕：开启（按 <实际键名> 切换）`，
+    键名取 `KeyMapping.getTranslatedKeyMessage()` —— 玩家在「操作设置」里改键后提示跟着变，不写死「B」
+    （与 `ConverterItem` 的动态键名同款做法）。
+- **幻灵击杀归属玩家**：`mixin/PhantomKillCreditMixin` 对 `CommonHooks.onLivingDeath` 里
+  `new LivingDeathEvent(...)` 做 `@Redirect`，用 `PhantomDamageHandler.creditOwner(src, entity)`
+  只把**造成者**换成召唤者玩家（**直接实体仍是幻灵、伤害类型不变**）。
+  - 为什么必须 mixin：1.21.1 的 `DamageSource` 不可变、`DamageContainer.source` 是 final 且无 setter，
+    事件阶段（`LivingDamageEvent.Pre`）改不动它；`LivingAttackEvent` 在 1.21.1 已被移除。
+  - 为什么在这一刻：`LivingEntity.die` 第一行就调 `CommonHooks.onLivingDeath`，之后才
+    `getKillCredit()` / `dropAllDeathLoot()` / `dropExperience()`；FTB Quests 等判
+    `source.getEntity() instanceof ServerPlayer` 的模组全挂在这一个事件上。
+  - 为什么**只**在这一刻：`LivingDamageEvent` 阶段拿到的仍是原始 source，所以本模组十几处
+    「玩家造成」判定（元素活性/弱点、命中率掷骰、韧性减伤、灵魂口哨、弹幕远程触发…）全部维持原样：
+    幻灵打人不触发照片弹幕、也不吃玩家元素加成。
+  - 坑：回调**必须 static**（目标是 static 方法，否则启动期
+    `InvalidInjectionException: non-static callback method ... has a static target`）；NeoForge 类不混淆 ⇒
+    `remap = false`。
+- **弹幕不再误伤驯服生物**：`handler/PhotoProjSafetyHandler` 的免除名单由「玩家」扩为「玩家 + 任何驯服生物」
+  （`PhantomDamageHandler.isTamedPet`：狼/猫/鹦鹉/马…）。理由是选敌 `findNearestNonPlayer` 只排除玩家，
+  玩家身边的狗会挤进弹道；口径取「只要驯服就不打」（队友的宠物挡弹道同样算误伤）。
+  只掐 `PhotoProjMarker.isBarrageDamage` 的弹幕：玩家自己用剑/弓打自己的狗照旧掉血。
+- 同批随行：强化界面（`gui/ReinforceMenu`、`gui/ReinforceSelectScreen`、`reinforce/ReinforceDataLoader`、
+  `reinforce/ReinforceTooltipHandler`、`data/lensouls/reinforcement/blacklist.json`）、
+  `entity/BossPhantomManager`、`entity/PhantomDamageHandler`、`handler/WhistlePhantomHandler`、
+  `event/GunKillHandler`、`integration/PhotoSpecialEffects`、`integration/PhotographEffectRegistry`、语言文件。
+
+## 需求批次（`1.5.16`→`1.5.17`）：湮灭/先驱者激光回到「原作两片」+ 爆点持续动画
+
+### 44. 光束几何：撤掉 4 面方管，回到原作 2 片，只修「平视退化」
+
+- 用户口径（1.5.9 的方管之后又一轮纠偏）：**「就按原作两片吧」+「修复平视 bug，但两片」**。
+- 字节码事实（LM 2.1.20 `AnnihilationBeamRenderer.renderBeam`、灾变 3.32 `Death_Laser_beam_Renderer.renderBeam`，
+  两边结构一致）：
+  - `drawBeam` 各恰好 2 处 ⇒ 光束体本来就是 **2 张面片**；
+  - 两张面片的滚转角是 `+(相机俯仰+90°)` 与 `−(相机俯仰+90°)` ⇒ **两面片夹角 = 2×滚转角**：
+    俯仰 0° → **0°（完全重合 = 用户说的「纸片」）**、−45° → 90°（正交）、90° → 0°（又重合）
+    ⇒ **这个退化是原作自身的 bug**，不是我们改出来的；
+  - `clearerView`（= 施法者是本地玩家且第一人称）为 true 时：第 1 张**不滚转**、第 2 张**整段跳过** ⇒ 只剩 1 张；
+  - 灾变第一张的 `rotationY` 传的是**弧度**却按度数写（`相机俯仰+90` 忘了 ×π/180），是原作另一处 bug。
+- 实现（`1.5.8` 那套已被实机确认的写法，这次从方管回退到它）：
+  1. `@Inject` 在 `render` 调 `renderBeam` 之前：`PhotoProjMarker.isBarrage` 打标 + 我们的弹幕
+     `clearerView = false`（两张都要画；放在这个位置而非 `render` 开头，是因为 `renderStart` 已带原值跑过
+     ⇒ 起手贴脸光斑照旧跳过）；
+  2. `@ModifyArg` 把两个滚转角**钉成 ±45°**（"原作在相机俯仰 −45° 时才成立的理想夹角"，钉死后任何俯仰都是正交十字）：
+     LM 用 `MathUtils.quatFromRotationXYZ` 的 **ordinal 3/4**、角度在 **index 1**；灾变用
+     `Quaternionf.rotationY` 的 **ordinal 0/1**、**index 0**，且直接给 ±π/4 **弧度**（顺带绕开上面那个单位 bug）。
+- 只改角度、**不改面片数量**：方管的 `@Redirect`（`lensouls$drawFourFaceBox` / `lensouls$skipSecondQuad`）
+  与那两个 `Box` 类已删除，改回 `AnnihilationBeamCrossRenderMixin` / `DeathLaserCrossRenderMixin`
+  （`lensouls.compat.mixins.json` 的 client 数组同步改名）。BOSS 本体与原子分裂者的光束角度原样放行。
+- `@ModifyArg` 处理器签名**只有被改的那个参数**（不像 `@Redirect` 要加接收者）；`@Shadow` 私有字段照旧。
+
+### 45. 爆点（收尾特效）整条命都在动
+
+- 现象（用户）：`湮灭激光射地上那个特效只在消失时有动画，前边的生命都是静帧，很丑`。
+- 根因（字节码）：`render` 里爆点与光束体**共用同一个帧号**
+  `frame = Mth.floor((beam.appear.getTimer() − 1 + partialTick) × 2)`，而 `appear` 是
+  `ControlledAnim(3)` —— `increaseTimer()` 涨到 duration 即**饱和**（不循环）⇒ 爆点只在前 3 tick 变一次，
+  之后整条命都是同一帧；唯一还会动的是结束时 `on = false` → `decreaseTimer()` 的倒放。
+  （`ControlledAnim` 字节码：`increaseTimer` 有 `if (timer < duration)` 守卫、`decreaseTimer` 下限 0。）
+- 贴图实据（两张图逐像素一致）：`the_warped_one/annihilation_beam.png` 与
+  `cataclysm:harbinger/death_laser_beam.png` 上半区是 16 张 16×16（`u = 0.0625 × frame`），
+  **只有 frame 0~5 是火花**（不透明像素 12/32/52/88/132/164，由小到大），**frame 6 起全空白**
+  —— 原作 `if (frame < 0) frame = 6;` 就是拿空白帧当「隐身」。
+- 实现：`client/render/PhotoBeamRenderFlag` 扩成「本帧光束状态」（加 `endFrame` 与
+  `impactCapFrame(tickCount, partialTick)` = 0→5→0 三角波，周期 `IMPACT_PERIOD_TICKS = 12` tick）；
+  两个 Cross mixin 各加一个 `@ModifyArg` 只改 `render` 里 **`renderEnd(...)` 的 index 0（帧号）**：
+  我们的弹幕用动画帧、别人的原样。实体只在 `render` 签名里，所以帧号在同一个 `@Inject` 里顺手写入。
+- 只改爆点帧：光束本体/起手光斑/贴图/伤害/长度一律不动。
+
+### 46. 交付
+
+- 版本 `1.5.16`（十字版）构建通过但**未交付即被取代，作废**（jar 已从桌面删除）；
+  最终 `1.5.17`：`.\gradlew.bat build` 通过；`tools/MixinSelfCheck` 全绿（47 条 target、语法错误 0、注入点错误 0；
+  两个 Cross mixin 分别命中 `Inject renderBeam` 1、`ModifyArg renderEnd` 1、
+  `ModifyArg quatFromRotationXYZ` 5（ordinal 3/4）/ `ModifyArg rotationY` 2（ordinal 0/1））；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.17.jar`（5,921,178 字节），
+  MD5 `5D065BF5CBDCD70F39BC4CC6D08A5973`。**1.5.16 及更早的 1.5.x 作废，别分发**。
+- 字节核验：TOML `version="1.5.17"`；compat json client 数组为
+  `BetterCombatRangeMixin` / `GytrinketCameraChargeMixin` / `AnnihilationBeamCrossRenderMixin` /
+  `DeathLaserCrossRenderMixin`（**无** `Box` 类）；jar 内两个 Cross 类与 `PhotoBeamRenderFlag` 均在。
+- **待实机验证**：平视/抬头/低头看都是正交十字（不再退化成一张）；爆点 0.6 秒一涨一缩持续动、
+  消失时照旧收束；`B` 键开关的动作栏提示与动态键名、关掉后不再触发弹幕；幻灵击杀算玩家；
+  狗/猫等驯服生物不再被弹幕误伤。

@@ -87,7 +87,13 @@ public class ReinforceMenu extends AbstractContainerMenu {
         return this.player.getInventory().getItem(slot);
     }
 
-    /** 服务端：处理客户端的选择请求（选中物品栏中某个槽位）。黑名单物品也能选中，只是不能强化。 */
+    /**
+     * 服务端：处理客户端的选择请求（选中物品栏中某个槽位）。
+     * <p>
+     * 不可强化的物品（黑名单 + 全部强化材料——加载时已并入，见 {@code ReinforceDataLoader}）
+     * 直接拒绝，已选中的槽位保持不变。客户端选物界面同样先拦一道并给出红蒙版提示，
+     * 这里是权威防线：包可以被伪造，别的模组/脚本也能直接调本方法。
+     */
     public void onSelectRequest(int slot) {
         if (this.player.level().isClientSide) return;
         if (slot < 0 || slot >= PLAYER_SLOTS) {
@@ -99,6 +105,7 @@ public class ReinforceMenu extends AbstractContainerMenu {
             setSelectedSlot(NO_SELECTION);
             return;
         }
+        if (ReinforceDataLoader.isBlacklisted(stack)) return;
         setSelectedSlot(slot);
     }
 

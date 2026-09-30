@@ -71,8 +71,8 @@
   "client": [
     "BetterCombatRangeMixin",
     "GytrinketCameraChargeMixin",
-    "AnnihilationBeamBoxRenderMixin",
-    "DeathLaserBoxRenderMixin"
+    "AnnihilationBeamCrossRenderMixin",
+    "DeathLaserCrossRenderMixin"
   ],
   "injectors": {
     "defaultRequire": 0

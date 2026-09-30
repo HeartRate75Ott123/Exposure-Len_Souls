@@ -238,6 +238,14 @@ public class PhotoSpecialEffects {
     /** 弱弹幕类（小白 / 唤魔者）：只放一次性中低强度攻击 → -6% */
     private static final Set<String> WEAK_BARRAGE_PHOTOS = Set.of("minecraft:skeleton", "minecraft:evoker");
 
+    /**
+     * 幻术师：虚晃一招 —— 攻击 12% 概率落空。
+     * <p>
+     * <b>必须走独立档</b>：幻术师有 5 条描述，若落进下面的通用分级会拿到
+     * {@code HIT_TIER_STRONG} 的 <b>+7%</b>，与文案里写的「12% 概率落空」正好相反。
+     */
+    private static final Set<String> ILLUSION_MISS_PHOTOS = Set.of("minecraft:illusioner");
+
     /** 命中率档位：功能性越弱给得越高，用于抵扣弹幕类照片的惩罚。
      * 因属性上限为 100%，单戴正向照片不会超过 100%，其价值正体现在抵扣上。
      */
@@ -250,6 +258,7 @@ public class PhotoSpecialEffects {
     private static volatile boolean speedTuned = false;
 
     private static double hitChanceDelta(String entityId) {
+        if (ILLUSION_MISS_PHOTOS.contains(entityId)) return -0.12;
         if (WEAK_BARRAGE_PHOTOS.contains(entityId)) return -0.06;
         if (BARRAGE_PHOTOS.contains(entityId)) return -0.24;
         if (WEAK_SLOT_BONUS.containsKey(entityId)) return HIT_TIER_WEAKEST;
@@ -871,6 +880,20 @@ public class PhotoSpecialEffects {
             player.getFoodData().eat(1, 0.0f);
         }
 
+        // 幻术师：幻翼/幻术师 靠近 6 格即现形 3 秒（反制隐袭）。
+        // 与上面「猫：驱散周围幻翼」是两条不同机制：那条是让它们放弃你，这条是把它们照出来。
+        if (player.tickCount % 10 == 0 && gearEntities.contains("minecraft:illusioner")) {
+            player.level().getEntities(player, player.getBoundingBox().inflate(6.0),
+                    e -> e instanceof net.minecraft.world.entity.monster.Phantom
+                            || e.getType() == net.minecraft.world.entity.EntityType.ILLUSIONER)
+                    .forEach(e -> {
+                        if (e instanceof LivingEntity le) {
+                            le.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                                    net.minecraft.world.effect.MobEffects.GLOWING, 40, 0, false, false, false));
+                        }
+                    });
+        }
+
         // 应用照片效果（药水 + 元素活性灌注）
         for (String stolen : gearEntities) {
             PhotographEffectRegistry.applyEffects(player, stolen);
@@ -1033,6 +1056,10 @@ public class PhotoSpecialEffects {
         List<String> gearEntities = collectGearEntities(player);
         boolean witch = gearEntities.contains("minecraft:witch");
 
+        if (gearEntities.contains("minecraft:illusioner") && effectId.equals("minecraft:darkness")) {
+            event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+            return;
+        }
         if (gearEntities.contains("minecraft:warden") && effectId.equals("minecraft:darkness")) {
             event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
             return;

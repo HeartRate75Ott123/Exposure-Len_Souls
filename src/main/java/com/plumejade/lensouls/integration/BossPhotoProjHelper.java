@@ -4,11 +4,17 @@ import com.mojang.math.Axis;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.Direction;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.monster.Phantom;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.EvokerFangs;
@@ -67,6 +73,8 @@ public class BossPhotoProjHelper {
         TRIGGER.put("legendary_monsters:the_obliterator", 0.15f);
         TRIGGER.put("minecraft:evoker", 0.15f);
         TRIGGER.put("minecraft:skeleton", 0.15f);
+        TRIGGER.put("minecraft:ender_dragon", 0.10f);
+        TRIGGER.put("minecraft:illusioner", 0.12f);
         TRIGGER.put("archaion:last_of_deepslate", 0.12f);
         TRIGGER.put("fdbosses:chesed", 0.12f);
         TRIGGER.put("fdbosses:malkuth", 0.12f);
@@ -109,6 +117,20 @@ public class BossPhotoProjHelper {
         clearSwing(event.getEntity().getUUID());
     }
 
+    /**
+     * 登录即把服务端的弹幕开关权威值对齐给客户端。
+     * <p>
+     * 客户端那份只用于画状态提示，不参与判定（真正的裁决在 {@link #trigger} 里读服务端状态），
+     * 所以这里漏发最多是提示文字与实际不一致——不能省。
+     */
+    @SubscribeEvent
+    public static void onLoggedIn(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            com.plumejade.lensouls.network.BarrageStatePacket.send(
+                    player, com.plumejade.lensouls.util.BarrageToggle.isEnabled(player));
+        }
+    }
+
     /** 每次完整挥砍开始调用（由 Player#attack / BetterCombat handleAttackRequest mixin 触发）。
      *  {@code hitTarget} 为本次被攻击的实体（可为 null：空挥/BetterCombat 路径无目标时退化为最近敌人）。 */
     public static void onSwing(ServerPlayer player, Entity hitTarget) {
@@ -141,6 +163,12 @@ public class BossPhotoProjHelper {
 
     /** 弹幕判定核心：挥击与远程命中共用同一套 3 tick 去重 + 各 Boss 触发概率。 */
     private static void trigger(ServerPlayer player, Entity hitTarget) {
+        // 玩家用 B 键关掉弹幕：B 键开关的唯一收口点。
+        // 放在最前面（早于去重与限流），关闭时连掷骰额度都不消耗——否则关着也在烧配额，
+        // 重新打开时窗口已经被占满。套装额外弹幕与法师胸针必触发都在 triggerInner 里，
+        // 因此一并被这一个判断覆盖。
+        if (!com.plumejade.lensouls.util.BarrageToggle.isEnabled(player)) return;
+
         // 重入保护：本次触发过程中（同刻命中/引爆）产生的伤害不再触发新一轮弹幕
         if (Boolean.TRUE.equals(IN_TRIGGER.get())) return;
 
@@ -226,6 +254,8 @@ public class BossPhotoProjHelper {
                 case "legendary_monsters:the_obliterator" -> spawnAnnihilationLaser(player);
                 case "minecraft:evoker" -> spawnEvokerFangs(player);
                 case "minecraft:skeleton" -> spawnSkeletonArrows(player);
+                case "minecraft:ender_dragon" -> spawnDragonCrystals(player);
+                case "minecraft:illusioner" -> spawnPhantomSwarm(player, hit);
                 case "archaion:last_of_deepslate" -> spawnEchoStar(player, hit);
                 case "fdbosses:chesed" -> spawnChesedField(player, hit);
                 case "fdbosses:malkuth" -> spawnMalkuthSword(player, hit);
@@ -260,7 +290,13 @@ public class BossPhotoProjHelper {
         markAndSpawn(rune);
     }
 
-    /** 玩家周围指定范围内最近的非玩家 LivingEntity（排除玩家自身；跳过第三方辅助作战单位） */
+    /**
+     * 玩家周围指定范围内最近的非玩家 LivingEntity（排除玩家自身；跳过第三方辅助作战单位）
+     * <p>
+     * 也排除<b>驯服生物</b>：弹幕是「打面前那个敌人」的选敌逻辑，主人身边的狗会挤进这条逻辑里
+     * 被当成敌人（即使伤害随后被 {@code PhotoProjSafetyHandler} 免掉，弹幕仍会对着它放技能、
+     * 施加减益与击退）。既不选它、也不打它才是干净的做法。
+     */
     private static LivingEntity findNearestNonPlayer(ServerPlayer player, double radius) {
         LivingEntity best = null;
         double bestDist = radius * radius;
@@ -268,6 +304,8 @@ public class BossPhotoProjHelper {
                 net.minecraft.world.entity.LivingEntity.class,
                 player.getBoundingBox().inflate(radius),
                 en -> !(en instanceof net.minecraft.world.entity.player.Player) && en.isAlive()
+                        // 驯服生物是玩家宠物，不作为弹幕目标
+                        && !com.plumejade.lensouls.entity.PhantomDamageHandler.isTamedPet(en)
                         // gytrinket 无人机/蜂群/僚机不算目标，否则「最近敌人」会被随行的无人机抢走
                         && !com.plumejade.lensouls.util.PhotoTargetFilter.isIgnored(en))) {
             double d = player.distanceToSqr(e);
@@ -773,6 +811,230 @@ public class BossPhotoProjHelper {
         }
     }
 
+    // ========== 末影龙：末影水晶赐福 ==========
+
+    /** 水晶存续 tick（40 = 2 秒） */
+    private static final int CRYSTAL_TICKS = 40;
+    /** 每次召唤的水晶数 */
+    private static final int CRYSTAL_COUNT = 3;
+    /** 水晶水平散布半径（格） */
+    private static final double CRYSTAL_SPREAD = 2.6D;
+    /**
+     * 每 tick 回复占最大生命的比例：40 × 0.005 = <b>单次共 20%</b>。
+     * <p>
+     * 原版 {@code EndCrystal} <b>本身不治疗</b>（末地龙战是末影龙扫描水晶回血），
+     * 所以这里的回血完全由本队列驱动 —— 不是借用原版机制。
+     */
+    private static final float CRYSTAL_HEAL_RATIO = 0.005F;
+
+    /**
+     * 一次赐福水晶。<b>按玩家去重</b>：回血是玩家级（每 tick 一次），不是每枚水晶一次，
+     * 否则 3 枚水晶会变成 3 倍回复。
+     */
+    private record CrystalAura(java.util.UUID player, List<java.util.UUID> crystals,
+                               long expireTick, float healPerTick) {}
+    private static final Map<java.util.UUID, CrystalAura> CRYSTAL_AURAS = new ConcurrentHashMap<>();
+
+    /**
+     * 末影龙：<b>末影水晶赐福</b> —— 玩家周围升起 3 枚末影水晶，原版紫色光柱射向自己，
+     * 2 秒内每 tick 回复 0.5% 最大生命（合计 20%）。
+     * <p>
+     * 三条对着实机 jar（{@code compiledWithNeoForge_*}）核实过的事实，类路径是
+     * {@code net.minecraft.world.entity.boss.enderdragon.EndCrystal}：
+     * <ol>
+     *   <li><b>不在 {@code world.entity.item} 包下</b>，而在 {@code world.entity.boss.enderdragon}；</li>
+     *   <li>1.21.1 <b>没有</b> {@code setBeamRenderTarget(Entity)} / {@code setHeal(boolean)}
+     *       （那是旧版 API），光柱是靠 {@code setBeamTarget(BlockPos)}
+     *       （同步字段 {@code DATA_BEAM_TARGET}）画的，{@code EndCrystalRenderer} 读 {@code getBeamTarget()}；</li>
+     *   <li>{@code tick()} 在「{@code ServerLevel} + {@code getDragonFight() != null} + 所在方块是空气」
+     *       三个条件同时成立时会 {@code setBlockAndUpdate(pos, BaseFireBlock.getState(...))}
+     *       ——<b>在脚下点火</b>。末地龙战期间前两个条件必然成立，所以把水晶<b>埋进地面方块一格</b>
+     *       （{@code groundY - 1}），实体所在方块非空气 ⇒ 完全不走 fire 分支；
+     *       观感上正好是「从地面射向你的紫色光柱」。这与本仓库先驱者激光刻意不
+     *       {@code setFire(true)} 是同一类地形副作用，必须避开。</li>
+     * </ol>
+     */
+    private static void spawnDragonCrystals(ServerPlayer player) {
+        if (!(player.level() instanceof ServerLevel level) || level.getServer() == null) return;
+
+        // 同一玩家的光环不叠加（避免连着触发把回血翻倍）：先收掉旧的一组
+        CrystalAura existing = CRYSTAL_AURAS.remove(player.getUUID());
+        if (existing != null) {
+            for (java.util.UUID id : existing.crystals()) {
+                Entity old = level.getEntity(id);
+                if (old != null) old.discard();
+                DISCARD_AT.remove(id);
+            }
+        }
+
+        long expireTick = level.getServer().getTickCount() + CRYSTAL_TICKS;
+        List<java.util.UUID> ids = new ArrayList<>(CRYSTAL_COUNT);
+        BlockPos beamTarget = player.blockPosition().above();
+
+        for (int i = 0; i < CRYSTAL_COUNT; i++) {
+            double a = (Math.PI * 2.0 * i) / CRYSTAL_COUNT + player.getYRot() * Math.PI / 180.0;
+            double cx = player.getX() + Math.cos(a) * CRYSTAL_SPREAD;
+            double cz = player.getZ() + Math.sin(a) * CRYSTAL_SPREAD;
+            double groundY = findGroundY(level, cx, player.getY(), cz);
+            if (groundY < level.getMinBuildHeight() + 1) continue;
+
+            EndCrystal crystal = new EndCrystal(level, cx, groundY - 1.0, cz);
+            crystal.setBeamTarget(beamTarget);
+            crystal.setShowBottom(false);
+            level.addFreshEntity(crystal);
+            ids.add(crystal.getUUID());
+            // 兜底：本类正常到期会收走，这里防的是玩家下线/世界卸载等中断路径
+            DISCARD_AT.put(crystal.getUUID(), expireTick);
+        }
+
+        if (ids.isEmpty()) return;
+        CRYSTAL_AURAS.put(player.getUUID(),
+                new CrystalAura(player.getUUID(), ids, expireTick, CRYSTAL_HEAL_RATIO));
+        level.playSound(null, player.blockPosition(), SoundEvents.ENDER_DRAGON_AMBIENT,
+                SoundSource.PLAYERS, 1.0F, 1.4F);
+    }
+
+    private static void runCrystalAuras(MinecraftServer server, long now) {
+        if (CRYSTAL_AURAS.isEmpty()) return;
+        for (var entry : new ArrayList<>(CRYSTAL_AURAS.entrySet())) {
+            CrystalAura aura = entry.getValue();
+            ServerPlayer player = server.getPlayerList().getPlayer(aura.player());
+            if (player == null || !player.isAlive() || now >= aura.expireTick()) {
+                for (java.util.UUID id : aura.crystals()) {
+                    for (ServerLevel sl : server.getAllLevels()) {
+                        Entity ent = sl.getEntity(id);
+                        if (ent != null) ent.discard();
+                    }
+                    DISCARD_AT.remove(id);
+                }
+                CRYSTAL_AURAS.remove(entry.getKey());
+                continue;
+            }
+            player.heal(player.getMaxHealth() * aura.healPerTick());
+        }
+    }
+
+    // ========== 幻术师：幻影围攻 ==========
+
+    /** 幻翼存续 tick（60 = 3 秒） */
+    private static final int SWARM_TICKS = 60;
+    /** 每次召唤的幻翼数 */
+    private static final int SWARM_COUNT = 3;
+    /** 幻翼生成时相对锚点的散布半径（格） */
+    private static final double SWARM_SPREAD = 2.5D;
+    /** 接触伤害判定距离（平方；2.5 格） */
+    private static final double SWARM_HIT_DIST_SQR = 6.25D;
+    /** 追击寻路刷新间隔（tick）：寻路自带限流，逐 tick 重算只是浪费 */
+    private static final int SWARM_NAVI_INTERVAL = 2;
+
+    private record SwarmPhantom(ServerLevel level, java.util.UUID phantom, java.util.UUID caster,
+                                java.util.UUID anchor, long expireTick, float dmg) {}
+    private static final List<SwarmPhantom> SWARM_PHANTOMS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /**
+     * 幻术师：<b>幻影围攻</b> —— 在被攻击的敌人身边召出 3 只幻翼，幻翼锁定该敌人<b>主动追击</b>，
+     * 接触即造成等同攻击面板的伤害。
+     * <p>
+     * 「只打敌人、不打玩家」是对着 {@code Phantom.registerGoals()} 的实机字节码
+     * （{@code javap -c} 核实）做的 —— 原版注册的是：
+     * <ul>
+     *   <li>{@code targetSelector}：{@code PhantomAttackPlayerTargetGoal}（只找玩家）；</li>
+     *   <li>{@code goalSelector}：{@code PhantomAttackStrategyGoal} /
+     *       {@code PhantomSweepAttackGoal} / {@code PhantomCircleAroundAnchorGoal}。</li>
+     * </ul>
+     * <b>两个都要摘</b>：{@code PhantomSweepAttackGoal} 是 <b>AOE</b>
+     * （{@code getEntitiesOfClass(LivingEntity, getBoundingBox().inflate(d), …)} 后对每个目标
+     * {@code doHurtTarget}），留着就会扫到玩家。只摘 targetSelector 是不够的。
+     * <p>
+     * {@code Mob.targetSelector} / {@code goalSelector} 都是 {@code public final}（不是 protected），
+     * {@code GoalSelector.removeAllGoals(Predicate)} 也只有这一个重载 ——
+     * 两者都不需要 mixin，也不需要反射。
+     * <p>
+     * <b>不能用 setNoAi(true) 代替</b>：{@code PathNavigation.tick()} 位于
+     * {@code Mob.serverAiStep()} 内部，关掉 AI 会把寻路一起停掉，幻翼就成了原地摆拍
+     * （本项目 {@code StunPauseHelper} 的定身正是靠这一点生效）。保留 AI、只摘 goal，
+     * 寻路照跑，由 {@link #runPhantomSwarms} 每 2 tick 调一次 {@code moveTo} 驱动真正的三维飞行。
+     * <p>
+     * <b>范围限定</b>：只对这里 {@code addFreshEntity} 的那 3 只动手 —— 没有 mixin、没有全局注册，
+     * 全世界的幻术师、幻翼、自然生成物一律不受影响。
+     * <p>
+     * 伤害走 {@code playerAttack}（<b>近战</b>伤害类型），因此不会被
+     * {@code onRangedHit} 的 {@code RangedAttackHelper.isRanged} 认成远程 ⇒
+     * 不会触发「弹幕命中 → 再掷弹幕」的自增殖，不需要额外打 {@code photo_proj} 标记。
+     */
+    private static void spawnPhantomSwarm(ServerPlayer player, LivingEntity hit) {
+        LivingEntity anchor = hit != null ? hit : findNearestNonPlayer(player, 16.0);
+        if (anchor == null || anchor instanceof net.minecraft.world.entity.player.Player) return;
+        if (!(player.level() instanceof ServerLevel level) || level.getServer() == null) return;
+
+        float dmg = playerFinalDamage(player);
+        long expireTick = level.getServer().getTickCount() + SWARM_TICKS;
+
+        for (int i = 0; i < SWARM_COUNT; i++) {
+            Phantom ph = EntityType.PHANTOM.create(level);
+            if (ph == null) return;
+            double a = (Math.PI * 2.0 * i) / SWARM_COUNT;
+            ph.setPos(anchor.getX() + Math.cos(a) * SWARM_SPREAD,
+                    anchor.getY() + 2.2 + i * 0.3,
+                    anchor.getZ() + Math.sin(a) * SWARM_SPREAD);
+            ph.setPhantomSize(2 + i);
+            // 不调 finalizeSpawn：1.21.1 该方法签名已是
+            // (ServerLevelAccessor, DifficultyInstance, MobSpawnType, SpawnGroupData)，
+            // 而幻翼无装备、尺寸上面已显式指定，省掉这一层没必要的依赖。
+            ph.targetSelector.removeAllGoals(g -> true);
+            ph.goalSelector.removeAllGoals(g -> true);
+            level.addFreshEntity(ph);
+            SWARM_PHANTOMS.add(new SwarmPhantom(level, ph.getUUID(), player.getUUID(),
+                    anchor.getUUID(), expireTick, dmg));
+            DISCARD_AT.put(ph.getUUID(), expireTick);
+        }
+    }
+
+    private static void runPhantomSwarms(MinecraftServer server, long now) {
+        if (SWARM_PHANTOMS.isEmpty()) return;
+        for (int i = SWARM_PHANTOMS.size() - 1; i >= 0; i--) {
+            SwarmPhantom s = SWARM_PHANTOMS.get(i);
+            ServerPlayer caster = server.getPlayerList().getPlayer(s.caster());
+            Phantom ph = s.level().getEntity(s.phantom()) instanceof Phantom p ? p : null;
+
+            // 摘了 goal 的幻翼不会自然消失，成活与到期一律由本队列收
+            if (ph == null || !ph.isAlive() || caster == null || !caster.isAlive() || now >= s.expireTick()) {
+                if (ph != null) ph.discard();
+                DISCARD_AT.remove(s.phantom());
+                SWARM_PHANTOMS.remove(i);
+                continue;
+            }
+
+            // 锚点失效（死了/被移除/换了维度）→ 就近换一个敌人；换不到就地收回
+            LivingEntity anchor = s.level().getEntity(s.anchor()) instanceof LivingEntity le ? le : null;
+            if (anchor == null || !anchor.isAlive()
+                    || anchor instanceof net.minecraft.world.entity.player.Player) {
+                anchor = findNearestNonPlayer(caster, 16.0);
+                if (anchor == null) {
+                    ph.discard();
+                    DISCARD_AT.remove(s.phantom());
+                    SWARM_PHANTOMS.remove(i);
+                    continue;
+                }
+                SWARM_PHANTOMS.set(i, new SwarmPhantom(s.level(), s.phantom(), s.caster(),
+                        anchor.getUUID(), s.expireTick(), s.dmg()));
+            }
+
+            ph.setTarget(anchor);
+            if (now % SWARM_NAVI_INTERVAL == 0) {
+                ph.getNavigation().moveTo(anchor, 1.0D);
+            }
+
+            if (ph.distanceToSqr(anchor) < SWARM_HIT_DIST_SQR) {
+                anchor.invulnerableTime = 0;
+                anchor.hurt(caster.damageSources().playerAttack(caster), s.dmg());
+                ph.swing(InteractionHand.MAIN_HAND);
+                s.level().playSound(null, ph.blockPosition(), SoundEvents.PHANTOM_AMBIENT,
+                        SoundSource.NEUTRAL, 1.0F, 1.2F);
+            }
+        }
+    }
+
     // ========== archaion / fdbosses 兼容弹幕（运行时反射，可选 mod 缺席时优雅跳过）==========
 
     private static boolean modLoaded(String id) {
@@ -948,6 +1210,10 @@ public class BossPhotoProjHelper {
         }
         // 巨剑竖劈：到达 90t 命中时刻的自管伤害（实体自带伤害已关）
         runSwordCleaves(event);
+        // 末影龙赐福水晶：每 tick 回血 + 到期清理（必须排在下面那道 return 之前）
+        runCrystalAuras(event.getServer(), now);
+        // 幻术师幻影围攻：主动追击 + 接触伤害（同样必须排在 return 之前）
+        runPhantomSwarms(event.getServer(), now);
         // 动能力场 tick 电击：对被困住的敌人持续伤害（清无敌帧保证每 5tick 全额命中）
         if (KINETIC_FIELDS.isEmpty()) return;
         for (var e : new ArrayList<>(KINETIC_FIELDS.entrySet())) {

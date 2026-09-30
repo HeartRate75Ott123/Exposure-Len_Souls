@@ -1,7 +1,7 @@
 package com.plumejade.lensouls.event;
 
-import com.plumejade.lensouls.entity.BossPhantomManager;
 import com.plumejade.lensouls.entity.GunBulletEntity;
+import com.plumejade.lensouls.entity.PhantomDamageHandler;
 import com.plumejade.lensouls.item.DimensionalGunItem;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
@@ -36,10 +36,13 @@ public class GunKillHandler {
             return;
         }
 
-        // 2. 幻灵击杀：实体带有 lensouls:phantom 标记
-        if (direct != null && direct.getPersistentData().getBoolean("lensouls:phantom")) {
-            ServerPlayer player = BossPhantomManager.getInstance().findPlayerByPhantomEntityId(direct.getId());
-            if (player != null) creditKill(player);
+        // 2. 幻灵击杀：借体本体 / 它召出的随从 / 它们射出的弹幕，都按 persistentData 里的
+        //    归属 UUID 找召唤者玩家。
+        //    旧写法只认「直接实体带 lensouls:phantom 且能按实体 ID 反查活跃幻灵」，因此
+        //    随从与幻灵射出的弹一律不计数——那些实体根本不在 activePhantoms 里，ID 反查必落空。
+        ServerPlayer phantomOwner = PhantomDamageHandler.resolveOwnerPlayer(source);
+        if (phantomOwner != null) {
+            creditKill(phantomOwner);
             return;
         }
 

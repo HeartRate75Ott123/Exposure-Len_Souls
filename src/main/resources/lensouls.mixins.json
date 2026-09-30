@@ -18,7 +18,8 @@
     "EntitiesInFrameMixin",
     "EntityInvulnerableTimeAccessor",
     "FoodDataMixin",
-    "PhantomPushGuardMixin"
+    "PhantomPushGuardMixin",
+    "PhantomKillCreditMixin"
   ],
     "client": [
     "client.ItemRendererMixin",

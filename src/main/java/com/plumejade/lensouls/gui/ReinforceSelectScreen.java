@@ -11,8 +11,10 @@ import org.jetbrains.annotations.NotNull;
 /**
  * 选物界面（独立屏幕）：展示玩家物品栏，点击其中一格即选中它为强化目标，并返回主界面。
  * <p>
- * 单独打开而不是在主界面里叠一层：点击物品栏中任意非空物品 → 上报槽位 → 回到主界面。
- * 右键 / ESC / E / 点击空白处 = 直接返回，不改变当前选中。
+ * 单独打开而不是在主界面里叠一层：点击物品栏中任意<b>可被强化</b>的非空物品 → 上报槽位 → 回到主界面。
+ * 不可强化的物品（黑名单 + 全部强化材料，格子带红蒙版）左键<b>完全无效</b>：不上报、不返回，
+ * 停留在本界面以便改选其它物品。
+ * 右键 / ESC / E / 点击空白处 / 点击空槽 = 直接返回，不改变当前选中。
  */
 public class ReinforceSelectScreen extends Screen {
 
@@ -148,6 +150,10 @@ public class ReinforceSelectScreen extends Screen {
         if (button == 0 && slot >= 0) {
             ItemStack stack = stackAt(slot);
             if (!stack.isEmpty()) {
+                // 不可强化的物品（黑名单 + 全部强化材料）左键直接无效：不发包、不改变选中、
+                // 也不返回，留在本界面让玩家改选别的。格子上的红蒙版就是这个提示的视觉依据。
+                // 服务端 onSelectRequest 同样会拒，这里只是先给出即时反馈。
+                if (ReinforceDataLoader.isBlacklisted(stack)) return true;
                 PacketDistributor.sendToServer(new com.plumejade.lensouls.network.ReinforceSelectPacket(slot));
             }
         }

@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.handler;
 
+import com.plumejade.lensouls.entity.PhantomDamageHandler;
 import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -95,9 +96,9 @@ public class WhistlePhantomHandler {
 
         Entity direct = event.getSource().getDirectEntity();
         if (direct == null) return;
-        if (!isPhantomSource(direct)) return;
+        if (!PhantomDamageHandler.isPhantomSource(direct)) return;
 
-        UUID owner = phantomOwnerOf(direct);
+        UUID owner = PhantomDamageHandler.resolveOwnerUUID(direct);
         if (owner == null) return;
         ServerPlayer player = ((ServerLevel) target.level()).getServer().getPlayerList().getPlayer(owner);
         if (player == null) return;
@@ -145,37 +146,7 @@ public class WhistlePhantomHandler {
         return times.size();
     }
 
-    /** 是否幻灵来源：实体本身（本体/召唤物）或弹幕 owner 链 */
-    private static boolean isPhantomSource(Entity e) {
-        if (e == null) return false;
-        if (isPhantomEntity(e)) return true;
-        if (e instanceof net.minecraft.world.entity.projectile.Projectile proj) {
-            return isPhantomSource(proj.getOwner());
-        }
-        return false;
-    }
-
-    private static boolean isPhantomEntity(Entity e) {
-        return e.getPersistentData().getBoolean("lensouls:phantom")
-                || e.getPersistentData().getBoolean("lensouls:phantom_minion");
-    }
-
-    /** 沿直接实体→owner 链向上，取第一个带 phantom_owner 的 UUID */
-    private static UUID phantomOwnerOf(Entity e) {
-        Entity cur = e;
-        int guard = 0;
-        while (cur != null && guard++ < 6) {
-            UUID uuid = cur.getPersistentData().hasUUID("lensouls:phantom_owner")
-                    ? cur.getPersistentData().getUUID("lensouls:phantom_owner") : null;
-            if (uuid != null) return uuid;
-            if (cur instanceof net.minecraft.world.entity.projectile.Projectile proj) {
-                cur = proj.getOwner();
-            } else {
-                break;
-            }
-        }
-        return null;
-    }
-
+    /** 幻灵本体/召唤物/其弹幕 owner 链 与 归属玩家解析，统一走 {@link PhantomDamageHandler}，
+     *  避免与击杀归属那条链各写一份而漂移 */
     private WhistlePhantomHandler() {}
 }

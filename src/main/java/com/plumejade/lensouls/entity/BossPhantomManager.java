@@ -182,11 +182,11 @@ public class BossPhantomManager {
             }
 
             // 3. 幻灵标记（双重标记：persistentData + customName，对抗实体类 save/load 丢失）
-            entity.getPersistentData().putBoolean("lensouls:phantom", true);
+            entity.getPersistentData().putBoolean(PhantomDamageHandler.PHANTOM_TAG, true);
             // 记录镜魂等级（1-5），供穿透伤害按等级取值
-            entity.getPersistentData().putInt("lensouls:phantom_level", amplifier + 1);
+            entity.getPersistentData().putInt(PhantomDamageHandler.PHANTOM_LEVEL_TAG, amplifier + 1);
             // 记录归属玩家（Goety 式 owner，供友伤/瞄准逻辑识别主人）
-            entity.getPersistentData().putUUID("lensouls:phantom_owner", player.getUUID());
+            entity.getPersistentData().putUUID(PhantomDamageHandler.PHANTOM_OWNER_TAG, player.getUUID());
             entity.setCustomName(Component.translatable("entity.lensouls.boss_phantom." + type.name().toLowerCase()));
             entity.setCustomNameVisible(false);
             // 持久化保存玩家原始游戏模式（对抗断线丢失）
@@ -231,7 +231,7 @@ public class BossPhantomManager {
             com.plumejade.lensouls.boss.BossBarCache.clearBossBar(entity);
 
             // 7. 召唤瞬间 AOE 伤害（排除幻灵自身）
-            dealSpawnAOE(level, type, ox, py, oz, entity);
+            dealSpawnAOE(level, type, ox, py, oz, entity, player.getUUID());
 
             // 8. 发送开始包 + 入场粒子
             PacketDistributor.sendToPlayer(player, new PhantomStartPacket(player.getUUID(), type,
@@ -256,11 +256,34 @@ public class BossPhantomManager {
         }
     }
 
+    /**
+     * 幻灵 AOE 伤害源：causer 设为召唤者玩家。
+     * <p>
+     * 之前用 {@code level.damageSources().magic()} 无参重载，causer 与 directEntity 全为 null，
+     * 导致按 {@code DamageSource#getEntity()} 判定归属的逻辑（FTB 任务击杀统计、掉落归属等）
+     * 拿不到任何信息，AOE 击杀既不计入玩家也不计经验/掉落。
+     * <p>
+     * 这里保留 {@code magic} 伤害类型不变（无视护甲的既有手感不动），
+     * 只把 causer 换成召唤者；directEntity 仍是幻灵本身，
+     * 以便 {@link PhantomDamageHandler#isPhantomDamageSource} 继续把它认作幻灵来源
+     * （防误伤玩家 / 幻灵之间不互殴都依赖 direct 那一侧）。
+     */
+    private static DamageSource buildPhantomAOESource(Level level, Entity direct, UUID ownerId) {
+        if (level instanceof ServerLevel serverLevel && ownerId != null) {
+            ServerPlayer owner = serverLevel.getServer().getPlayerList().getPlayer(ownerId);
+            if (owner != null) {
+                return new DamageSource(level.damageSources().magic().typeHolder(), direct, owner);
+            }
+        }
+        // 主人离线等异常情况：退回无主来源，至少保证伤害照常结算
+        return level.damageSources().magic();
+    }
+
     /** 召唤瞬间径向 AOE（排除幻灵自身；对所有玩家免疫以防误伤队友） */
     private static void dealSpawnAOE(ServerLevel level, BossPhantomType type,
-                                      double cx, double cy, double cz, Entity self) {
+                                      double cx, double cy, double cz, Entity self, UUID ownerId) {
         double range = type == BossPhantomType.OBLITERATOR ? 30.0 : 10.0;
-        DamageSource piercing = level.damageSources().magic();
+        DamageSource piercing = buildPhantomAOESource(level, self, ownerId);
         AABB aabb = new AABB(cx - range, cy - range, cz - range,
                 cx + range, cy + range, cz + range);
         int count = 0;
@@ -285,6 +308,8 @@ public class BossPhantomManager {
             if (e instanceof Player || !e.isAlive()) continue;
             // 幻灵之间不互殴：排除其他幻灵及其召唤物
             if (PhantomDamageHandler.isPhantomEntity(e)) continue;
+            // 驯服生物是玩家宠物，不是敌人（否则幻灵开演会主动去咬主人身边的狗）
+            if (PhantomDamageHandler.isTamedPet(e)) continue;
             if (e.getMaxHealth() > 200) {
                 double d = e.distanceToSqr(x, y, z);
                 if (d < bossDist) { bossDist = d; boss = e; }
@@ -300,6 +325,7 @@ public class BossPhantomManager {
             if (e instanceof Player || !e.isAlive()) continue;
             // 幻灵之间不互殴：排除其他幻灵及其召唤物
             if (PhantomDamageHandler.isPhantomEntity(e)) continue;
+            if (PhantomDamageHandler.isTamedPet(e)) continue;
             double d = e.distanceToSqr(x, y, z);
             if (d < nearestDist) { nearestDist = d; nearest = e; }
         }
@@ -315,11 +341,13 @@ public class BossPhantomManager {
         if (victim instanceof Player) return;
         // 幻灵及其召唤物不记录（幻灵不互殴，也不该被主人引去打自家召唤物）
         if (PhantomDamageHandler.isPhantomEntity(victim)) return;
-        if (victim.getPersistentData().getBoolean("lensouls:phantom_minion")) return;
+        if (victim.getPersistentData().getBoolean(PhantomDamageHandler.PHANTOM_MINION_TAG)) return;
+        // 玩家误伤自家宠物（拿剑砍狗/打狗驱赶）不记录，否则幻灵会跟着去咬它
+        if (PhantomDamageHandler.isTamedPet(victim)) return;
         PLAYER_LAST_ATTACK_TARGET.put(player.getUUID(), new java.lang.ref.WeakReference<>(victim));
     }
 
-    /** 取玩家最近攻击且仍合法存活（同维度、非玩家/幻灵/召唤物）的目标，无则 null */
+    /** 取玩家最近攻击且仍合法存活（同维度、非玩家/幻灵/召唤物/驯服生物）的目标，无则 null */
     @javax.annotation.Nullable
     private static LivingEntity findPlayerLastAttackTarget(ServerPlayer player, Level level) {
         var ref = PLAYER_LAST_ATTACK_TARGET.get(player.getUUID());
@@ -327,7 +355,8 @@ public class BossPhantomManager {
         LivingEntity t = ref.get();
         if (t == null || !t.isAlive() || t instanceof Player) return null;
         if (PhantomDamageHandler.isPhantomEntity(t)) return null;
-        if (t.getPersistentData().getBoolean("lensouls:phantom_minion")) return null;
+        if (t.getPersistentData().getBoolean(PhantomDamageHandler.PHANTOM_MINION_TAG)) return null;
+        if (PhantomDamageHandler.isTamedPet(t)) return null;
         if (t.level() != level) return null;
         return t;
     }
@@ -353,7 +382,7 @@ public class BossPhantomManager {
                 boss.getX() + r, boss.getY() + r, boss.getZ() + r);
         for (Entity e : boss.level().getEntities(boss, box)) {
             if (!(e instanceof Mob mob)) continue;
-            if (!mob.getPersistentData().getBoolean("lensouls:phantom_minion")) continue;
+            if (!mob.getPersistentData().getBoolean(PhantomDamageHandler.PHANTOM_MINION_TAG)) continue;
             LivingEntity mt = mob.getTarget();
             if (mt != null && mt instanceof Player) {
                 mob.setTarget(null);
@@ -634,8 +663,8 @@ public class BossPhantomManager {
         double cz = phantom != null ? phantom.getZ() : d.originZ();
         double range = type == BossPhantomType.OBLITERATOR ? 30.0 : 10.0;
 
-        // 穿甲伤害源（magic 类型无视护甲）
-        DamageSource piercing = level.damageSources().magic();
+        // 穿甲伤害源（magic 类型无视护甲）；causer 为召唤者玩家，保证 AOE 击杀归属玩家
+        DamageSource piercing = buildPhantomAOESource(level, phantom, d.playerId());
 
         AABB aabb = new AABB(cx - range, cy - range, cz - range,
                 cx + range, cy + range, cz + range);
@@ -1020,7 +1049,7 @@ public class BossPhantomManager {
 
         Entity entity = event.getEntity();
         // 双重检测：persistentData 标记 + customName translation key（对抗实体类不保存 persistentData）
-        boolean isPhantom = entity.getPersistentData().getBoolean("lensouls:phantom");
+        boolean isPhantom = entity.getPersistentData().getBoolean(PhantomDamageHandler.PHANTOM_TAG);
         if (!isPhantom) {
             Component name = entity.getCustomName();
             if (name != null && name.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc) {
@@ -1050,7 +1079,7 @@ public class BossPhantomManager {
         if (event.loadedFromDisk()) return;
         Entity ent = event.getEntity();
         if (ent instanceof Player) return;
-        if (ent.getPersistentData().getBoolean("lensouls:phantom")) return;
+        if (ent.getPersistentData().getBoolean(PhantomDamageHandler.PHANTOM_TAG)) return;
         if (!(ent instanceof Mob || ent instanceof Projectile)) return;
 
         for (BossPhantomData d : getInstance().activePhantoms.values()) {
@@ -1060,10 +1089,10 @@ public class BossPhantomManager {
             // 真实 boss（高血量）不标为召唤物
             if (ent instanceof Mob mob && mob.getMaxHealth() > 200) continue;
 
-            ent.getPersistentData().putBoolean("lensouls:phantom_minion", true);
-            ent.getPersistentData().putInt("lensouls:phantom_level",
-                    boss.getPersistentData().getInt("lensouls:phantom_level"));
-            ent.getPersistentData().putUUID("lensouls:phantom_owner", d.playerId());
+            ent.getPersistentData().putBoolean(PhantomDamageHandler.PHANTOM_MINION_TAG, true);
+            ent.getPersistentData().putInt(PhantomDamageHandler.PHANTOM_LEVEL_TAG,
+                    boss.getPersistentData().getInt(PhantomDamageHandler.PHANTOM_LEVEL_TAG));
+            ent.getPersistentData().putUUID(PhantomDamageHandler.PHANTOM_OWNER_TAG, d.playerId());
             break;
         }
     }

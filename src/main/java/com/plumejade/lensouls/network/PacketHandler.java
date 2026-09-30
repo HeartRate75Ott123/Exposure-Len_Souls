@@ -88,6 +88,18 @@ public class PacketHandler {
                 ConverterMenuActivatePacket::handle
         );
 
+        // ---- 照片弹幕开关：B 键 C2S 切换 / S2C 回发权威值 ----
+        registrar.playToServer(
+                BarrageTogglePacket.TYPE,
+                BarrageTogglePacket.STREAM_CODEC,
+                BarrageTogglePacket::handle
+        );
+        registrar.playToClient(
+                BarrageStatePacket.TYPE,
+                BarrageStatePacket.STREAM_CODEC,
+                BarrageStatePacket::handle
+        );
+
         // ---- 能力系统 C2S 包 ----
         registrar.playToServer(
                 AbilityOpenGuiPacket.TYPE,

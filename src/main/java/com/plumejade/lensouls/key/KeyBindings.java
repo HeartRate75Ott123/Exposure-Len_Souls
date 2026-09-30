@@ -2,9 +2,11 @@ package com.plumejade.lensouls.key;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.client.ClientBarrageState;
 import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.gui.SoulSelectOverlay;
 import com.plumejade.lensouls.item.ConverterItem;
+import com.plumejade.lensouls.network.BarrageTogglePacket;
 import com.plumejade.lensouls.network.ConverterMenuActivatePacket;
 import com.plumejade.lensouls.network.ConverterMenuRequestPacket;
 import com.plumejade.lensouls.network.ConverterModeSwitchPacket;
@@ -41,6 +43,7 @@ public class KeyBindings {
     public static final String KEY_CATEGORY = "key.category.lensouls";
     public static final String KEY_CONVERTER = "key.lensouls.converter";
     public static final String KEY_PHOTO_GUI = "key.lensouls.photo_gui";
+    public static final String KEY_BARRAGE = "key.lensouls.barrage";
 
     /** 触发模式常量落在公共类上（物品组件与 tooltip 共用），此处仅作别名 */
     public static final int MODE_FAST = ModDataComponents.CONVERTER_MODE_FAST;
@@ -58,6 +61,12 @@ public class KeyBindings {
             Lazy.of(() -> new net.minecraft.client.KeyMapping(
                     KEY_PHOTO_GUI, KeyConflictContext.IN_GAME,
                     InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_X, KEY_CATEGORY));
+
+    /** 弹幕开关（默认 B）：切换是否触发照片弹幕，状态显示在物品栏上方 */
+    private static final Lazy<net.minecraft.client.KeyMapping> BARRAGE_KEY =
+            Lazy.of(() -> new net.minecraft.client.KeyMapping(
+                    KEY_BARRAGE, KeyConflictContext.IN_GAME,
+                    InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, KEY_CATEGORY));
 
     private static boolean converterKeyHeld = false;
     private static long pressStartNanos = 0;
@@ -97,6 +106,7 @@ public class KeyBindings {
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(CONVERTER_KEY.get());
         event.register(PHOTO_GUI_KEY.get());
+        event.register(BARRAGE_KEY.get());
     }
 
     @SubscribeEvent
@@ -106,6 +116,13 @@ public class KeyBindings {
 
         if (PHOTO_GUI_KEY.get().consumeClick()) {
             PacketDistributor.sendToServer(new PhotoOpenPacket());
+        }
+
+        // 弹幕开关（B 键）：本地乐观翻转保证提示即时，再上报服务端翻转权威状态
+        if (BARRAGE_KEY.get().consumeClick()) {
+            boolean nowOn = ClientBarrageState.toggle();
+            PacketDistributor.sendToServer(new BarrageTogglePacket());
+            mc.player.displayClientMessage(barrageStatusMessage(nowOn), true);
         }
 
         // 激活键物理状态（Sus 式状态机）
@@ -168,6 +185,18 @@ public class KeyBindings {
                         .append(keyName)
                         .append(mode == MODE_FAST ? " 直接触发）" : " 呼出菜单）"),
                 true);
+    }
+
+    /**
+     * 弹幕开关状态提示（显示在物品栏上方的动作栏）。
+     * <p>
+     * 措辞里嵌 {@code getTranslatedKeyMessage()}，所以玩家在「操作设置」里改了键之后，
+     * 提示会跟着显示新键名，而不是永远写死一个「B」——与转换器模式的提示同一套做法。
+     */
+    private static Component barrageStatusMessage(boolean enabled) {
+        return Component.literal(enabled ? "§a弹幕：开启（按 " : "§c弹幕：关闭（按 ")
+                .append(BARRAGE_KEY.get().getTranslatedKeyMessage())
+                .append(" 切换）");
     }
 
     private static boolean isConverterKeyEvent(InputEvent.Key event) {

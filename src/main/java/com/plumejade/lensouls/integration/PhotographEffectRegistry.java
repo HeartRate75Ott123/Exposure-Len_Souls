@@ -154,6 +154,19 @@ public class PhotographEffectRegistry {
         add("minecraft:ravager", "§a近战攻击 +15%", "");
         add("minecraft:vindicator", "§a佩戴时额外获得 1 个照片饰品栏位", "");
         add("minecraft:evoker", "§a魔法攻击 +15%；§a你受到的魔法伤害 -12%", "§c近战伤害 -12%", "§a挥击/远程命中时 15% 概率在视线前方钻出 一排尖牙", "§a尖牙：对范围内目标造成 魔法伤害（原版固定值）");
+        // 末影龙：赐福水晶（"免疫摔落"不是新加的 —— PhotoSpecialEffects 里早有
+        // addRule("minecraft:ender_dragon", FALL, 0.0f)，这里只是把既有行为写进文案）
+        add("minecraft:ender_dragon",
+                "§a挥击/远程命中时 10% 概率在自身周围召唤 3 枚 末影水晶（持续 2 秒）",
+                "§a末影水晶：存在期间每 tick 恢复 0.5% 最大生命（单次合计 20%）",
+                "§a佩戴时免疫 摔落 伤害");
+        // 幻术师：幻影围攻。刻意与唤魔者零重叠（唤魔者 = 魔法增伤/减伤 + 近战减伤 + 尖牙弹幕）
+        potion("minecraft:illusioner", "minecraft:night_vision", 0,
+                "§a挥击/远程命中时 12% 概率在敌人身边召唤 3 只 幻影幻翼（持续 3 秒）",
+                "§a幻翼锁定最近的敌人并主动追击，每次接触造成 等同攻击面板 的伤害",
+                "§a佩戴时免疫 黑暗 效果，并自带 夜视",
+                "§a佩戴时 幻翼/幻术师 进入 6 格会现形 3 秒",
+                "§c佩戴时 你的攻击有 12% 概率落空");
         add("minecraft:pillager", "§a远程攻击 +10%", "");
         add("minecraft:vex", "§a移动 +15%", "");
         add("minecraft:shulker", "", "");

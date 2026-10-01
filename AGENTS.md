@@ -1323,3 +1323,106 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   （预览逻辑删干净）。桌面上的 `1.5.24` 由另一路交付、**不含本次修复**，别拿它验这一条。
 - **待实机验证**：背包 / JEI 里悬停一张**没装**的照片 → 它自己那一格是灰的、行尾 `已装 X/N` 不虚高；
   把同一张装进 Curios 照片栏（或收进相册）后再悬停 → 变绿且 X 加一。
+
+## 需求批次（`1.5.26`）：苦力怕照片的爆炸免疫（描述 vs 实现对账）
+
+### 50. 苦力怕：爆炸改成真免疫
+
+- 用户口径：「苦力怕照片，免疫爆炸伤害，实测没用」→ 追问后**只修爆炸**（不加全局 −10%；也不往描述里补交互距离
+  —— 交互距离那条属性 Curios 佩戴在栏位上时会自己显示）。
+- 根因（描述 vs 实现三处不一致；`git log -L` 查证 `0.8f` 从 `d98aee9` 引入起**从未**是免疫）：
+  - 描述 `PhotographEffectRegistry:132`：`免疫 爆炸 伤害；受到所有来源伤害 -10%`；
+  - 代码 `PhotoSpecialEffects:126`：爆炸伤害 **×0.8（−20%）** ⇒ 玩家按描述期望免疫、实际还吃 80% = 「实测没用」；
+  - 代码 `PhotoSpecialEffects:317`：`ENTITY_INTERACTION_RANGE −0.5`（`4d085aa` 那版描述里本来有、后来被删，本次不动）。
+- 改法（一行）：
+  `addRule("minecraft:creeper", new DamageRule(e -> e.getSource().is(DamageTypeTags.IS_EXPLOSION), 0.0f));`
+  —— 倍率 `0.0f` = 完全免疫；判定由 `EXPLOSION || PLAYER_EXPLOSION` 换成 **`DamageTypeTags.IS_EXPLOSION`** 标签，
+  连床/重生锚的 `bad_respawn_point` 一起免疫。
+- **仍未对齐（本次刻意不动）**：描述里「受到所有来源伤害 -10%」没有实现；**恶魂**（`PhotoSpecialEffects:127`）也是
+  ×0.8 + 描述「免疫 爆炸 伤害」，属同一类矛盾 ⇒ 需要时再开一批「全量描述 ↔ 实现对账」。
+- 交付：版本 `1.5.26`：`.\gradlew.bat build` 通过；`tools/MixinSelfCheck` 全绿（54 条 target）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.26.jar`（5,931,369 字节），
+  MD5 `A4601C7B31613EF7D070A5A00CF9F9BF`。**1.5.25 及更早作废**（1.5.25 的 tooltip 严格口径修复已含在 1.5.26 里）。
+- 字节核验：`PhotoSpecialEffects.class` 78,460 → **78,450** 字节；`javap -v` 显示 `minecraft:creeper` 注册点用的是
+  BootstrapMethods **#22** → `lambda$static$4`，该 lambda 体引用 `DamageTypeTags.IS_EXPLOSION`，紧随其后是
+  `fconst_0`（倍率 0.0f = 免疫）。
+- **待实机验证**：佩戴苦力怕照片 → 站在苦力怕爆炸 / TNT 里应**完全不掉血**；摘掉后照常掉血。
+
+## 需求批次（`1.5.27`）：苦力怕「所有来源 −10%」实现 + 恶魂描述订正
+
+### 51. 两条收尾
+
+- 用户口径（接 1.5.26）：「一块修恶魂的描述」「受到所有来源伤害 -10% 做出实际实现」。
+- 改动两处：
+  1. `PhotoSpecialEffects`：给苦力怕**加第二条规则** `new DamageRule(e -> true, 0.9f)` = 受到**所有来源**伤害 −10%，
+     对应描述第二句（与爆炸那条叠加时 `0 × 0.9` 仍是 0 ⇒ 爆炸依旧完全免疫）。
+  2. `PhotographEffectRegistry`：**恶魂描述订正**——
+     `§a免疫 爆炸 伤害；§a你受到的爆炸伤害 -20%` → `§a你受到的爆炸伤害 -20%`。
+     恶魂代码（`PhotoSpecialEffects:127`）一直是 ×0.8 = −20%，描述里那句「免疫」是**谎报**；
+     本次按「代码为准」修文本（要真免疫得改那条倍率，不是改文本）。注释里写清了这个岔路。
+- 交付：版本 `1.5.27`：`.\gradlew.bat build` 通过；`tools/MixinSelfCheck` 全绿（54 条 target）；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.27.jar`（5,931,407 字节），
+  MD5 `CF5C1888A53122ABE2C9222F8065FC18`；桌面 `1.5.26` 已删（**作废**）。
+- 字节核验：`javap -c` 里 `String minecraft:creeper` 出现 **3** 次 —— 第 1 处（offset 422）
+  `invokedynamic #22`（IS_EXPLOSION 谓词）+ **`fconst_0`**（免疫）、第 2 处（offset 441）
+  `invokedynamic #23` + **`ldc 0.9f`**（全局 −10%）、第 3 处（offset 3081）是 `ENTITY_INTERACTION_RANGE` 属性 ✓；
+  `PhotoSpecialEffects.class` 78,450 → **78,581**、`PhotographEffectRegistry.class` 39,833 → **39,807**；
+  类常量池里恶魂新串「你受到的爆炸伤害 -20%」出现 1 次、旧合并串（含「免疫 爆炸 伤害；」）**0 次**。
+- **仍未对账**：照片描述（`PhotographEffectRegistry` 里 300+ 条硬编码中文）与 `PhotoSpecialEffects` 的
+  「属性 / 减伤 / 免疫」实现之间可能还有同类漂移 ⇒ 需要时开一批「全量描述 ↔ 实现对账」。
+- **待实机验证**：佩戴苦力怕照片 → 爆炸完全不掉血、其它来源伤害掉血比原来少 10%；恶魂照片 tooltip 不再显示「免疫 爆炸 伤害」。
+
+## 需求批次（`1.5.28`）：折翼（禁复制羽毛）× 复制之魂 × 超越维度磁铁「网络里无限增长」修复
+
+### 52. 现象与根因（对着实机存档 NBT 逐条核实）
+
+- 用户口径：**没戴羽毛也会**「网络磁铁吸不动掉落物 / 地面复制之魂实体不消失 / 网络里的复制之魂一直涨」，
+  且**摘除折翼后仍继续增长**；只影响复制之魂，不影响其它物品。
+- 实机存档证据（`saves/新的世界/data/BDNet_0.dat` 解 NBT）：
+  - 11:04 快照：`lensouls:copy_soul` 未封印 **8416** ＋ 同物品**带 `lensouls:copy_soul_sealed` 组件** **8352**
+    （同一物品两条不同键）；11:27 快照（本轮测试后）：未封印 **64** ＋ 封印 **1024**；
+  - 该键 `slotCapacity = Long.MAX_VALUE`、`slotMaxSize = Integer.MAX_VALUE` ⇒ **不是容量/槽位满**。
+- 结论（三层）：
+  1. **能往网络里写复制之魂的只有本模组的「禁复制封印」迁移那一条路**：折翼在
+     `CopySoulSealHandler.wearsForbiddenFeather` 名单里 → `sweep` 每 20 tick →
+     `BeyondDimensionsCompat.sealCopySouls`。BD 的 `NetMagnetItem` 自己是「先模拟 → discard → 后真插」，
+     逐行核对（0.7.24 反编译 + `javap`）**不会**重复入库。
+  2. 旧迁移是**两步非原子写**：`setAmountByKey(新键, 新键活值+迁移量)` → `setAmountByKey(旧键, 旧键活值-实际量)`，
+     **旧键那一步的结果从不核对**（`invoke` 会把异常吞成 null，BD 的 `onContentChanged` 回调还可能重入），
+     于是「迁移」静默退化成「复制」：每 20 tick 给封印键加一份 ⇒ 观感就是**无限递归/连发**；
+     并且**摘掉羽毛后**只要再发生一次扫描（登录兜底/饰品变化）就继续涨。
+  3. **`componentEntries` 把任何带 `beyonddimensions:istack_slots` 的物品都当容器** —— 而 BD 的
+     `net_magnet_item` / `net_feeder` / `net_restocker` 用**同一个组件装它们的过滤槽**（36/41 个 `KeyAmount`）。
+     旧实现因此会去改写磁铁/馈送器的过滤组件（机器每 tick 又写回 ⇒ 组件乒乓写），
+     次元锤的材料统计/消耗也会把过滤槽里的东西当成「玩家可用材料」。
+
+### 53. 修法（`BeyondDimensionsCompat` + `CopySoulSealHandler`）
+
+- **只认物质压缩球**：新增 `isMatterBall`（按 `beyonddimensions:matter_compress_ball` 解析一次并缓存），
+  `componentEntries` 对其它物品一律返回空表 ⇒ 不再碰机器过滤组件（连带修掉材料误统计/误消耗）。
+- **迁移改为「写—回读—核对—必要时回滚」**：写新键 → **回读真值**算 `gained`（不信返回值）→
+  `旧键 = max(0, 旧值 - gained)` → **回读旧键核对**；若旧键没降到位，则把
+  `gained - (旧值 - 旧后值)` 从新键扣回（`Math.max(新键原值, …)`）并 WARN（30s 降频）。
+  ⇒ 任何异常/回调/钳制下都**守恒**，迁移永不变成复制。
+- **可重入闸**：`SEALING`（`AtomicBoolean`）护住 `sealCopySouls` 整段，`SWEEPING` 护住 `sweep` 整段。
+- **新旧键相同直接不动**（`oldKey.equals(newKey)`）：先加后减会把自己清零，属于丢魂而不是迁移。
+- **标志维护进 `finally`**：`SEALED_IN_CONTAINERS` 无论中途是否抛错都要更新，
+  否则「摘羽毛后每 20 tick 继续扫」成为永久状态（正是用户说的「摘除后仍增长」）。
+- **登录兜底解封**：`PlayerLoggedInEvent` 时若无禁复制羽毛 → 做一次 `sweep(player, false)`，
+  把旧会话留在终端里的封印魂解掉（旧实现只在「本次会话封过东西」时才回扫，重登即丢标志，
+  那个封印键会永远躺着 —— 实机存档里同物品两条键就是这么来的）。
+
+### 54. 交付
+
+- 版本 `1.5.28`（**工作区同时有另一路会话在改**：1.5.26/1.5.27 是他们的批次；本次构建**先把
+  `mod_version` 误设为 1.5.26、已改为 1.5.28**，被覆盖的桌面 `lensouls-1.5.26.jar` 已删除 ——
+  它在另一路批次里本就是**作废**号，1.5.27 保持不动）：
+  `.\gradlew.bat build` 通过（只剩既有 JEI 弃用告警）；jar 5,932,944 字节，
+  MD5 `ADDAE7C833413333DB0F61B72825A233`，TOML 内 `version="1.5.28"` 已核；
+  交付 `C:/Users/volans/Desktop/lensouls-1.5.28.jar`。
+- **待实机验证**：戴折翼 → 终端里复制之魂数量不再自己涨（每轮只有磁铁真正吸进来的量）；
+  摘除/重登后封印版复制之魂被解封回一条；磁铁/馈送器的过滤槽内容不再被本模组改写。
+- **已知未动（要修再开）**：BD 磁铁默认 `hopper_nbt_mode = DENY`（跳过带组件物品，且 0.7.24 的 GUI
+  没有这个开关），所以**带封印组件的复制之魂（戴羽期间丢出去那堆）依然吸不进去**；要连这个也修，
+  得给 BD 的 `ItemStackHelper.hasExtraComponents` 加兼容 mixin（把我们的封印组件排除），
+  或落魂时摘掉封印组件 —— 两条都会改封印语义，等用户点头再做。

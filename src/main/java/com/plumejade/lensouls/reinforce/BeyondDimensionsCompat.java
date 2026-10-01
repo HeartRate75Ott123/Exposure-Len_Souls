@@ -48,6 +48,30 @@ public final class BeyondDimensionsCompat {
     /** ModList 查询结果缓存（每 tick/每秒都会问一次，别每次都查加载器） */
     private static volatile Boolean loadedCache;
 
+    /**
+     * 物质压缩球物品（<b>唯一</b>真正以 {@code ISTACK_SLOTS} 当内容物的物品）。
+     * <p>
+     * 【1.5.26 修复】BD 的 {@code net_magnet_item} / {@code net_feeder} / {@code net_restocker}
+     * 也用同一个组件名装它们的<b>过滤槽</b>（36/41 个 {@code KeyAmount}）。旧实现把任何带
+     * {@code ISTACK_SLOTS} 的物品都当成容器，于是：
+     * <ul>
+     *   <li>{@code sealCopySouls} 会去改磁铁/馈送器的过滤组件（机器自己每 tick 又写回，
+     *       形成 20 tick 一轮的组件乒乓写，观感就是"无限递归/连发"）；</li>
+     *   <li>{@code tally}/{@code consume}（次元锤材料统计与消耗）会把过滤器里的材料
+     *       当成"玩家可用材料"，甚至把过滤槽里的东西消耗掉。</li>
+     * </ul>
+     * 现在只认物质压缩球，其余物品的这个组件一律不碰。
+     */
+    private static volatile Item matterBallItem;
+    private static volatile boolean matterBallResolved;
+
+    /** 网络封印迁移的可重入保护（BD 的 {@code onContentChanged} 回调可能绕回来再触发一次扫描）。 */
+    private static final java.util.concurrent.atomic.AtomicBoolean SEALING =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
+    /** 迁移回滚告警降频时间戳（最多 30s 一条） */
+    private static volatile long lastRollbackWarnAt;
+
     private static Method getPrimaryNetFromPlayer;
     private static Method getUnifiedStorage;
     private static Method getStorage;
@@ -151,6 +175,21 @@ public final class BeyondDimensionsCompat {
      */
     public static boolean sealCopySouls(Player player, boolean seal, List<ItemStack> carried) {
         if (!ensureReady()) return false;
+        // 可重入保护：BD 的 setAmountByKey → onContentChanged 回调可能绕回来再触发一次本扫描，
+        // 重入会让「先加新键、后扣旧键」的两步迁移互相踩踏 —— 实测表现就是封印魂无限增长。
+        if (!SEALING.compareAndSet(false, true)) {
+            LenSouls.LOGGER.debug("[CopySoulSeal] 上一轮网络迁移尚未结束，跳过本次（防重入）");
+            return false;
+        }
+        try {
+            return sealCopySouls0(player, seal, carried);
+        } finally {
+            SEALING.set(false);
+        }
+    }
+
+    /** {@link #sealCopySouls} 的主体（调用方已持有 {@link #SEALING}）。 */
+    private static boolean sealCopySouls0(Player player, boolean seal, List<ItemStack> carried) {
         boolean changed = false;
 
         // 1) 网络存储（可能同时属于多个网络）
@@ -159,10 +198,10 @@ public final class BeyondDimensionsCompat {
             if (!seal && netHasFeatherMember(player, net)) continue; // 共享网络：有人还戴着就不解封
             Object unified = invoke(getUnifiedStorage, net);
             if (unified == null) continue;
-            if (getStackByKey == null) {
-                // 缺"按 key 读活值"句柄：合并式迁移做不了，宁可不动也绝不覆盖写（覆盖写=丢存量）
+            if (getStackByKey == null || setAmountByKey == null) {
+                // 缺"按 key 读活值/按 key 写"句柄：合并式迁移做不了，宁可不动也绝不覆盖写（覆盖写=丢存量）
                 LenSouls.LOGGER.debug(
-                        "[CopySoulSeal] 缺 getStackByKey 句柄，网络封印降级为不动（避免覆盖写丢存量）");
+                        "[CopySoulSeal] 缺 getStackByKey/setAmountByKey 句柄，网络封印降级为不动（避免覆盖写丢存量）");
                 continue;
             }
             Object listed = invoke(getStorage, unified);
@@ -179,24 +218,37 @@ public final class BeyondDimensionsCompat {
                 if (updated == null) continue;
                 Object newKey = newItemStackKey(updated);
                 if (newKey == null) continue;
+                // 新旧键相同（组件没进键身份等）：先加后减会把自己清零，直接不动
+                if (oldKey.equals(newKey)) continue;
 
                 // ── 写前重读活值（快照只是一份"计划"，数量以此刻的存储为准）──
                 // 终端网络是共享的：维度磁铁吸掉落物 / 馈送器 / 其他玩家随时可能往这两个键合并。
-                // setAmountByKey 是绝对量覆盖写，照抄快照量会把新键下的存量覆盖掉（磁铁丢魂根因）。
                 long oldLive = amountOf(invoke(getStackByKey, unified, oldKey));
                 if (oldLive <= 0L) continue; // 旧键已被别人清空/搬走：本轮不动，下轮按新快照收敛
                 long moved = Math.min(amountOf(entry), oldLive);
-
+                if (moved <= 0L) continue;
                 long newLive = amountOf(invoke(getStackByKey, unified, newKey));
 
-                // 先加新键（合并），返回值 = 实际写入量（新键槽容量不足时会被钳制）；
-                // 反射失败/异常 → 0 → actual 为负 → 跳过本轮（绝不盲目覆盖写）
-                long applied = amountOf(invoke(setAmountByKey, unified, newKey, newLive + moved));
-                long actual = applied - newLive;
-                if (actual <= 0L) continue; // 容量已满：本轮不动，下轮再试
+                // ① 先加新键（按键合并）——写完立刻回读真值，不信返回值（反射异常时返回 null）
+                invoke(setAmountByKey, unified, newKey, newLive + moved);
+                long gained = amountOf(invoke(getStackByKey, unified, newKey)) - newLive;
+                if (gained <= 0L) continue; // 没写进去（键满/异常）：本轮不动，下轮再试
 
-                // 按实际迁移量扣旧键（可能剩一小部分，下一轮 sweep 幂等收敛）
-                invoke(setAmountByKey, unified, oldKey, oldLive - actual);
+                // ② 按"实际增加量"扣旧键
+                long left = Math.max(0L, oldLive - gained);
+                invoke(setAmountByKey, unified, oldKey, left);
+
+                // ③ 核对扣减真的生效；没生效就把新增原样回滚 —— 保证「迁移」在任何异常下都不会变成「复制」
+                long oldAfter = amountOf(invoke(getStackByKey, unified, oldKey));
+                if (oldAfter > left) {
+                    long excess = gained - (oldLive - oldAfter);
+                    if (excess > 0L) {
+                        long newAfter = amountOf(invoke(getStackByKey, unified, newKey));
+                        invoke(setAmountByKey, unified, newKey, Math.max(newLive, newAfter - excess));
+                    }
+                    warnMigrationRolledBack(oldLive, left, oldAfter, gained);
+                    continue;
+                }
                 netChanged = true;
             }
             if (netChanged) {
@@ -286,6 +338,16 @@ public final class BeyondDimensionsCompat {
         return copy;
     }
 
+    /** 迁移回滚告警（30s 降频，避免每 20 tick 刷屏） */
+    private static void warnMigrationRolledBack(long oldLive, long left, long oldAfter, long gained) {
+        long now = System.currentTimeMillis();
+        if (now - lastRollbackWarnAt < 30_000L) return;
+        lastRollbackWarnAt = now;
+        LenSouls.LOGGER.warn(
+                "[CopySoulSeal] 网络旧键扣减未生效，已回滚新增以保持守恒（旧键活值={} 目标残留={} 实际残留={} 本轮新增={}）",
+                oldLive, left, oldAfter, gained);
+    }
+
     private static Object newItemStackKey(ItemStack stack) {
         if (itemStackKeyConstructor == null) return null;
         try {
@@ -295,14 +357,32 @@ public final class BeyondDimensionsCompat {
         }
     }
 
-    /** 读取物质压缩球组件里的条目；其它物品返回空列表。 */
+    /**
+     * 读取物质压缩球组件里的条目；<b>其它物品一律返回空列表</b>（见 {@link #matterBallItem} 的说明：
+     * 磁铁/馈送器/补货器的同名组件是过滤槽，不是内容物）。
+     */
     private static List<Object> componentEntries(ItemStack stack) {
         if (stack.isEmpty() || hasComponent == null) return List.of();
+        if (!isMatterBall(stack)) return List.of();
         Object present = invoke(hasComponent, stack);
         if (!(present instanceof Boolean flag) || !flag) return List.of();
         Object value = invoke(getComponent, stack);
         if (value instanceof List<?> list) return new ArrayList<>(list);
         return List.of();
+    }
+
+    /** 是否是超越维度的「物质压缩球」（唯一以 {@code ISTACK_SLOTS} 作为内容物的物品）。 */
+    private static boolean isMatterBall(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        if (!matterBallResolved) {
+            Item resolved = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                    net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "matter_compress_ball"));
+            if (resolved != null && resolved != net.minecraft.world.item.Items.AIR) {
+                matterBallItem = resolved;
+                matterBallResolved = true;
+            }
+        }
+        return matterBallItem != null && stack.getItem() == matterBallItem;
     }
 
     /**

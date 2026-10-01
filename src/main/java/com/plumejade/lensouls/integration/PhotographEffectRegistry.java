@@ -134,7 +134,9 @@ public class PhotographEffectRegistry {
         add("minecraft:endermite", "§a你受到的魔法伤害 -12%；§a免疫 末影珍珠 伤害", "");
         add("minecraft:blaze", "§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
         add("minecraft:magma_cube", "§a赋予 火焰免疫 效果；§a免疫 摔落 伤害", "§c你受到的 冰冻 伤害 +12%");
-        add("minecraft:ghast", "§a免疫 爆炸 伤害；§a你受到的爆炸伤害 -20%", "§c你受到的 火 伤害 +12%");
+        // 恶魂：代码一直是「爆炸伤害 ×0.8 = -20%」，描述里那句「免疫 爆炸 伤害」是谎报 ⇒ 只留真实的那半句
+        // （要真免疫的话改的是 PhotoSpecialEffects:127 的倍率，不是这行文本）
+        add("minecraft:ghast", "§a你受到的爆炸伤害 -20%", "§c你受到的 火 伤害 +12%");
         add("minecraft:witch", "§a负面效果持续时间 -50%；§a药水效果时长 +20%", "");
         add("minecraft:cave_spider", "§a免疫 中毒 效果", "§c你受到的近战伤害 +5%");
         add("minecraft:spider", "", "§c你受到的近战伤害 +5%");

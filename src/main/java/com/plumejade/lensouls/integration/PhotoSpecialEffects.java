@@ -123,7 +123,11 @@ public class PhotoSpecialEffects {
         addRule("legendary_monsters:posessed_paladin", new DamageRule(PhotoSpecialEffects::isMelee, 0.88f));
         addRule("legendary_monsters:cloud_golem", new DamageRule(e -> true, 1.12f));
         // ── 原版 ──
-        addRule("minecraft:creeper", new DamageRule(e -> e.getSource().is(DamageTypes.EXPLOSION) || e.getSource().is(DamageTypes.PLAYER_EXPLOSION), 0.8f));
+        // 苦力怕：爆炸**完全免疫**（与描述「免疫 爆炸 伤害」对齐；判定用 IS_EXPLOSION 标签，
+        // 一次覆盖 爆炸/玩家爆炸/床与重生锚的 bad_respawn_point；原实现是 ×0.8 = 只减 20%）
+        addRule("minecraft:creeper", new DamageRule(e -> e.getSource().is(DamageTypeTags.IS_EXPLOSION), 0.0f));
+        // 苦力怕：受到**所有来源**伤害 -10%（对应描述第二句；与上面那条叠加时 0×0.9 仍是 0 = 爆炸依旧免疫）
+        addRule("minecraft:creeper", new DamageRule(e -> true, 0.9f));
         addRule("minecraft:ghast", new DamageRule(e -> e.getSource().is(DamageTypes.EXPLOSION) || e.getSource().is(DamageTypes.PLAYER_EXPLOSION), 0.8f));
         addRule("minecraft:wither", new DamageRule(e -> e.getSource().is(DamageTypes.WITHER) || e.getSource().is(DamageTypes.WITHER_SKULL), 0.0f));
         addRule("minecraft:ender_dragon", new DamageRule(e -> e.getSource().is(DamageTypes.FALL), 0.0f));

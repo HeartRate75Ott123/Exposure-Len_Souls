@@ -61,6 +61,9 @@ public final class CopySoulSealHandler {
     private static final Map<UUID, Boolean> SEAL_FLAG = new ConcurrentHashMap<>();
     /** 曾经在「容器里」封过东西的玩家：摘羽毛后需要再扫一次把封印摘掉 */
     private static final Set<UUID> SEALED_IN_CONTAINERS = ConcurrentHashMap.newKeySet();
+    /** 扫描可重入保护：写物品组件 / 写容器内容物 / 写网络都会触发同步与回调 */
+    private static final java.util.concurrent.atomic.AtomicBoolean SWEEPING =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     // ========== 对外 API ==========
 
@@ -210,39 +213,63 @@ public final class CopySoulSealHandler {
 
     /** 扫一遍三处容器，按 {@code seal} 打/摘封印 */
     private static void sweep(ServerPlayer player, boolean seal) {
+        // 可重入保护：本次扫描会写物品组件、容器内容物与超越维度网络，
+        // 每一处都可能触发同步/回调（BD 的 onContentChanged、容器 setStackInSlot 等），
+        // 若不设闸就会「扫描 → 写 → 回调 → 再扫描」地无限递归连发。
+        if (!SWEEPING.compareAndSet(false, true)) return;
+
         boolean touchedContainers = false;
-
-        // 1) 玩家物品栏 41 格（即时路径由 inventoryTick 负责，这里兜底）
-        Inventory inventory = player.getInventory();
-        for (int i = 0; i < inventory.getContainerSize(); i++) {
-            applySeal(inventory.getItem(i), seal);
-        }
-
-        // 2) 物品栏 + 饰品栏里的「容器类物品」内容物（精妙背包等）
-        List<ItemStack> carriers = new ArrayList<>(inventory.getContainerSize() + 8);
-        for (int i = 0; i < inventory.getContainerSize(); i++) {
-            ItemStack stack = inventory.getItem(i);
-            if (!stack.isEmpty()) carriers.add(stack);
-        }
-        carriers.addAll(equippedCurios(player));
-        for (ItemStack carrier : carriers) {
-            if (applyInsideHandler(carrier, seal)) touchedContainers = true;
-        }
-
-        // 3) 超越维度：网络存储 + 随身物质压缩球
         try {
-            if (BeyondDimensionsCompat.isLoaded() && BeyondDimensionsCompat.sealCopySouls(player, seal, carriers)) {
-                touchedContainers = true;
+            // 1) 玩家物品栏 41 格（即时路径由 inventoryTick 负责，这里兜底）
+            Inventory inventory = player.getInventory();
+            for (int i = 0; i < inventory.getContainerSize(); i++) {
+                applySeal(inventory.getItem(i), seal);
             }
-        } catch (Throwable t) {
-            LenSouls.LOGGER.warn("[CopySoul] 超越维度封印扫描失败（已忽略本次）", t);
-        }
 
-        if (seal && touchedContainers) {
-            SEALED_IN_CONTAINERS.add(player.getUUID());
-        } else if (!seal) {
-            SEALED_IN_CONTAINERS.remove(player.getUUID());
+            // 2) 物品栏 + 饰品栏里的「容器类物品」内容物（精妙背包等）
+            List<ItemStack> carriers = new ArrayList<>(inventory.getContainerSize() + 8);
+            for (int i = 0; i < inventory.getContainerSize(); i++) {
+                ItemStack stack = inventory.getItem(i);
+                if (!stack.isEmpty()) carriers.add(stack);
+            }
+            carriers.addAll(equippedCurios(player));
+            for (ItemStack carrier : carriers) {
+                if (applyInsideHandler(carrier, seal)) touchedContainers = true;
+            }
+
+            // 3) 超越维度：网络存储 + 随身物质压缩球
+            try {
+                if (BeyondDimensionsCompat.isLoaded() && BeyondDimensionsCompat.sealCopySouls(player, seal, carriers)) {
+                    touchedContainers = true;
+                }
+            } catch (Throwable t) {
+                LenSouls.LOGGER.warn("[CopySoul] 超越维度封印扫描失败（已忽略本次）", t);
+            }
+        } finally {
+            // 标志维护必须在 finally 里：中途抛错时若漏掉，「摘掉羽毛后每 20 tick 继续扫」
+            // 会成为永久状态（实测：摘除折翼后终端里的复制之魂仍被反复迁移）。
+            if (seal && touchedContainers) {
+                SEALED_IN_CONTAINERS.add(player.getUUID());
+            } else if (!seal) {
+                SEALED_IN_CONTAINERS.remove(player.getUUID());
+            }
+            SWEEPING.set(false);
         }
+    }
+
+    /**
+     * 登录兜底：没戴禁复制羽毛时清一次历史封印。
+     * <p>
+     * 【1.5.26】终端里的封印魂不会自己解封：原来的「上次封过东西」标志只存在内存里，
+     * 换会话/重登就丢，于是旧会话封印过的终端魂永远带着 {@code copy_soul_sealed} 躺着
+     * （实测存档里同时存在封印版与未封印版两条复制之魂）。登录时做一次无羽毛扫描，
+     * 把随身容器与（没有羽毛成员的）网络一起对齐。
+     */
+    @SubscribeEvent
+    public static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (wearsForbiddenFeather(player)) return;
+        sweep(player, false);
     }
 
     private static List<ItemStack> equippedCurios(ServerPlayer player) {

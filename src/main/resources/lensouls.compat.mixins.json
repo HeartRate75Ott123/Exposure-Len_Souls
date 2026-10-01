@@ -19,6 +19,7 @@
     "IgnisFireballNoFireMixin",
     "EnergyBeamNoShakeMixin",
     "IgnisFireballBrandMixin",
+    "HydraPartDamageMixin",
     "GatekeeperStunBlockMixin",
     "GatekeeperSoulDropMixin",
     "EternalStarlightBossStunMixin",

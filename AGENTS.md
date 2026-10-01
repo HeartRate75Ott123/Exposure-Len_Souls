@@ -1623,3 +1623,133 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   MD5 `DB20B43346C25FAA9ABC4D5A78847AA8`；`1.5.41` 作废。
 - **待实机验证**：① 召唤后打一会儿 → 走远约 200 格（让其区块卸载）→ 回来：仍在原地、状态接续、血条恢复；
   ② 重启存档后仍存在不消失；③（预期）它会随区块卸载，只是「你不在时它不 tick」。
+
+## 需求批次（`1.5.44`）：洞穴蜘蛛移出「剧毒逆转」+ 套装张数 count 改动态识别
+
+### 61. 需求与实现
+
+- 需求（用户）：① 洞穴蜘蛛从「剧毒逆转」套装要求中移除；② `count` 从硬编码改为**动态识别**。
+- 数据现状（脚本全量核对 54 套）：
+  - `venom_twist`（剧毒逆转，`photo_set_defs/conversion.json`）成员原为 bee / **cave_spider** /
+    silverfish / spider 共 4，档位 `count: 4`；`photo_set/conversion.json` 里删除 cave_spider 那一项。
+  - **有 4 套的 count 故意大于成员数**（允许同种照片重复凑数），动态化绝不能一把梭：
+    `boss_barrage` 5/0（由照片 Boss 标记驱动，特殊）、`molten_oath` 4/3、`cinder_swarm` 3/2、
+    `magma_kin` 3/2。其余 49 套 count == 成员数。
+- 动态口径（`count` 省略 ⇒ 动态；显式写 ⇒ 覆盖）：
+  - `config/PhotoSetLoader`：新增 `memberCounts`（setId → 成员实体数，随成员表在 `apply` /
+    `setClientCache` 后由 `rebuildMemberCounts()` 重建）+ 访问器 `memberCount(setId)`；
+  - `config/PhotoSetDefs`：解析时**不写 count ⇒ 0**（显式写非正数仍按无效档位跳过），
+    新增 `effectiveCount(setId, tier)`：声明 >0 用声明值，否则 `max(1, memberCount(setId))`；
+  - `integration/PhotoSetRegistry`：3 处消费点（激活判定 `getActiveSets`、tooltip 的 min/max `need`）
+    全部改走 `effectiveCount`。
+  - 网络同步无需改动：defs 与 membership 都会同步，两端各自按同一套口径现算（`count=0` 原样发过去）。
+- 数据清理：用行级脚本把**「count 恰等于成员数」的冗余 `count` 行**从 7 个 defs 文件里删掉
+  （attack 14 / balanced 8 / conversion 3 / daynight 8 / defense 5 / mobility 8 / survival 8 处），
+  保留那 4 个覆盖值；`venom_twist` 因为删了 cave_spider 后已不等（4≠3）而未被自动删掉，
+  额外手工删除 —— 否则它会变成「成员 3 却要 4 张」的不可达套装。
+- **验证（脚本对比 HEAD vs 改后）**：54 套的 effective count **只有 `venom_twist` 由 [4] → [3]**，
+  其余一字未变；仍显式写 count 的恰为那 4 套 ✓；14 个 JSON 全部 `json.load` 通过 ✓。
+- 交付：版本 `1.5.44`：`.\gradlew.bat build` 通过、`tools/MixinSelfCheck` 全绿；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.44.jar`（5,935,974 字节），
+  MD5 `936C7FC379A8517C5AB2523E07E22AB4`；`1.5.43` 作废。
+- 未动：`balanced.json` 里 cave_spider 仍挂在 `twin_spider`（双蛛噬影）名下（用户只要求剧毒逆转）。
+- **待实机验证**：集齐蜜蜂 / 蠹虫 / 蜘蛛三张照片即触发「剧毒逆转」；
+  `cinder_swarm`（2 成员要 3 张）、`molten_oath`（3 成员要 4 张）维持原强度。
+
+### 61.1 更正（`1.5.45`）：普通套装 count≠成员数 = 死套装，那 3 条不是「故意设计」
+
+- 用户纠偏：「count 不等于成员数本身就是 Bug！除了首领套按件计数，而且首领套也有去重」。
+- 事实核对（本次读码确认）：
+  - `PhotoSetRegistry.collectInstalledEntities` 里已有去重（`if (!ids.contains(n)) ids.add(n)`）⇒
+    喂给 `getActiveSets` 的成员列表**本来就是不重复的成员集合**，因此每套的计数**上限 = 成员数**；
+    `count` 一旦大于成员数（`molten_oath` 4/3、`cinder_swarm` 3/2、`magma_kin` 3/2），
+    该档位**永远凑不齐** —— 是**死套装**（tooltip 上表现为卡在「已装 2/3」永不点绿），
+    而 §61 里把它们当成「故意允许同种照片重复凑数」是**误判**，此处更正。
+  - 首领套 `boss_barrage` 才是唯一例外：`countInstalledBossPhotos` 用 `HashSet seen` 去重，
+    **同 Boss 多张只算一次**，即「按件计数 + 去重」，成员表里没有它（成员 0），故必须保留显式 `count: 5`。
+- 修法：删掉 `molten_oath` / `cinder_swarm` / `magma_kin` 这 3 条 `count`（改走动态 = 成员数）；
+  全量复核结果 `normal sets where effective != members: none`（54 套里除 `boss_barrage` 外，
+  生效张数一律等于成员数）。
+- 防回归：`PhotoSetDefs.effectiveCount` 新增一次性 WARN —— 普通套装显式 `count` > 成员数时提示
+  「该档位永远无法激活（同种照片不重复计数），普通套装请省略 count」，每 `套装#count` 只报一次
+  （`WARNED_UNREACHABLE`，避免每 tick 刷屏）。
+- 口径统一说明：**激活判定与 tooltip 都按「已安装的不同成员数」**（去重），
+  所以「同一种照片堆两张」不会再点亮套装。
+- 交付：版本 `1.5.45`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.45.jar`（5,936,535 字节），
+  MD5 `32A2224263FCD88D4336AD10817930D4`；`1.5.44` 作废。
+  jar 内核验：仅存显式 count `boss_barrage: 5` ✓；`cave_spider` 已不在成员表 ✓；`venom_twist` 成员 3 ✓。
+- **待实机验证**：炽粉虫群集齐 2 种、岩浆之裔 2 种、熔心誓约 3 种即可触发（此前永不触发）；
+  剧毒逆转集齐蜂/蠹虫/蜘蛛；首领套仍是 5 种不同首领。
+
+## 修复（`1.5.46`）：弹幕打不到多子部件 BOSS（九头蛇）
+
+### 62. 根因：命中判据只认 LivingEntity + 本体无条件吞伤害
+
+- 现象（用户）：照片弹幕（如「湮灭构造体」射线）打不到九头蛇这种多子部件 BOSS；次元枪自带的一套碰撞算法实测有效。
+- 逐字核实（传奇怪物源码 2.1.15 + 运行时 jar 2.1.20 `javap`、暮色 4.8.3345 源码）：
+  - `AnnihilationBeamEntity:623` 索敌是 `world.getEntitiesOfClass(LivingEntity.class, 射线包围盒)` ⇒
+    九头蛇的 `HydraHead`/`HydraNeck` 是 `TFPart extends PartEntity`（**不是 LivingEntity**）⇒ 永不进候选；
+  - 候选里只剩**本体**（是 LivingEntity、巨大 AABB）⇒ 射线必然与之相交 ⇒ `hydra.hurt(...)`，而
+    `Hydra.hurt` = `return src.is(BYPASSES_INVULNERABILITY) && super.hurt(...)` ⇒ **无条件吞伤害**；
+  - 真正该走的 `HydraPart.hurt → parent.attackEntityFromPart(...)`（头部减伤/头血/断裂）**永远走不到**；
+  - 暮色自己的设计注释：`Hydra.isPickable() → false`（"enormous bounding box"）、`TFPart.isPickable() → true`
+    —— 即**本体故意不可命中、部件才是碰撞体**。次元枪之所以灵，是因为 `GunBulletEntity.checkEntity`
+    自己遍历 `getParts()` 直接命中部件，绕开了本体这一层。
+  - 连带事实：`ModDamageTypes.causeAnnihilationDamage` 把 direct entity 写成 **caster**（不是射线本体），
+    所以「查 `getDirectEntity().persistentData["lensouls:photo_proj"]`」的标记判定对 LM 两条射线静默失效
+    （灾变死亡激光的 direct 才是光束本体，标记有效）。
+  - 全整合包 javap 逐个核过：**只有九头蛇是无条件吞伤害**（娜迦走 `super.hurt`；湮灭者/潜影贝/利维坦/
+    下界合金巨兽都只在特定状态或特定来源下吞）⇒ 爆点集中在这一型。
+- **为什么不做「逐弹幕 mixin」**：LM 三条 Beam 各自 `extends Entity`、各有私有 `raytraceEntities`
+  （无共同父类，无法合并）；每个 mixin 还要在类内部重算伤害公式（`getDamage() + 目标最大HP×HpDamage%`）
+  有漂移风险，且必须写在 HEAD 且**不能 cancel**（`collidePos`/`blockSide` 是它内部写的，粒子渲染与已有的
+  `ObliteratorBeamNoAutoExplosionMixin` 都依赖）。改 `Level#getEntitiesOfClass` 则**结构上不可能**：
+  `EntityTypeTest.forClass(LivingEntity.class)` 对部件返回 null，硬塞进 `List<LivingEntity>` 会在调用方
+  `checkcast` 崩。
+- 解法（一个单点，覆盖所有弹幕）：
+  1. 新增 `util/PartHitUtil` —— 把次元枪那套「部件优先」算法抽出来共用（此前仓里有三份拷贝：
+     `GunBulletEntity.checkEntity` / `AimTargetUtil` / `CameraVisibility`）：`clipParts`（线段×部件求交，
+     薄部件补 0.3 与次元枪同口径）、`nearestPart`、`resolveRoot`（部件→父实体）、
+     `hurtResolvingParts`（把「打在本体上必被吞掉」的伤害改派给最近部件）、
+     `livingTargetsInBox`（AoE 取目标时把部件折算成父实体并去重）。
+  2. 新增 `mixin/compat/HydraPartDamageMixin`（`targets = "twilightforest.entity.boss.Hydra"`、
+     `remap=false`、`require=0`、compat 配置 `required:false`）：在 `Hydra.hurt` HEAD，
+     **原逻辑注定返回 false 时**用 `hurtResolvingParts` 把命中改派给最近部件（部件 hurt 转发父实体、
+     跑本家头部逻辑）并 `setReturnValue(true)`。
+     **闸门**：`BYPASSES_INVULNERABILITY` 原本就能生效 ⇒ 不插手；`directEntity instanceof Projectile`
+     或 `direct != entity` ⇒ 不插手（LM 射线把 direct 写成施法者 `direct == entity`，而原版弓箭/投掷物
+     direct 就是投射物本身）⇒ **原版弓箭行为一字不变**（射身体照旧无效，必须射头）。
+  3. D2 自家代码：`BossPhotoProjHelper` 两处只查 `getEntitiesOfClass(LivingEntity.class, box)` 的 AoE
+     （地震践踏 `:398`、巨剑斩击 `:1327`）改用 `PartHitUtil.livingTargetsInBox`；
+     动能力场按 UUID 取本体（拿到的是父实体）与「要害打击/断魂」（`getEntities` + `AimTargetUtil.isAimedAt`，
+     后者本就遍历部件）**核实无需改动**。
+- 覆盖：我方全部弹幕 + 其它模组「无投射物本体」的射线/范围伤害/爆炸（凡走 `Hydra.hurt` 本体的）✓；
+  不覆盖：真正带投射物本体的第三方弹幕打在本体上（保持原设计）✓。
+- 交付：版本 `1.5.46`；`tools/MixinSelfCheck` 全绿（把暮色 jar 一并放进 classpath 复核 target 选择器 54 个、
+  0 语法错误）；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.46.jar`（5,940,550 字节），
+  MD5 `58EA00061AA187345E0869145A2E6683`；`1.5.45` 作废。
+- **待实机验证**：① 湮灭构造体射线 / 云筑魔像能量射线 / 先驱者死亡激光 打九头蛇**头** → 掉血
+  （头部减伤、头血结算都应生效，而不是 0）；② 用**弓射身体**仍然无效（必须射头）——闸门没有被放宽；
+  ③ 娜迦/其它多部件 BOSS 行为不变。
+
+### 62.1 更正（`1.5.47`）：§62 的改派加了「回退本体」⇒ 无限递归 StackOverflowError
+
+- 实测崩溃（客户端 `crash-2026-10-02_00.19.28-client.txt`，566 KB）：`java.lang.StackOverflowError`，
+  栈里反复出现 `PartHitUtil.hurtResolvingParts:115` → `Hydra.hurt`（我们的注入
+  `handler$iih000$lensouls$rerouteToPart`）→ `PartHitUtil.hurtResolvingParts:115` …。
+- **根因**：`hurtResolvingParts` 里那条「部件拒收就回退 `victim.hurt`」的分支。而本方法**就是从受害者
+  自己的 `hurt` 里调用的** ⇒ 形成
+  「改派给部件 → `HydraPart.hurt` → `Hydra.attackEntityFromPart` → 本体 `hurt` → 我们的注入再改派…」
+  的无限递归。触发条件很普通：九头蛇处于无敌帧时 `Hydra.isInvulnerableTo` 判定失败 ⇒ 部件返回 `false`。
+- **修法（两处）**：
+  1. `PartHitUtil.hurtResolvingParts` → 改名 **`hurtNearestPart`**，并**删除回退分支**：
+     部件拒收就返回 `false`，由调用方决定（九头蛇那里即保持原有「吞掉」行为）。
+     javadoc 写死这条坑：*本方法会从受害者自己的 hurt 内被调用，绝不可回退 victim.hurt*。
+  2. `HydraPartDamageMixin` 增加 `ThreadLocal<Boolean> LENSOULS_IN_REROUTE` **重入保护**：
+     改派链路内再进 `Hydra.hurt` 直接不插手（部件 hurt 内部还会走回父实体）——与第 1 条双重兜底。
+- 复核：`tools/MixinSelfCheck` 全绿（把暮色 jar 一起放进 classpath）；jar 内核验：`hurtResolvingParts`
+  已无残留、`hurtNearestPart` 存在、重入保护在位。
+- 交付：版本 `1.5.47`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.47.jar`（5,941,031 字节），
+  MD5 `B49E29395FA91F9FECA217C42ABFD19E`；`1.5.46` 作废。
+- **教训（通用）**：任何「在 A 的 `hurt` 里改派给 B、失败再回退 `A.hurt`」的写法都是**自递归**。
+  在实体的 `hurt` 内做伤害转发时，只能**单向派发 + 重入保护**，绝不回退到入口方法。

@@ -395,7 +395,8 @@ public class BossPhotoProjHelper {
         net.minecraft.world.phys.AABB quake = new net.minecraft.world.phys.AABB(
                 cx - QUAKE_RADIUS, gy - 1.5D, cz - QUAKE_RADIUS,
                 cx + QUAKE_RADIUS, gy + 3.0D, cz + QUAKE_RADIUS);
-        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, quake)) {
+        // 部件感知：多子部件 BOSS（九头蛇头/娜迦体节）的碰撞体是 PartEntity，只查 LivingEntity 会漏
+        for (LivingEntity e : com.plumejade.lensouls.util.PartHitUtil.livingTargetsInBox(level, quake)) {
             if (e == player || e instanceof net.minecraft.world.entity.player.Player) continue;
             if (!e.isAlive()) continue;
             float dmg = panel + Math.min(panel, e.getMaxHealth() * QUAKE_HP_PART);
@@ -1324,7 +1325,7 @@ public class BossPhotoProjHelper {
             try {
                 buddy = Class.forName("com.finderfeed.fdbosses.content.entities.malkuth_boss.MalkuthBossBuddy");
             } catch (Exception ignored) {}
-            for (LivingEntity e : sc.level().getEntitiesOfClass(LivingEntity.class, box)) {
+            for (LivingEntity e : com.plumejade.lensouls.util.PartHitUtil.livingTargetsInBox(sc.level(), box)) {
                 if (e == caster || e instanceof net.minecraft.world.entity.player.Player) continue;
                 if (!e.isAlive()) continue;
                 if (buddy != null && buddy.isInstance(e)) continue;

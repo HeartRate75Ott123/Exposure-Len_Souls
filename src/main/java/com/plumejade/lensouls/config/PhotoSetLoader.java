@@ -29,6 +29,8 @@ public class PhotoSetLoader extends SimpleJsonResourceReloadListener {
     private static final Gson GSON = new GsonBuilder().setLenient().create();
     private static final String FOLDER = "photo_set";
     private static Map<ResourceLocation, List<String>> membership = Map.of();
+    /** setId → 成员表里登记的实体数；供 {@link PhotoSetDefs} 的「动态 count」使用（随成员表一同重建） */
+    private static Map<String, Integer> memberCounts = Map.of();
 
     public PhotoSetLoader() {
         super(GSON, FOLDER);
@@ -73,12 +75,32 @@ public class PhotoSetLoader extends SimpleJsonResourceReloadListener {
         }
 
         membership = Map.copyOf(newMap);
+        rebuildMemberCounts();
         LenSouls.LOGGER.info("[PhotoSet] 加载了 {} 条套装成员映射", membership.size());
     }
 
     /** 查询实体所属套装 id 列表（可能为空） */
     public static List<String> getSets(ResourceLocation entityId) {
         return membership.getOrDefault(entityId, List.of());
+    }
+
+    /**
+     * 某套装登记了多少个实体 —— <b>「动态 count」的口径</b>：
+     * 套装定义里不写 {@code count} 时，要求张数就取这个值，于是成员表的增删会自动反映到强度上。
+     */
+    public static int memberCount(String setId) {
+        return memberCounts.getOrDefault(setId, 0);
+    }
+
+    /** 重建 setId → 成员数（成员表每次加载/客户端同步后调用一次） */
+    private static void rebuildMemberCounts() {
+        Map<String, Integer> counts = new HashMap<>();
+        for (List<String> sets : membership.values()) {
+            for (String setId : sets) {
+                counts.merge(setId, 1, Integer::sum);
+            }
+        }
+        memberCounts = Map.copyOf(counts);
     }
 
     /** 全部成员映射（供 tooltip 反查某套装包含哪些实体） */
@@ -91,5 +113,6 @@ public class PhotoSetLoader extends SimpleJsonResourceReloadListener {
      */
     public static void setClientCache(Map<ResourceLocation, List<String>> cache) {
         membership = Map.copyOf(cache);
+        rebuildMemberCounts();
     }
 }

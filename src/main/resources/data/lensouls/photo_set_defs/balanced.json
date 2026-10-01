@@ -17,7 +17,6 @@
     "name": "熔心誓约",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "immune_fire",
           "cond:fire|maxhp:0.3",
@@ -30,7 +29,6 @@
     "name": "炽翎烈羽",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "immune_fire",
           "barrage_trigger:1",
@@ -43,7 +41,6 @@
     "name": "余烬亡魂",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "immune_fire",
           "convert_eff:wither:healing",
@@ -56,7 +53,6 @@
     "name": "深渊低语",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "env:water_breath",
           "cond:water|speed_mult:2.8",
@@ -69,7 +65,6 @@
     "name": "海妖之握",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "env:water_breath",
           "kb_resist:0.2",
@@ -82,7 +77,6 @@
     "name": "圣骑誓约",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "kb_resist:0.2",
           "dot_mult:ender:2.8",
@@ -95,7 +89,6 @@
     "name": "蛮力冲锋",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "kb_resist:0.25",
           "dot_mult:earth:2.2"
@@ -107,7 +100,6 @@
     "name": "冰原远征",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "dmg_element:freeze:2.2",
           "kb_resist:0.15"
@@ -119,7 +111,6 @@
     "name": "双蛛噬影",
     "tiers": [
       {
-        "count": 2,
         "effects": [
           "cond:night|infusion_boost:1",
           "barrage_dmg:1.2"

@@ -67,7 +67,7 @@ public class PhotoSetRegistry {
             PhotoSetDefs.SetDef def = PhotoSetDefs.get(e.getKey());
             if (def == null) continue;
             for (PhotoSetDefs.Tier t : def.tiers()) {
-                if (e.getValue() >= t.count()) {
+                if (e.getValue() >= PhotoSetDefs.effectiveCount(e.getKey(), t)) {
                     bySet.computeIfAbsent(e.getKey(), k -> new ArrayList<>()).add(t);
                 }
             }
@@ -260,11 +260,12 @@ public class PhotoSetRegistry {
             // （Curios 照片栏 + 相册内容物）。**不要**退回「正在悬停的这张也算已装」的预览写法
             // （1.5.7 曾这么写）——那会让 JEI / 背包里任何一张还没装的照片，自己那一格永远点绿，
             // 等于谎报已装；JEI 那条路径 `getEntity()` 常常是 null，连进度行都不显示，绿得更没道理。
-            int need = def.tiers().stream().mapToInt(PhotoSetDefs.Tier::count).min().orElse(1);
+            // 张数走 effectiveCount：没写 count 的套装 = 动态取成员数（首领套另有口径）
+            int need = def.tiers().stream().mapToInt(t -> PhotoSetDefs.effectiveCount(setId, t)).min().orElse(1);
             MutableComponent head = Component.literal("  ").withStyle(ChatFormatting.GRAY)
                     .append(Component.literal("集齐 ").withStyle(ChatFormatting.GRAY));
             if (setId.equals("boss_barrage")) {
-                need = def.tiers().stream().mapToInt(PhotoSetDefs.Tier::count).max().orElse(1);
+                need = def.tiers().stream().mapToInt(t -> PhotoSetDefs.effectiveCount(setId, t)).max().orElse(1);
                 head.append(Component.literal(need + " 张首领").withStyle(ChatFormatting.GRAY));
             } else {
                 for (int i = 0; i < members.size(); i++) {

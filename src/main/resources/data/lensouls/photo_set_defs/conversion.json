@@ -3,7 +3,6 @@
     "name": "凋朽轮回",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "convert_eff:wither:healing",
           "convert_eff:slow:speed",
@@ -20,7 +19,6 @@
     "name": "凋零连锁",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "convert_eff:wither:healing",
           "convert_eff:slow:speed",
@@ -35,7 +33,6 @@
     "name": "剧毒逆转",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "convert_eff:poison:healing",
           "on_hit_effect:poison:0.15:60:0",

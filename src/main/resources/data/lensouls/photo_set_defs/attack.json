@@ -3,7 +3,6 @@
     "name": "苍白猎魂",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "barrage_trigger:1",
           "dmg_element:wither:2.2"
@@ -15,7 +14,6 @@
     "name": "湮灭协议",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "dot_mult:ender:3.5",
           "barrage_trigger:1"
@@ -27,7 +25,6 @@
     "name": "云筑天穹",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "barrage_trigger:1",
           "dot_mult:water:2.5"
@@ -39,7 +36,6 @@
     "name": "霜原巨兽",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "dmg_element:freeze:2.8",
           "kb_resist:0.2"
@@ -51,7 +47,6 @@
     "name": "永冻之缚",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "dmg_element:freeze:2.8",
           "kb_resist:0.15"
@@ -63,7 +58,6 @@
     "name": "霜铸魔像",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "dmg_element:freeze:2.8",
           "armor:0.15"
@@ -75,7 +69,6 @@
     "name": "白骨军团",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "dmg_element:wither:2.2",
           "cond:night|maxhp:0.15"
@@ -87,7 +80,6 @@
     "name": "炼狱牧人",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "kb_resist:0.2",
           "dmg_element:fire:2.2",
@@ -100,7 +92,6 @@
     "name": "荆棘林巡",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "barrage_dmg:1.15",
           "cond:night|speed_mult:2.2",
@@ -113,7 +104,6 @@
     "name": "渊海歌者",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "env:water_breath",
           "dot_mult:water:2.5",
@@ -126,7 +116,6 @@
     "name": "幽渊礁民",
     "tiers": [
       {
-        "count": 5,
         "effects": [
           "env:water_breath",
           "dot_mult:water:1.8"
@@ -138,7 +127,6 @@
     "name": "幽冥矿工",
     "tiers": [
       {
-        "count": 5,
         "effects": [
           "dot_mult:earth:2.2",
           "armor:0.1"
@@ -150,7 +138,6 @@
     "name": "沼泽巫咒",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "on_hit_effect:weak:0.1:60:0",
           "maxhp:0.15",
@@ -163,7 +150,6 @@
     "name": "僭律裁决",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "dmg_mod:boss_barrage:4.0",
           "barrage_trigger:1",

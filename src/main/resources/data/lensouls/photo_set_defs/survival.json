@@ -3,7 +3,6 @@
     "name": "藤甲巨像",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "maxhp:0.25",
           "kb_resist:0.2",
@@ -16,7 +15,6 @@
     "name": "迷牢潜伏者",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "cond:night|maxhp:0.2",
           "dodge:0.1",
@@ -29,7 +27,6 @@
     "name": "月相之裔",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "cond:night|maxhp:0.25",
           "dodge:0.1"
@@ -41,7 +38,6 @@
     "name": "枯骨行军",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "cond:night|maxhp:0.3",
           "barrage_trigger:1",
@@ -54,7 +50,6 @@
     "name": "群兽之契",
     "tiers": [
       {
-        "count": 5,
         "effects": [
           "maxhp:0.1",
           "speed_mult:2.0",
@@ -67,7 +62,6 @@
     "name": "林间精灵",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "speed_mult:2.2",
           "maxhp:0.1",
@@ -80,7 +74,6 @@
     "name": "流萤之舞",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "env:dark_invis",
           "cond:night|maxhp:0.15",
@@ -93,7 +86,6 @@
     "name": "终末虚空",
     "tiers": [
       {
-        "count": 5,
         "effects": [
           "dodge:0.1",
           "cond:night|maxhp:0.2",

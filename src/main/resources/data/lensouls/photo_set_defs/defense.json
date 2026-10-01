@@ -3,7 +3,6 @@
     "name": "城堡卫队",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "armor:0.15",
           "kb_resist:0.2",
@@ -16,7 +15,6 @@
     "name": "辉光守者",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "armor:0.15",
           "kb_resist:0.2",
@@ -29,7 +27,6 @@
     "name": "守家猛兽",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "armor:0.15",
           "kb_resist:0.15",
@@ -42,7 +39,6 @@
     "name": "珊瑚守哨",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "env:water_breath",
           "armor:0.15",
@@ -55,7 +51,6 @@
     "name": "炽粉虫群",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "immune_fire",
           "cond:fire|maxhp:0.2",
@@ -68,7 +63,6 @@
     "name": "岩浆之裔",
     "tiers": [
       {
-        "count": 3,
         "effects": [
           "immune_fire",
           "cond:fire|speed_mult:2.8",
@@ -81,7 +75,6 @@
     "name": "钢蹄铁骑",
     "tiers": [
       {
-        "count": 4,
         "effects": [
           "speed_mult:2.2",
           "kb_resist:0.2",

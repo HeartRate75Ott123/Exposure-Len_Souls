@@ -266,7 +266,7 @@
   "item.lensouls.feather_twitcher.desc2": "§eWorks when worn in any trinket slot, cannot be removed once equipped",
   "item.lensouls.feather_twitcher.desc3": "§cWhile worn: +100% damage taken, §a-25% damage dealt. §cTwist starts at 0: +1 per Copy Soul consumed in crafting, cap 100; §ahigher twist increases damage dealt, up to +300%",
   "item.lensouls.feather_twitcher.desc4": "§cDying at 100 twist attempts to spawn a Twitcher (deduplicated: skipped if a Twitcher owned by you is alive within 32 blocks or a boss is within 64 blocks)",
-  "item.lensouls.feather_twitcher.desc5": "§aTwist always resets to 0 on death, whether or not the Twitcher was spawned; §akilling a Twitcher resets the §akiller's§a twist (requires wearing this feather, regardless of who owns it)",
+  "item.lensouls.feather_twitcher.desc5": "§cEach death adds +10 twist§a (cap 100; death no longer resets it); §aonly killing a Twitcher §aresets the §akiller's§a twist (requires wearing this feather, regardless of who owns it)",
   "item.lensouls.curio_any_slot": "§eSlots: Any",
   "item.lensouls.staff_tag": "Staff",
   "curios.modifiers.photograph": "When equipped in the Photograph slot:",

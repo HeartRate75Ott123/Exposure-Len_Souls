@@ -25,10 +25,10 @@ import java.util.UUID;
  * 机制：
  * <ul>
  *   <li>受到伤害 +100%、造成伤害 -25%（随扭曲值线性增幅，最高 +250%）</li>
- *   <li>扭曲值：0 起，复制之魂合成按实际消耗 +N，死亡 +10，封顶 100</li>
- *   <li>扭曲值满 100 死亡：生成扭曲者（死亡点 32 格内无存活扭曲者且 64 格内无 BOSS 时），
- *       扭曲值清零，本次死亡强制掉落（由 PlayerDropEquipmentMixin 依据 FORCE_DROP 标记执行）</li>
- *   <li>任一归属扭曲者死亡 → 扭曲值清零</li>
+ *   <li>扭曲值：0 起，复制之魂合成按实际消耗 +N，**每次死亡 +10**，封顶 100</li>
+ *   <li>扭曲值满 100 时死亡：尝试生成扭曲者（死亡点 32 格内无存活扭曲者且 64 格内无 BOSS 时），
+ *       本次死亡强制掉落（由 PlayerDropEquipmentMixin 依据 FORCE_DROP 标记执行）</li>
+ *   <li><b>清零的唯一途径</b>：击杀扭曲者（击杀者需佩戴本羽毛）</li>
  * </ul>
  */
 public class FeatherTwitcherHandler {
@@ -46,6 +46,8 @@ public class FeatherTwitcherHandler {
     public static final float DEALT_PER_TWIST = 0.03f;
 
     public static final int MAX_TWIST = 100;
+    /** 每次死亡增加的扭曲值（死亡不再清零） */
+    public static final int DEATH_TWIST_GAIN = 10;
     /** 存活扭曲者判定半径 */
     public static final int SPAWN_RANGE = 32;
     /** BOSS 判定半径 */
@@ -125,28 +127,28 @@ public class FeatherTwitcherHandler {
     }
 
     /**
-     * 死亡结算（触发点在死亡，不是累加）：
+     * 死亡结算：
      * <ul>
-     *   <li>扭曲值满 100 时<b>尝试召唤扭曲者</b>——去重逻辑保留：
-     *       附近 32 格内已有存活的归属扭曲者、或 64 格内有 BOSS 时不召唤；</li>
-     *   <li><b>无论这次有没有成功召唤，一律清零</b>（不再把 100 留给下次重试）；</li>
-     *   <li>扭曲值不足 100 时同样清零（「死亡就清0」）。</li>
+     *   <li><b>每次死亡 +{@value #DEATH_TWIST_GAIN}</b>（封顶 100）——死亡<b>不再清零</b>；</li>
+     *   <li>加上这 10 点之后扭曲值已满 100 ⇒ <b>尝试召唤扭曲者</b>（去重逻辑保留：
+     *       附近 32 格内已有存活的归属扭曲者、或 64 格内有 BOSS 时不召唤），
+     *       并写入「本次死亡强制掉落」标记（由掉落 mixin 消费）；</li>
+     *   <li>清零只能靠击杀扭曲者（见 {@link #onTwitcherDeath}）。</li>
      * </ul>
-     * 满 100 时死亡仍保留「本次死亡强制掉落」标记（由掉落 mixin 消费）。
      */
     @SubscribeEvent
     public static void onDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (!hasTwitcher(player)) return;
 
+        addTwist(player, DEATH_TWIST_GAIN);
         if (getTwist(player) >= MAX_TWIST) {
-            // 去重：附近已有归属扭曲者 / 有 BOSS → 不召唤（但下面照样清零）
+            // 去重：附近已有归属扭曲者 / 有 BOSS → 不召唤
             if (canSpawnTwitcher(player)) {
                 spawnTwitcher(player);
             }
             player.getPersistentData().putBoolean(KEY_FORCE_DROP, true);
         }
-        setTwist(player, 0);
     }
 
     /** 生成条件：死亡点 32 格内无存活归属扭曲者，且 64 格内无 BOSS */

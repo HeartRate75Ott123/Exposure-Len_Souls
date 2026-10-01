@@ -39,9 +39,8 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import top.theillusivec4.curios.api.CuriosApi;
-import top.theillusivec4.curios.api.type.ICuriosMenu;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
-import top.theillusivec4.curios.common.network.server.sync.SPacketSyncCurios;
+import top.theillusivec4.curios.common.network.server.sync.SPacketSyncModifiers;
 
 import java.util.*;
 import java.util.Locale;
@@ -925,16 +924,31 @@ public class PhotoSpecialEffects {
                         targetExtra, AttributeModifier.Operation.ADD_VALUE);
             }
 
-            // 槽位容量即时生效：若玩家正打开 CuriosScreen，先重建服务端菜单（Curios 官方
-            // /reload 同款：发全量同步包由客户端重建并 resetSlots），再推送到客户端。
-            // 这样 shrink/grow 与服务端→客户端的槽广播不失配，规避多人下
-            // "取下加槽照片时 CuriosScreen 越界崩溃（Slot N not in valid range）"的竞态，
-            // 也让佩戴加槽照片（如绵羊 +3）当场扩容，无需关闭容器重开。
-            if (player.containerMenu instanceof ICuriosMenu curiosMenu) {
-                curiosMenu.resetSlots();
+            // ① 把 Curios 的**惰性** resize 就地落实：CurioStacksHandler 只在被读取
+            //    （getStacks/getCosmeticStacks/getRenders/getSlots…）时才 update()，而只有 update()
+            //    才会 resize + 把越界槽里的东西交给 loseStacks + post SlotModifiersUpdatedEvent。
+            //    后者正是 L2Tabs 重开饰品页的触发源 ⇒ 早一拍排队、窗口更小；
+            //    也保证下面那个包发出去时服务端尺寸已经是新的。
+            var stacks = handler.getCurios().get("photograph");
+            if (stacks != null) {
+                stacks.update();
             }
-            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
-                    new SPacketSyncCurios(player.getId(), handler.getCurios()));
+
+            // ② Curios 官方收尾：只发「变动过的那一类」并清 updates（CuriosEventHandler 的装备变更
+            //    流程就是这么收尾的）。客户端收到后会 applySyncTag，并对**实现了 ICuriosMenu**的容器
+            //    resetSlots —— 与原来等价，但包小得多。
+            //    原来那套「自己 resetSlots + 全量 SPacketSyncCurios」已移除：全量包是卡顿来源，
+            //    而且绕过官方流程会在 getUpdatingInventories() 里留一条脏条目，之后任意一次 Curios
+            //    变更都会把它再搭发一次。
+            //    注：L2Tabs 饰品页「客户端槽位列表慢一拍」是它自己的设计缺口
+            //    （BaseCuriosListMenu 不实现 ICuriosMenu，只靠 SlotModifiersUpdatedEvent 在下个 tick
+            //    重开页面），不属本模组能修的范围。
+            var updates = handler.getUpdatingInventories();
+            if (!updates.isEmpty()) {
+                net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                        new SPacketSyncModifiers(player.getId(), updates));
+                updates.clear();
+            }
         });
         player.getPersistentData().putInt(SLOT_TAG, extra);
     }

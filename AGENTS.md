@@ -1426,3 +1426,200 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   没有这个开关），所以**带封印组件的复制之魂（戴羽期间丢出去那堆）依然吸不进去**；要连这个也修，
   得给 BD 的 `ItemStackHelper.hasExtraComponents` 加兼容 mixin（把我们的封印组件排除），
   或落魂时摘掉封印组件 —— 两条都会改封印语义，等用户点头再做。
+
+## 需求批次（`1.5.29`）：照片栏位扩缩的收尾改走 Curios 官方路径
+
+### 55. 不再自己 resetSlots + 全量同步（纯 lensouls 侧优化）
+
+- 起因：L2 FIX 那边的分析提到「客户端槽位数少于服务端」。核完结论：**那是 L2Tabs 自己的设计缺口**——
+  - Curios 客户端只在容器实现了 `ICuriosMenu` 时才重建槽位：`CuriosClientPackets:196`（`SPacketSyncModifiers`）
+    与 `:234`（`SPacketSyncCurios`）两处都是 `if (localPlayer.containerMenu instanceof ICuriosMenu curiosMenu)
+    curiosMenu.resetSlots();`；
+  - L2 饰品页菜单 `dev.xkmc.l2tabs.compat.common.BaseCuriosListMenu`（在 `l2library` 的 jarjar 里）**不实现任何接口**，
+    整个 l2tabs 70 个类里引用 `ICuriosMenu` 的 **0 个** ⇒ 即时重建对页面永不触发；
+  - L2Tabs 的补偿是 `CuriosEventHandler.onSlotModifierUpdate(SlotModifiersUpdatedEvent)` → 塞 `MAP` →
+    **下一个** `EntityTickEvent.Post` 才 `openMenuWrapped` + `switchPage` 重开页面 ⇒ 至少慢一拍；
+  - Curios 的 resize 还是惰性的（`getStacks/getCosmeticStacks/getRenders/getActiveStates/getSlots` 里才 `update()`），
+    窗口可能更长。期间越界的容器更新由修好的 `l2curiospagefix` 兜住（重定向到 `DiscardSlot`）。
+  ⇒ 按用户口径「是别人的锅就先不管」，本轮只做 lensouls 侧的无谓开销清理。
+- 改动（`PhotoSpecialEffects.updatePhotoSlots`）：
+  1. 改完槽位修饰符后**就地落实惰性 resize**：`handler.getCurios().get("photograph").update()` ——
+     `update()` 才会 resize + `loseStacks` 处理越界物品 + post `SlotModifiersUpdatedEvent`
+     （后者是 L2Tabs 重开页面的触发源 ⇒ 排队早一拍），也保证随后那个包带的是**新尺寸**；
+  2. 收尾换成 Curios 官方两行：`new SPacketSyncModifiers(player.getId(), handler.getUpdatingInventories())`
+     + `updates.clear()`（与 `CuriosEventHandler:761-768` 装备变更流程同款）。
+- 移除：原来的 `containerMenu instanceof ICuriosMenu → resetSlots()` 与**全量** `SPacketSyncCurios`。
+  理由：全量包是「卡一下」的来源；且绕过官方流程会在 `getUpdatingInventories()` 里**留一条脏条目**，
+  之后任意一次 Curios 变更都会把它再搭发一次。同时删掉不再使用的 `ICuriosMenu` import。
+- 明确不变量：**只减少我们自己的同步，不改变 L2Tabs 那个窗口**（那是它的锅）。
+- 交付：版本 `1.5.29`（`gradle.properties` 里的 1.5.28 是另一路顶上去的；`build/libs` 已有他们 11:34 的
+  `lensouls-1.5.28.jar`，为免同号两套字节本路取 1.5.29，内容 = 1.5.28 + 本次优化）：
+  `.\gradlew.bat build` 通过；`tools/MixinSelfCheck` 全绿；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.29.jar`（5,932,948 字节），
+  MD5 `90699029F1DB0BCB89041C96BE03C266`；桌面 `1.5.27`（本路旧包）已删。
+- 字节核验：`PhotoSpecialEffects.class` 常量池 `SPacketSyncModifiers` 1 次、`SPacketSyncCurios` **0** 次、
+  `ICuriosMenu` **0** 次、`ICurioStacksHandler` 3 次、`getUpdatingInventories` 1 次。
+- **待实机验证**：戴/摘加栏照片（绵羊 +3、vindicator +1…）→ 照片栏位当场扩/缩、栏内物品按 Curios 规则处理、
+  不再有整份 Curios 同步引起的卡顿；越界更新继续由 `l2curiospagefix` 兜住。
+
+## 排查批次（`1.5.30-probe` → `1.5.38-probe`，**已全部撤销**）：Iris 光影界面切换时「闪黑」
+
+### 56. 结论：那 0.7 s 是一次卡帧，黑不在帧里
+
+- 现象（用户口径）：在 Iris 光影界面「列表 ↔ 设置」切换时出现约 **0.7 s 的整屏闪黑**（像眨一下眼），随后稳定；
+  纯净环境（仅 Iris + Sodium）不出现；整包二分查不到单一凶手、「每个模组看起来都无辜」。
+- 排查手段（临时探针逐版加深，只写 `logs/lensouls-iris-probe.log` + PNG，不参与游戏逻辑）：
+  逐帧 6 点亮度/细节度；交换前整幅 `PRESENT`（mean / 黑像素占比 / 8×5 网格 / detail）；
+  截图；`GuiGraphics.fill|fillGradient` 全屏填充（带调用者栈）；`GameRenderer.processBlurEffect`/`renderBlur`、
+  `PostChain.process`、`RenderTarget.bindWrite`；`RenderSystem.clear`/`GlStateManager._clear`；
+  `Minecraft.resizeDisplay`、`Window.setWindowed|setFullscreen|toggleFullscreen|changeFullscreenVideoMode|setVsync`；
+  `Iris.reload|toggleShaders`、`IrisConfig.setShadersEnabled`、`PipelineManager.preparePipeline|destroyPipeline`、
+  `Iris.loadShaderpack`；`OptionInstance.set`；`GlStateManager._viewport`；鼠标/按键标记（把「点的那一下」对齐帧号）；
+  6 个可疑模组版本快照。
+- **实测结论**（632 帧 PRESENT + 12654 条事件）：
+  - `f=494 dt=731 ms` —— 打开光影界面那一帧主线程卡住 **0.73 s，期间一帧都没有呈现**（与用户「0.7 s」吻合）；
+    同类卡帧：4547 / 2886 ms（世界加载）、792 / 741 / 414 / 133 ms（各界面切换）。
+  - **632 帧交换前读屏没有一帧变黑**（除启动黑屏），`mean` 全程 27~34，`black%` 最高只是 Iris 面板自身的 13~24%。
+  - **窗口层零动作**：`WINDOW` 仅启动 3 条（854×480 → 1920×1080）；运行期无窗口模式/垂直同步切换。
+  - **管线层零动作**：`pipeId` 全程不变，`pipeline.*` 仅启动 `loadShaderpack` 一次。
+  - `option.set` 仅启动与「完成（重载）」时出现；`VIEWPORT` 4445/4448 为正常 `0,0,1920,1080`
+    （唯一异常是启动时 iceberg 物品渲染的 96×96）。
+  - ⇒ **用户看到的黑发生在卡帧期间（游戏根本没出帧）**，是显示器/合成器层面的表现，**不在帧缓冲里** ——
+    这正是前几版探针怎么找都找不到的原因。
+- **撤销**（按用户要求）：删除 `debug/IrisFlickerProbe.java` 与 10 个 `mixin/compat/*ProbeMixin.java`，
+  并 `git checkout` 还原 `LenSoulsClient`、`GameRendererFrameEndMixin`、`FrozenOutlineManager` 三处调用点与
+  `lensouls.compat.mixins.json`（残留引用检查 = **0**）。探针源码只留在桌面 `lensouls-1.5.30~1.5.38-probe.jar` 里，
+  需要时从 jar 反编译即可取回。
+- **后续方向（未做）**：要定位那 0.73 s 卡在哪，只能靠主线程 profiler（spark / F3 / 对「界面首次打开」分段计时），
+  **不是「谁画了黑」的问题**。
+- 交付：清理版 `1.5.39`（= 1.5.29 内容、无任何探针代码）：build 通过、`tools/MixinSelfCheck` 全绿。
+
+## 需求批次（`1.5.40`）：破韧拍脚 / 扭曲羽毛清零口径 / 员工战区票
+
+### 57. 破韧拍脚无效：根因在「入镜列表」而不是削韧判定
+
+- 用户回报：「破韧 拍脚没用（之前承诺修复但实测没有修好）」。
+- 排查结论（运行时 1.9.18 jar `javap -c` 核实）：Exposure 的 `EntitiesInFrame.get` **自己先用眼睛点预筛**
+  （`frustum.contains(entity.getEyePosition())` + `calculateVisibleDistance` + 对**眼睛**的 `hasLineOfSight`）。
+  拍高大 BOSS 的脚 / 下半身时相机俯视，它的眼睛远在画面上沿之外 ⇒ **实体在进入我们的逻辑之前就被丢掉**。
+  而 `EntitiesInFrameMixin` 是 TAIL「只收窄不放宽」⇒ 1.4.97 / 1.4.98 加的多身体采样点
+  （`CameraVisibility.BODY_SAMPLE_FRACTIONS`）**对削韧完全空转**；「照片里看得见脚」只是渲染截图，
+  与 `entitiesInFrame` 无关 —— 之前那次修复是**假阳性**。
+- 修法（`mixin/EntitiesInFrameMixin`，同一个 TAIL 注入里一次扫描做两件事）：
+  1. 保留原收窄；2. **补回**：对附近 `LivingEntity` 先过 Exposure 同口径焦距阈值
+  （`EntitiesInFrame.calculateVisibleDistance ≤ Fov.fovToFocalLength(fov × 0.95)`，70° 镜头 ≈ 26 格），
+  再过多身体采样点的 `CameraVisibility.isVisible`（视锥 + 逐点视线、`ClipContext.Block.COLLIDER` 遇方块即止）；
+  子部件 → 父实体逻辑合并进同一趟扫描（省一次实体遍历）；最后按到相机距离升序重排，
+  保持 `get(0)` = 最近主体（`PhotoInjectionHandler:110` 的能力窃取主体口径依赖它）。
+- **不会**隔墙削韧（每个采样点都要过方块遮挡）；**不要**动只服务要害打击 / 断魂的 `hasClearSight`
+  （改多点会导致隔墙锁头）。
+- 波及面（预期）：`entitiesInFrame` 的所有消费者一起变宽 —— 弱点透镜 / 能力窃取主体 / 时间定格 /
+  图鉴解锁 / **削韧**，从今以后「拍到脚」都算拍到。
+- 递归提醒：`ToughnessPhotoHandler` 没有中心点 / 准星判定（全遍历 `getEntitiesInFrame()`），
+  所以「削韧不灵」先查**列表生成端**；另有两个次级干扰项（与瞄准无关）：
+  `!bossTierManager.contains` 且 tier = 0 时静默不削、以及 `BossToughnessData` 每次削韧后 60t 无敌窗。
+
+### 58. 羽·扭曲之人：死亡改为 +10，清零只保留「击杀扭曲者」
+
+- 用户口径：「扭曲羽毛改动，清除方法只保留击杀扭曲者时清除，每次死亡会涨 10 扭曲值」。
+- 改动（`handler/FeatherTwitcherHandler`）：
+  - 新增 `DEATH_TWIST_GAIN = 10`；`onDeath` 里原来的 `setTwist(player, 0)` **删除**，
+    改为 `addTwist(player, DEATH_TWIST_GAIN)`（封顶 100）；
+  - 召唤判定改为「**加完这 10 点之后** ≥ 100」才尝试召唤扭曲者 + 写 `FORCE_DROP`（去重逻辑不变）；
+  - `onTwitcherDeath` 的 `setTwist(killer, 0)` **保留** ⇒ 全仓再无其它清零点
+    （另一处 `setTwist(0)` 在 `FeatherAbyssHandler`，属**羽·深渊**独立机制，刻意未动）。
+  - 文案 `item.lensouls.feather_twitcher.desc5`（zh / en）同步改写；两个 lang JSON 已 `json.load` 校验。
+- 字节核验：`javap -c FeatherTwitcherHandler.onDeath` = `bipush 10` → `addTwist` → `bipush 100` 比较，
+  方法体内**没有** `setTwist` 调用 ✓。
+
+### 59. 员工（`lensouls:level2_staff_boss`）被区块卸载：补两条腿
+
+- 先纠正前提（本次排查）：员工**不是** `block_factorys_bosses` 的实体，是**本模组自研测试 BOSS**
+  （commit `8662398` 引入，`entity/Level2StaffBossEntity`，GeckoLib 模型 / 动画）；
+  `block_factorys_bosses-2.1.2` 里根本没有 staff 实体类。⇒ 可直接改普通 Java，**无需 mixin**。
+- 现状：全仓 `setChunkForced` / `TicketType` / `addRegionTicket` / `setPersistenceRequired` **0 命中** ⇒
+  员工原先既没有防卸载、也没有防 despawn。
+- 原版机制（`javap` 核实，真实 FQCN `net.minecraft.world.level.dimension.end.EndDragonFight`）：
+  末影龙靠 `tick()` 里 `level.getChunkSource().addRegionTicket(TicketType.DRAGON, new ChunkPos(0, 0), 9, Unit.INSTANCE)`
+  钉住战区（有玩家时加、无玩家时 remove），**没有**用 `setChunkForced`；`EnderDragon.checkDespawn` 是空实现。
+  关键事实：**`Mob.checkDespawn()` 是 `isPersistenceRequired()` 的唯一读取点**，而它只在 entity-ticking
+  区块里跑；区块卸载由 `DistanceManager` 的 ticket level 决定、从不读实体 NBT ⇒
+  **persistenceRequired 只防 despawn，不防卸载**，必须两条腿。
+- 修法（`entity/Level2StaffBossEntity`，无 mixin）：
+  1. 构造器 `this.setPersistenceRequired()`（防自然刷除：MONSTER 类别
+     `noActionTime > 600 && nextInt(800) == 0` 仍会 discard）；
+  2. 新增静态 `TicketType<ChunkPos> LENSOULS_ARENA_TICKET = TicketType.create("lensouls_boss_arena",
+     Comparator.comparingLong(ChunkPos::toLong), 100)`，在 `tick()` 的**所有 early-return 之前**
+     （客户端守卫之后）对自身 `chunkPosition()` 续期
+     `addRegionTicket(LENSOULS_ARENA_TICKET, chunkPos, 2, chunkPos)`
+     （level = 33 − 2 = 31 = ENTITY_TICKING ⇒ 5×5 区块）。
+     `timeout = 100` 的票在每次 add 时刷新计时，实体一旦停止 tick（卸载 / 崩服）100 tick 后自动过期
+     ⇒ **零泄漏、无需手动释放**；刻意不用 `setChunkForced`（写 `ForcedChunksSavedData`、跨重启残留、
+     会与玩家 `/forceload` 互相踩）。
+- 已知未做：员工战斗状态字段（`fightState` / `meleeHits` / 窗口 tick 等）没有 `addAdditionalSaveData` 落盘，
+  区块不再卸载后这个问题不再暴露；若将来仍需「重载后接续战斗」，得单独补持久化。
+- 交付：版本 `1.5.40`（三处改动一起构建）：`tools/MixinSelfCheck` 全绿；
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.40.jar`（5,934,043 字节），
+  MD5 `E1D0C38FB50365AC0090266B7F474E8A`。字节核验：`Level2StaffBossEntity.class` 含
+  `lensouls_boss_arena` / `addRegionTicket` / `setPersistenceRequired` 各 1 处；`EntitiesInFrameMixin.class`
+  含 `calculateVisibleDistance` / `fovToFocalLength` 各 1 处；`onDeath` 内无 `setTwist` 调用。
+- **待实机验证**：① 拍高大 BOSS 的脚/下半身 → 韧性条照掉；② 佩戴扭曲羽毛死亡 → 扭曲值 +10 不清零，
+  击杀扭曲者才清零；③ `/summon lensouls:level2_staff_boss` 后玩家跑远/换维度再回来 → 员工仍在原地
+  且战斗状态未重置（区块被票钉住）。
+
+### 57.1 补记（`1.5.41`）：把「入镜列表」策略从 mixin 抽到 `util/FrameEntities`，并修掉架空的早退
+
+- 用户提问：「拍脚修复能不能合并到之前的视锥里？哪种做法更干净？」
+- 结论：**判定原语早已共用**（收窄与补回调的是同一个 `CameraVisibility.isVisible`），没有第二套视锥。
+  没合并、也**不该**合并的只有两件 Exposure 领域的事：①焦距口径
+  （`EntitiesInFrame.calculateVisibleDistance` / `Fov.fovToFocalLength`）；②列表语义
+  （子部件→父实体、去重、按距离排序、`get(0)`=最近主体）。
+- 为什么**不**塞进 `CameraVisibility`：它被 `AimTargetUtil`（要害打击 / 断魂）共用，那里**必须**只认包围盒
+  中心（`hasClearSight`）；让这个类承担「放宽 / 组列表」的策略，下一个人就会在瞄准路径误用多采样 ⇒
+  **隔墙锁头**。另外焦距规则属于 Exposure 相机模型，纯几何类不该知道 fov。
+- 为什么**不**改回 `@Redirect` Exposure 的预筛：`FrustumCheck.contains(Vec3)` 的 redirect 拿不到
+  「正在被检测的是哪个实体」——上一版的 ThreadLocal + 隐式参数捕获即由此而来，且曾**静默失效**。
+  TAIL「事后对齐」从结构上避开这类 bug。
+- 落地（方案 A，行为不变部分）：新增 `util/FrameEntities.assemble(cameraHolder, pov, fov, exposureResult)`
+  = 收窄 + 补回 + 子部件 + 排序 + 焦距口径；`mixin/EntitiesInFrameMixin` 缩成 8 行适配
+  （取参数 → `assemble` → `setReturnValue`），类 javadoc 保留「不要再退回 @Redirect」的告诫；
+  `CameraVisibility` 一行未改。字节核验：mixin 内已无 `CameraVisibility` / `Fov` /
+  `calculateVisibleDistance` 引用；`FrameEntities` 内各 1 处。
+- **顺带修掉一个会架空补回的 bug（重要）**：1.5.40 的补回前面有
+  `if (original == null || original.isEmpty()) return;` ⇒ Exposure 返回空列表时补回完全不跑，
+  而「高大 BOSS 只露脚」恰恰就是 Exposure 全刷掉、列表为空的情形 ⇒ 那一版在**最典型场景**下
+  依旧不削韧。现改为**空列表也照常扫描补回**。
+- 交付：版本 `1.5.41`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.41.jar`（5,934,482 字节），
+  MD5 `AF287FABBF5D6D29FD928A6DD59810F2`；`1.5.40` 作废。
+- **待实机验证**：对着高大 BOSS 的脚拍，且**画面里没有别的生物**（照片主体只有它）—— 这正是前两版失效的场景。
+
+### 59.1 更正（`1.5.42`）：员工弃用战区票，改「与灾变 BOSS 一致」的持久化方案
+
+- 用户实测：「员工还是会被卸载掉。可以看看灾变模组的 boss 怎么做的」。
+- **灾变的做法（`参考项目的源码\灾变` 全树核实）**：**根本不用区块票** —— 全树只有
+  `setPersistenceRequired()`（在结构生成处，如 `Cursed_Pyramid_Structure:196/206/216/228`）+
+  `LLibrary_Boss_Monster:243 removeWhenFarAway → false`、`:247 shouldDespawnInPeaceful → false`
+  + `:57/:62 addAdditionalSaveData/readAdditionalSaveData`（战斗状态落盘）。
+  ⇒ **灾变的 BOSS 一样会被区块卸载**，他们保证的是「重载后状态照旧 + 永不自然消失」。
+  因此 §59 里那条「对齐末影龙钉住 5×5 区块」的方向被废弃（更重且不是这条路的正解）。
+- **上一版为什么没修好（`javap -c net.minecraft.world.entity.Mob` 核实）**：
+  `readAdditionalSaveData` 里有 `ldc "PersistenceRequired" → getBoolean → putfield persistenceRequired`
+  —— 即**存档加载会用 NBT 覆写该字段**。上一版只在构造器调 `setPersistenceRequired()`，
+  实体一旦经历「卸载 → 重新加载」，标记就可能变回 `false` ⇒ `Mob.checkDespawn()` 判它「可自然刷除」
+  ⇒ 玩家走远（>128 格）即 `discard()` —— 这才是用户看到的「还是会被卸载掉」。
+- **本次改法（`entity/Level2StaffBossEntity`，全部普通 Java，无 mixin）**：
+  1. **删除战区票**：`LENSOULS_ARENA_TICKET` / `ARENA_TICKET_DISTANCE` / `tick()` 里的续期三处全撤；
+  2. **永不自然消失**：`removeWhenFarAway(double) → false`、`shouldDespawnInPeaceful() → false`、
+     **`isPersistenceRequired() → true`（覆写 getter，与 NBT 彻底解耦 ⇒ 连改动前就存在的旧实体也安全）**；
+  3. **战斗状态落盘**：`addAdditionalSaveData`/`readAdditionalSaveData` 序列化 L101–141 的 27 个字段
+     （`fightState`/`meleeHits`/`cameraCooldown`/`spikeMidCooldown`/`spikeFromMid`/各窗口 tick/
+     `meleeDamaged`/`meleeSounded`/`meleeLanded`/动画名/`spikeShotsDone`/`rayTicksLeft`/
+     `rayHead{X,Y,Z}`/`rayDir{X,Y,Z}`/`rayResult`/`lastSpikeHit`），键名统一 `lensouls:` 前缀，
+     动画名空串占位、读回还原 `null`。
+- 字节核验：`Level2StaffBossEntity.class` 内 `lensouls_boss_arena`/`addRegionTicket` **各 0 处**；
+  `removeWhenFarAway`/`isPersistenceRequired`/`shouldDespawnInPeaceful`/`addAdditionalSaveData`/
+  `readAdditionalSaveData` 各 1 处；`lensouls:fight_state`/`lensouls:ray_result`/`lensouls:melee_anim` 各 1 处。
+- 交付：版本 `1.5.42`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.42.jar`（5,935,357 字节），
+  MD5 `DB20B43346C25FAA9ABC4D5A78847AA8`；`1.5.41` 作废。
+- **待实机验证**：① 召唤后打一会儿 → 走远约 200 格（让其区块卸载）→ 回来：仍在原地、状态接续、血条恢复；
+  ② 重启存档后仍存在不消失；③（预期）它会随区块卸载，只是「你不在时它不 tick」。

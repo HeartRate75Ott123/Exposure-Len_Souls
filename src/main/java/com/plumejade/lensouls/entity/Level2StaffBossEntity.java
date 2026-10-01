@@ -142,6 +142,33 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
 
     public Level2StaffBossEntity(EntityType<? extends Level2StaffBossEntity> type, Level level) {
         super(type, level);
+        // 把 NBT 里的持久化字段写成 true（下面的 isPersistenceRequired() 覆写才是真正兜底的那条）。
+        this.setPersistenceRequired();
+    }
+
+    // ==================== 「永不自然消失」（对齐灾变 BOSS 的写法） ====================
+    // 灾变 LLibrary_Boss_Monster：`removeWhenFarAway → false` + `shouldDespawnInPeaceful → false`，
+    // 他们的 BOSS **一样会被区块卸载**，靠的是「重载后状态照旧 + 永不 despawn」（见下面的状态落盘）。
+    // 额外覆写 isPersistenceRequired()：Mob.readAdditionalSaveData 会用存档里的 "PersistenceRequired"
+    // 覆写该字段（javap 核实），只靠构造器 setPersistenceRequired() 会在「卸载后重新加载」时被抹回
+    // false ⇒ Mob.checkDespawn 判它「可自然刷除」⇒ 玩家走远即 discard（实测踩过）。
+
+    /** 走多远都不算「可以被刷掉」（父类默认：距最近玩家 ≥128 格即返回 true）。 */
+    @Override
+    public boolean removeWhenFarAway(double distanceToClosestPlayer) {
+        return false;
+    }
+
+    /** 和平难度下也不消失（玩家召唤的 BOSS，不该被难度清场）。 */
+    @Override
+    protected boolean shouldDespawnInPeaceful() {
+        return false;
+    }
+
+    /** 与 NBT 解耦的持久标记：无论存档里写的是什么，本实体始终要求持久化。 */
+    @Override
+    public boolean isPersistenceRequired() {
+        return true;
     }
 
     @Override
@@ -151,6 +178,86 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         builder.define(ACTION_ACTIVE, false);
         builder.define(ACTION_SEQ, 0);
         builder.define(ACTION_ANIM, "");
+    }
+
+    // ==================== 战斗状态落盘（对齐灾变：被区块卸载后重新加载能接续） ====================
+    // 员工会像灾变 BOSS 一样随区块卸载并被写进区块 NBT；不落盘的话，玩家离开再回来
+    // 状态机 / 各冷却 / 射线全部重置（表现为「行为中断」）。这里把所有战斗字段序列化。
+    // 键名统一加 "lensouls:" 前缀，避免与父类/其它模组的键冲突。
+
+    private static final String KEY_PREFIX = "lensouls:";
+
+    @Override
+    public void addAdditionalSaveData(net.minecraft.nbt.CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        tag.putInt(KEY_PREFIX + "fight_state", fightState);
+        tag.putInt(KEY_PREFIX + "melee_hits", meleeHits);
+        tag.putInt(KEY_PREFIX + "camera_cooldown", cameraCooldown);
+        tag.putInt(KEY_PREFIX + "spike_mid_cooldown", spikeMidCooldown);
+        tag.putBoolean(KEY_PREFIX + "spike_from_mid", spikeFromMid);
+        tag.putInt(KEY_PREFIX + "melee_start", meleeStartTick);
+        tag.putInt(KEY_PREFIX + "melee_window_start", meleeWindowStartTick);
+        tag.putInt(KEY_PREFIX + "melee_window_end", meleeWindowEndTick);
+        tag.putInt(KEY_PREFIX + "melee_end", meleeEndTick);
+        tag.putBoolean(KEY_PREFIX + "melee_damaged", meleeDamaged);
+        tag.putBoolean(KEY_PREFIX + "melee_sounded", meleeSounded);
+        tag.putBoolean(KEY_PREFIX + "melee_landed", meleeLanded);
+        // 动画名可能为 null（未进行中）→ 用空串占位，读回时空串再还原成 null
+        tag.putString(KEY_PREFIX + "melee_anim", meleeAnimName == null ? "" : meleeAnimName);
+        tag.putString(KEY_PREFIX + "last_action", lastActionAnimName == null ? "" : lastActionAnimName);
+        tag.putInt(KEY_PREFIX + "spike_start", spikeStartTick);
+        tag.putInt(KEY_PREFIX + "spike_release", spikeReleaseTick);
+        tag.putInt(KEY_PREFIX + "spike_end", spikeEndTick);
+        tag.putInt(KEY_PREFIX + "spike_shots", spikeShotsDone);
+        tag.putString(KEY_PREFIX + "spike_anim", spikeAnimName == null ? "" : spikeAnimName);
+        tag.putInt(KEY_PREFIX + "camera_end", cameraEndTick);
+        tag.putInt(KEY_PREFIX + "ray_ticks", rayTicksLeft);
+        tag.putDouble(KEY_PREFIX + "ray_head_x", rayHeadX);
+        tag.putDouble(KEY_PREFIX + "ray_head_y", rayHeadY);
+        tag.putDouble(KEY_PREFIX + "ray_head_z", rayHeadZ);
+        tag.putDouble(KEY_PREFIX + "ray_dir_x", rayDirX);
+        tag.putDouble(KEY_PREFIX + "ray_dir_y", rayDirY);
+        tag.putDouble(KEY_PREFIX + "ray_dir_z", rayDirZ);
+        tag.putInt(KEY_PREFIX + "ray_result", rayResult);
+        tag.putBoolean(KEY_PREFIX + "last_spike_hit", lastSpikeHit);
+    }
+
+    @Override
+    public void readAdditionalSaveData(net.minecraft.nbt.CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        fightState = tag.getInt(KEY_PREFIX + "fight_state");
+        meleeHits = tag.getInt(KEY_PREFIX + "melee_hits");
+        cameraCooldown = tag.getInt(KEY_PREFIX + "camera_cooldown");
+        spikeMidCooldown = tag.getInt(KEY_PREFIX + "spike_mid_cooldown");
+        spikeFromMid = tag.getBoolean(KEY_PREFIX + "spike_from_mid");
+        meleeStartTick = tag.getInt(KEY_PREFIX + "melee_start");
+        meleeWindowStartTick = tag.getInt(KEY_PREFIX + "melee_window_start");
+        meleeWindowEndTick = tag.getInt(KEY_PREFIX + "melee_window_end");
+        meleeEndTick = tag.getInt(KEY_PREFIX + "melee_end");
+        meleeDamaged = tag.getBoolean(KEY_PREFIX + "melee_damaged");
+        meleeSounded = tag.getBoolean(KEY_PREFIX + "melee_sounded");
+        meleeLanded = tag.getBoolean(KEY_PREFIX + "melee_landed");
+        meleeAnimName = emptyToNull(tag.getString(KEY_PREFIX + "melee_anim"));
+        lastActionAnimName = tag.getString(KEY_PREFIX + "last_action");
+        spikeStartTick = tag.getInt(KEY_PREFIX + "spike_start");
+        spikeReleaseTick = tag.getInt(KEY_PREFIX + "spike_release");
+        spikeEndTick = tag.getInt(KEY_PREFIX + "spike_end");
+        spikeShotsDone = tag.getInt(KEY_PREFIX + "spike_shots");
+        spikeAnimName = emptyToNull(tag.getString(KEY_PREFIX + "spike_anim"));
+        cameraEndTick = tag.getInt(KEY_PREFIX + "camera_end");
+        rayTicksLeft = tag.getInt(KEY_PREFIX + "ray_ticks");
+        rayHeadX = tag.getDouble(KEY_PREFIX + "ray_head_x");
+        rayHeadY = tag.getDouble(KEY_PREFIX + "ray_head_y");
+        rayHeadZ = tag.getDouble(KEY_PREFIX + "ray_head_z");
+        rayDirX = tag.getDouble(KEY_PREFIX + "ray_dir_x");
+        rayDirY = tag.getDouble(KEY_PREFIX + "ray_dir_y");
+        rayDirZ = tag.getDouble(KEY_PREFIX + "ray_dir_z");
+        rayResult = tag.getInt(KEY_PREFIX + "ray_result");
+        lastSpikeHit = tag.getBoolean(KEY_PREFIX + "last_spike_hit");
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.isEmpty() ? null : value;
     }
 
     /** 服务端移动标志（供客户端动画选择 walk） */
@@ -171,6 +278,9 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
     public void tick() {
         super.tick();
         if (level().isClientSide) return;
+
+        // 战区票已按「与灾变 BOSS 一致」的口径移除：员工的区块会正常卸载，
+        // 靠上面「永不 despawn + 战斗状态落盘」保证重新加载后无缝接续。
 
         // 移动标志 = 导航有未完成路径（供客户端决定播 walk）
         var path = this.getNavigation().getPath();

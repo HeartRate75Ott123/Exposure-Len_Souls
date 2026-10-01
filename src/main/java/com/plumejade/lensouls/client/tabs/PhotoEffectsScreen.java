@@ -31,6 +31,10 @@ import java.util.Map;
  * <p>
  * 其余：套装整块优先不跨页（单块超一页时拆页续排）、正文区 {@code enableScissor} 兜底裁切、
  * 分页结果在 {@code init()} 里算一次缓存（折行要量字宽，不能每帧重算）。
+ * <p>
+ * <b>「通用效果」表头只在首页显示</b>，首页容量相应少「表头行数」行 —— 分页（{@code buildPages}）
+ * 与渲染（{@code render}）必须用<b>同一套预算</b>。早期版本渲染时每页都重画表头却不预留容量，
+ * 于是每页最后几行被 {@code budget} 静默丢掉、最后一页的尾巴永远没人画（「超过两页后内容被截断」）。
  */
 public class PhotoEffectsScreen extends BaseTextScreen {
 
@@ -92,7 +96,8 @@ public class PhotoEffectsScreen extends BaseTextScreen {
         var sets = PhotoSetRegistry.getActiveSets(player,
                 PhotoSetClient.collectGearEntities(player), PhotoSetClient.countBossPhotos(player));
         this.emptyState = sets.isEmpty() && !PhotoEffectsDebug.isEnabled();
-        this.pages = buildPages(sets);
+        // 首页要给「通用效果」表头留出预算，分页与渲染用同一套口径（见类 javadoc）
+        this.pages = buildPages(sets, this.headerLines.size());
 
         int totalPage = Math.max(1, this.pages.size());
         int x = (this.width + this.imageWidth) / 2 - 16;
@@ -139,13 +144,16 @@ public class PhotoEffectsScreen extends BaseTextScreen {
                 return;
             }
 
-            // 首页先占掉「通用效果」的行数，剩余额度给套装内容
+            // 「通用效果」表头只在首页显示，首页预算相应扣掉它 —— 与 buildPages 的首页容量一致，
+            // 否则这里会再截掉每页末尾若干行（且最后一页的尾巴永远没人画）。
             int budget = linesPerPage();
-            for (Component line : headerLines) {
-                if (budget <= 0) break;
-                g.drawString(font, line, x, y, 0, false);
-                y += LINE_HEIGHT;
-                budget--;
+            if (page == 0) {
+                for (Component line : headerLines) {
+                    if (budget <= 0) break;
+                    g.drawString(font, line, x, y, 0, false);
+                    y += LINE_HEIGHT;
+                    budget--;
+                }
             }
             int used = 0;
             for (Component comp : pages.get(page)) {
@@ -185,8 +193,10 @@ public class PhotoEffectsScreen extends BaseTextScreen {
     /**
      * 按 setId 分组（大标题只出现一次），再把每个套装作为整块打包进分页。
      * 块优先不跨页；块本身高于一页时拆开续到下一页。折行在打包前完成，折出的行照常占额度。
+     *
+     * @param firstPageReserve 首页留给「通用效果」表头的行数（首页容量 = 整页 − 该值，下限 1 行）
      */
-    private List<List<Component>> buildPages(List<PhotoSetRegistry.ActiveSet> sets) {
+    private List<List<Component>> buildPages(List<PhotoSetRegistry.ActiveSet> sets, int firstPageReserve) {
         LinkedHashMap<String, List<PhotoSetDefs.Tier>> grouped = new LinkedHashMap<>();
         for (var as : sets) {
             grouped.computeIfAbsent(as.setId(), k -> new ArrayList<>()).add(as.tier());
@@ -206,20 +216,24 @@ public class PhotoEffectsScreen extends BaseTextScreen {
         blocks.addAll(0, wrapAll2(PhotoEffectsDebug.debugBlocks()));
 
         int limit = linesPerPage();
+        // 首页容量要扣掉「通用效果」表头（它就是首页正文的一部分），之后各页都是整页
+        int pageLimit = Math.max(1, limit - Math.max(0, firstPageReserve));
         List<List<Component>> result = new ArrayList<>();
         List<Component> cur = new ArrayList<>();
         for (var block : blocks) {
-            if (!cur.isEmpty() && cur.size() + block.size() > limit) {
+            if (!cur.isEmpty() && cur.size() + block.size() > pageLimit) {
                 result.add(cur);
                 cur = new ArrayList<>();
+                pageLimit = limit;      // 翻页后恢复整页容量
             }
-            if (block.size() <= limit) {
+            if (block.size() <= pageLimit) {
                 cur.addAll(block);
             } else {
                 for (Component line : block) {
-                    if (cur.size() >= limit) {
+                    if (cur.size() >= pageLimit) {
                         result.add(cur);
                         cur = new ArrayList<>();
+                        pageLimit = limit;
                     }
                     cur.add(line);
                 }

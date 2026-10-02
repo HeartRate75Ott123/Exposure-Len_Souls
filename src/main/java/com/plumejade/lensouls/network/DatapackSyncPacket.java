@@ -148,13 +148,15 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         for (int i = 0; i < outer; i++) {
             ResourceLocation key = buf.readResourceLocation();
             int inner = buf.readVarInt();
-            Map<ElementDamage, Float> m = new HashMap<>(inner);
+            // 内层必须保序：弱点优先级 = 数据包书写顺序（WeaknessLensPhoto.weaknessElementOf），
+            // HashMap/Map.copyOf 都会打散顺序，客户端重算时会退化成「平手取 fire」。
+            Map<ElementDamage, Float> m = new java.util.LinkedHashMap<>(inner);
             for (int j = 0; j < inner; j++) {
                 ElementDamage el = elementOf(buf.readVarInt());
                 if (el == null) { buf.readFloat(); continue; }
                 m.put(el, buf.readFloat());
             }
-            map.put(key, Map.copyOf(m));
+            map.put(key, java.util.Collections.unmodifiableMap(m));
         }
         return Map.copyOf(map);
     }

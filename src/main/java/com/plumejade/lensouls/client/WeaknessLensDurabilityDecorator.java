@@ -35,8 +35,10 @@ public class WeaknessLensDurabilityDecorator implements IItemDecorator {
         int width = Math.round(BAR_WIDTH * ratio);
         int x = xOffset + 2;
         int y = yOffset + 13;
+        // 原版款式（照 `ItemRenderer.renderGuiItemDecorations`）：底色 13×2 纯黑，
+        // 前景（彩色）只占**上面 1 行**。此前前景也画 2 行，视觉上就显得比原版粗一倍。
         guiGraphics.fill(RenderType.guiOverlay(), x, y, x + BAR_WIDTH, y + 2, BAR_BLANK);
-        guiGraphics.fill(RenderType.guiOverlay(), x, y, x + width, y + 2,
+        guiGraphics.fill(RenderType.guiOverlay(), x, y, x + width, y + 1,
                 Mth.hsvToRgb(ratio / 3.0F, 1.0F, 1.0F) | 0xFF000000);
         return true;
     }

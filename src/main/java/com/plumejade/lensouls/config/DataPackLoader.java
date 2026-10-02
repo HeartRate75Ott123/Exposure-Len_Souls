@@ -134,8 +134,9 @@ public class DataPackLoader extends SimpleJsonResourceReloadListener {
                 Map<ElementDamage, Float> elementMap = parseElementMap(weaknessObj.getAsJsonObject(), fileId);
 
                 // 合并：同一实体可在多个文件中出现，后加载的覆盖同名元素
+                // （合并也要保序——丢了顺序就等于把弱点优先级退回枚举顺序）
                 newCache.merge(entityId, elementMap, (oldMap, newMap) -> {
-                    Map<ElementDamage, Float> merged = new HashMap<>(oldMap);
+                    Map<ElementDamage, Float> merged = new LinkedHashMap<>(oldMap);
                     merged.putAll(newMap);
                     return merged;
                 });
@@ -146,7 +147,9 @@ public class DataPackLoader extends SimpleJsonResourceReloadListener {
     }
 
     private static Map<ElementDamage, Float> parseElementMap(JsonObject obj, ResourceLocation sourceFile) {
-        Map<ElementDamage, Float> result = new HashMap<>();
+        // **必须保序**：弱点优先级 = 数据包里的书写顺序（见 WeaknessLensPhoto.weaknessElementOf）。
+        // 用 HashMap 会把顺序打散，最终退化成「按元素枚举顺序取」，表现就是「全部记录成火」。
+        Map<ElementDamage, Float> result = new LinkedHashMap<>();
         for (String key : obj.keySet()) {
             ElementDamage element = ElementDamage.byName(key);
             if (element == null) {

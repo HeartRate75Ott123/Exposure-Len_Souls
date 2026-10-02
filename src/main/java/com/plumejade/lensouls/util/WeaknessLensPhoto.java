@@ -113,7 +113,14 @@ public final class WeaknessLensPhoto {
      * 只认显式配置——{@code DataPackLoader.getWeakness} 对未配置元素会给 0.1 的兜底值，
      * 拿它来「识别弱点」等于任何生物都能认出一个弱点，那不是识别。
      * 弹射物弱点（{@link ElementDamage#PROJECTILE}）不参与：它的活性来自投射物而非武器，
-     * 换算成「武器活性」没有意义。倍率相同时按枚举声明顺序取前者（结果确定，不随 Map 迭代顺序漂移）。
+     * 换算成「武器活性」没有意义。
+     * <p>
+     * <b>遍历顺序 = 数据包里的书写顺序</b>（{@code DataPackLoader} 用 {@link java.util.LinkedHashMap} 保序）：
+     * 倍率相同时取**先写的**那个。**不要退回「按 {@code ElementDamage.values()} 枚举顺序遍历」** ——
+     * 那等于给平手情况硬编码一个 fire，实测表现就是「明明有水弱点却一律记录成火」。
+     *
+     * @return 该实体的弱点元素；<b>没有任何显式（非弹射物）弱点时返回 {@code null}</b>
+     *         —— 调用方据此**不记录任何弱点**（照片上就不该有这一项）
      */
     public static ElementDamage weaknessElementOf(ResourceLocation entityId) {
         if (entityId == null) return null;
@@ -122,11 +129,12 @@ public final class WeaknessLensPhoto {
 
         ElementDamage best = null;
         float bestValue = 0f;
-        for (ElementDamage element : ElementDamage.values()) {
+        for (Map.Entry<ElementDamage, Float> entry : weaknesses.entrySet()) {
+            ElementDamage element = entry.getKey();
             if (element == ElementDamage.PROJECTILE) continue;
-            Float value = weaknesses.get(element);
+            Float value = entry.getValue();
             if (value == null || value <= 0f) continue;
-            if (best == null || value > bestValue) {
+            if (value > bestValue) {
                 best = element;
                 bestValue = value;
             }

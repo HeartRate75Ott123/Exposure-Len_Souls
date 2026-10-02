@@ -73,11 +73,20 @@ public final class FrameEntities {
         double halfAngleDeg = (fov * FOV_MARGIN) / 2.0;
         double maxDistance = CameraVisibility.maxCaptureDistance();
 
+        // ⚠ 相机持有者（玩家自己）绝不在「画面内实体」里：
+        // Exposure 的眼睛视锥天然把它排除（眼睛就在相机位置，depth ≈ 0），但**本方法的补回一点都可能把它捞回来**
+        // —— 视线朝下时自己的脚/身体就在视锥里，而且「对自己的射线」不会被自己的碰撞箱挡住 ⇒ isVisible 通过。
+        // 它到相机的距离 ≈ 0，排序后必定落在 get(0) ⇒ 下游所有「取第 0 个当主体」的消费者
+        // （能力窃取主体、弱点透镜记录弱点、时间定格…）都会变成玩家自己：实测症状就是
+        // 「弱点透镜记录的弱点全是同一个元素（玩家那条 entity_weakness 配置）」，与拍摄对象无关。
+        boolean holderIsLiving = cameraHolder instanceof LivingEntity;
+
         // 1) 收窄：Exposure 已含视锥 + 焦距距离 + 单点（眼睛）视线，这里再按我们的多采样口径复判
         List<LivingEntity> visible = new ArrayList<>();
         if (exposureResult != null) {
             for (LivingEntity candidate : exposureResult) {
                 if (candidate == null || !candidate.isAlive()) continue;
+                if (candidate == cameraHolder) continue;      // 防御：持有者永不算主体
                 if (CameraVisibility.isVisible(level, camPos, lookDir, halfAngleDeg, maxDistance, candidate)) {
                     visible.add(candidate);
                 }
@@ -94,6 +103,7 @@ public final class FrameEntities {
                 if (!part.isAlive()) continue;
                 Entity parent = part.getParent();
                 if (!(parent instanceof LivingEntity living) || !living.isAlive()) continue;
+                if (living == cameraHolder) continue;         // 部件链回到持有者 ⇒ 同样不算
                 if (visible.contains(living)) continue;
                 if (!CameraVisibility.isVisible(level, camPos, lookDir, halfAngleDeg, maxDistance, part)) continue;
                 visible.add(living);
@@ -101,6 +111,7 @@ public final class FrameEntities {
             }
             // 2b) 本体：Exposure 只看眼睛点，拍脚 / 下半身时会被它刷掉
             if (!(entity instanceof LivingEntity living) || !living.isAlive()) continue;
+            if (holderIsLiving && living == cameraHolder) continue;   // ← 别把玩家自己补回来（见上方警告）
             if (visible.contains(living)) continue;
             // 与 Exposure 同口径的焦距阈值（镜头越广越近、越长焦越远），不额外放宽
             if (EntitiesInFrame.calculateVisibleDistance(camPos, living) > focalLength) continue;

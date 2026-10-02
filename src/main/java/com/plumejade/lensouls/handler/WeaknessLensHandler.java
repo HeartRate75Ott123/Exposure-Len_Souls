@@ -90,15 +90,25 @@ public class WeaknessLensHandler {
         WeaknessLensPhoto.writeInstalled(target, photo, access);
 
         // 消耗手里这一张（堆叠时只拿 1 张）
-        player.setItemInHand(hand, photo.copyWithCount(photo.getCount() - 1));
+        ItemStack remaining = photo.copyWithCount(photo.getCount() - 1);
+        player.setItemInHand(hand, remaining);
 
-        if (!replaced.isEmpty() && !player.getInventory().add(replaced)) {
-            player.drop(replaced, false);
+        if (!replaced.isEmpty()) {
+            // 换下来的旧照片**直接放回「照片所在的那只手」**：手里这一张刚好用掉时就是原地对调，
+            // 完全不依赖背包空间 ⇒ 背包满也不会被吞（用户口径）。
+            // 手里还有剩余照片（整堆装机）时才退回背包，最后才掉地上——任何情况都不凭空吞掉。
+            if (remaining.isEmpty()) {
+                player.setItemInHand(hand, replaced);
+            } else if (!player.getInventory().add(replaced)) {
+                player.drop(replaced, false);
+            }
         }
 
-        player.displayClientMessage(Component.translatable(replaced.isEmpty()
-                ? "message.lensouls.weakness_lens.installed"
-                : "message.lensouls.weakness_lens.swapped"), true);
+        // 需求：**更换成功不提示**（只有「首次装入」才发动作栏消息；换装是原地对调，玩家自己能看见）
+        if (replaced.isEmpty()) {
+            player.displayClientMessage(
+                    Component.translatable("message.lensouls.weakness_lens.installed"), true);
+        }
         player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
                 SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.PLAYERS, 0.8f, 1.2f);
     }

@@ -1753,3 +1753,113 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   MD5 `B49E29395FA91F9FECA217C42ABFD19E`；`1.5.46` 作废。
 - **教训（通用）**：任何「在 A 的 `hurt` 里改派给 B、失败再回退 `A.hurt`」的写法都是**自递归**。
   在实体的 `hurt` 内做伤害转发时，只能**单向派发 + 重入保护**，绝不回退到入口方法。
+
+## 兼容（`1.5.48`）：gytrinket 无人机伤害豁免「非弱点 ×0.1 惩罚」
+
+### 63. 需求与实现
+
+- 需求（用户）：「让该模组几种无人机造成的伤害，绕过非弱点的伤害损失」
+  （模组源码：`E:\volans\Downloads\新建文件夹 (3)\gytrinket-1.21.1neoforge`，mod id `gytrinket`）。
+- 现状：`DamageHandler` 里原本只有一行
+  `boolean isGytrinket = sourceEntity != null && sourceEntity.getClass().getName().contains("gytrinket");`
+  —— 只看伤害源的 `getEntity()`（攻击者）类名。
+- 逐条核对该模组的无人机伤害路径（源码实测）：
+  | 路径 | 伤害源 | 旧判定 |
+  |---|---|---|
+  | `DroneBullet:223`、`ExplosiveProjectile:74/85`（无人机子弹/爆炸弹） | 类型 `gytrinket:drone_bullet`，causing entity 常是**玩家**（构造体归玩家所有） | **漏** ✗ |
+  | `DroneBeamProjectile:160-169`（光束） | 原版 `mobAttack` / `indirectMagic`，攻击者=无人机实体 | 命中 ✓ |
+  | `SwarmConstructEntity:566`（蜂群电弧） | 类型 `gytrinket:swarm_damage`（direct=entity=蜂群） | 命中 ✓ |
+  | `MeleeWeaponMode:118`、`InterceptorChargedHandler:385`、`AbstractConstructEntity:488`（近战/横扫） | 原版 `mobAttack(构造体)` | 命中 ✓ |
+  | `ModDamageTypes.getExecuteDamageSource(player, player)`（僚机斩杀） | 类型 `gytrinket:execute_damage`，direct=entity=**玩家** | **漏** ✗ |
+- 修法：把那一行换成 `isGytrinketDamage(DamageSource)`（与既有 `isKrakenCannonball` 同款写法），
+  三种特征任一命中即认定：
+  1. **伤害类型命名空间 = `gytrinket`**（覆盖 `drone_bullet` / `swarm_damage` / `execute_damage` /
+     `siphon_damage` 等自有类型）；
+  2. **直接实体或攻击实体的类名以 `com.gytrinket.` 开头**（覆盖用原版伤害类型的光束与近战）；
+  3. **直接实体或攻击实体的实体类型命名空间 = `gytrinket`**（与类名互为兜底，对方改包名也稳）。
+  三者缺一必漏：只看 ① 会漏原版类型的光束/近战；只看 ②（旧实现）会漏「causing entity 是玩家」的子弹与斩杀。
+- 复核：`tools/MixinSelfCheck` 全绿；jar 内核验 `isGytrinketDamage` 在位、`gytrinket` 命名空间比对 2 处、
+  `com.gytrinket.` 前缀 1 处、旧 `sourceEntity` 写法已无残留。
+- 交付：版本 `1.5.48`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.48.jar`（5,941,136 字节），
+  MD5 `EEBBF9DFB9DF6DDA1966B476E201C75F`；`1.5.47` 作废。**未提交**。
+- **待实机验证**：① 无人机（子弹/蜂群/光束/僚机斩杀）打有非弱点配置的目标 → 不再被砍成 10%；
+  ② 玩家自己的普通武器打同一目标 → 仍然吃 ×0.1（豁免不能泄漏到玩家武器上）。
+
+## 修复（`1.5.49`）：弱点透镜「记录弱点永远是火」+ 耐久条改原版款式
+
+### 64. 根因：弱点顺序被 Map 打散，平手时退化成「枚举顺序 = 火」
+
+- 现象（用户）：弱点透镜照片**记录的弱点永远是火**；实测生物明明配了水弱点；
+  另外物品栏里的耐久条「比原版粗」。
+- 排查（读代码 + 语言文件，**不依赖开发环境的数据包**）：
+  - 语言文件正常：`item.lensouls.weakness_lens.element` = `§7记录弱点：%s`、`element.lensouls.*.short`
+    火/水/土/末影 齐全 ⇒ **不是文案写死**；
+  - 写入口正常：`AbilityBehavior.writePhotoData`（WEAKNESS_LENS 分支）与
+    `WeaknessLensPhoto.writeInstalled` / `PhotoGuiMenu` 都是**动态**取 `weaknessElementOf(entityId)`，
+    没有 `ElementDamage.FIRE` 之类的兜底（全仓 grep 确认）；
+  - `ElementDamage.byName` 返回 null 而非默认值；`parseElement` 对空/非法串返回 null；
+    `getAllWeaknesses` 只返回**显式配置**项（`getWeakness` 的 0.1 兜底不在其中）⇒ 这些都没问题；
+  - **真正的坑在顺序**：`weaknessElementOf` 原本遍历 `ElementDamage.values()`（**枚举顺序**）去查 Map，
+    于是「倍率平手」时永远取到枚举里最靠前的 **fire** ✗；而更上游还有三处**把数据包书写顺序丢掉**：
+    1. `DataPackLoader.parseElementMap` 用 `new HashMap<>()`；
+    2. 同文件多文件合并用 `new HashMap<>(oldMap)`；
+    3. 客户端同步 `DatapackSyncPacket.decodeWeakness` 用 `HashMap` + `Map.copyOf`（两者都不保序）。
+    ⇒ 数据包里「水在前、火在后（或同倍率）」的意图被抹掉，最终一律记录成火。
+- 修法：
+  1. 三层全部改为 **保序**：`LinkedHashMap`（解析 / 合并）+ `Collections.unmodifiableMap(LinkedHashMap)`
+     （客户端解码，替换 `Map.copyOf`）；
+  2. `WeaknessLensPhoto.weaknessElementOf` 改为**按数据包书写顺序**遍历 `entrySet()`，
+     取倍率最高者、**平手取先写者**；并在 javadoc 里写明「**不要退回 `ElementDamage.values()` 枚举遍历**」；
+  3. 「无显式（非弹射物）弱点 ⇒ 返回 null ⇒ 照片**不记录任何弱点**」这一语义在 javadoc 里明确写出
+     （调用方本来就只在非 null 时写键，行为不变）。
+- 耐久条（`client/WeaknessLensDurabilityDecorator`）：原版 `ItemRenderer.renderGuiItemDecorations` 是
+  **底色 13×2 纯黑 + 前景彩色只占上面 1 行**；此前我们把前景也画满 2 行 ⇒ 视觉上粗一倍。
+  现前景改为 `y + 1`（1 像素），其余（+2/+13 偏移、HSV 绿→红、满耐久不画）保持与原版一致。
+- 复核：`tools/MixinSelfCheck` 全绿；jar 内核验 `DataPackLoader` 用 `LinkedHashMap`、
+  `WeaknessLensPhoto` 走 `entrySet`（不再是枚举 `values()`）、`DatapackSyncPacket` 用 `LinkedHashMap`。
+- 交付：版本 `1.5.49`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.49.jar`（5,941,355 字节），
+  MD5 `C2B8686D7B8E3C53DA836C431AF70B11`；`1.5.48` 作废。**未提交**。
+- 顺带：按用户要求删除工作区里的临时脚本/中间产物目录 `.probe`（270 个文件）；
+  后续排查记录一律直接写进 `AGENTS.md`，不再留临时脚本。
+- **待实机验证**：① 拍有水弱点的生物 → tooltip 显示「记录弱点：水」；
+  ② 拍没有显式弱点的生物 → 不显示该行（也不该写进照片 NBT）；
+  ③ 物品栏耐久条与原版同宽同高（彩色部分 1 像素）。
+
+### 64.1 更正（`1.5.50`）：弱点「全是火」的真因是**主体取成了玩家自己**
+
+- 结论：上述 §64 的「平手取枚举顺序」修复本身没错（弱点优先级现在按数据包书写顺序取最高），
+  但**不是**「记录弱点全是火」的原因。真因是**照片主体被解析成了相机持有者（玩家自己）**。
+- 机制（逐步可复现）：
+  1. Exposure 的 `EntitiesInFrame.get` 用**眼睛**预筛，玩家自己天然被排除（眼睛就在相机位置，depth ≈ 0）；
+  2. 但 `FrameEntities.assemble` 的**补回**扫描附近 `LivingEntity` 时**没有排除相机持有者** ⇒
+     视线朝下时玩家自己的脚/身体就落在视锥里，而且「对自己的射线」不会被自己的碰撞箱挡住
+     （`ClipContext` 的 context 就是目标自身）⇒ `CameraVisibility.isVisible(...)` **判定通过** ⇒ 玩家被补进列表；
+  3. 列表随后按「到相机的距离」升序排序，玩家距离 ≈ 0 ⇒ **必然落在 `get(0)`**；
+  4. 下游所有「取第 0 个当主体」的消费者（`WeaknessLensPhoto.subjectEntityId` = 弱点透镜记录弱点、
+     `PhotoInjectionHandler` 的能力窃取主体、时间定格…）于是都指向**玩家自己** ⇒
+     弱点透镜记录的是 `minecraft:player` 的弱点配置 ⇒ **每张照片都是同一个元素**（用户看到「全是火」）。
+- 修法：`FrameEntities.assemble` **三处**排除相机持有者——收窄循环、子部件→父实体、本体补回
+  （`holderIsLiving && living == cameraHolder`），并在方法体里写死警告注释，说明「补回最容易漏的就是持有者本身、
+  以及它为什么必然落到 `get(0)`」。字节核验：`assemble` 内 `if_acmpne` 3 处（修复前 0 处）、
+  局部变量 `holderIsLiving` 在位。
+- 交付：版本 `1.5.50`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.50.jar`（5,941,418 字节），
+  MD5 `1E73A8C79E795FA9ED5A27DC9FFA35F9`；`1.5.49` 作废。**未提交**。
+- **待实机验证**：① 拍有水弱点的生物 → 「记录弱点：水」；换一只弱点不同的生物再拍 → 显示对应元素
+  （不再是恒定同一个）；② 拍无显式弱点的生物 → 不显示该行；③ 顺带确认「能力窃取」不会再窃取到玩家自己。
+- **教训**：任何「在已有结果上做补回/放宽」的逻辑，都必须显式排除**发起者自身**；
+  且下游若用 `get(0)` 表达「最近主体」，排序前的候选集合就必须先保证语义正确。
+
+### 66. 需求：更换成功不再提示（`1.5.52`）
+
+- 需求（用户）：更换剑槽照片成功后**不要发送消息**。
+- 改法（`handler/WeaknessLensHandler.install`）：把原来「按 `replaced.isEmpty()` 二选一」的
+  `displayClientMessage` 改成**只在首次装入时**发动作栏消息；**更换路径完全不发消息**
+  （旧照片是原地对调回那只手，玩家自己看得见，再弹提示是噪音）。
+- 语言键 `message.lensouls.weakness_lens.swapped` 保留但**已无人引用**——按「lang 只追加键」的惯例不删，
+  以免以后又需要时找不到文案。
+- 复核：jar 内 `WeaknessLensHandler` 的 `displayClientMessage` 只剩 **1 处**（首次装入），
+  常量池内已无 `weakness_lens.swapped`；`tools/MixinSelfCheck` 全绿。
+- 交付：版本 `1.5.52`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.5.52.jar`（5,941,431 字节），
+  MD5 `6F0D379BA9825A37CF638C06C9A12BC5`；`1.5.51` 作废。**未提交**
+  （待提交批次共 5 个：`1.5.48` gytrinket 豁免 / `1.5.49` 弱点顺序 + 耐久条 / `1.5.50` 主体修正 /
+  `1.5.51` 换照片回手 / `1.5.52` 更换不提示）。

@@ -222,8 +222,11 @@ public class DamageHandler {
                     break;
                 }
             }
-            Entity sourceEntity = event.getSource().getEntity();
-            boolean isGytrinket = sourceEntity != null && sourceEntity.getClass().getName().contains("gytrinket");
+            // gytrinket 无人机/构造体豁免：该模组几种无人机（无人机子弹 / 蜂群电弧 / 光束 / 近战 /
+            // 僚机横扫 / 斩杀）造成的伤害来自它自己的构造体机制，不属于「玩家武器元素不匹配」，
+            // 不吃 ×0.1。注意不能只看攻击者类名：无人机子弹的 causing entity 常常就是**玩家**
+            // （构造体归玩家所有），必须同时看伤害类型命名空间与直接实体。
+            boolean isGytrinket = isGytrinketDamage(event.getSource());
             // DoT 跳伤豁免：正在结算的 DoT 元素属于目标弱点集 → 不吃武器匹配 ×0.1
             ElementDamage dotElem = SoulDotHandler.getApplyingDotElement();
             // 克拉肯船炮豁免：block_factorys_bosses 的克拉肯船炮（kraken_cannon_item 发射的 cannonball）
@@ -235,6 +238,39 @@ public class DamageHandler {
                 if (event.getNewDamage() > cap) event.setNewDamage(cap);
             }
         }
+    }
+
+    /**
+     * 是否为 gytrinket 构造体（无人机 / 蜂群 / 僚机）造成的伤害（用于豁免上面的 ×0.1 武器匹配惩罚）。
+     * <p>
+     * 三种特征任一命中即认定 —— 单看某一项都会漏（见每种特征后面的备注）：
+     * <ol>
+     *   <li><b>伤害类型命名空间是 {@code gytrinket}</b>：覆盖 {@code drone_bullet}
+     *       （无人机子弹 / 爆炸弹。它的 causing entity 常常是<b>玩家</b>——构造体归玩家所有，
+     *       所以只看攻击者类名会漏）、{@code swarm_damage}（蜂群电弧）、
+     *       {@code execute_damage}（僚机斩杀，归属玩家）、{@code siphon_damage} 等该模组自有伤害类型；</li>
+     *   <li>直接实体或攻击实体的<b>类名</b>以 {@code com.gytrinket.} 开头：覆盖它用原版
+     *       {@code mobAttack} / {@code indirectMagic} 造伤害的光束与近战（伤害类型是原版的）；</li>
+     *   <li>直接实体或攻击实体的<b>实体类型命名空间</b>是 {@code gytrinket}：与类名互为兜底
+     *       （对方若改包名/类名，实体类型 id 仍稳定）。</li>
+     * </ol>
+     * 全部按字符串比对，未安装该模组时自然恒为 false。
+     */
+    private static boolean isGytrinketDamage(DamageSource source) {
+        if (source == null) return false;
+
+        var typeKey = source.typeHolder().unwrapKey();
+        if (typeKey.isPresent() && "gytrinket".equals(typeKey.get().location().getNamespace())) {
+            return true;
+        }
+
+        for (Entity e : new Entity[]{source.getDirectEntity(), source.getEntity()}) {
+            if (e == null) continue;
+            if (e.getClass().getName().startsWith("com.gytrinket.")) return true;
+            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType());
+            if (id != null && "gytrinket".equals(id.getNamespace())) return true;
+        }
+        return false;
     }
 
     /**

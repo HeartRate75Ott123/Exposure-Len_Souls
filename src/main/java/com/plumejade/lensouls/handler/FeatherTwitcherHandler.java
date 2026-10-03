@@ -2,6 +2,7 @@ package com.plumejade.lensouls.handler;
 
 import com.plumejade.lensouls.entity.ModEntities;
 import com.plumejade.lensouls.entity.TwitcherEntity;
+import com.plumejade.lensouls.feather.FeatherEquip;
 import com.plumejade.lensouls.item.ModItems;
 import com.plumejade.lensouls.network.TwistSyncPacket;
 import net.minecraft.nbt.CompoundTag;
@@ -57,12 +58,12 @@ public class FeatherTwitcherHandler {
     private static int lastLoggedTwist = -1;
     private static long lastTwistLogTick = 0;
 
-    /** 佩戴检测：Curios 任意槽位持有扭曲羽毛 */
+    /**
+     * 佩戴检测：**Curios 任意槽位 ‖ 羽毛装配界面的 5 个槽位**（见 {@link FeatherEquip}）。
+     * <p>同种物品只生效一次（布尔语义，重复持有不叠加）。
+     */
     public static boolean hasTwitcher(Player player) {
-        if (player == null) return false;
-        return CuriosApi.getCuriosInventory(player)
-                .map(inv -> inv.findFirstCurio(s -> s.is(ModItems.FEATHER_TWITCHER.get())).isPresent())
-                .orElse(false);
+        return FeatherEquip.has(player, ModItems.FEATHER_TWITCHER.get());
     }
 
     /**

@@ -49,6 +49,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
     private final List<ResourceLocation> bosses;
     private final List<com.plumejade.lensouls.reinforce.ReinforceMaterial> reinforceMaterials;
     private final java.util.Set<ResourceLocation> reinforceBlacklist;
+    /** 羽毛槽「可放入物品」列表（选择界面给不可放入的物品盖红蒙版） */
+    private final List<ResourceLocation> featherItems;
 
     public DatapackSyncPacket(
             Map<ResourceLocation, Map<ElementDamage, Float>> weaknesses,
@@ -59,7 +61,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
             List<ResourceLocation> staffItems,
             List<ResourceLocation> bosses,
             List<com.plumejade.lensouls.reinforce.ReinforceMaterial> reinforceMaterials,
-            java.util.Set<ResourceLocation> reinforceBlacklist) {
+            java.util.Set<ResourceLocation> reinforceBlacklist,
+            List<ResourceLocation> featherItems) {
         this.weaknesses = weaknesses;
         this.attackerElement = attackerElement;
         this.itemElementActivity = itemElementActivity;
@@ -69,6 +72,7 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         this.bosses = bosses;
         this.reinforceMaterials = reinforceMaterials;
         this.reinforceBlacklist = reinforceBlacklist;
+        this.featherItems = featherItems;
     }
 
     /**
@@ -87,7 +91,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
                 StaffItemLoader.allStaffs(),
                 BossEntityLoader.allBosses(),
                 com.plumejade.lensouls.reinforce.ReinforceDataLoader.allMaterials(),
-                com.plumejade.lensouls.reinforce.ReinforceDataLoader.allBlacklist());
+                com.plumejade.lensouls.reinforce.ReinforceDataLoader.allBlacklist(),
+                com.plumejade.lensouls.feather.FeatherSlotLoader.supportedIds());
     }
 
     private DatapackSyncPacket(RegistryFriendlyByteBuf buf) {
@@ -109,6 +114,10 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         java.util.Set<ResourceLocation> blacklist = new java.util.LinkedHashSet<>();
         for (int i = 0; i < blacklistSize; i++) blacklist.add(buf.readResourceLocation());
         this.reinforceBlacklist = java.util.Set.copyOf(blacklist);
+        int featherSize = buf.readVarInt();
+        List<ResourceLocation> featherList = new ArrayList<>(featherSize);
+        for (int i = 0; i < featherSize; i++) featherList.add(buf.readResourceLocation());
+        this.featherItems = List.copyOf(featherList);
     }
 
     // ========== 编码 ==========
@@ -126,6 +135,8 @@ public class DatapackSyncPacket implements CustomPacketPayload {
         com.plumejade.lensouls.reinforce.ReinforceMaterial.encodeAll(buf, reinforceMaterials);
         buf.writeVarInt(reinforceBlacklist.size());
         for (ResourceLocation id : reinforceBlacklist) buf.writeResourceLocation(id);
+        buf.writeVarInt(featherItems.size());
+        for (ResourceLocation id : featherItems) buf.writeResourceLocation(id);
     }
 
     private static void encodeWeakness(RegistryFriendlyByteBuf buf,
@@ -281,6 +292,7 @@ public class DatapackSyncPacket implements CustomPacketPayload {
             BossEntityLoader.setClientCache(packet.bosses);
             com.plumejade.lensouls.reinforce.ReinforceDataLoader.setClientCache(
                     packet.reinforceMaterials, packet.reinforceBlacklist);
+            com.plumejade.lensouls.feather.FeatherSlotLoader.setClientCache(packet.featherItems);
         });
     }
 }

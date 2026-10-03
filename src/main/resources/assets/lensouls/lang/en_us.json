@@ -467,5 +467,14 @@
   "gui.lensouls.reinforce.done": "§aReinforced: %s",
   "gui.lensouls.reinforce.none_found": "No matching materials",
   "gui.lensouls.reinforce.back": "Back",
-  "gui.lensouls.reinforce.page": "%s / %s"
+  "gui.lensouls.reinforce.page": "%s / %s",
+  "lensouls.tabs.feather": "Feather Assembly",
+  "gui.lensouls.feather.title": "Feather Assembly",
+  "gui.lensouls.feather.hint": "§7Click a slot to choose a feather · §eE§7/§eESC§7 to go back",
+  "gui.lensouls.feather.locked": "This slot is permanently locked",
+  "gui.lensouls.feather.unsupported": "This item cannot go into a feather slot",
+  "gui.lensouls.feather.creative_only": "Only creative mode can remove feathers",
+  "gui.lensouls.feather.empty": "Empty slot",
+  "gui.lensouls.feather.select_title": "Choose a feather to install",
+  "gui.lensouls.feather.select_hint": "§7Items with a red overlay cannot be installed · §eESC§7 to cancel"
 }

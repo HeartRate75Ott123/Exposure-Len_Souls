@@ -466,5 +466,14 @@
   "gui.lensouls.reinforce.done": "§a强化成功：%s",
   "gui.lensouls.reinforce.none_found": "没有匹配的强化材料",
   "gui.lensouls.reinforce.back": "返回",
-  "gui.lensouls.reinforce.page": "%s / %s"
+  "gui.lensouls.reinforce.page": "%s / %s",
+  "lensouls.tabs.feather": "羽毛装配",
+  "gui.lensouls.feather.title": "羽毛装配",
+  "gui.lensouls.feather.hint": "§7点击槽位选择羽毛 · §eE§7/§eESC§7 返回",
+  "gui.lensouls.feather.locked": "该槽位已永久锁定",
+  "gui.lensouls.feather.unsupported": "该物品不能放入羽毛槽",
+  "gui.lensouls.feather.creative_only": "只有创造模式可以卸下羽毛",
+  "gui.lensouls.feather.empty": "空槽位",
+  "gui.lensouls.feather.select_title": "选择要装配的羽毛",
+  "gui.lensouls.feather.select_hint": "§7红色覆盖的物品无法放入 · §eESC§7 取消"
 }

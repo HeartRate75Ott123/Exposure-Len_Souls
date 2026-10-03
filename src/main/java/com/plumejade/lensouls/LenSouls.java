@@ -59,6 +59,8 @@ public class LenSouls {
         ModCreativeTabs.register(modEventBus);
         ModDataComponents.register(modEventBus);
         com.plumejade.lensouls.boss.ModAttachments.register(modEventBus);
+        // 羽毛槽（5 槽 + 永久锁定标记，玩家附件，copyOnDeath）
+        com.plumejade.lensouls.feather.FeatherAttachments.register(modEventBus);
         ModEntities.register(modEventBus);
         com.plumejade.lensouls.recipe.DimensionalGunRecipes.register(modEventBus);
         com.plumejade.lensouls.recipe.CopySoulRecipes.register(modEventBus);
@@ -192,6 +194,8 @@ public class LenSouls {
         event.addListener(new com.plumejade.lensouls.config.PhotoSetDefs());
         event.addListener(new com.plumejade.lensouls.config.StaffItemLoader());
         event.addListener(new com.plumejade.lensouls.reinforce.ReinforceDataLoader());
+        // 羽毛槽「可放入物品」列表（数据驱动，方便后续追加羽毛）
+        event.addListener(new com.plumejade.lensouls.feather.FeatherSlotLoader());
     }
 
     /**

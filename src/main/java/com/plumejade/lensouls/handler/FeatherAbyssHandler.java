@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.handler;
 
+import com.plumejade.lensouls.feather.FeatherEquip;
 import com.plumejade.lensouls.item.ModItems;
 import com.plumejade.lensouls.mixin.EntityInvulnerableTimeAccessor;
 import com.plumejade.lensouls.network.AbyssCountdownPacket;
@@ -131,12 +132,12 @@ public class FeatherAbyssHandler {
     private static final EntityType<?>[] DISASTER_TYPES = {
             EntityType.ZOMBIE, EntityType.SKELETON, EntityType.CAVE_SPIDER};
 
-    /** 佩戴检测：Curios 任意槽位持有折翼沉渊 */
+    /**
+     * 佩戴检测：**Curios 任意槽位 ‖ 羽毛装配界面的 5 个槽位**（见 {@link FeatherEquip}）。
+     * <p>同种物品只生效一次（布尔语义，重复持有不叠加）。
+     */
     public static boolean hasAbyss(Player player) {
-        if (player == null) return false;
-        return CuriosApi.getCuriosInventory(player)
-                .map(inv -> inv.findFirstCurio(s -> s.is(ModItems.FEATHER_ABYSS.get())).isPresent())
-                .orElse(false);
+        return FeatherEquip.has(player, ModItems.FEATHER_ABYSS.get());
     }
 
     /** 跨死亡持久化子键（NeoForge 复活只复制 PlayerPersisted 子键） */

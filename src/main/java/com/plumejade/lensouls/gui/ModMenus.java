@@ -45,9 +45,16 @@ public class ModMenus {
                     (IContainerFactory<ReinforceMenu>) (id, inv, buf) -> new ReinforceMenu(id, inv)));
 
     /**
-     * 在玩家背包中查找第一个转换器物品。
+     * 羽毛装配界面（l2tabs 新分页点开后进入）：5 个羽毛槽 + 41 个隐藏玩家背包槽。
+     * 界面全部自绘，菜单负责背包同步与「生存永久锁定 / 创造可卸下」的权威结算。
      */
-    public static ItemStack findConverter(Player player) {
+    public static final DeferredHolder<MenuType<?>, MenuType<FeatherSlotMenu>> FEATHER =
+            MENUS.register("feather_slots", () -> IMenuTypeExtension.create(
+                    (IContainerFactory<FeatherSlotMenu>) (id, inv, buf) -> new FeatherSlotMenu(id, inv)));
+
+    /**
+     * 在玩家背包中查找第一个转换器物品。
+     */    public static ItemStack findConverter(Player player) {
         for (ItemStack stack : player.getInventory().items) {
             if (stack.getItem() instanceof ConverterItem) {
                 return stack;

@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.handler;
 
 import com.plumejade.lensouls.effect.ModEffects;
+import com.plumejade.lensouls.feather.FeatherEquip;
 import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
@@ -42,12 +43,12 @@ public class FeatherElementRiseHandler {
     private static final String TAG_APPLIED = "lensouls:feather_rise_applied";
     private static final String TAG_BASE = "lensouls:feather_rise_base";
 
-    /** 佩戴检测：Curios 任意槽位持有羽毛 */
+    /**
+     * 佩戴检测：**Curios 任意槽位 ‖ 羽毛装配界面的 5 个槽位**（见 {@link FeatherEquip}）。
+     * <p>同种物品只生效一次（布尔语义，重复持有不叠加）。
+     */
     public static boolean hasFeather(Player player) {
-        if (player == null) return false;
-        return CuriosApi.getCuriosInventory(player)
-                .map(inv -> inv.findFirstCurio(s -> s.is(ModItems.FEATHER_ELEMENTRISE.get())).isPresent())
-                .orElse(false);
+        return FeatherEquip.has(player, ModItems.FEATHER_ELEMENTRISE.get());
     }
 
     /** 受到伤害 +50% */

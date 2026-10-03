@@ -56,6 +56,8 @@ public class LenSoulsClient {
         modEventBus.addListener(LenSoulsClient::registerLayerDefinitions);
         modEventBus.addListener(LenSoulsClient::registerLayers);
         modEventBus.addListener(LenSoulsClient::registerShaders);
+        // 羽毛界面的圆角（SDF）shader：显式注册并打日志（自动订阅失败是静默的）
+        com.plumejade.lensouls.client.feather.FeatherShaders.register(modEventBus);
         modEventBus.addListener(LenSoulsClient::registerParticleProviders);
         modEventBus.addListener(LenSoulsClient::registerItemDecorations);
 
@@ -86,6 +88,8 @@ public class LenSoulsClient {
 
         // 注册背包「照片效果」选项卡（L2 Library tabs 框架）
         PhotoTabRegistry.register();
+        // 注册背包「羽毛装配」选项卡（同框架，点击后请求服务端开屏）
+        com.plumejade.lensouls.client.tabs.FeatherTabRegistry.register();
     }
 
     /** 注册菜单界面到 RegisterMenuScreensEvent */
@@ -95,6 +99,7 @@ public class LenSoulsClient {
         event.register(ModMenus.PHOTO_GUI.get(), PhotoGuiScreen::new);
         event.register(ModMenus.PHOTO_ALBUM.get(), com.plumejade.lensouls.gui.AlbumScreen::new);
         event.register(ModMenus.REINFORCE.get(), com.plumejade.lensouls.gui.ReinforceScreen::new);
+        event.register(ModMenus.FEATHER.get(), com.plumejade.lensouls.client.feather.FeatherScreen::new);
     }
 
     /**

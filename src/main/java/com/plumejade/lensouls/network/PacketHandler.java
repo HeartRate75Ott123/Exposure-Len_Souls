@@ -264,6 +264,18 @@ public class PacketHandler {
                 ReinforceApplyPacket.STREAM_CODEC,
                 ReinforceApplyPacket::handle
         );
+        // ---- 羽毛装配界面：装入 / 更换 / 卸下 C2S ----
+        registrar.playToServer(
+                FeatherSlotPacket.TYPE,
+                FeatherSlotPacket.STREAM_CODEC,
+                FeatherSlotPacket::handle
+        );
+        // ---- 羽毛装配界面：请求开屏 C2S（l2tabs 分页点击是纯客户端事件）----
+        registrar.playToServer(
+                FeatherOpenPacket.TYPE,
+                FeatherOpenPacket.STREAM_CODEC,
+                FeatherOpenPacket::handle
+        );
         registrar.playToClient(
                 ReinforceCountsPacket.TYPE,
                 ReinforceCountsPacket.STREAM_CODEC,

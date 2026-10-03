@@ -1863,3 +1863,258 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   MD5 `6F0D379BA9825A37CF638C06C9A12BC5`；`1.5.51` 作废。**未提交**
   （待提交批次共 5 个：`1.5.48` gytrinket 豁免 / `1.5.49` 弱点顺序 + 耐久条 / `1.5.50` 主体修正 /
   `1.5.51` 换照片回手 / `1.5.52` 更换不提示）。
+
+## 新功能（`1.6.0`）：羽毛装配界面（l2tabs 分页 + 全屏 5 槽 + 磨砂玻璃面板）
+
+### 67. 需求与已定口径（用户逐条确认）
+
+- l2tabs 新增分页，图标用 `icon.png`（导入为 `textures/gui/feather_tab_icon.png`）；
+  点开后进入**全屏**界面，背景 `feather_background.png`（用户已改为 **16:9**）铺满；
+  `E`/`ESC` 快速返回。
+- 画面中心**横排 5 槽**（`slot.png` → `textures/gui/feather_slot.png`），间距一致；
+  槽后是**圆角 + 半透明 + 高斯模糊**的小面板（参考 `plumestweaks`，见下）。
+- 点槽位呼出玩家物品栏选择屏；**不可放入的物品红色覆盖且点击无效**；
+  可放入物品是**数据驱动列表**（当前 4 种羽毛），方便后续追加。
+- **生存**：装入即**永久锁定**（该槽左右键此后无效）；**创造**：右键已装槽卸下、左键更换；
+  卸下/更换的旧物品先回背包、满了掉地上（沿用弱点透镜那批定的口径）。
+- **同种物品只生效一次**；「装进界面」**等效于装在正确的 curios 槽位**上
+  ⇒ 既有 Curios 佩戴继续有效，两条通道等价。
+- 锁定提示**必须画在当前 GUI 内**并淡入淡出（动作栏/聊天会被 GUI 盖住，玩家看不到）：
+  0.25s 淡入 / **2s 停留** / 0.5s 淡出。
+
+### 68. 架构与文件
+
+| 文件 | 职责 |
+|------|------|
+| `feather/FeatherSlotData` | 5 槽内容 + 5 锁定位，`INBTSerializable<CompoundTag>`（锁定用位掩码） |
+| `feather/FeatherAttachments` | 玩家附件 `feather_slots`：`serializable` + **`copyOnDeath`**（永久锁定必须跨死亡保留） |
+| `feather/FeatherEquip` | **生效唯一入口** `has(player, item)` = 界面槽 ‖ Curios；布尔语义 = 同种只生效一次 |
+| `feather/FeatherSlotLoader` | 数据包 `data/lensouls/feather_slot/*.json` 的 `{"items":[...]}` 列表；热重载 + 随 `DatapackSyncPacket` 下发 |
+| `feather/FeatherSlotContainer` | 把数据包成原版 `Container`（槽内容走菜单自动同步） |
+| `gui/FeatherSlotMenu` | 5 羽毛槽（0..4）+ 41 隐藏背包槽（5..45）；`ContainerData` 5 个锁定标记；**服务端权威**：`onInstall`/`onUninstall` |
+| `network/FeatherSlotPacket` | 装入/更换/卸下 C2S（action + slot + inventoryIndex） |
+| `network/FeatherOpenPacket` | 请求开屏 C2S（l2tabs 点击是纯客户端事件，菜单必须服务端 `openMenu`） |
+| `client/feather/FeatherShaders` | `rrect` CoreShader 显式注册（`LenSoulsClient` 调 `register(modEventBus)`） |
+| `client/feather/RoundedRect` | SDF 圆角矩形绘制（移植 `RiftDraw`） |
+| `client/feather/GlassRuntime` | 原生 GL 两趟高斯 + UBO（移植 `RiftGlassRuntime`） |
+| `client/feather/GlassProgram` | 磨砂合成程序（移植 `RiftGlassGuiProgram`） |
+| `client/feather/GlassPanel` | 屏幕内合成磨砂玻璃（移植 `RiftGlass`） |
+| `client/feather/FeatherScreen` | 全屏界面（`Screen implements MenuAccess<FeatherSlotMenu>`，**不是** `AbstractContainerScreen`） |
+| `client/feather/FeatherSelectScreen` | 41 格选择屏（红覆盖 + 点击无效） |
+| `client/feather/FeatherToast` | GUI 内浮动提示（0.25s/2s/0.5s 淡入淡出） |
+| `client/tabs/FeatherTab(+Registry)` | l2tabs 分页，`renderIcon` 自绘 `feather_tab_icon.png` |
+
+- 4 个羽毛 handler 的佩戴谓词（`hasTwitcher`/`hasHardman`/`hasFeather`/`hasAbyss`）**各改一行**走 `FeatherEquip`，
+  效果数值与逻辑一字未动。
+
+### 69. 磨砂玻璃 + 圆角：移植要点与三个坑（**照抄参考项目，别自己重造**）
+
+来源：参考项目 `E:\volans\Documents\GitHub\tweaks\plumestweaks-template-1.21.1` 的
+`client/render/{RiftDraw,RiftGlass,RiftGlassRuntime,RiftGlassGuiProgram,RiftShaders}` +
+`shaders/core/{rrect.*,blit_fullscreen.vsh}` + `shaders/program/{rift_blur,rift_glass_gui}.fsh`
+（其血统为 ReGlass，MIT）。**着色器按字节复制**（控制台读出来是 GBK 乱码，文本转录会毁注释），
+只把 `rrect.json` 里的 `plumestweaks:rrect` 改成 `lensouls:rrect`。
+
+- **层级时机（参考项目内部迭代过，注释里写反过）**：正确顺序是 `Screen.render()` 内
+  **背景 → `graphics.flush()` → `GlassPanel.renderPanelGlass(...)` → 描边/文字**
+  （玻璃垫底、文字清晰）。参考项目把磨砂挂在 `GameRenderer.render` TAIL 的帧末合成
+  **已被否**（盖住全部文字），那个 `GameRendererMixin` 现在根本不存在，只剩 `Panel`/`RiftBackdrop`/`RiftBlur`
+  三处**过时注释**还在提它——别被注释骗，看调用链（`RiftTeleportScreen:266-283`）。
+- **`graphics.flush()` 不能省**：GUI 的 `fill`/`blit` 是延迟批处理，不刷到主画面就拷贝不到背景。
+- **坑 1（矩阵）**：`setDefaultUniforms(QUADS, poseMat=RenderSystem 当前姿态, proj=GUI 正交 1000..21000)`
+  + 顶点用**恒等矩阵**写裸 GUI 坐标。传错会让 `-11000` 应用两次（z=-22000）落在近截体外 ⇒ **面板整块被裁、看不见**。
+- **坑 2（alpha）**：面板不透明度必须**烘进 `FillColor.a`**，否则相乘为 0 ⇒ 只剩描边、内部全透明。
+- **坑 3（UBO）**：LWJGL 只接受 **direct** 缓冲，堆缓冲传给 `glBufferSubData` 会让驱动拿到无效指针 ⇒
+  `EXCEPTION_ACCESS_VIOLATION` ⇒ **JVM 秒崩**（参考项目 hs_err 崩在 atio6axx.dll）；两处上传都走 `MemoryStack`。
+- 另：整套走**原生 GL**（`glUseProgram`/`glDrawArrays`），**不用** `ShaderInstance`/`PostPass`——
+  参考项目在 GUI 阶段实测踩过三种失败（GPU 反馈回路 / Ortho 矩阵 NPE / 背景 blit 后消失）；
+  GL 状态逐项保存恢复（program/fbo/vao/active texture/2 个纹理/depth/blend/scissor/cull/depthmask + viewport）。
+
+### 70. 其它实现要点
+
+- **防伪造点击包**：羽毛槽用 `FeatherSlotMenu.FeatherSlot`（`mayPlace`/`mayPickup` 均 false）。
+  `AbstractContainerMenu.clicked` 吃的是客户端发来的槽位点击包，不封掉的话改包客户端能直接往槽里塞
+  或把已锁定的羽毛抠出来——「生存永久锁定」会被绕过。`quickMoveStack` 直接返回空。
+- **选择屏读物品栏的口径**：直接 `player.getInventory().getItem(i)`，**不要按 `menu.slots` 下标读**
+  （槽位顺序是 0..4 羽毛槽 + 5..45 隐藏背包槽，按 menu.slots 读会整体错位 5 格）。
+- 复用 `PhotoTabRegistry.REG`：同一模组只应有一个 l2core `Reg` 实例，另建会注册名冲突。
+- 交付：版本 `1.6.0`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.0.jar`（8,134,767 字节，含 2.1MB 背景），
+  MD5 `A85857F54A76A9C1CEB7AA9F44A1E545`；`1.5.52` 作废。**未提交**。
+- **待实机验证**：① l2tabs 出现羽毛分页、图标正确、点击进全屏界面、`E`/`ESC` 返回；
+  ② 背景铺满（16:9 窗口应恰好无裁切）、5 槽横排居中、面板磨砂+圆角+半透明生效（面板外背景不受影响）；
+  ③ 点槽开选择屏：不可放入的物品红覆盖且点击无效；
+  ④ 生存装入后该槽锁定（再点出浮动提示并淡出）、创造可右键卸下/左键更换、旧物回背包或掉地上；
+  ⑤ 装进界面的羽毛与戴 Curios **效果等价**，同种物品只生效一次；
+  ⑥ 退出重进 / 死亡重生后槽内容与锁定仍在。
+
+### 71. 实机反馈四修（`1.6.1`）
+
+1. **l2tabs 分页图标偏心**（16×16 贴图没画在 tab 中心）
+   - 根因：框架的 `TabType.drawIcon(g, x, y, stack)` 会**按所在组加偏移**——
+     `javap -p -c` 反编译 `libs/l2tabs-3.0.5+7.jar` 的 `dev.xkmc.l2tabs.tabs.core.TabType`：
+     ordinal 0（**ABOVE**）`x+=6, y+=9`；1（BELOW）`+6/+6`；2（LEFT）`+10/+5`；3（RIGHT）`+6/+5`。
+     我们直接 `blit(ICON, getX(), getY())` 少了这个偏移 ⇒ 明显偏左上。
+   - 修法：`FeatherTab.renderIcon` 用 `getX()+6, getY()+9`（我们的分页在 ABOVE 组），并把这条写进注释。
+   - **教训**：分页图标要用贴图时，必须照抄框架 `drawIcon` 的偏移规则（或仍走 `drawIcon` 传物品）；
+     **我们的「照片效果」分页（`PhotoEffectsTab`）是稳定参考实现**——它用 `token.getType().drawIcon(...)`。
+2. **背景 y 方向被拉伸**
+   - 根因：cover 裁切公式里的素材尺寸写死成 `1620×1080`（**3:2**，最初那版素材），
+     而用户后来换成了 **1920×1080（16:9）** ⇒ 按错误的素材比例算裁切，就表现为「y 拉长」。
+   - 修法：`TEX_W/TEX_H` 改为真实尺寸 1920×1080，并在常量上写明
+     **「换素材必须同步改这两个常量」**（只按屏幕比例推不出素材尺寸）。
+3. **放弃 `slot.png`，改程式化槽位**
+   - `SLOT_SIZE` 由 34 改为 **18**（= 原版一个物品槽的大小），物品按原版口径画在 `+1/+1`；
+     槽底仍是 `rrect` 圆角块（半径 4），并**删除** `assets/lensouls/textures/gui/feather_slot.png`。
+4. **红覆盖层不贴合槽位**
+   - 根因：红覆盖用 `graphics.fill` 画的是**直角矩形**，而格子是圆角 ⇒ 四角露出缺口、看着不贴合。
+   - 修法：改用 `RoundedRect.roundedRect(...)` 画**同尺寸同圆角（18×18，半径 4）**的红色覆盖，
+     alpha 直接烘进颜色（与 `RoundedRect` 的 alpha 规则一致）。
+
+- 交付：版本 `1.6.1`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.1.jar`（8,133,539 字节），
+  MD5 `70D7CA6B3935F390C76ADA2527985CB8`；`1.6.0` 作废。**未提交**。
+
+### 72. 界面手感与交互五修（`1.6.2`）
+
+1. **5 个槽位整行上移**，使「提示↔槽位」行距与「标题↔提示」行距一致。
+   - 面板文字：标题 `panelY+12`、提示 `panelY+30` ⇒ 行距 **18**（原版字体行高 9，实际按 18 排版）。
+   - 槽位行因此放 `panelY+48`（原来 +56，多了 8px），面板高度同步收紧为
+     `SLOTS_Y + SLOT_SIZE + 12 = 78`（上下留白都 12，对称）。
+   - 三个常量 `TITLE_Y/HINT_Y/SLOTS_Y` 提出来，行距改动只需改一处。
+2. **不可放入的格子：保留红覆盖，悬停不额外渲染**。
+   - 悬停高亮（白描边）加 `&& supported` 条件——红覆盖已经说明"不能放"，再叠一层高亮会误导成可点。
+   - 红覆盖本身仍用 `RoundedRect` 画同尺寸同圆角（`1.6.1` 的修法）。
+3. **点击空槽 / 不可放入的物品：停在选择屏，不关闭**（原实现是「点哪儿都返回」）。
+4. **选择屏：点击物品栏区域之外才返回上级**。
+   - 新增 `insideGrid(...)`：网格包围盒 = `9*CELL` 宽、`4*CELL + 8 + 18` 高（含快捷栏与护甲/副手那一行）。
+   - **格子之间的缝隙算「区域内」**——点缝隙不该把玩家踢回上级，只有点到网格外才算。
+5. **一级界面：点击面板矩形之外自动关闭**（回到玩家物品栏）。
+   - 新增 `insidePanel(...)`；`slot < 0` 时：面板外 ⇒ `onClose()`，面板内空白 ⇒ 不响应（也不关闭）。
+   - 另加护栏（参考项目同款）：选择屏 `tick()` 内若 `containerMenu != menu`（菜单已在别处失效）
+     就 `setScreen(null)` 退场，避免停在一个「父屏无菜单」的死状态上。
+
+- 交付：版本 `1.6.2`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.2.jar`（8,134,007 字节），
+  MD5 `10EAC87BF6993A493E88BEAB68B953BE`；`1.6.1` 作废。**未提交**。
+
+### 73. E/ESC 兜底加固 + 两级菜单都加关闭按钮（`1.6.3`）
+
+1. **选择屏 E/ESC 回一级菜单**（用户反馈"按 E/ESC 无效"）
+   - 代码核查：`FeatherSelectScreen.keyPressed` 自 `1.6.0` 起就有 `keyCode == 256 || 69 → back()`
+     （`FeatherSelectScreen:190-197`），路径本身是通的。
+   - 但只靠一条路径太脆（ESC 有可能先被原版通路吃掉），因此**三条都覆盖**：
+     ① `keyPressed`（键盘事件）；② `onClose()` 覆写成 `back()`（ESC 走原版 `onClose` 时的兜底）；
+     ③ 显式 `shouldCloseOnEsc()` 返回 true（声明允许关闭）。
+   - `back()` 改为 null-safe（`Minecraft` 缺失时直接返回，绝不让玩家卡在两级屏之间）。
+   - **若实机仍表现为「按 E 直接回游戏」**，需要用户给出具体现象（回游戏 / 无反应 / 只关一半），
+     因为这说明 ESC 走的是我们没覆盖的第四条路径。
+2. **两级菜单都加关闭按钮**（照参考项目 `plumestweaks` 的 `RiftTeleportScreen#renderCloseButton`）
+   - 视觉口径原样移植：`CLOSE_SIZE = 16`、距锚点 `MARGIN = 6`、圆角 4 的小方块，
+     悬停底色增亮（`0x18FFFFFF → 0x40FFFFFF`）+ `0x66FFFFFF` 描边，
+     X 用**两根 45° 旋转的细条**（`arm = 5`，`Axis.ZP.rotationDegrees(45)` + 两次 `graphics.fill`），
+     颜色 `0xFF9FB3B6 → 悬停 0xFFFFFFFF`。
+   - 抽成共用组件 `client/feather/CloseButton`（尺寸/配色/命中判定只有一份实现，两级屏不会各写一套走样）。
+   - 锚点与行为：
+     | 屏幕 | 锚点 | 点击 |
+     |---|---|---|
+     | 一级 `FeatherScreen` | 面板右上角（`panelX+panelW` / `panelY`） | `onClose()` → 回玩家物品栏 |
+     | 选择 `FeatherSelectScreen` | 物品栏网格右缘、网格上方 24px（标题行右侧是空的） | `back()` → 回一级菜单 |
+   - **点击判定必须放在最前面**：按钮落在一级面板内部，若放在槽位/面板逻辑之后会被抢走。
+3. 交付：版本 `1.6.3`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.3.jar`（8,135,773 字节），
+   MD5 `116D83F0C2D4C33B8E5E5785E297A38E`；`1.6.2` 作废。**未提交**。
+
+### 74. 撤回过度加固（`1.6.4`）
+
+- 用户澄清：E/ESC 那条"只是怕你没加"，**不用复杂化代码**。
+- 因此撤掉 `1.6.3` 里为"怕漏"加的三重兜底：
+  `shouldCloseOnEsc()` 覆写、大段 javadoc、以及 null-safe 版 `back()`（连 `Minecraft` import 一并去掉）。
+  回到最简两条路径：`keyPressed`（E/ESC → `back()`）与 `onClose()`（→ `back()`）——
+  这两条自 `1.6.0` 起就在，功能上没有任何回退。
+- **关闭按钮保留**（那是真正的新需求）：`client/feather/CloseButton` + 两级屏各自锚点。
+- 教训：**不要为"担心漏掉"而堆冗余路径**。一条清晰路径 + 让用户可实测的行为就够；
+  多出来的路径只会变成以后的维护成本（本次立刻被要求撤掉）。
+- 交付：版本 `1.6.4`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.4.jar`（8,135,707 字节），
+  MD5 `3C5D0306FD45BD4C0AA13A183988A09B`；`1.6.3` 作废。**未提交**
+  （待提交：`1.6.0` 主体 + `1.6.1`/`1.6.2` 实机四修与五修 + `1.6.4`）。
+
+### 75. 实机两修（`1.6.5`）：关闭回物品栏 / 提示淡出不再闪帧
+
+**1. 一级菜单关闭后直接回游戏（应为回玩家物品栏）**
+- 根因：原版**只有 `AbstractContainerScreen.removed()` 会调 `player.closeContainer()`**；
+  我们（与 `ReinforceScreen` 一样）是**普通 `Screen`**，`removed()` 是空操作 ⇒ 服务端容器一直挂着，
+  关屏就表现为「直接关掉全部 GUI」。
+- 修法：`FeatherScreen.onClose()` 覆写为
+  `mc.player.closeContainer()`（客户端会立刻把 `containerMenu` 切回 `inventoryMenu` 并发关闭包）
+  → 再 `mc.setScreen(new InventoryScreen(mc.player))` 回物品栏。
+  X 按钮 / ESC / 面板外点击三条入口都汇到 `onClose`，一处修好即可。
+- **结论记牢：普通 `Screen` + 菜单的组合，必须自己关容器**（否则容器泄漏 + 关闭即回游戏）。
+
+**2. 提示渐隐前"闪一帧"、文字突兀消失**
+- 现象：底板已消失、文字还有几帧满不透明，随后突兀彻底消失。
+- 根因：底板是 `rrect` 着色器按**色值里的 alpha** 画的（会正常渐隐），
+  而文字走**另一条渲染通路**，把 alpha 烘进色值对它没有产生预期效果 ⇒ 两者不同步。
+- 修法：整条提示改用 `GuiGraphics.setColor(1,1,1,alpha)`（即 RenderSystem 的 **ColorModulator**）
+  **统一乘住「底板 + 文字」**，色值只保留设计用的半透明；`try/finally` 复位为 1。
+- **结论记牢：要同步淡化「着色器画的 + 文字」，必须用 `setColor`（ColorModulator），不能各自烘焙 alpha。**
+
+- 交付：版本 `1.6.5`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.5.jar`（8,135,841 字节），
+  MD5 `474CBA72EB0B0C8F5BCBFDFAC678B6B3`；`1.6.4` 作废。**未提交**。
+
+### 76. 两级菜单间距整理（`1.6.6`）
+
+**一级菜单（`FeatherScreen`）** —— 纵向版式现在全部由**一个行距常量**推导（改行距只动 `LINE_GAP`）：
+| 常量 | 值 | 含义 |
+|---|---|---|
+| `TITLE_Y` | 12 | 上留白：面板顶 → 第一行文字 |
+| `LINE_GAP` | 18 | 标题↔提示、提示↔槽位行 的行距 |
+| `HINT_Y` | `TITLE_Y + LINE_GAP` = 30 | |
+| `SLOTS_Y` | `HINT_Y + LINE_GAP` = 48 | |
+| `BOTTOM_PAD` | `LINE_GAP + TITLE_Y` = **30** | 下留白：槽位底端 → 面板底部（**用户口径**） |
+
+⇒ `panelH = SLOTS_Y + SLOT_SIZE + BOTTOM_PAD = 48 + 18 + 30 = 96`（原来 78，下留白只有 12、明显偏挤）。
+
+**选择屏（`FeatherSelectScreen`）** —— 文字与物品栏统一为 `LINE_GAP = 12`：
+- 标题 `gridY() - 24`、提示 `gridY() - 12`（原来 `-22` / `-10`：提示离物品栏只有 10、比离标题的 12 还近，
+  正是用户看到的「红色覆盖…这行字太靠近下边的物品栏」）。
+- 现在「提示↔标题」与「提示↔物品栏顶边」都是 12。
+- 关闭按钮上沿与标题行对齐（`CloseButton.y(gridY() - LINE_GAP*2 - 6)`，写 `-6` 是补掉 `CloseButton` 自己的 MARGIN）。
+
+- 教训：**多行版式的间距一律由一个常量推导**，不再出现「两个间距各写死、互相不等」的情况；
+  以后觉得紧了只改那一个常量。
+- 交付：版本 `1.6.6`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.6.jar`（8,135,920 字节），
+  MD5 `405B920F2995E31F508E045312080475`；`1.6.5` 作废。**未提交**。
+
+### 77. 提示底板不淡出 + 切屏保持光标（`1.6.7`）
+
+**1. 锁定提示只有文字淡入淡出、底板不淡**
+- 真因：`rrect` **不读 ColorModulator** —— 它的 uniform 是自己声明的
+  （`FillColor` / `FillColor2` / `BorderColor` / `Tint`），而 `setColor()` 设的是
+  `RenderSystem` 的 ColorModulator，对自定义 CoreShader **无效** ⇒ `1.6.5` 的改法只作用于文字。
+- 修法：**两条通路各自承载 alpha，缺一不可**：
+  ① 底板（着色器）把 alpha 烘进 `FillColor.a`；② 文字走 `setColor`。
+  （`1.6.4` 只做 ① ⇒ 文字不淡；`1.6.5` 只做 ② ⇒ 底板不淡；两者都做才同步。）
+- **教训：自定义 CoreShader 的透明度必须走它自己的 uniform；`setColor` 只覆盖原版渲染类型的 ColorModulator。**
+
+**2. 进入/退出一级菜单时光标被刷到屏幕中央**
+- 做法照参考项目 `Sus-InstantSwap`（`InstantSwapClient#positionCursorToUIBottomRight`，:292-312）：
+  `MouseHandler.xpos/ypos` 是**私有字段**，且 OS 光标与内部值要同时对齐 ⇒
+  **反射写 `xpos`/`ypos` + `GLFW.glfwSetCursorPos(window, x, y)`，两件都要做**
+  （只移 OS 光标的话，下一次鼠标事件会按旧内部值算，光标会"跳"）。
+  坐标单位是**窗口物理像素**（与 MouseHandler 内部存的一致，不是 GUI 缩放后的坐标）。
+- 抽成 `client/feather/CursorKeeper`（`remember()` / `restore()`，全程 try/catch 静默兜底——
+  光标只是手感，绝不能因此把界面搞崩），接到 4 个切屏点：
+  ① `FeatherTab.onTabClicked`（点分页时记住）；② `FeatherScreen.init()` **末尾**（开屏后复原，
+     必须晚于原版居中处理）；③ 一级关闭（关前记住 → 打开 `InventoryScreen` → 复原）；
+  ④ 一级 ↔ 选择屏两个方向。
+- 交付：版本 `1.6.7`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.7.jar`（8,137,581 字节），
+  MD5 `4D20A622B442DB8A65F2BC803969634C`；`1.6.6` 作废。**未提交**。
+
+### 78. 一级下留白与悬停提示（`1.6.8`）
+
+1. **一级菜单下留白**：`BOTTOM_PAD` 由 `LINE_GAP + TITLE_Y`（30）改为 **`TITLE_Y`（12）** ——
+   即「槽位底端 → 面板底部」与「面板顶 → 第一行文字」**完全相等**（用户口径微调）。
+   `panelH = SLOTS_Y + SLOT_SIZE + BOTTOM_PAD = 48 + 18 + 12 = 78`。
+2. **选择屏取消「不可放入」物品的悬停提示**：红覆盖本身就是提示。
+   现在的口径：可放入 ⇒ 物品 tooltip；空格子 ⇒ 「空槽位」；**不可放入 ⇒ 什么都不显示**
+   （原先还会额外画一行「该物品不能放入羽毛槽」，已去掉）。
+   语言键 `gui.lensouls.feather.unsupported` 保留但暂时无人引用（按 lang 只追加键的惯例不删）。
+- 交付：版本 `1.6.8`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.8.jar`（8,137,537 字节），
+  MD5 `8260F4A45E0186A895F6FBE9EA6AEB0F`；`1.6.7` 作废。**未提交**。

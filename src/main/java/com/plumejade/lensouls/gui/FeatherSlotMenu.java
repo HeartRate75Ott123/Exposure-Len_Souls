@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.gui;
 
 import com.plumejade.lensouls.feather.FeatherAttachments;
+import com.plumejade.lensouls.feather.FeatherEquip;
 import com.plumejade.lensouls.feather.FeatherSlotContainer;
 import com.plumejade.lensouls.feather.FeatherSlotData;
 import com.plumejade.lensouls.feather.FeatherSlotLoader;
@@ -11,6 +12,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -32,7 +34,13 @@ import net.minecraft.world.item.ItemStack;
  * <b>规则（服务端权威）</b>：
  * <ul>
  *   <li>生存：只能装入**空且未锁定**的槽，装入后该槽<b>永久锁定</b>；</li>
- *   <li>创造：可装入/更换（无视锁定），右键已装槽可卸下（同时解除锁定）；</li>
+ *   <li>创造：可装入/更换（无视锁定），右键已装槽可卸下；
+ *       <b>创造模式下所有槽一律解锁</b>（橙色描边自动消失，创造本来就能随意装卸）；</li>
+ *   <li>锁定标记不做成「只在装入那一刻写死」，而是每 tick 对齐成
+ *       <b>锁定 = 非创造 ∧ 槽非空</b>（见 {@link #syncLocks()}）——
+ *       创造放入后切生存会立刻上锁，切回创造又立刻解锁；</li>
+ *   <li><b>已装配过的物品不再允许放入</b>（本界面槽 ‖ Curios）：「同种只生效一次」，
+ *       重复装入只会白占一个锁定的槽位，所以选择界面把它和「不支持的物品」一样盖红；</li>
  *   <li>卸下/更换下来的旧物品：先回背包，满了掉地上——绝不凭空吞掉。</li>
  * </ul>
  */
@@ -96,6 +104,23 @@ public class FeatherSlotMenu extends AbstractContainerMenu {
         return !isLocked(slot) && featherStack(slot).isEmpty();
     }
 
+    /**
+     * 该物品是否**已经装配**（本界面 5 个槽 ‖ Curios 等价通道）。
+     * <p>
+     * 用途：选择界面把「已装配」与「不支持」同等对待（盖红、点击无效）——羽毛「同种只生效一次」，
+     * 再装一份只是白占一个永久锁定的槽位（用户口径：防止生存重复放完，槽位全占还拆不掉）。
+     * <p>
+     * 5 个槽读的是菜单同步数据（客户端也准）；Curios 侧若客户端拿不到内容，最坏只是那一格标红晚一步，
+     * 服务端 {@link #onInstall} 仍会二次校验——与 {@code isSupported} 是同一套护栏。
+     */
+    public boolean isInstalled(Item item) {
+        if (item == null) return false;
+        for (int i = 0; i < FEATHER_SLOTS; i++) {
+            if (this.featherStack(i).is(item)) return true;
+        }
+        return FeatherEquip.has(this.player, item);
+    }
+
     // ========== 服务端权威结算 ==========
 
     /** 从玩家背包第 {@code inventoryIndex} 格装 1 个羽毛到 {@code slot} */
@@ -106,6 +131,8 @@ public class FeatherSlotMenu extends AbstractContainerMenu {
 
         ItemStack source = this.player.getInventory().getItem(inventoryIndex);
         if (!FeatherSlotLoader.isSupported(source)) return;
+        // 已装配过同种物品：再装一份不叠加任何效果，只是白占一个永久锁定的槽位
+        if (isInstalled(source.getItem())) return;
 
         boolean creative = creative();
         // 生存：锁定槽、非空槽都不许换（「选定后无法更改」）
@@ -149,6 +176,37 @@ public class FeatherSlotMenu extends AbstractContainerMenu {
     }
 
     // ========== 原版覆写 ==========
+
+    /**
+     * 把锁定标记对齐到「当前模式下的真实规则」：<b>锁定 = 非创造 ∧ 槽非空</b>。
+     * <ul>
+     *   <li><b>生存</b>：槽里有东西就锁定（创造放进去的也算）⇒ 橙色描边立刻出现；</li>
+     *   <li><b>创造</b>：一律解锁 ⇒ 橙色描边立刻消失（创造本来就能随意装卸/更换；
+     *       也顺带避免「空槽却仍锁着、生存再也放不进去」的死槽）。</li>
+     * </ul>
+     * 为什么不只在装入那一刻写：装入时是创造的话按规则<b>不</b>锁，玩家随后切回生存时那个槽
+     * 其实已经拆不掉了，标记却还是「未锁」——用户实测就是「创造放入后切生存，橙色锁定没出现，
+     * 要等下一次生存装入才看到」（反向切创造同理）。
+     * <p>
+     * 挂在 {@link #broadcastChanges()} 上：{@code ServerPlayer.tick} 每 tick 都会调它，
+     * 而开屏时 {@code addSlotListener} 也会调一次 ⇒ 开屏与运行中都能立刻对齐。
+     */
+    private void syncLocks() {
+        if (!isServer()) return;
+        boolean survivalLock = !creative();
+        for (int i = 0; i < FEATHER_SLOTS; i++) {
+            boolean locked = survivalLock && !this.featherStack(i).isEmpty();
+            // 附件（持久化状态）与 ContainerData（客户端只读这个）一起写
+            this.container.data().setLocked(i, locked);
+            this.data.set(i, locked ? 1 : 0);
+        }
+    }
+
+    @Override
+    public void broadcastChanges() {
+        syncLocks();   // 必须早于 super：本 tick 对齐出来的变化随这次广播一起下发
+        super.broadcastChanges();
+    }
 
     /** 本界面不做物品搬运（槽位只为同步而存在），与 ReinforceMenu 同口径 */
     @Override

@@ -35,6 +35,9 @@ import java.util.UUID;
  * <p>
  * 右键激活：检测冷却 → 应用对应元素隐藏效果 → 启动冷却。
  * 冷却期间右键提示剩余时间。
+ * <p>
+ * <b>防火</b>：构造器里强制加 {@code FIRE_RESISTANT} 组件（见下面 super 处的注释）——
+ * 镜魂是贵重消耗品，掉进岩浆/火里必须烧不掉。以后新增镜魂只要还走这个类，就自动带上。
  */
 public class LensoulItem extends Item {
 
@@ -57,7 +60,11 @@ public class LensoulItem extends Item {
     }
 
     public LensoulItem(ElementDamage element, float damageMultiplier, boolean applySlowness, int cooldownSeconds, boolean isBossSoul, Properties properties) {
-        super(properties);
+        // 镜魂一律**防火**（所有构造器最终都汇到这里，一处即全覆盖）：
+        // 1.21.1 里防火不是 Item 的布尔字段而是数据组件 `DataComponents.FIRE_RESISTANT`
+        // （`Item.Properties#fireResistant()` 就是 `component(FIRE_RESISTANT, Unit.INSTANCE)`），
+        // 而掉落物是否免疫岩浆/火焰由 `ItemEntity#fireImmune()` 读这个组件、`Entity#lavaHurt()` 据此短路。
+        super(properties.fireResistant());
         this.element = element;
         this.damageMultiplier = damageMultiplier;
         this.applySlowness = applySlowness;

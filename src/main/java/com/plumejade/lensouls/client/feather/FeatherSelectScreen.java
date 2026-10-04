@@ -21,8 +21,10 @@ import org.jetbrains.annotations.NotNull;
  * ——羽毛菜单的 slot 顺序是「0..4 羽毛槽 + 5..45 隐藏背包槽」，按 menu.slots 读会整体错位 5 格。
  * 这与 {@code ReinforceMenu#getSelectedStack} 是同口径（也保证了与选择时同一 tick 的一致性）。
  * <p>
- * <b>红覆盖</b>：{@link FeatherSlotLoader#isSupported} 为假的物品盖红色蒙版且点击无效
- * （支持列表由数据包驱动、随 {@code DatapackSyncPacket} 下发到客户端）。
+ * <b>红覆盖</b>：{@link FeatherSlotLoader#isSupported} 为假、**或该物品已经装配过**
+ * （{@code FeatherSlotMenu#isInstalled}，即界面 5 槽 ‖ Curios 已有同种）的物品盖红色蒙版且点击无效
+ * ——「同种只生效一次」，已装配的再放一份只会白占一个永久锁定的槽位。
+ * （支持列表由数据包驱动、随 {@code DatapackSyncPacket} 下发到客户端。）
  */
 public class FeatherSelectScreen extends Screen {
 
@@ -92,6 +94,16 @@ public class FeatherSelectScreen extends Screen {
         return player.getInventory().getItem(inventoryIndex);
     }
 
+    /**
+     * 能否放入：**支持该物品，且尚未装配过同种物品**（红覆盖 / 悬停高亮 / 点击三处共用这一份口径）。
+     * <p>
+     * 已装配的（本界面 5 槽 ‖ Curios）和「不支持」同等对待——「同种只生效一次」，
+     * 再装一份只是白占一个永久锁定的槽位。
+     */
+    private boolean installable(ItemStack stack) {
+        return FeatherSlotLoader.isSupported(stack) && !this.menu.isInstalled(stack.getItem());
+    }
+
     /** 关闭按钮：与物品栏网格右缘对齐、放在网格上方（标题行右侧是空的） */
     private int closeX() {
         return CloseButton.x(gridX() + 9 * CELL);
@@ -126,7 +138,7 @@ public class FeatherSelectScreen extends Screen {
             int x = pos[0];
             int y = pos[1];
             ItemStack stack = stackAt(i);
-            boolean supported = FeatherSlotLoader.isSupported(stack);
+            boolean supported = installable(stack);
 
             RoundedRect.roundedRect(graphics, x, y, 18, 18, 4.0F,
                     0x40FFFFFF, 0x30FFFFFF, 0x22FFFFFF, 1.0F);
@@ -139,20 +151,20 @@ public class FeatherSelectScreen extends Screen {
                 graphics.renderItemDecorations(this.font, stack, x + 1, y + 1);
             }
             if (!supported) {
-                // 不支持投入 ⇒ 红色覆盖，点击也无效（需求口径）。
+                // 不支持投入 / 已经装配过 ⇒ 红色覆盖，点击也无效（需求口径）。
                 // ★ 必须与格子同形（同尺寸同圆角）：直角 fill 会在圆角处露出缺口，看着不贴合。
                 RoundedRect.roundedRect(graphics, x, y, 18, 18, 4.0F,
                         RED_TINT, RED_TINT, 0, 0.0F);
             }
         }
 
-        // 悬停在「不可放入」的物品上时**不给任何信息提示**（红覆盖本身就是提示，用户口径）；
-        // 可放入的照常显示物品 tooltip，空格子提示「空槽位」。
+        // 悬停只用**常规物品 tooltip**：不可放入的（红覆盖）照样显示，红覆盖只是"不能放"的标记，
+        // 不影响玩家查看物品本身的信息（用户口径）；本屏不额外画任何自定义提示行。
         if (hovered >= 0) {
             ItemStack stack = stackAt(hovered);
-            if (FeatherSlotLoader.isSupported(stack)) {
+            if (!stack.isEmpty()) {
                 graphics.renderTooltip(this.font, stack, mouseX, mouseY);
-            } else if (stack.isEmpty()) {
+            } else {
                 graphics.renderTooltip(this.font,
                         Component.translatable("gui.lensouls.feather.empty"), mouseX, mouseY);
             }
@@ -177,7 +189,7 @@ public class FeatherSelectScreen extends Screen {
         int index = cellAt(mouseX, mouseY);
         if (index >= 0) {
             ItemStack stack = stackAt(index);
-            if (!stack.isEmpty() && FeatherSlotLoader.isSupported(stack)) {
+            if (installable(stack)) {
                 PacketDistributor.sendToServer(FeatherSlotPacket.install(targetSlot, index));
                 back();   // 只有成功放入才回上级
             }

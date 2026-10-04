@@ -32,17 +32,25 @@ import org.jetbrains.annotations.NotNull;
  */
 public class FeatherScreen extends Screen implements MenuAccess<FeatherSlotMenu> {
 
-    private static final ResourceLocation BACKGROUND =
-            ResourceLocation.fromNamespaceAndPath("lensouls", "textures/gui/feather_background.png");
     /**
-     * 背景素材<b>真实尺寸</b>（cover 裁切用）。
+     * 背景素材 + 它的**真实像素尺寸**（cover 裁切公式离不开素材尺寸）。
      * <p>
-     * ★ **换素材必须同步改这两个常量**：只按屏幕比例算裁切的公式离不开素材尺寸，
-     * 写错就会拉伸——此前素材是 1620×1080（3:2）而这里没更新，实机表现就是「y 方向被拉长」。
-     * 现资产为 1920×1080（16:9）。
+     * ★ **换素材必须同步改这里的尺寸**：只按屏幕比例推不出素材比例，写错就会拉伸——
+     * 此前素材是 1620×1080（3:2）而常量没跟着更新，实机表现就是「y 方向被拉长」。
+     * 尺寸与路径写在同一处，就是为了换图时不会再漏掉其中一个。
      */
-    private static final int TEX_W = 1920;
-    private static final int TEX_H = 1080;
+    private record Background(ResourceLocation texture, int texW, int texH) {
+        static Background of(String path, int texW, int texH) {
+            return new Background(ResourceLocation.fromNamespaceAndPath("lensouls", path), texW, texH);
+        }
+    }
+
+    /** 默认背景（槽位没装满时）：1920×1080（16:9） */
+    private static final Background BG_DEFAULT =
+            Background.of("textures/gui/feather_background.png", 1920, 1080);
+    /** **5 个槽全部装上**后换用的背景（用户口径），同为 1920×1080 */
+    private static final Background BG_FULL =
+            Background.of("textures/gui/feather_background2.png", 1920, 1080);
 
     /** 单个槽位边长 = 原版一个物品槽的大小（18px 含 1px 边框），槽间距与面板内边距 */
     private static final int SLOT_SIZE = 18;
@@ -75,21 +83,22 @@ public class FeatherScreen extends Screen implements MenuAccess<FeatherSlotMenu>
      * <ul>
      *   <li>{@code TITLE_Y} 12 —— 面板顶 → 第一行文字（上留白）</li>
      *   <li>{@code HINT_Y} 30、{@code SLOTS_Y} 48 —— 标题/提示/槽位行**行距一律 18**</li>
-     *   <li>{@code BOTTOM_PAD} = {@code TITLE_Y} 12 —— 槽位底端 → 面板底部，
-     *       与「面板顶 → 第一行文字」**完全相等**（用户口径）</li>
+     *   <li>{@code BOTTOM_PAD} = {@code TITLE_Y} + {@code TITLE_Y} / 2 = 18 ——
+     *       槽位底端 → 面板底部（用户口径：在上留白的基础上**再增加「上留白的一半」**）</li>
      * </ul>
      */
     private static final int TITLE_Y = 12;
     private static final int LINE_GAP = 18;
     private static final int HINT_Y = TITLE_Y + LINE_GAP;
     private static final int SLOTS_Y = HINT_Y + LINE_GAP;
-    private static final int BOTTOM_PAD = TITLE_Y;
+    /** 下留白 = 上留白 + 上留白的一半（12 + 6） */
+    private static final int BOTTOM_PAD = TITLE_Y + TITLE_Y / 2;
 
     @Override
     protected void init() {
         super.init();
         this.panelW = FeatherSlotData.SLOTS * SLOT_SIZE + (FeatherSlotData.SLOTS - 1) * SLOT_GAP + 48;
-        // 上留白 + 两行文字 + 槽位行 + 下留白（= 行距 + 上留白，见 BOTTOM_PAD）
+        // 上留白 + 两行文字 + 槽位行 + 下留白（= 上留白 + 其一半，见 BOTTOM_PAD）
         this.panelH = SLOTS_Y + SLOT_SIZE + BOTTOM_PAD;
         this.panelX = (this.width - this.panelW) / 2;
         this.panelY = (this.height - this.panelH) / 2;
@@ -139,7 +148,8 @@ public class FeatherScreen extends Screen implements MenuAccess<FeatherSlotMenu>
 
     @Override
     public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderCoverBackground(graphics);
+        // 5 个槽全满 ⇒ 换第二张背景（用户口径）
+        renderCoverBackground(graphics, allSlotsFilled() ? BG_FULL : BG_DEFAULT);
 
         // ★ 层级关键：先把已经提交的背景（fill/blit 是延迟批处理）刷到主画面，再合成玻璃
         graphics.flush();
@@ -174,15 +184,23 @@ public class FeatherScreen extends Screen implements MenuAccess<FeatherSlotMenu>
         CloseButton.render(graphics, closeX(), closeY(), mouseX, mouseY);
     }
 
+    /** 5 个羽毛槽是否**全部装上**（决定用哪张背景；槽内容随菜单同步，客户端读得到） */
+    private boolean allSlotsFilled() {
+        for (int i = 0; i < FeatherSlotData.SLOTS; i++) {
+            if (this.menu.featherStack(i).isEmpty()) return false;
+        }
+        return true;
+    }
+
     /** 背景 cover 铺满（等比放大到覆盖整个窗口，超出部分裁掉；素材 16:9 时恰好满屏） */
-    private void renderCoverBackground(GuiGraphics graphics) {
+    private void renderCoverBackground(GuiGraphics graphics, Background bg) {
         if (this.width <= 0 || this.height <= 0) return;
-        float scale = Math.max((float) this.width / TEX_W, (float) this.height / TEX_H);
+        float scale = Math.max((float) this.width / bg.texW(), (float) this.height / bg.texH());
         int srcW = Math.max(1, (int) (this.width / scale));
         int srcH = Math.max(1, (int) (this.height / scale));
-        int u = (TEX_W - srcW) / 2;
-        int v = (TEX_H - srcH) / 2;
-        graphics.blit(BACKGROUND, 0, 0, this.width, this.height, u, v, srcW, srcH, TEX_W, TEX_H);
+        int u = (bg.texW() - srcW) / 2;
+        int v = (bg.texH() - srcH) / 2;
+        graphics.blit(bg.texture(), 0, 0, this.width, this.height, u, v, srcW, srcH, bg.texW(), bg.texH());
     }
 
     private void renderSlot(GuiGraphics graphics, int index, boolean hovered) {

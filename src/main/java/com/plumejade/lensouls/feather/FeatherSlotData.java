@@ -14,6 +14,10 @@ import net.neoforged.neoforge.common.util.INBTSerializable;
  * <b>锁定语义</b>：生存模式下「装入即永久锁定」——该槽此后左右键都无效，只有创造模式能右键卸下。
  * 锁定标记与内容一起持久化，并且必须**跨死亡保留**，所以附件注册时要用 {@code copyOnDeath()}。
  * <p>
+ * 注意：打开界面时锁定由 {@code FeatherSlotMenu#syncLocks()} <b>每 tick 重算</b>成
+ * 「非创造 ∧ 槽非空」（切模式立即生效、创造下橙色描边自动消失）；这里的字段是它的持久化载体，
+ * 不是唯一事实来源。
+ * <p>
  * <b>物品去向</b>：槽里放的是**真实物品**（等同 Curios：装进去＝从背包移入该槽，卸下退回背包）。
  * 生效判定见 {@link FeatherEquip}，它把「界面槽」与「Curios 佩戴」视为等价的两个通道。
  */

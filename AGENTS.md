@@ -2118,3 +2118,84 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
    语言键 `gui.lensouls.feather.unsupported` 保留但暂时无人引用（按 lang 只追加键的惯例不删）。
 - 交付：版本 `1.6.8`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.8.jar`（8,137,537 字节），
   MD5 `8260F4A45E0186A895F6FBE9EA6AEB0F`；`1.6.7` 作废。**未提交**。
+
+### 79. 一级下留白再增 + 选择屏恢复常规 tooltip（`1.6.9`）
+
+1. **一级菜单下留白**：`BOTTOM_PAD` 由 `TITLE_Y`（12）改为 `TITLE_Y + TITLE_Y / 2`（**18**）——
+   用户口径：「slot 到底部的距离再增加一些，大概是第一行文字顶部到面板顶部距离的一半」。
+   `panelH = SLOTS_Y + SLOT_SIZE + BOTTOM_PAD = 48 + 18 + 18 = 84`（`1.6.8` 为 78）。
+   仍由 `TITLE_Y` 一处推导，改上留白会自动带上这个"一半"。
+2. **选择屏只取消自定义提示、**不**拦截常规物品 tooltip**：`1.6.8` 把「不可放入」物品的 tooltip
+   一并去掉了 —— 那是**过度删除**。现口径：悬停**任何非空物品**都照常
+   `graphics.renderTooltip(stack, …)`（红覆盖只表示"不能放入"），空格子仍是「空槽位」，
+   本屏**不额外画任何自定义提示行**。
+   - 教训：用户说"不要提示信息"时要分清是**我们自己加的提示行**（如原来的「该物品不能放入羽毛槽」）
+     还是**原版的物品 tooltip**；顺手删掉后者属于越界，用户会立刻发现"物品信息也没了"。
+3. 交付：版本 `1.6.9`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.9.jar`（8,137,525 字节），
+   MD5 `A54E4D62A525827B7B4BDF0F5EC0A05A`；`1.6.8` 作废。**未提交**。
+
+### 80. 已装配视为不可放入 + 锁定标记即时对齐（`1.6.10`）
+
+1. **已装配 = 不可放入**（`FeatherSlotMenu#isInstalled` + `FeatherSelectScreen#installable`）
+   - 口径：羽毛「同种只生效一次」，再装一份不叠加任何效果、却要白占一个**永久锁定**的槽位
+     （用户口径：防止生存重复放完，槽位全占还拆不掉）⇒ 已装配的物品与「不支持」同等对待：盖红、点击无效。
+   - 判定 = 界面 5 槽（菜单同步数据，客户端也准）‖ Curios（`FeatherEquip.has`，等价通道）。
+     客户端若拿不到 Curios 内容，最坏只是那一格标红晚一步；服务端 `onInstall` 有同一份二次校验。
+   - 三处（红覆盖 / 悬停高亮 / 点击）**收口到一个 `installable(stack)`**，不再各写一份条件。
+2. **橙色锁定标记不及时**（`FeatherSlotMenu#syncLocks` + 覆写 `broadcastChanges`）
+   - 现象：创造模式放入 → 切生存 → 槽其实已经拆不掉，橙色描边却不出现，**要等下一次生存装入才看到**。
+   - 根因：锁定只在 `onInstall` 的**非创造**分支写；创造装入按规则不锁，切回生存没有任何人补写这个标记。
+   - 修法：`syncLocks()` 把标记对齐到「当前模式的真实规则」——**生存里凡是有东西的槽一律锁定**，
+     并同步附件（持久化）与 `ContainerData`（客户端只读它）。
+   - **挂在 `broadcastChanges()` 上**（覆写，先 `syncLocks()` 再 `super`）：反编译确认
+     `ServerPlayer.tick()` 里就是 `this.containerMenu.broadcastChanges()`（每 tick 一次），
+     而开屏时 `initMenu → addSlotListener → broadcastChanges()` + `setSynchronizer → sendAllDataToRemote()`
+     会把当前值整份发给客户端 ⇒ **开屏与运行中都能立刻对齐**。
+     创造模式直接 return（不清除既有锁定；解除锁定只由「创造右键卸下」负责）。
+3. 交付：版本 `1.6.10`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.10.jar`（8,137,967 字节），
+   MD5 `125390C555152E37F50BF393FDF46C9F`；`1.6.9` 作废。**未提交**。
+
+### 81. 锁定改为「每 tick 重算的模式函数」（`1.6.11`）
+
+- 用户追问：**切到创造时橙色描边也应自动消失**（`1.6.10` 只做了「切生存自动上锁」这一个方向，
+  创造下仍留着描边）。⇒ 把 `syncLocks()` 从「只补锁」改成**双向重算**：
+  **`锁定 = 非创造 ∧ 槽非空`**（创造模式一律解锁，生存模式凡是有东西就锁）。
+- 好处不只是显示对齐：
+  - 两个方向都即时（创造↔生存切换，界面开着也一样，靠 `broadcastChanges` 每 tick 一次）；
+  - 顺带消掉一个潜在死槽——「槽已空但仍锁着 ⇒ 生存再也放不进去」；
+  - 语义收敛成**纯函数**，`FeatherSlotData#locked` 退化成「持久化载体」而不再是唯一事实来源
+    （`FeatherSlotMenu` 是它唯一的消费者，开屏时立刻重算）。
+- 交付：版本 `1.6.11`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.11.jar`（8,138,029 字节），
+  MD5 `AFD61F22BFF5DCF05C86BB884DB7FF4C`；`1.6.10` 作废。**未提交**。
+
+### 82. 五格全满换背景（`1.6.12`）
+
+- 需求：**5 个羽毛槽全部装上**后，一级菜单背景换成用户提供的 `feather_background2.png`
+  （红光辉光那张，1920×1080，与默认背景同尺寸）⇒ 新资产
+  `assets/lensouls/textures/gui/feather_background2.png`。
+- 判定在客户端即可（`FeatherScreen#allSlotsFilled` 读 5 个槽的内容——槽位是真实菜单槽，
+  内容随菜单同步，双端一致），无需新包。
+- 顺带把「背景素材」收成一个记录 `Background(texture, texW, texH)`：**路径与真实尺寸写在一起**。
+  这是针对 §71 那条老坑（素材换成 16:9 后常量没跟着改 ⇒ 画面被拉伸）的结构性修法——
+  两张背景尺寸可能不同，尺寸再散落在别处迟早还会漏；`renderCoverBackground` 改成收 `Background` 参数。
+- 交付：版本 `1.6.12`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.12.jar`（**10,512,253 字节**，
+  比上一版大 2.37MB = 新背景贴图），MD5 `50939997DB65893F37258F21FCE52C44`；`1.6.11` 作废。**未提交**。
+
+### 83. 镜魂全部防火（`1.6.13`）
+
+- 需求：镜魂物品掉进岩浆/火里不能被烧掉。
+- **1.21.1 的防火是数据组件，不是 Item 的布尔字段**（与 1.20 及更早不同）：
+  `Item.Properties#fireResistant()` 的实现就是 `component(DataComponents.FIRE_RESISTANT, Unit.INSTANCE)`
+  （反编译 `Item.java` 确认），判定点在 `ItemEntity#fireImmune()`：
+  `this.getItem().has(DataComponents.FIRE_RESISTANT) || super.fireImmune()`，
+  而 `Entity#lavaHurt()` 第一行就是 `if (!this.fireImmune())` ⇒ 岩浆/火焰伤害整段短路。
+  所以必须让这个组件落到**物品的默认组件**上（改别的都没用）。
+- 落点选在**唯一的总构造器** `LensoulItem(element, dmg, slowness, cooldown, isBossSoul, properties)`：
+  `super(properties.fireResistant())` —— 其余构造器全部委托到它，17 个镜魂
+  （4 基础 + 6 灾变/传奇怪物 BOSS + 4 暮色 + 其余 3）**一处即全覆盖**；
+  以后新增镜魂只要还走这个类就自动防火。`javap -c` 已核实字节码是
+  `Properties.fireResistant()` → `Item.<init>`。
+- 刻意**只动镜魂**：转换器 / 能力球 / 镜头 / 羽毛 / 复制之魂 / 虚影核心等仍是普通物品
+  （用户口径是「镜魂物品」；要扩大范围再说一声）。
+- 交付：版本 `1.6.13`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.13.jar`（10,512,273 字节），
+  MD5 `F3B2D8158639F6C8BECBB076413D88AA`；`1.6.12` 作废。**未提交**。

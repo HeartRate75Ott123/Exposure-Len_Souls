@@ -39,16 +39,38 @@ public class CopySoulDropHandler {
         // 数据驱动掉落黑白名单：综合白/黑名单与 "all" 通配
         if (!CopySoulFilter.isDropAllowed(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()))) return;
 
-        spawnCopySoulDrop((ServerLevel) entity.level(), entity.getX(), entity.getY(), entity.getZ());
+        spawnCopySoulDrop((ServerLevel) entity.level(), entity.getX(), entity.getY(), entity.getZ(),
+                copySoulMult(event.getSource().getEntity()));
     }
 
     /**
      * 生成 5~20 个复制之魂的掉落实体（供死亡事件与 Gatekeeper 挑战胜利 mixin 复用）。
      */
     public static void spawnCopySoulDrop(ServerLevel level, double x, double y, double z) {
+        spawnCopySoulDrop(level, x, y, z, 1.0f);
+    }
+
+    /**
+     * 同上，但带掉落倍率。
+     * <p>
+     * ⑤ 铁序·厄运 反转后的「复制之魂掉落 +50%」走这里 —— 措辞与实现同源，
+     * 不再是只写在 tooltip 里的空头承诺。
+     */
+    public static void spawnCopySoulDrop(ServerLevel level, double x, double y, double z, float mult) {
         int count = 5 + level.random.nextInt(16); // 5..20
+        if (mult != 1.0f) count = Math.max(1, Math.round(count * mult));
         level.addFreshEntity(new ItemEntity(level, x, y, z,
                 new ItemStack(ModItems.COPY_SOUL.get(), count)));
+    }
+
+    /** 击杀者是否处于「⑤ 铁序·厄运 已反转」→ 复制之魂掉落 ×1.5 */
+    private static float copySoulMult(net.minecraft.world.entity.Entity killer) {
+        if (killer instanceof net.minecraft.server.level.ServerPlayer sp
+                && com.plumejade.lensouls.feather.CurseManager.rev(sp,
+                        com.plumejade.lensouls.feather.CurseDefs.TIMECORE, 14)) {
+            return 1.5f;
+        }
+        return 1.0f;
     }
 
     /** 反射检测实体是否持有可见的 BOSS 血条（沿类层次遍历字段，供扭曲羽毛生成判定复用） */

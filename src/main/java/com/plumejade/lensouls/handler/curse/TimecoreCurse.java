@@ -288,18 +288,25 @@ public final class TimecoreCurse {
             event.getDrops().clear();
             return;
         }
-        // e4 徒劳 反转：不再吞掉落，且「时运 +2」用额外掉落近似（每块最多补 2 个）
+        // e4 徒劳 反转：不再吞掉落，且**时运 +2**（按原版公式模拟，等同于工具上带时运 II）
         if (CurseManager.rev(player, D, 3) && !event.getDrops().isEmpty()) {
-            int extra = 0;
-            for (int i = 0; i < 2; i++) {
-                if (player.getRandom().nextFloat() < 0.5f) extra++;
-            }
+            int extra = fortuneExtra(player, 2);
             var src = event.getDrops().get(0);
             for (int i = 0; i < extra; i++) {
                 event.getDrops().add(new net.minecraft.world.entity.item.ItemEntity(
                         player.level(), src.getX(), src.getY(), src.getZ(), src.getItem().copy()));
             }
         }
+    }
+
+    /** 原版「时运」掉落公式：额外数量 = rand(0..level+1) - 1，下限 0 */
+    private static int fortuneExtra(ServerPlayer player, int level) {
+        return Math.max(0, player.getRandom().nextInt(level + 2) - 1);
+    }
+
+    /** 原版「抢夺」掉落公式：额外数量 = rand(0..level) */
+    private static int lootingExtra(ServerPlayer player, int level) {
+        return player.getRandom().nextInt(level + 1);
     }
 
     /**
@@ -321,11 +328,12 @@ public final class TimecoreCurse {
             return;
         }
         if (CurseManager.rev(player, D, 14)) {
-            // getDrops() 是 Collection（不可按下标取），先收集副本再整体加入，避免遍历时修改
+            // e15 厄运 反转：**抢夺 +2**（按原版公式模拟，等同于武器上带抢夺 II）
             java.util.List<net.minecraft.world.entity.item.ItemEntity> copies = new java.util.ArrayList<>();
+            int extra = lootingExtra(player, 2);
             int n = 0;
             for (var src : drops) {
-                if (n++ >= 2) break;
+                if (n++ >= extra) break;
                 copies.add(new net.minecraft.world.entity.item.ItemEntity(
                         player.level(), src.getX(), src.getY(), src.getZ(), src.getItem().copy()));
             }

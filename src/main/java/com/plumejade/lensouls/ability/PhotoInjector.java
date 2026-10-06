@@ -127,6 +127,10 @@ public final class PhotoInjector {
                 tag.putBoolean("lensouls:ability_steal", true);
                 tag.putString("lensouls:stolen_entity", entityId);
                 tag.putBoolean("lensouls:photograph_curio", true);
+                // ⑤ 铁序·裁影 的反转条件：累计拍过 50 种不同的能力窃取照片（同种生物不重复计）
+                if (player != null) {
+                    com.plumejade.lensouls.handler.curse.TimecoreCurse.onStolenPhoto(player, entityId);
+                }
                 Boolean isBoss = PhotoInjectionHandler.pollBoss(exposureId);
                 if (isBoss != null && isBoss) tag.putBoolean("lensouls:is_boss", true);
             }

@@ -23,7 +23,11 @@ public class FoodDataMixin {
     )
     private void lensouls$blockFoodHealing(Player player, float amount) {
         if (!FeatherAbyssHandler.hasAbyss(player)) {
-            player.heal(amount);
+            // ⑤ 羽·断时炉心 e8「止息」反转：生命**自然恢复 ×2**。
+            // ④ 的禁疗（上面那个分支）优先于本加成——两者同时佩戴时「无法通过食物回血」照常成立。
+            float mult = com.plumejade.lensouls.feather.CurseManager.rev(player,
+                    com.plumejade.lensouls.feather.CurseDefs.TIMECORE, 7) ? 2.0f : 1.0f;
+            player.heal(amount * mult);
         }
     }
 }

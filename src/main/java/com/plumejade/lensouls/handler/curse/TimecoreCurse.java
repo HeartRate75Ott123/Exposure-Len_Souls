@@ -198,6 +198,17 @@ public final class TimecoreCurse {
         // e14 裁影：照片栏位 -2（诅咒态）/ +4（反转态）——「照片槽」就是 Curios 的 photograph 栏
         updatePhotoSlots(player);
 
+        // e21 反转窗口内「免疫一切负面效果」
+        if (CurseManager.rev(player, D, 20) && noAidGraceActive(player)) {
+            purgeNegativeEffects(player);
+        }
+        // ⑤ 大成：23 条全部反转 → 全属性 +50%（属性修饰符）+ 常驻「免疫一切负面效果」
+        boolean grand = grandActive(player);
+        applyGrand(player, grand);
+        if (grand) {
+            purgeNegativeEffects(player);
+        }
+
         // e13 余悸：大击窗口过期即清除
         Long until = FEAR_UNTIL.get(player.getUUID());
         if (until != null && player.level().getGameTime() > until) FEAR_UNTIL.remove(player.getUUID());
@@ -299,6 +310,17 @@ public final class TimecoreCurse {
             event.getDrops().clear();
             return;
         }
+        // e15 厄运 诅咒态：时运 −2 ⇒ 平均少掉 0~2 件（至少保留 1 件）
+        if (CurseManager.on(player, D, 14) && event.getDrops().size() > 1) {
+            int cut = player.getRandom().nextInt(3);
+            java.util.Iterator<net.minecraft.world.entity.item.ItemEntity> it = event.getDrops().iterator();
+            while (it.hasNext() && cut > 0 && event.getDrops().size() > 1) {
+                it.next();
+                it.remove();
+                cut--;
+            }
+        }
+
         // e4 徒劳 反转：不再吞掉落，且**时运 +2**（按原版公式模拟，等同于工具上带时运 II）
         if (CurseManager.rev(player, D, 3) && !event.getDrops().isEmpty()) {
             int extra = fortuneExtra(player, 2);
@@ -335,7 +357,14 @@ public final class TimecoreCurse {
         if (drops.isEmpty()) return;
 
         if (CurseManager.on(player, D, 14)) {
-            if (player.getRandom().nextFloat() < 0.5f) drops.remove(drops.size() - 1);
+            // e15 厄运 诅咒态：时运/抢夺 −2 ⇒ 平均少掉 0~2 件（至少保留 1 件；原版没有「负等级附魔」可表达）
+            int cut = player.getRandom().nextInt(3);
+            java.util.Iterator<net.minecraft.world.entity.item.ItemEntity> it = drops.iterator();
+            while (it.hasNext() && cut > 0 && drops.size() > 1) {
+                it.next();
+                it.remove();
+                cut--;
+            }
             return;
         }
         if (CurseManager.rev(player, D, 14)) {
@@ -429,6 +458,21 @@ public final class TimecoreCurse {
             CurseManager.tick(player, D, 4, (long) Math.ceil(d), 3000L);
         }
 
+        // e23 平势 反转：目标最大生命高于你 50% 时，你受伤有 20% 概率**反制**（并清掉对方无敌帧）
+        if (CurseManager.rev(player, D, 22)
+                && event.getSource().getDirectEntity() instanceof LivingEntity counter
+                && counter != player
+                && counter.getMaxHealth() >= player.getMaxHealth() * 1.5f
+                && player.getRandom().nextFloat() < 0.20f) {
+            counter.invulnerableTime = 0;                 // 清无敌帧（Entity 上的公开字段）
+            counter.hurt(player.damageSources().playerAttack(player), Math.max(1.0f, d * 0.5f));
+        }
+
+        // ⑤ 大成：受到伤害 -25%（乘算；受伤侧一律乘算 §2）
+        if (grandActive(player)) {
+            d *= 0.75f;
+        }
+
         event.setAmount(d);
     }
 
@@ -486,20 +530,45 @@ public final class TimecoreCurse {
             CurseManager.tick(player, D, 19, (long) Math.ceil(d), 1000L);
         }
 
-        // e10 夺佑 反转：每有一级抗性提升，伤害 +5%（加算）
+        // ── 输出侧收口（§2「叠加口径（定稿）」：反转态一律**加算**，汇总 Σ 后一次 d × (1 + Σ)） ──
+        float additive = 0.0f;
+
+        // e10 夺佑 反转：每有一级抗性提升，伤害 +5%
         if (CurseManager.rev(player, D, 9)) {
             MobEffectInstance res = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
             int level = res == null ? 0 : res.getAmplifier() + 1;
-            if (level > 0) d *= (1.0f + 0.05f * level);
+            if (level > 0) additive += 0.05f * level;
+        }
+        // e20 垂翅 反转：腾空 / 飞行时造成伤害 +25%。
+        // 与照片「创造飞行」−90% 的关系：那张照片的惩罚里**已经含**这 +25%
+        // （§2 实例：−90% + 25% = 净 −65%），所以这里只在**没有**该照片标记（非创造飞行）时补，
+        // 避免同一份加成被计两次。
+        if (CurseManager.rev(player, D, 19) && !player.onGround() && !player.getAbilities().flying) {
+            additive += 0.25f;
+        }
+        // e21 无援 反转：保命触发后 10 秒内造成伤害 +50%
+        if (noAidGraceActive(player)) {
+            additive += 0.50f;
+        }
+        // e22 封镜 反转：Y≥100 时照片弹幕伤害 +50%（同样按加算并入 Σ）
+        if (CurseManager.rev(player, D, 21) && player.getY() >= 100.0
+                && com.plumejade.lensouls.util.PhotoProjMarker.isBarrageDamage(event.getSource())) {
+            additive += 0.50f;
         }
 
-        // e23 平势：目标最大生命比你高一倍时，它被你打就反击你
+        if (additive > 0.0f) {
+            d *= (1.0f + additive);
+        }
+
+        // e17 重负 反转：每 1% 移速损失 → +1 点伤害（**点数加算**，§2③，与上面的百分比乘区分）
+        if (CurseManager.rev(player, D, 16)) {
+            d += slowPercent(player);
+        }
+
+        // e23 平势（诅咒态）：目标最大生命比你高一倍时，它被你打就反击你
         levelFieldCounter(player, target);
 
         event.setNewDamage(d);
-
-        // e22 封镜 反转：Y≥100 时照片弹幕伤害 +50%（加算，在所有乘算之后收口）
-        photoBarrageBonus(player, event);
     }
 
     // ==================== 死亡 / 击杀 ====================
@@ -570,9 +639,9 @@ public final class TimecoreCurse {
             return;
         }
         if (CurseManager.rev(player, D, 20)) {
-            // 反转：保命手段恢复；触发后 10 秒伤害提升 + 抗性提升（"免疫负面"用高抗性近似）
-            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 200, 1, true, false, false));
-            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 200, 2, true, false, false));
+            // 反转：保命手段恢复，并开 10 秒窗口 —— 窗口内造成伤害 +50%、免疫一切负面效果
+            // （免疫在 tick 里持续清除负面；加伤在输出侧 Σ 里）
+            grantNoAidGrace(player);
         }
     }
 
@@ -657,12 +726,113 @@ public final class TimecoreCurse {
         CurseManager.tick(player, D, 21, 1L, 100L);
     }
 
-    /** e22 封镜 反转：Y≥100 时照片弹幕伤害 +50%（加算） */
-    private static void photoBarrageBonus(ServerPlayer player, LivingDamageEvent.Pre event) {
-        if (!CurseManager.rev(player, D, 21)) return;
-        if (player.getY() < 100.0) return;
-        if (!com.plumejade.lensouls.util.PhotoProjMarker.isBarrageDamage(event.getSource())) return;
-        event.setNewDamage(event.getNewDamage() * 1.5f);
+    // ==================== 反转态 / 大成 的公共支撑 ====================
+
+    /** e21 无援 反转：保命触发后的 10 秒强化窗口（持久化，跨维度保留） */
+    private static final String KEY_NO_AID_UNTIL = "lensouls:tc_no_aid_until";
+    /** e14 裁影 条件：能力窃取照片的**生物种类**去重集合（持久化，跨死亡保留） */
+    private static final String KEY_STOLEN_KINDS = "lensouls:tc_stolen_kinds";
+    /** e14 条件目标：50 种 */
+    private static final int STOLEN_KIND_GOAL = 50;
+    /** ⑤ 大成：全属性 +50% 的属性修饰符 id */
+    private static final ResourceLocation GRAND_MOD = ResourceLocation.parse("lensouls:curse_grand");
+
+    /** e17 重负 反转：当前移速**损失**百分比（0..100），1% = 1 点附加伤害 */
+    private static float slowPercent(ServerPlayer player) {
+        var attr = player.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (attr == null) return 0f;
+        double base = attr.getBaseValue();
+        if (base <= 0.0) return 0f;
+        double lost = (1.0 - attr.getValue() / base) * 100.0;
+        return (float) Math.max(0.0, Math.min(100.0, lost));
+    }
+
+    /** e21 无援 反转：强化窗口是否还在 */
+    private static boolean noAidGraceActive(ServerPlayer player) {
+        long until = player.getPersistentData().getLong(KEY_NO_AID_UNTIL);
+        return until > 0L && player.level().getGameTime() < until;
+    }
+
+    /** e21 无援 反转：保命手段（不死图腾 / 时空回溯）触发时开 10 秒窗口 */
+    public static void grantNoAidGrace(ServerPlayer player) {
+        if (player == null) return;
+        if (!CurseManager.rev(player, D, 20)) return;
+        player.getPersistentData().putLong(KEY_NO_AID_UNTIL, player.level().getGameTime() + 200L);
+    }
+
+    /** 清掉身上所有**负面**效果（e21 反转窗口内 / 大成常驻 = 「免疫一切负面效果」） */
+    private static void purgeNegativeEffects(ServerPlayer player) {
+        java.util.List<net.minecraft.core.Holder<net.minecraft.world.effect.MobEffect>> bad =
+                new java.util.ArrayList<>();
+        for (MobEffectInstance inst : player.getActiveEffects()) {
+            if (!inst.getEffect().value().isBeneficial()) bad.add(inst.getEffect());
+        }
+        for (var holder : bad) {
+            player.removeEffect(holder);
+        }
+    }
+
+    /** ⑤ 大成：该款 23 条**全部**反转 */
+    private static boolean grandActive(ServerPlayer player) {
+        if (player == null || !CurseManager.isActive(player, D)) return false;
+        return CurseManager.state(player).reversedCount(D) >= 23;
+    }
+
+    /** ⑤ 大成「全属性 +50%」覆盖的属性（主要战斗属性） */
+    @SuppressWarnings("unchecked")
+    private static final net.minecraft.core.Holder<net.minecraft.world.entity.ai.attributes.Attribute>[] GRAND_ATTRS =
+            new net.minecraft.core.Holder[]{
+                    Attributes.MAX_HEALTH,
+                    Attributes.ATTACK_DAMAGE,
+                    Attributes.ARMOR,
+                    Attributes.ARMOR_TOUGHNESS,
+                    Attributes.MOVEMENT_SPEED,
+                    Attributes.ATTACK_SPEED,
+                    Attributes.KNOCKBACK_RESISTANCE,
+                    Attributes.LUCK,
+            };
+
+    /** ⑤ 大成：全属性 +50%（ADD_MULTIPLIED_TOTAL，收口在属性修饰符上） */
+    private static void applyGrand(ServerPlayer player, boolean grand) {
+        for (var attr : GRAND_ATTRS) {
+            var inst = player.getAttribute(attr);
+            if (inst == null) continue;
+            if (grand) {
+                if (inst.getModifier(GRAND_MOD) == null) {
+                    inst.addOrUpdateTransientModifier(new AttributeModifier(
+                            GRAND_MOD, 0.5, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+                }
+            } else if (inst.getModifier(GRAND_MOD) != null) {
+                inst.removeModifier(GRAND_MOD);
+            }
+        }
+    }
+
+    /**
+     * e14 裁影 的反转条件：**累计拍过 50 种不同的能力窃取照片**（同种生物不重复计）。
+     * <p>
+     * 由 {@code ability/PhotoInjector} 在写入 {@code lensouls:stolen_entity} 时回调——
+     * 能力窃取照片本来就有这条数据，这里只做**去重统计**（写玩家 persisted 子键，跨死亡保留）。
+     */
+    public static void onStolenPhoto(ServerPlayer player, String entityId) {
+        if (player == null || entityId == null || entityId.isEmpty()) return;
+        if (!CurseManager.on(player, D, 13)) return;
+
+        var tag = player.getPersistentData()
+                .getCompound(net.minecraft.world.entity.player.Player.PERSISTED_NBT_TAG);
+        var list = tag.getList(KEY_STOLEN_KINDS, net.minecraft.nbt.Tag.TAG_STRING);
+        for (int i = 0; i < list.size(); i++) {
+            if (entityId.equals(list.getString(i))) return;      // 同种生物只计一次
+        }
+        list.add(net.minecraft.nbt.StringTag.valueOf(entityId));
+        tag.put(KEY_STOLEN_KINDS, list);
+        player.getPersistentData().put(net.minecraft.world.entity.player.Player.PERSISTED_NBT_TAG, tag);
+
+        int n = list.size();
+        CurseManager.setProgress(player, D, 13, n);
+        if (n >= STOLEN_KIND_GOAL) {
+            CurseManager.reach(player, D, 13);
+        }
     }
 
     /** e10 条件用：当前没有任何**正面**效果（文案是「无任何正面效果」，不是「无任何效果」） */

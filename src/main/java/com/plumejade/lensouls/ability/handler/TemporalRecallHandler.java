@@ -54,6 +54,8 @@ public class TemporalRecallHandler {
         if (snapshot != null) {
             consumePhoto(player, result);
             snapshot.apply(player);
+            // ⑤ 铁序·无援 反转：时空回溯也属于「保命手段」，触发后同样开 10 秒强化窗口
+            com.plumejade.lensouls.handler.curse.TimecoreCurse.grantNoAidGrace(player);
             player.displayClientMessage(
                     net.minecraft.network.chat.Component.translatable("ability.lensouls.temporal_recall.triggered")
                             .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
@@ -131,6 +133,8 @@ public class TemporalRecallHandler {
         TemporalSnapshot snapshot = readSnapshot(result);
         if (snapshot != null) {
             consumePhoto(player, result);
+            // ⑤ 铁序·无援 反转：主动回溯触发后同样开 10 秒强化窗口
+            com.plumejade.lensouls.handler.curse.TimecoreCurse.grantNoAidGrace(player);
         }
         return snapshot;
     }

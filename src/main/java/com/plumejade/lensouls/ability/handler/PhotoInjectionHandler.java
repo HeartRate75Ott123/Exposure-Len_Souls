@@ -7,7 +7,8 @@ import com.plumejade.lensouls.config.AttackerElementLoader;
 import com.plumejade.lensouls.config.BossEntityLoader;
 import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
-import com.plumejade.lensouls.handler.FeatherHardmanHandler;
+import com.plumejade.lensouls.util.PhotoLog;
+import com.plumejade.lensouls.util.PhotoTargets;
 import io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -61,32 +62,64 @@ public class PhotoInjectionHandler {
         return exposureId != null ? pendingAbilities.remove(exposureId) : null;
     }
 
+    /**
+     * 拍照瞬间的缓存入口。这里每一个 {@code return} 都对应一种「照片最后变成普通照片」的成因，
+     * 所以失败原因一律走 {@link PhotoLog}：<b>INFO 可见 + 按原因限流</b>
+     * （同一原因 60 秒一条、全场 40 条上限；藏进 debug 等于排障时没人看，无脑 INFO 又会刷屏）。
+     * <p>
+     * 排障口径：<b>这一端</b>只回答「拍照时缓存成功了没有」——没选中能力 / 手上没相机 / 没摄魂术 /
+     * 窃取时帧内没有非玩家实体；若这里都正常而照片仍是普通照片，断点就在打印端
+     * （见 {@code PhotoInjector#inject} 的日志）。「按设计如此」的分支（即时生效能力不产照片）
+     * 只走 {@link PhotoLog#debug}，不占 INFO 额度。
+     */
     @SubscribeEvent
     public static void onFrameAdded(FrameAddedEvent event) {
         try {
             if (!(event.getCameraHolderEntity() instanceof ServerPlayer player)) return;
             var frame = event.getFrame();
-            if (frame == null) return;
+            if (frame == null) {
+                PhotoLog.info("cache-frame-null", () -> "未缓存：事件里的 frame 为空");
+                return;
+            }
             String exposureId = frame.identifier() != null ? frame.identifier().toString() : null;
-            if (exposureId == null || exposureId.isEmpty()) return;
+            if (exposureId == null || exposureId.isEmpty()) {
+                PhotoLog.info("cache-no-exposure-id", () -> "未缓存：帧没有 exposureId");
+                return;
+            }
 
-            // 羽·荒厄遗咒：残存魔力被吞噬，无法发动相机能力
-            if (FeatherHardmanHandler.hasHardman(player)) {
+            // 帧内第一个带元素活性的实体 → 缓存（普通拍照也注入组件）
+            cacheFrameElements(player, exposureId, event.getEntitiesInFrame());
+
+            // ① 羽·荒厄遗咒 e2「封器」：无法发动相机能力 = 只禁能力照片，普通拍照不受影响
+            if (com.plumejade.lensouls.feather.CurseManager.on(player,
+                    com.plumejade.lensouls.feather.CurseDefs.HARDMAN, 1)) {
+                PhotoLog.info("cache-hardman", () -> "未缓存：① e2 封器未反转（exposureId=" + exposureId + "）");
                 player.displayClientMessage(
                         net.minecraft.network.chat.Component.translatable("message.lensouls.hardman.inject_fail"), true);
                 return;
             }
 
-            // 帧内第一个带元素活性的实体 → 缓存（普通拍照也注入组件）
-            cacheFrameElements(exposureId, event.getEntitiesInFrame());
-
             AbilityType ability = CameraAbilityStore.getSelected(player);
-            if (ability == null) return;
+            if (ability == null) {
+                PhotoLog.info("cache-no-ability", () -> "未缓存：相机上没有选中的能力（exposureId=" + exposureId
+                        + "）——这一帧出片会是普通照片");
+                return;
+            }
             // 即时生效类能力（时间定格/要害打击/断魂）不注入照片——行为声明见 AbilityBehavior
-            if (!com.plumejade.lensouls.ability.AbilityBehavior.producesAbilityPhoto(ability)) return;
+            // 这条是「按设计如此」，不算故障 ⇒ 只进 debug.log，不占 INFO 额度
+            if (!com.plumejade.lensouls.ability.AbilityBehavior.producesAbilityPhoto(ability)) {
+                PhotoLog.debug("cache-instant-ability", () -> "未缓存：能力 " + ability.getId()
+                        + " 属即时生效、按设计不产能力照片（exposureId=" + exposureId + "）");
+                return;
+            }
 
             ItemStack hand = CameraInputHandler.getWieldedCamera(player);
-            if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), hand) <= 0) return;
+            if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), hand) <= 0) {
+                PhotoLog.info("cache-no-enchant", () -> "未缓存：手持相机没有摄魂术（exposureId=" + exposureId
+                        + ", ability=" + ability.getId() + ", 拍摄者此刻手上"
+                        + (hand.isEmpty() ? "没有" : "有其它") + "相机）——常见于拍完立刻切手/换物品/进传送门");
+                return;
+            }
 
             // 按帧 ID 存储能力，后续切换能力不影响已拍帧
             LenSouls.LOGGER.debug("[PhotoInject] onFrameAdded: exposureId={} ability={}", exposureId, ability);
@@ -97,20 +130,22 @@ public class PhotoInjectionHandler {
                 int unlocked = com.plumejade.lensouls.integration.FieldGuideBridge.unlockEntities(
                         player, event.getEntitiesInFrame());
                 if (unlocked > 0) {
-                    LenSouls.LOGGER.debug("[PhotoInject] 见微知著解锁图鉴 {} 条", unlocked);
+                    PhotoLog.info("glimpse-unlocked",
+                            () -> "见微知著解锁图鉴 " + unlocked + " 条（exposureId=" + exposureId + "）");
                 }
             }
 
             // 能力窃取：缓存被窃取实体 + Boss 判定（首领清单）
             if (ability == AbilityType.ABILITY_STEAL) {
-                var frameEntities = event.getEntitiesInFrame();
-                if (frameEntities != null && !frameEntities.isEmpty()) {
-                    // 多部件 boss（九头蛇头/娜迦尾等）子体离相机更近、排在帧首——
-                    // 追溯到父体，确保取到的 id 是 BOSS 本体（与削韧一致），否则按部件 id 查不到效果。
-                    LivingEntity target = resolveToParent(frameEntities.get(0));
+                LivingEntity target = PhotoTargets.subject(
+                        player, event.getEntitiesInFrame(), PhotoInjectionHandler::resolveToParent);
+                if (target != null) {
                     String stolenId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
                     cacheStolenEntity(exposureId, stolenId);
                     bossFlagCache.put(exposureId, BossEntityLoader.isBoss(target));
+                } else {
+                    PhotoLog.info("cache-steal-no-subject", () -> "能力窃取未缓存主体：帧内没有「非玩家」实体"
+                            + "（exposureId=" + exposureId + "）——这一帧出片会是普通照片");
                 }
             }
         } catch (Exception e) {
@@ -118,26 +153,25 @@ public class PhotoInjectionHandler {
         }
     }
 
-    /** 缓存帧内第一个带元素活性实体的元素等级与 id */
-    private static void cacheFrameElements(String exposureId, List<LivingEntity> frameEntities) {
-        if (frameEntities == null || frameEntities.isEmpty()) return;
-        for (LivingEntity e : frameEntities) {
-            ResourceLocation rl = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType());
-            if (rl == null) continue;
-            Map<ElementDamage, Integer> levels = AttackerElementLoader.getLevels(rl);
-            if (!levels.isEmpty()) {
-                elementEntityCache.put(exposureId, rl.toString());
-                elementCache.put(exposureId, levels);
-                return;
-            }
-        }
+    /** 缓存帧内第一个带元素活性实体的元素等级与 id（选取口径见 {@link PhotoTargets#subjectWithElement}） */
+    private static void cacheFrameElements(LivingEntity viewer, String exposureId,
+                                           List<LivingEntity> frameEntities) {
+        LivingEntity e = PhotoTargets.subjectWithElement(viewer, frameEntities);
+        if (e == null) return;
+        ResourceLocation rl = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType());
+        if (rl == null) return;
+        Map<ElementDamage, Integer> levels = AttackerElementLoader.getLevels(rl);
+        if (levels.isEmpty()) return;
+        elementEntityCache.put(exposureId, rl.toString());
+        elementCache.put(exposureId, levels);
     }
 
     /**
      * 多部件实体（九头蛇头/娜迦尾等）子体追溯到父体，确保能力窃取取到 BOSS 本体（与削韧一致）。
      * <p>
-     * 帧内实体按到相机距离排序，子体往往比父体中心离相机更近而排在最前；直接取 {@code get(0)}
-     * 会取到部件实体 id，导致 {@link PhotographEffectRegistry#hasEffect} 查不到效果、退化为普通照片。
+     * 帧内实体按到相机距离排序，子体往往比父体中心离相机更近而排在最前；直接取
+     * {@code get(0)} 会取到部件实体 id，导致 {@link PhotographEffectRegistry#hasEffect}
+     * 查不到效果、退化为普通照片。
      */
     private static LivingEntity resolveToParent(LivingEntity entity) {
         // 子部件（九头蛇头/娜迦尾等）实现 PartEntity，追溯到父体

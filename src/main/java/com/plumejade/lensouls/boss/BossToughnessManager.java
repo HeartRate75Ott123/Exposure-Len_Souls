@@ -117,7 +117,10 @@ public class BossToughnessManager {
         }
         float hitMultiplier = 1.0f;
         if (player != null) {
-            hitMultiplier = com.plumejade.lensouls.integration.TrophyModifierHandler.applyHitsModifier(player, 1.0f);
+            hitMultiplier = com.plumejade.lensouls.integration.TrophyModifierHandler.applyHitsModifier(player, 1.0f)
+                    + com.plumejade.lensouls.handler.FeatherHardmanHandler.toughnessDamageDelta(player);
+            // ① e2 反转的「韧性伤害 -2」是点数加算（§2③）：夹到 ≥0，避免削韧进度倒退
+            hitMultiplier = Math.max(0f, hitMultiplier);
         }
         boolean actuallyHit = data.hit(invTicks, hitMultiplier);
         boolean isBroken = data.isBroken();

@@ -23,8 +23,8 @@ import net.neoforged.neoforge.common.util.INBTSerializable;
  */
 public class FeatherSlotData implements INBTSerializable<CompoundTag> {
 
-    /** 槽位数量（界面横排 5 个，与资产 slot.png 的排布一致） */
-    public static final int SLOTS = 5;
+    /** 槽位数量（界面横排 7 个：7 款诅咒全开、可同时佩戴；旧存档后 2 槽按空补齐） */
+    public static final int SLOTS = 7;
 
     private static final String TAG_ITEMS = "items";
     private static final String TAG_LOCKS = "locks";

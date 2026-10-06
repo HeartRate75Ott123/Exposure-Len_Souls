@@ -1,9 +1,8 @@
 package com.plumejade.lensouls.handler;
 
-import com.plumejade.lensouls.entity.PhantomDamageHandler;
+import com.plumejade.lensouls.util.AllyFilter;
 import com.plumejade.lensouls.util.PhotoProjMarker;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
@@ -20,10 +19,10 @@ import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
  *   <li>命中发射者本人 → 免伤（本次修复的问题）；</li>
  *   <li>命中任意玩家 → 免伤（与弹幕框架注释里既有的「不伤自身/队友」口径一致，
  *       队友挡在弹道上也属于误伤而非设计意图）；</li>
- *   <li>命中任意<b>驯服生物</b>（狼/猫/鹦鹉/马…）→ 免伤。弹幕是「打面前那个敌人」的选敌逻辑
- *       （{@code findNearestNonPlayer} 只排除玩家），玩家身边的狗会挤进这条弹道上挨打，
- *       那是纯粹的误伤。口径取「只要是驯服的就不打」，不区分是谁的宠物——
- *       队友的宠物挡在弹道上与队友本人一样属于误伤。</li>
+ *   <li>命中任意<b>友方单位</b> → 免伤。口径 = 统一大过滤 {@link AllyFilter#isFriendly}
+ *       （类别：玩家 + 任意驯服宠物（狼/猫/鹦鹉/马…）+ 自家召唤物（幻灵/幻翼）+ 任意第三方辅助作战单位，
+ *       <b>不区分归属</b>；外加同乘），视角 = 弹幕发射者——
+ *       队友的宠物、队友（甚至路人）的无人机挡在弹道上，都算误伤而非设计意图。</li>
  * </ul>
  * 普通弓箭、别的玩家射来的箭、BOSS 自己的弹幕一律不受影响；玩家用剑/弓打自己的狗也照旧掉血。
  * <p>
@@ -40,7 +39,9 @@ public class PhotoProjSafetyHandler {
             event.setCanceled(true);
             return;
         }
-        if (victim instanceof Player || PhantomDamageHandler.isTamedPet(victim)) {
+        // 统一大过滤：类别（玩家/任意驯服宠物/自家召唤物/任意辅助单位）+ 同乘，
+        // 视角 = 弹幕发射者（被反弹后 getEntity 可能已是别人，故用 ownerOf 解析投影物 owner）
+        if (AllyFilter.isFriendly(PhotoProjMarker.ownerOf(event.getSource()), victim)) {
             if (PhotoProjMarker.isBarrageDamage(event.getSource())) {
                 event.setCanceled(true);
             }

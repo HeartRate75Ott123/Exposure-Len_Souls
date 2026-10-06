@@ -223,9 +223,17 @@ public class BossPhantomManager {
             // 6. 加入世界（addFreshEntity 会触发 startSeenByPlayer → boss bar 出现）
             level.addFreshEntity(entity);
             addedToWorld = true;
-            // 幻灵生成即赋予「抗性提升 V」（level 5 → amplifier 4），时长匹配演出、显示图标
+            // 幻灵无敌：用**原版无敌标签**（原先给的是「抗性提升 V」，已撤）。
+            // 两条都是原版既有语义，本次用 javap -c 逐条核过：
+            //   ① 免索敌：TargetingConditions.test → LivingEntity.canAttack → canBeSeenAsEnemy()
+            //      = {@code !isInvulnerable() && canBeSeenByAnyone()} ⇒ 敌方 AI 看不见它，不会把它当目标；
+            //   ② 砍不到：LivingEntity.hurt 的第 2 条指令就是 isInvulnerableTo，直接挡掉
+            //      非 BYPASSES_INVULNERABILITY、非创造玩家的伤害——连受击闪红/击退/音效都不会发生。
+            //      （抗性 V 是「照样挨打、伤害为 0」：会闪红、会被推动、会被打断出招。）
+            // 创造模式玩家与 BYPASSES_INVULNERABILITY 在 isInvulnerableTo 里是放行的 ⇒ 由
+            // PhantomDamageHandler#onIncomingDamage 兜第二层（前者取消、后者刻意放行留后路）。
             if (entity instanceof LivingEntity le) {
-                le.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, PHANTOM_TOTAL_TICKS, 4, false, true, true));
+                le.setInvulnerable(true);
             }
             // 加入后再清除 boss bar（startSeenByPlayer 新增的玩家被 removeAllPlayers 移除）
             com.plumejade.lensouls.boss.BossBarCache.clearBossBar(entity);

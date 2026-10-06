@@ -1,7 +1,9 @@
 package com.plumejade.lensouls.entity;
 
+import com.plumejade.lensouls.util.AllyFilter;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -44,44 +46,42 @@ public class PhantomDamageHandler {
 
     private static final int[] PEN_DAMAGE = {20, 36, 42, 70, 74};
 
-    // ---- persistentData 键（写入点：BossPhantomManager；读法统一走本类常量）----
-    /** 借体 BOSS 本体标记 */
-    public static final String PHANTOM_TAG = "lensouls:phantom";
-    /** 借体 BOSS 演出期间召出的随从标记 */
-    public static final String PHANTOM_MINION_TAG = "lensouls:phantom_minion";
+    // ---- persistentData 键 ----
+    // 写入点：BossPhantomManager。**键名的唯一事实来源是 AllyFilter**，这里只做别名转发——
+    // 「自己人」的标记键不许有第二份定义（见 AllyFilter 类注释：加新单位只改一处）。
+    /** 借体 BOSS 本体标记（= {@link AllyFilter#PHANTOM_TAG}） */
+    public static final String PHANTOM_TAG = AllyFilter.PHANTOM_TAG;
+    /** 借体 BOSS 演出期间召出的随从标记（= {@link AllyFilter#PHANTOM_MINION_TAG}） */
+    public static final String PHANTOM_MINION_TAG = AllyFilter.PHANTOM_MINION_TAG;
     /** 幻灵本体与随从都写入的召唤者玩家 UUID（击杀归属的事实来源） */
     public static final String PHANTOM_OWNER_TAG = "lensouls:phantom_owner";
     /** 幻灵镜魂等级 1-5，决定穿透伤害档位 */
     public static final String PHANTOM_LEVEL_TAG = "lensouls:phantom_level";
 
-    /** 实体本身是否是幻灵（借体 boss 本体 / 召唤物），用于幻灵之间不互殴的隔离判断 */
+    /**
+     * 实体本身是否是幻灵（借体 boss 本体 / 召唤物），用于幻灵之间不互殴的隔离判断。
+     * <p>口径定义在 {@link AllyFilter#isPhantom}（「谁是自己人」的唯一事实来源）。
+     */
     public static boolean isPhantomEntity(Entity e) {
-        if (e == null) return false;
-        CompoundTag tag = e.getPersistentData();
-        return tag.getBoolean(PHANTOM_TAG) || tag.getBoolean(PHANTOM_MINION_TAG);
+        return AllyFilter.isPhantom(e);
     }
 
-    /** 递归判定实体是否属幻灵来源：本体 / 召唤物 / 弹幕 owner（供效果与推动拦截共用） */
+    /**
+     * 递归判定实体是否属幻灵来源：本体 / 召唤物 / 弹幕 owner（供效果与推动拦截共用）。
+     * <p>口径定义在 {@link AllyFilter#isPhantomSource}。
+     */
     public static boolean isPhantomSource(Entity e) {
-        if (e == null) return false;
-        if (isPhantomEntity(e)) return true;
-        if (e instanceof Projectile proj) {
-            return isPhantomSource(proj.getOwner());
-        }
-        return false;
+        return AllyFilter.isPhantomSource(e);
     }
 
     /**
      * 驯服生物（狼、猫、鹦鹉、马…）：玩家宠物，<b>不算敌人</b>。
      * <p>
-     * 三处共用同一口径，避免「幻灵打狗 / 弹幕打狗 / 幻灵把狗当最近敌人」各写各的判断：
-     * 幻灵选敌（{@code BossPhantomManager}）、照片弹幕误伤保护（{@code PhotoProjSafetyHandler}）。
-     * <p>
-     * 只看 {@code isTame()} 不看主人：弹幕的免伤口径是「所有驯服生物一律免疫」，
-     * 选敌则本来就该绕开任何宠物（不分是谁的）。
+     * 口径定义在 {@link AllyFilter#isTamedPet}：<b>只认 {@code isTame()}、不分是谁的宠物</b>——
+     * 幻灵选敌、照片弹幕误伤保护、定格选取都共用它（队友的狗挡在弹道上与队友本人一样算误伤）。
      */
     public static boolean isTamedPet(Entity e) {
-        return e instanceof TamableAnimal tame && tame.isTame();
+        return AllyFilter.isTamedPet(e);
     }
 
     /**
@@ -196,13 +196,39 @@ public class PhantomDamageHandler {
         victim.setLastHurtByMob(owner);
     }
 
-    /** 防误伤：幻灵来源（直接来源或真实攻击者，含弹幕 owner）对玩家全免；幻灵之间也不互殴（幻灵来源同样不可伤其他幻灵）。 */
+    /**
+     * 两层保护（顺序就是原版 {@code LivingEntity.hurt} 的判定顺序，已用 {@code javap -c} 核过：
+     * {@code isInvulnerableTo} 在第 2 条指令，{@code CommonHooks.onEntityIncomingDamage} 在第 81 条）。
+     *
+     * <ol>
+     *   <li><b>自家召唤物无敌</b>（幻灵 + 幻翼）：两者都带原版无敌标签——幻灵在
+     *       {@code BossPhantomManager.startBorrowedEntity}，幻翼在
+     *       {@code BossPhotoProjHelper} 的生成处，各调用一次 {@code setInvulnerable(true)}。
+     *       常规伤害在 {@code isInvulnerableTo} 就被挡掉，<b>本事件根本不会触发</b>
+     *       ——这也正是"连受击闪红/击退/音效都没有"的原因。能进到本方法的只有两类：
+     *       <b>创造模式玩家</b>（{@code isInvulnerableTo} 里 {@code !source.isCreativePlayer()} 是放行条件）
+     *       与 {@code BYPASSES_INVULNERABILITY}（如 {@code /kill}、虚空）。前者在这里补一刀取消，
+     *       后者<b>刻意放行</b>，留一条管理员/环境的后路（幻灵/幻翼本来就都有时效，到点自会回收）。</li>
+     *   <li><b>幻灵来源不伤玩家</b>：原始实体或真实攻击者（含弹幕 owner）属幻灵时，
+     *       对玩家的伤害全免；幻灵之间也不互殴。</li>
+     * </ol>
+     */
     @SubscribeEvent
     public static void onIncomingDamage(LivingIncomingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
         if (event.getAmount() <= 0f) return;
-        boolean receiverProtected = event.getEntity() instanceof Player || isPhantomEntity(event.getEntity());
-        if (!receiverProtected) return;
+
+        // ① 自家召唤物（幻灵 + 幻翼）：原版无敌标签已挡掉常规伤害，
+        //    这里只补它放行的「创造模式玩家挥砍」；BYPASS 类刻意放行留后路
+        if (AllyFilter.isOwnSummon(event.getEntity())) {
+            if (!event.getSource().is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+                event.setCanceled(true);
+            }
+            return;
+        }
+
+        // ② 幻灵来源对玩家免伤
+        if (!(event.getEntity() instanceof Player)) return;
         if (isPhantomDamageSource(event.getSource())) {
             event.setCanceled(true);
         }

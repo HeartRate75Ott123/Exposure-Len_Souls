@@ -192,7 +192,12 @@ public class DamageHandler {
         // 追加叠加在护甲后伤害上（护甲仍然有效）
         if (!level.isClientSide && totalBonusMultiplier > 0f) {
             float current = event.getNewDamage();
-            event.setNewDamage(current + current * totalBonusMultiplier);
+            float elementBonus = current * totalBonusMultiplier;
+            event.setNewDamage(current + elementBonus);
+            // ③ 羽·元素觉醒者 整款共用反转条件：活性等级 ≥10 且生命 ≥90% 时造成一次 10000 点元素附加伤害
+            if (attacker instanceof ServerPlayer bonusPlayer) {
+                com.plumejade.lensouls.handler.FeatherElementRiseHandler.onElementBonus(bonusPlayer, elementBonus);
+            }
         }
 
         // 弱点武器匹配：目标有「非弹射物」弱点（倍率 > 0）但玩家武器元素（item_activity / 次元枪子弹元素）

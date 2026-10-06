@@ -29,6 +29,16 @@ public class FeatherAttachments {
             TYPES.register("feather_slots",
                     () -> AttachmentType.serializable(FeatherSlotData::new).copyOnDeath().build());
 
+    /**
+     * 诅咒状态（反转位掩码 + 逐条进度）。
+     * <p>
+     * 与槽位数据同款语义：序列化 + {@code copyOnDeath}（反转一次永久、跨死亡保留）。
+     * 槽位内容仍在 {@link FeatherSlotData} 里（已由 5 槽扩到 7 槽），这里只存「哪几条反转了、进度多少」。
+     */
+    public static final Supplier<AttachmentType<CurseStateData>> CURSE_STATE =
+            TYPES.register("curse_state",
+                    () -> AttachmentType.serializable(CurseStateData::new).copyOnDeath().build());
+
     public static void register(IEventBus modEventBus) {
         TYPES.register(modEventBus);
     }

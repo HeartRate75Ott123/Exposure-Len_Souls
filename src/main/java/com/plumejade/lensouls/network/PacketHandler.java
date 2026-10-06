@@ -239,6 +239,20 @@ public class PacketHandler {
                 TwistSyncPacket::handle
         );
 
+        // ---- 诅咒状态同步 S2C（反转掩码 + 逐条进度，供物品 tooltip） ----
+        registrar.playToClient(
+                CurseSyncPacket.TYPE,
+                CurseSyncPacket.STREAM_CODEC,
+                CurseSyncPacket::handle
+        );
+
+        // ---- 诅咒列表装入 C2S（§4.1：按诅咒 id 装入；背包没有则发放） ----
+        registrar.playToServer(
+                CurseInstallPacket.TYPE,
+                CurseInstallPacket.STREAM_CODEC,
+                CurseInstallPacket::handle
+        );
+
         // ---- 祸之可能性倒计时 S2C（物品栏上方红字） ----
         registrar.playToClient(
                 AbyssCountdownPacket.TYPE,
@@ -292,6 +306,12 @@ public class PacketHandler {
                 DatapackSyncPacket.TYPE,
                 DatapackSyncPacket.STREAM_CODEC,
                 DatapackSyncPacket::handle
+        );
+        // ---- 自家幻翼的时效 S2C（替代「往原版 Phantom 塞同步数据槽」，见 SwarmPhantomFade） ----
+        registrar.playToClient(
+                SwarmPhantomPacket.TYPE,
+                SwarmPhantomPacket.STREAM_CODEC,
+                SwarmPhantomPacket::handle
         );
     }
 }

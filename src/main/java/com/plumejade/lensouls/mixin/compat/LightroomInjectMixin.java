@@ -28,7 +28,7 @@ public class LightroomInjectMixin {
         if (!(result.getItem() instanceof io.github.mortuusars.exposure.world.item.PhotographItem)) return;
 
         // 暗房不保留拍摄者实体，按帧里记录的摄影师 UUID 反查在线玩家
-        PhotoInjector.inject(result, frame, lensouls$resolvePhotographer(frame), false);
+        PhotoInjector.inject(result, frame, lensouls$resolvePhotographer(frame), false, "lightroom");
     }
 
     private static ServerPlayer lensouls$resolvePhotographer(Frame frame) {

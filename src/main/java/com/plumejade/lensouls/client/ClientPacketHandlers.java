@@ -3,6 +3,8 @@ package com.plumejade.lensouls.client;
 import com.plumejade.lensouls.boss.FreezeRejectParticlePacket;
 import com.plumejade.lensouls.boss.ToughnessHitSoundPacket;
 import com.plumejade.lensouls.boss.ToughnessParticlePacket;
+import com.plumejade.lensouls.client.phantom.SwarmPhantomClient;
+import com.plumejade.lensouls.network.SwarmPhantomPacket;
 import com.plumejade.lensouls.particle.ModParticleTypes;
 import com.plumejade.lensouls.sound.ModSounds;
 import net.minecraft.client.Minecraft;
@@ -27,6 +29,16 @@ import java.util.Random;
 public class ClientPacketHandlers {
 
     private ClientPacketHandlers() {
+    }
+
+    /**
+     * 自家幻翼的时效（见 {@link SwarmPhantomClient}）：只存一份「还剩多少刻」，
+     * 渐隐曲线由渲染层按时间本地推算——不逐 tick 同步。
+     */
+    public static void handleSwarmPhantom(SwarmPhantomPacket packet) {
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return;
+        SwarmPhantomClient.put(packet.getEntityId(), packet.getRemainingTicks(), level.getGameTime());
     }
 
     public static void handleToughnessHitSound(ToughnessHitSoundPacket packet) {

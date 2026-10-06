@@ -124,8 +124,9 @@ public final class CameraVisibility {
                                     double halfAngleDeg, double maxDistance, Entity target) {
         if (level == null || cameraPos == null || lookDir == null || target == null) return false;
         // 第三方辅助作战单位（gytrinket 无人机/蜂群/僚机）一律不算拍摄目标。
-        // 过滤发生在「逐个候选」这一层，调用方自然会继续看下一个生物（见 PhotoTargetFilter）。
-        if (PhotoTargetFilter.isIgnored(target)) return false;
+        // 分类定义在 AllyFilter（「谁是自己人」的唯一事实来源）；过滤发生在「逐个候选」这一层，
+        // 调用方自然会继续看下一个生物。
+        if (AllyFilter.isAssistConstruct(target)) return false;
 
         if (isEntityVisible(level, cameraPos, lookDir, halfAngleDeg, maxDistance, target)) {
             return true;

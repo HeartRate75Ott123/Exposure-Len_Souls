@@ -21,8 +21,8 @@ import net.neoforged.api.distmarker.OnlyIn;
  * 两个用途共用本类：
  * <ul>
  *   <li>幻灵（虚影 BOSS）：固定 {@link #PHANTOM_ALPHA}（0.5）；</li>
- *   <li>幻术师照片的幻影幻翼：alpha 逐 tick 变化，见
- *       {@link com.plumejade.lensouls.entity.SwarmPhantomFade}——走带 alpha 的第二个构造器。</li>
+ *   <li>幻术师照片的幻影幻翼：alpha 随余命变化，余命由 S2C 包下发、
+ *       客户端本地算渐隐（见 {@link SwarmPhantomClient}）——走带 alpha 的第二个构造器。</li>
  * </ul>
  */
 @OnlyIn(Dist.CLIENT)

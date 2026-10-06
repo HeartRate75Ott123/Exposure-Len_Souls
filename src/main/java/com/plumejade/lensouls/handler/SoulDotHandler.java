@@ -159,13 +159,11 @@ public class SoulDotHandler {
         DamageSource source = new DamageSource(typeRef, null, attacker);
 
         // 照片套装「元素 DoT 增伤」乘区（无套装效果时为 1.0）
-        // 羽·元素觉醒者：佩戴时元素 DoT ×3
+        // 羽·元素觉醒者 e2「余灰」：DoT 伤害随目标剩余血量百分比变化（最高 +100%、最低 -50%；反转后下限 -20%）
         float amount = dot.damagePerTick();
         if (attacker != null) {
             amount *= com.plumejade.lensouls.integration.PhotoSetEffects.getDotMultiplier(attacker, dot.element());
-            if (FeatherElementRiseHandler.hasFeather(attacker)) {
-                amount *= FeatherElementRiseHandler.DOT_MULTIPLIER;
-            }
+            amount *= FeatherElementRiseHandler.dotMultiplier(attacker, target);
         }
 
         applyingDot = true;

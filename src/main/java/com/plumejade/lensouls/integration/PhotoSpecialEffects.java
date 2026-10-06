@@ -1042,7 +1042,14 @@ public class PhotoSpecialEffects {
         // ── 玩家攻击：kind 增伤 + 飞行惩罚 + 焰魔烙印 ──
         if (event.getSource().getEntity() instanceof ServerPlayer player) {
             if (player.getPersistentData().getBoolean(FLIGHT_TAG) && player.getAbilities().flying) {
-                event.setNewDamage(event.getNewDamage() * 0.1f);
+                // 照片「创造飞行」的 −90% 惩罚
+                float penalty = 0.1f;
+                // ⑤ 铁序·垂翅 反转后与它**加算**：−90% + 25% = −65%（设计文档 §2「叠加口径（定稿）」）
+                if (com.plumejade.lensouls.feather.CurseManager.rev(player,
+                        com.plumejade.lensouls.feather.CurseDefs.TIMECORE, 19)) {
+                    penalty = 1.0f - 0.9f + 0.25f;
+                }
+                event.setNewDamage(event.getNewDamage() * penalty);
             }
             List<String> gear = collectGearEntities(player);
             for (String id : gear) {

@@ -17,6 +17,7 @@ import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.monster.Phantom;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import com.plumejade.lensouls.entity.SwarmPhantomFade;
+import com.plumejade.lensouls.network.SwarmPhantomPacket;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.EvokerFangs;
 import net.minecraft.world.entity.projectile.Arrow;
@@ -30,7 +31,9 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -297,15 +300,14 @@ public class BossPhotoProjHelper {
     }
 
     /**
-     * 玩家周围指定范围内最近的非玩家 LivingEntity（排除玩家自身；跳过第三方辅助作战单位）
+     * 玩家周围指定范围内最近的<b>可打目标</b>（选取口径统一在 {@code AllyFilter#isEnemyOf}）。
      * <p>
-     * 也排除<b>驯服生物</b>：弹幕是「打面前那个敌人」的选敌逻辑，主人身边的狗会挤进这条逻辑里
-     * 被当成敌人（即使伤害随后被 {@code PhotoProjSafetyHandler} 免掉，弹幕仍会对着它放技能、
-     * 施加减益与击退）。既不选它、也不打它才是干净的做法。
-     * <p>
-     * 也排除<b>本模组自己召唤的幻影幻翼</b>（{@link #isSwarmPhantom}）：它们是 {@code LivingEntity}
-     * 且就飞在玩家与目标旁边，是这个方法里「最近的生物」。空挥路径（{@code hit == null}）与
-     * 目标死亡后的兜底选敌都会经过这里，不排除就会「新一批幻翼把上一批当敌人打」。
+     * 排除玩家自身、<b>驯服生物</b>（弹幕是「打面前那个敌人」的选敌逻辑，主人身边的狗会挤进这条逻辑里
+     * 被当成敌人——即使伤害随后被 {@code PhotoProjSafetyHandler} 免掉，弹幕仍会对着它放技能、
+     * 施加减益与击退；既不选它、也不打它才干净）、<b>自家召唤物</b>
+     * （幻灵本体与随从、以及 {@link #isSwarmPhantom 幻影幻翼}——空挥路径与目标死亡后的兜底选敌都会经过这里，
+     * 不排除就会「新一批幻翼把上一批当敌人打」）、以及<b>第三方辅助作战单位</b>
+     * （gytrinket 无人机/蜂群/僚机，否则「最近敌人」会被随行的无人机抢走）。
      */
     private static LivingEntity findNearestNonPlayer(ServerPlayer player, double radius) {
         LivingEntity best = null;
@@ -313,13 +315,7 @@ public class BossPhotoProjHelper {
         for (net.minecraft.world.entity.Entity e : player.level().getEntitiesOfClass(
                 net.minecraft.world.entity.LivingEntity.class,
                 player.getBoundingBox().inflate(radius),
-                en -> !(en instanceof net.minecraft.world.entity.player.Player) && en.isAlive()
-                        // 驯服生物是玩家宠物，不作为弹幕目标
-                        && !com.plumejade.lensouls.entity.PhantomDamageHandler.isTamedPet(en)
-                        // 自家召唤的幻翼不是敌人（否则幻翼会互殴）
-                        && !isSwarmPhantom(en)
-                        // gytrinket 无人机/蜂群/僚机不算目标，否则「最近敌人」会被随行的无人机抢走
-                        && !com.plumejade.lensouls.util.PhotoTargetFilter.isIgnored(en))) {
+                en -> en.isAlive() && com.plumejade.lensouls.util.AllyFilter.isEnemyOf(player, en))) {
             double d = player.distanceToSqr(e);
             if (d < bestDist) {
                 bestDist = d;
@@ -972,11 +968,14 @@ public class BossPhotoProjHelper {
      * {@code lensouls:phantom_minion}：那套标记会连带触发幻灵专属的穿透伤害、
      * 目标硬拦截与击杀归属改写，语义不同，不该混用。
      */
-    private static final String SWARM_PHANTOM_TAG = "lensouls:photo_swarm_phantom";
+    private static final String SWARM_PHANTOM_TAG = com.plumejade.lensouls.util.AllyFilter.SWARM_PHANTOM_TAG;
 
-    /** 是不是本模组召唤的幻翼（自家作战单位，永远不作为弹幕目标） */
-    private static boolean isSwarmPhantom(net.minecraft.world.entity.Entity e) {
-        return e != null && e.getPersistentData().getBoolean(SWARM_PHANTOM_TAG);
+    /**
+     * 是不是本模组召唤的幻翼（自家作战单位，永远不作为弹幕目标；定格选取也用它）。
+     * <p>口径与标记键的定义都在 {@code AllyFilter#isSwarmPhantom}（"谁是自己人"的唯一事实来源）。
+     */
+    public static boolean isSwarmPhantom(net.minecraft.world.entity.Entity e) {
+        return com.plumejade.lensouls.util.AllyFilter.isSwarmPhantom(e);
     }
 
     /** 玩家最近一次命中的敌人（触发点写入，弹幕选敌用） */
@@ -994,7 +993,7 @@ public class BossPhotoProjHelper {
         if (hit == null || hit instanceof net.minecraft.world.entity.player.Player) return;
         // 自家召唤的幻翼不算「玩家新打到的敌人」，否则打到自家幻翼会让整队掉头互殴
         if (isSwarmPhantom(hit)) return;
-        if (com.plumejade.lensouls.util.PhotoTargetFilter.isIgnored(hit)) return;
+        if (com.plumejade.lensouls.util.AllyFilter.isAssistConstruct(hit)) return;
         LAST_HIT.put(player.getUUID(), new LastHit(hit.getUUID(), player.level().getGameTime()));
     }
 
@@ -1092,8 +1091,15 @@ public class BossPhotoProjHelper {
             ph.goalSelector.removeAllGoals(g -> true);
             // 打上「自家召唤物」标记：必须在 addFreshEntity 之前，否则入世那一刻可能已被别处选敌扫到
             ph.getPersistentData().putBoolean(SWARM_PHANTOM_TAG, true);
-            // 同步槽（标记 + 不透明度）也要在入世前写好，让生成包就带上它们
-            SwarmPhantomFade.mark(ph);
+            // 无敌：与虚影幻灵同口径（**原版无敌标签**，不是抗性、也不是事件层过滤）。
+            //   ① 免索敌：LivingEntity.canBeSeenAsEnemy() = !isInvulnerable() && … ⇒ 怪物不再盯幻翼；
+            //   ② 砍不到：Entity.isInvulnerableTo 挡掉非 BYPASSES_INVULNERABILITY、非创造玩家的伤害——
+            //      玩家近战/横扫/弓箭/照片弹幕/召唤物代打，以及「幻翼互殴」（伤害源虽由 caster 发起，
+            //      但幻翼自身已无敌）全在这一层挡掉，不再需要事件层过滤；
+            //   ③ 创造模式玩家仍被 isInvulnerableTo 放行 ⇒ 由 PhantomDamageHandler#onIncomingDamage 兜底。
+            ph.setInvulnerable(true);
+            // 时效（服务端 persistentData）同样在入世前写好：玩家开始追踪时据此下发余命
+            SwarmPhantomFade.mark(ph, expireTick);
             // 首帧就要有目标点，否则 moveTargetPoint 还是默认的 Vec3.ZERO，
             // 第一个 tick 会朝世界原点扑一下
             setSwarmTargetPoint(ph, anchor);
@@ -1102,6 +1108,32 @@ public class BossPhotoProjHelper {
                     anchor.getUUID(), expireTick, dmg, now));
             DISCARD_AT.put(ph.getUUID(), expireTick);
         }
+    }
+
+    /**
+     * 玩家「开始追踪」某实体时，给自家幻翼补发一份余命。
+     * <p>
+     * <b>为什么改成发余命而不是写同步数据槽</b>：旧做法用
+     * {@code SynchedEntityData.defineId(Phantom.class, …)} 往原版幻翼的数据表里加槽，
+     * 而 {@code defineId} 的 id 是按「谁先初始化」现场分配的 —— 本类（服务端）
+     * 与渲染层（客户端）首次触碰 {@code SwarmPhantomFade} 的时机不同，同一个槽两端 id 不一致，
+     * 客户端收到「id=17 的 Integer」却发现本地是 Boolean，直接报
+     * {@code Invalid entity data item type for field … on entity Phantom} 掉线（实测崩溃）。
+     * <p>
+     * 现在只在追踪建立时发一次余命，渐隐由客户端本地按时间推算：
+     * 区块重载重建实体、后加入、传送过去，都会重新触发开始追踪 ⇒ 拿到的永远是当前余命。
+     */
+    @SubscribeEvent
+    public static void onStartTracking(PlayerEvent.StartTracking event) {
+        if (!(event.getTarget() instanceof Phantom phantom)) return;
+        if (!(event.getEntity() instanceof ServerPlayer viewer)) return;
+        if (!SwarmPhantomFade.isSwarm(phantom)) return;
+
+        MinecraftServer server = phantom.level().getServer();
+        if (server == null) return;
+        long remaining = SwarmPhantomFade.expireTick(phantom) - server.getTickCount();
+        if (remaining <= 0) return;   // 已到期：交给 runPhantomSwarms 的收回流程
+        PacketDistributor.sendToPlayer(viewer, new SwarmPhantomPacket(phantom.getId(), (int) remaining));
     }
 
     private static void runPhantomSwarms(MinecraftServer server, long now) {
@@ -1154,14 +1186,14 @@ public class BossPhotoProjHelper {
             // 不要在这里写 setDeltaMovement，也不要 setLookAt（PhantomLookControl.tick 是空实现）。
             setSwarmTargetPoint(ph, anchor);
 
-            // ── 渐隐：余命进入末尾 1.5 秒后逐 tick 由不透明线性降到全透明 ──
-            // 只在服务端算、写同步槽；客户端渲染时直接读（见 SwarmPhantomFade 的说明）。
-            SwarmPhantomFade.tickAlpha(ph, (int) (s.expireTick() - now));
+            // ── 渐隐：只发一次时效 —— 余命在「玩家开始追踪」时下发（见 onStartTracking），
+            //    末尾 1.5 秒的 alpha 由客户端本地按时间推算，不逐 tick 同步 ──
 
             if (ph.distanceToSqr(anchor) < SWARM_HIT_DIST_SQR) {
                 // 最后一道闸：真到了结算这一步再确认一次锚点合法。
-                // 幻翼互殴的伤害源是 playerAttack(caster)（直接实体是玩家，不是幻翼），
-                // 所以伤害侧认不出「自己人打自己人」——这里与 onSwarmPhantomIncomingDamage 是两道拦截。
+                // 幻翼互殴的伤害源是 playerAttack(caster)（直接实体是玩家，不是幻翼），所以伤害侧认不出
+                // 「自己人打自己人」；现在幻翼带原版无敌标签（生成处 setInvulnerable(true)），
+                // 互殴即使漏到这里也打不动。这里仍是主防线：少放技能、少刷音效。
                 if (!isSelectableAnchor(anchor)) continue;
                 anchor.invulnerableTime = 0;
                 anchor.hurt(caster.damageSources().playerAttack(caster), s.dmg());
@@ -1184,41 +1216,11 @@ public class BossPhotoProjHelper {
                         new Vec3(anchor.getX(), anchor.getEyeY() + 0.4D, anchor.getZ()));
     }
 
-    /**
-     * 自家召唤的幻翼不受<b>玩家来源</b>的伤害：近战、横扫之刃、弓箭、照片弹幕、以及玩家召唤物的代打
-     * 全部免除（需求：玩家不要误伤幻翼）。
-     * <p>
-     * 用 {@link LivingIncomingDamageEvent}（可取消、且在无敌帧/护甲结算之前）而不是
-     * {@code LivingDamageEvent}：后者只能把伤害置 0，击退与受击动画照旧。与
-     * {@code PhotoProjSafetyHandler} 同一口径。
-     * <p>
-     * 沿 {@code Projectile.getOwner()} 链查，是因为照片弹幕与「召唤物代打」的真实攻击者
-     * 藏在 owner 上，只看直接实体会漏（这一点与 {@code PhotoProjMarker.isBarrageDamage} 同款教训）。
-     * <p>
-     * <b>顺带兜住了「幻翼互殴」</b>：幻翼打幻翼用的伤害源是 {@code playerAttack(caster)}，
-     * 造成者正是玩家 ⇒ 这里必然取消。选敌逻辑是主防线，这条是结构性兜底。
-     */
-    @SubscribeEvent
-    public static void onSwarmPhantomIncomingDamage(LivingIncomingDamageEvent event) {
-        if (event.getAmount() <= 0f) return;
-        if (!isSwarmPhantom(event.getEntity())) return;
-        if (isPlayerCaused(event.getSource())) event.setCanceled(true);
-    }
-
-    /** 该伤害是否可追溯到玩家（直接实体 / 造成者，各自再沿弹射物 owner 链向上） */
-    private static boolean isPlayerCaused(net.minecraft.world.damagesource.DamageSource source) {
-        return isPlayerChain(source.getDirectEntity()) || isPlayerChain(source.getEntity());
-    }
-
-    /** 沿弹射物 owner 链向上找玩家；限深防自引用 */
-    private static boolean isPlayerChain(Entity start) {
-        Entity e = start;
-        for (int depth = 0; e != null && depth < 8; depth++) {
-            if (e instanceof net.minecraft.world.entity.player.Player) return true;
-            e = e instanceof Projectile proj ? proj.getOwner() : null;
-        }
-        return false;
-    }
+    // 幻翼的误伤保护已并入「原版无敌标签」：生成处 {@code ph.setInvulnerable(true)}；
+    // 创造模式那一档由 {@code PhantomDamageHandler#onIncomingDamage} 统一兜底。
+    // 原先的 onSwarmPhantomIncomingDamage / isPlayerCaused / isPlayerChain 已删除——
+    // 它只挡「玩家来源」的伤害，**怪物照样能打幻翼、也照样把幻翼当索敌目标**；
+    // 换成无敌标签后这两件事一起解决（且连受击闪红/击退/音效都没有）。
 
     /**
      * 该实体能不能当幻翼的锚点：活着、非玩家、<b>且不是本模组自己召唤的幻翼</b>。

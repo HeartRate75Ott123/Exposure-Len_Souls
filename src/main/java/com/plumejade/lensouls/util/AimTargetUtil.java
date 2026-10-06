@@ -30,9 +30,9 @@ public final class AimTargetUtil {
      * @param halfAngleDeg  锥半角（度），如 30 表示总锥角 60°
      */
     public static boolean isAimedAt(Player player, LivingEntity entity, double range, double halfAngleDeg) {
-        // 第三方辅助作战单位（gytrinket 无人机/蜂群/僚机）不算瞄准目标：
+        // 第三方辅助作战单位（gytrinket 无人机/蜂群/僚机）不算瞄准目标（分类定义见 AllyFilter）：
         // 返回 false 后调用方会继续看下一个生物，不会出现「准星扫过无人机就锁定它」。
-        if (PhotoTargetFilter.isIgnored(entity)) return false;
+        if (AllyFilter.isAssistConstruct(entity)) return false;
 
         Level level = player.level();
         Vec3 eye = player.getEyePosition();

@@ -22,6 +22,28 @@ public class ExposureHelper {
     private static final Logger LOGGER = LenSouls.LOGGER;
     private static final ResourceLocation PHOTO_ITEM_ID =
             ResourceLocation.parse("exposure:photograph");
+    /** 玩家实体类型 id —— 「主体不认玩家」的共用地基，理由见 {@link #isPlayerEntityId} */
+    private static final ResourceLocation PLAYER_ENTITY_ID =
+            ResourceLocation.fromNamespaceAndPath("minecraft", "player");
+
+    /**
+     * 该实体 id 是否玩家。
+     * <p>
+     * <b>用途</b>：凡是「把主体记录进照片」的链路都<b>不认玩家</b>——
+     * 能力窃取（玩家没有实体照片效果条目，选中它整张照片退化成普通照片）与
+     * 弱点透镜（用户口径：弱点透镜不需要帧内有其他玩家）。
+     * 帧列表里那些"拍队友"的玩法（滤镜 / 药水玻璃板）<b>不经过本判定</b>：
+     * 它们直接读 {@code FrameAddedEvent.getEntitiesInFrame()}，玩家照旧在列表里。
+     * <p>
+     * 另：相机持有者本身已由 {@code FrameEntities.assemble} 在源头排除；
+     * 这里还要再判一次，是因为<b>旧照片</b>（1.5.50 之前拍的）存的
+     * {@code entities_in_frame} 里仍留着拍摄者自己，而 {@code EntityInFrame} 只存
+     * {@code (id,name,pos,distance)}、<b>没有 UUID</b>，无法精确定位"哪一条是拍摄者"，
+     * 只能按"玩家一律不算主体"处理。
+     */
+    public static boolean isPlayerEntityId(ResourceLocation id) {
+        return PLAYER_ENTITY_ID.equals(id);
+    }
 
     /**
      * 判断物品是否为 Exposure 照片（通过物品 ID 比对）。
@@ -90,11 +112,19 @@ public class ExposureHelper {
         // Frame.entitiesInFrame 字段
         if (frameTag.contains("entities_in_frame", Tag.TAG_LIST)) {
             ListTag entities = frameTag.getList("entities_in_frame", Tag.TAG_COMPOUND);
-            if (!entities.isEmpty()) {
-                String idStr = entities.getCompound(0).getString("id");
-                if (!idStr.isEmpty()) {
-                    return ResourceLocation.parse(idStr);
+            for (int i = 0; i < entities.size(); i++) {
+                String idStr = entities.getCompound(i).getString("id");
+                if (idStr.isEmpty()) continue;
+                ResourceLocation id;
+                try {
+                    id = ResourceLocation.parse(idStr);
+                } catch (Exception ignored) {
+                    continue;   // 坏 id 就往后找一个能解析的
                 }
+                // 玩家不算主体：走本方法的只有弱点透镜那几条链路（见 isPlayerEntityId）；
+                // 旧照片里可能还留着拍摄者自己，必须跳过
+                if (isPlayerEntityId(id)) continue;
+                return id;
             }
         }
         return null;

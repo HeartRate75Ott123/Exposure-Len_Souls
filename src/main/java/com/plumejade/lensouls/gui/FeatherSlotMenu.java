@@ -100,8 +100,8 @@ public class FeatherSlotMenu extends AbstractContainerMenu {
      */
     public boolean canModify(int slot) {
         if (slot < 0 || slot >= FEATHER_SLOTS) return false;
-        if (creative()) return true;
-        return !isLocked(slot) && featherStack(slot).isEmpty();
+        // §4.1：生存模式也能左键打开列表**更换**（只是不能撤下），所以一律放行
+        return true;
     }
 
     /**
@@ -135,8 +135,7 @@ public class FeatherSlotMenu extends AbstractContainerMenu {
         if (isInstalled(source.getItem())) return;
 
         boolean creative = creative();
-        // 生存：锁定槽、非空槽都不许换（「选定后无法更改」）
-        if (!creative && (isLocked(slot) || !featherStack(slot).isEmpty())) return;
+        // §4.1：生存模式允许左键**更换**（旧物退回背包），只是不允许把槽清空——那是创造右键的权限
 
         ItemStack replaced = featherStack(slot).copy();
         this.container.setItem(slot, source.copyWithCount(1));
@@ -151,6 +150,70 @@ public class FeatherSlotMenu extends AbstractContainerMenu {
         this.broadcastChanges();
     }
 
+    /**
+     * §4.1：从诅咒列表直接装入（列表**固定包含全部 7 款**，与背包里有没有无关）。
+     * <p>
+     * 背包里有同款就搬一个过来，没有就**直接发放**；槽里已有则视为「更换」，旧物退回背包。
+     * 生存装入 = 永久锁定（与旧的 onInstall 同口径）。
+     */
+    public void onInstallCurse(int slot, String curseId) {
+        if (!isServer()) return;
+        if (slot < 0 || slot >= FEATHER_SLOTS) return;
+        com.plumejade.lensouls.feather.CurseDef def =
+                com.plumejade.lensouls.feather.CurseDefs.byId(curseId);
+        if (def == null) return;
+        Item item = com.plumejade.lensouls.feather.CurseDefs.itemOf(def);
+        if (item == null) return;
+
+        int existing = slotOf(item);
+        if (existing == slot) return;   // 已经是这一款，无事发生
+
+        ItemStack current = featherStack(slot);
+
+        if (existing >= 0) {
+            // 该款装在**别的槽**：空槽不许装（客户端已用黄框挡住）；占用槽 ⇒ **交换两槽内容**
+            if (current.isEmpty()) return;
+            ItemStack other = featherStack(existing).copy();
+            this.container.setItem(existing, current.copy());
+            this.container.setItem(slot, other);
+            if (!creative()) {
+                this.container.data().setLocked(existing, true);
+                this.container.data().setLocked(slot, true);
+            }
+            this.data.set(slot, this.container.data().isLocked(slot) ? 1 : 0);
+            this.data.set(existing, this.container.data().isLocked(existing) ? 1 : 0);
+            this.broadcastChanges();
+            return;
+        }
+
+        // 正常装入：背包里有同款就搬一个过来，没有就发放；旧物退回背包
+        ItemStack source = ItemStack.EMPTY;
+        for (int i = 0; i < PLAYER_SLOTS; i++) {
+            ItemStack candidate = this.player.getInventory().getItem(i);
+            if (!candidate.isEmpty() && candidate.is(item)) {
+                source = candidate;
+                break;
+            }
+        }
+        if (!source.isEmpty()) source.shrink(1);
+
+        this.container.setItem(slot, new ItemStack(item));
+        if (!creative()) {
+            this.container.data().setLocked(slot, true);
+        }
+        this.data.set(slot, this.container.data().isLocked(slot) ? 1 : 0);
+        // 旧物不退实物（脱离实物化）；背包里有同款的那个已在上面被消耗
+        this.broadcastChanges();
+    }
+
+    /** 该物品当前装在哪个槽（-1 = 没装） */
+    private int slotOf(Item item) {
+        for (int i = 0; i < FEATHER_SLOTS; i++) {
+            if (this.featherStack(i).is(item)) return i;
+        }
+        return -1;
+    }
+
     /** 卸下 {@code slot} 的羽毛（仅创造） */
     public void onUninstall(int slot) {
         if (!isServer()) return;
@@ -163,7 +226,7 @@ public class FeatherSlotMenu extends AbstractContainerMenu {
         this.container.setItem(slot, ItemStack.EMPTY);
         this.container.data().setLocked(slot, false);
         this.data.set(slot, 0);
-        giveBack(removed);
+        // 不给实物：诅咒正在脱离实物化，取下即消失（列表里随时可以再选回来）
         this.broadcastChanges();
     }
 

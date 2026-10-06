@@ -30,9 +30,34 @@ public class ToughnessPhotoHandler {
             BossToughnessManager manager = BossToughnessManager.getInstance();
             boolean playedSound = false;
 
+            // ① 荒厄·封器 反转：被拍摄的敌对生物受到「韧性伤害 × 玩家当前近战伤害」的伤害
+            boolean photoDamage = hitter != null
+                    && com.plumejade.lensouls.handler.FeatherHardmanHandler.isCameraUnlocked(hitter);
+            float photoDamagePoints = 0f;
+            float photoDamageMelee = 0f;
+            if (photoDamage) {
+                photoDamagePoints = Math.max(0f,
+                        com.plumejade.lensouls.integration.TrophyModifierHandler.applyHitsModifier(hitter, 1.0f)
+                                + com.plumejade.lensouls.handler.FeatherHardmanHandler.toughnessDamageDelta(hitter));
+                photoDamageMelee = (float) hitter.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE);
+            }
+
             for (LivingEntity entity : entities) {
                 // 幻灵（借体 BOSS 及其召唤物）不参与削韧：玩家对幻灵不造成削韧伤害，也不出韧性条/音效
                 if (com.plumejade.lensouls.entity.PhantomDamageHandler.isPhantomEntity(entity)) continue;
+
+                // ① e2 反转的拍照伤害：对所有被拍到的敌对生物生效（与削韧等级无关）
+                if (photoDamage && entity != hitter
+                        && entity instanceof net.minecraft.world.entity.monster.Enemy
+                        && entity.isAlive()) {
+                    float dmg = photoDamagePoints * photoDamageMelee;
+                    if (dmg > 0f) {
+                        ((com.plumejade.lensouls.mixin.EntityInvulnerableTimeAccessor) (Object) entity)
+                                .lensouls$setInvulnerableTime(0);
+                        entity.hurt(hitter.damageSources().playerAttack(hitter), dmg);
+                    }
+                }
+
                 boolean hasTier = BossTierLoader.getTier(entity) > 0;
                 boolean inManager = manager.has(entity);
 

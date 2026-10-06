@@ -91,18 +91,27 @@ public final class WeaknessLensPhoto {
     }
 
     /**
-     * 帧内第一个实体（= Exposure 记录的「离相机最近的主体」，与
-     * {@link ExposureHelper#getEntityId} 读到的 {@code entities_in_frame[0]} 一致）。
+     * 照片主体：帧内第一个**非玩家**实体（= Exposure 记录的「离相机最近的主体」，
+     * 与 {@link ExposureHelper#getEntityId} 读到的 {@code entities_in_frame[0]} 同口径）。
      * <p>
      * {@code EntitiesInFrameMixin} 保证列表内都是活着的 {@code LivingEntity}，
      * 多部件 boss 的子部件已追溯到父体再补进列表。
+     * <p>
+     * <b>玩家不算主体（用户口径）</b>：弱点透镜<b>不需要</b>帧内有其他玩家——
+     * 玩家既没有实体照片效果条目，拿玩家当主体只会让照片退化（旧照片里还留着持有者自己）。
+     * 判定收口在 {@link ExposureHelper#isPlayerEntityId}；「滤镜给队友上增益」那条链路
+     * <b>不经过本方法</b>（它直接读帧内实体列表），所以这里跳玩家不会影响给队友加 buff。
      */
     public static ResourceLocation subjectEntityId(Frame frame) {
         if (frame == null) return null;
         List<EntityInFrame> list = frame.entitiesInFrame();
-        if (list == null || list.isEmpty()) return null;
-        var first = list.get(0);
-        return first != null ? first.id() : null;
+        if (list == null) return null;
+        for (EntityInFrame entry : list) {
+            if (entry == null || entry.id() == null) continue;
+            if (ExposureHelper.isPlayerEntityId(entry.id())) continue;
+            return entry.id();
+        }
+        return null;
     }
 
     // ========== 弱点元素 ==========

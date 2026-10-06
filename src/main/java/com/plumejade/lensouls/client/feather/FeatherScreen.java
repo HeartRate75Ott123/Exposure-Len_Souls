@@ -286,7 +286,7 @@ public class FeatherScreen extends Screen implements MenuAccess<FeatherSlotMenu>
             }
             if (this.minecraft != null) {
                 CursorKeeper.remember();
-                this.minecraft.setScreen(new FeatherSelectScreen(this, this.menu, slot));
+                this.minecraft.setScreen(new CurseListScreen(this, this.menu, slot));
                 CursorKeeper.restore();
             }
             return true;

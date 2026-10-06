@@ -161,19 +161,23 @@ public class ModItems {
     public static final DeferredItem<SlowIronPlateItem> SLOW_IRON_PLATE = ITEMS.register("slow_iron_plate",
             () -> new SlowIronPlateItem(new Item.Properties()));
 
-    // ---- 羽·元素觉醒者（Curios 任意槽位饰品） ----
-    public static final DeferredItem<FeatherElementRiseItem> FEATHER_ELEMENTRISE =
-            ITEMS.register("feather_elementrise", () -> new FeatherElementRiseItem(new Item.Properties()));
+    // ---- 7 款诅咒道具：统一用 FeatherCurseItem（差异全在 CurseDefs + lang 键里；7 槽全开、可同时佩戴） ----
+    public static final DeferredItem<FeatherCurseItem> FEATHER_ELEMENTRISE =
+            ITEMS.register("feather_elementrise", () -> new FeatherCurseItem(com.plumejade.lensouls.feather.CurseDefs.ELEMENTRISE));
+public static final DeferredItem<FeatherCurseItem> FEATHER_TWITCHER =
+ITEMS.register("feather_twitcher", () -> new FeatherCurseItem(com.plumejade.lensouls.feather.CurseDefs.TWITCHER));
+public static final DeferredItem<FeatherCurseItem> FEATHER_HARDMAN =
+ITEMS.register("feather_hardman", () -> new FeatherCurseItem(com.plumejade.lensouls.feather.CurseDefs.HARDMAN));
+public static final DeferredItem<FeatherCurseItem> FEATHER_ABYSS =
+ITEMS.register("feather_abyss", () -> new FeatherCurseItem(com.plumejade.lensouls.feather.CurseDefs.ABYSS));
 
-    // ---- 羽·扭曲之人（Curios 任意槽位饰品，与元素羽毛互斥） ----
-public static final DeferredItem<FeatherTwitcherItem> FEATHER_TWITCHER =
-ITEMS.register("feather_twitcher", () -> new FeatherTwitcherItem(new Item.Properties()));
-public static final DeferredItem<FeatherHardmanItem> FEATHER_HARDMAN =
-ITEMS.register("feather_hardman", () -> new FeatherHardmanItem(new Item.Properties()));
-
-    // ---- 羽·折翼沉渊（Curios 任意槽位饰品，与其他羽毛互斥） ----
-public static final DeferredItem<FeatherAbyssItem> FEATHER_ABYSS =
-ITEMS.register("feather_abyss", () -> new FeatherAbyssItem(new Item.Properties()));
+    // ---- ⑤ 羽·断时炉心 / ⑥ 羽·终焉秘仪 / ⑦ 羽·零号誓炉（诅咒三件套；7 槽全开、可同时佩戴） ----
+public static final DeferredItem<FeatherCurseItem> FEATHER_TIMECORE =
+ITEMS.register("feather_timecore", () -> new FeatherCurseItem(com.plumejade.lensouls.feather.CurseDefs.TIMECORE));
+public static final DeferredItem<FeatherCurseItem> FEATHER_FINALRITE =
+ITEMS.register("feather_finalrite", () -> new FeatherCurseItem(com.plumejade.lensouls.feather.CurseDefs.FINALRITE));
+public static final DeferredItem<FeatherCurseItem> FEATHER_ZEROFORGE =
+ITEMS.register("feather_zeroforge", () -> new FeatherCurseItem(com.plumejade.lensouls.feather.CurseDefs.ZEROFORGE));
 
     // ---- 法师胸针 / 灵魂口哨（Curios 任意槽位饰品，二者互斥） ----
     public static final DeferredItem<MageBroochItem> MAGE_BROOCH =

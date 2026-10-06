@@ -1,124 +1,269 @@
 package com.plumejade.lensouls.handler;
 
+import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.effect.ModEffects;
+import com.plumejade.lensouls.feather.CurseDef;
+import com.plumejade.lensouls.feather.CurseDefs;
+import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.FeatherEquip;
 import com.plumejade.lensouls.item.ModItems;
+import net.minecraft.core.Holder;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
-import top.theillusivec4.curios.api.CuriosApi;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 /**
- * 羽·元素觉醒者效果处理器。
- * <p>
- * 佩戴检测：Curios 任意槽位（findFirstCurio 遍历所有槽）。
- * 效果：
- * <ul>
- *   <li>受到伤害 +50%（LivingDamageEvent.Pre 受害者为佩戴者）</li>
- *   <li>造成伤害 +40%（LivingDamageEvent.Pre 伤害来源为佩戴者）</li>
- *   <li>身上的药水活性等级 <b>+3</b>（在现有活性基础上叠加，带防滚雪球记录）</li>
- *   <li>造成的元素 DoT 伤害 <b>×3</b>（见 {@code SoulDotHandler}）</li>
- * </ul>
- * 佩戴者「无法使用复制之魂」由 CopySoulItem 封印（配方层拦截）处理；
- * 「无法掉落复制之魂」已按需求<b>移除</b>——佩戴时 BOSS 照常掉落复制之魂。
+ * ③ 羽·元素觉醒者（新改案 · 2 条 · 整款共用反转条件）。
+ *
+ * <pre>
+ * e1 躁动(0)：诅咒 = 每 (4 × 活性等级²) 秒，所有活性等级 +1；每个活性等级使受到伤害 +5%
+ *             反转 = 每个活性等级使受到伤害改为 +2%（等级成长照旧）
+ * e2 余灰(1)：诅咒 = DoT 伤害随目标剩余血量百分比变化（最高 +100%、最低 -50%）
+ *             反转 = DoT 伤害下限改为 -20%
+ * 反转条件（整款共用）：活性等级 ≥10 且生命值 ≥90% 时，造成一次 10000 点元素附加伤害
+ * </pre>
+ *
+ * 旧版的「受到伤害 +50%」「造成伤害 +40%」「活性等级 +3」「元素 DoT ×3」
+ * 与「无法使用复制之魂」<b>全部移除</b>（复制之魂封印见 {@code CopySoulSealHandler}）。
  */
 public class FeatherElementRiseHandler {
 
-    /** 受击伤害倍率（+50%） */
-    public static final float DAMAGE_TAKEN_MULTIPLIER = 1.5f;
-    /** 造成伤害倍率（+40%） */
-    public static final float DAMAGE_DEALT_MULTIPLIER = 1.4f;
-    /** 元素 DoT 增伤倍率（×3） */
-    public static final float DOT_MULTIPLIER = 3.0f;
-    /** 药水活性等级加成（+3 级） */
-    public static final int INFUSION_LEVEL_BONUS = 3;
-    /** 活性效果时长：-1 = 无限（信标式常驻） */
-    public static final int INFUSION_DURATION = -1;
+    private static final CurseDef D = CurseDefs.ELEMENTRISE;
 
-    /** 防滚雪球：记录我们写入的等级与推算出的玩家基础等级 */
-    private static final String TAG_APPLIED = "lensouls:feather_rise_applied";
-    private static final String TAG_BASE = "lensouls:feather_rise_base";
+    // ── e1 躁动 ──
+    /** 间隔基数：每 (4 × 活性等级²) 秒 +1 级 */
+    public static final int E1_INTERVAL_SECONDS_BASE = 4;
+    /** 每级活性使受到伤害 +5%（诅咒态） */
+    public static final float E1_TAKEN_PER_LEVEL_CURSE = 0.05f;
+    /** 每级活性使受到伤害 +2%（反转态） */
+    public static final float E1_TAKEN_PER_LEVEL_REVERSED = 0.02f;
 
-    /**
-     * 佩戴检测：**Curios 任意槽位 ‖ 羽毛装配界面的 5 个槽位**（见 {@link FeatherEquip}）。
-     * <p>同种物品只生效一次（布尔语义，重复持有不叠加）。
-     */
-    public static boolean hasFeather(Player player) {
-        return FeatherEquip.has(player, ModItems.FEATHER_ELEMENTRISE.get());
-    }
+    // ── e2 余灰：DoT 曲线 ──
+    /** DoT 系数上限（+100% ⇒ ×2.0） */
+    public static final float E2_DOT_MAX_MULT = 2.0f;
+    /** DoT 系数下限（诅咒态 −50% ⇒ ×0.5） */
+    public static final float E2_DOT_MIN_MULT = 0.5f;
+    /** DoT 系数下限（反转态 −20% ⇒ ×0.8） */
+    public static final float E2_DOT_MIN_MULT_REVERSED = 0.8f;
 
-    /** 受到伤害 +50% */
-    @SubscribeEvent
-    public static void onDamaged(LivingDamageEvent.Pre event) {
-        if (event.getEntity() instanceof ServerPlayer player && hasFeather(player)) {
-            event.setNewDamage(event.getNewDamage() * DAMAGE_TAKEN_MULTIPLIER);
-        }
-    }
+    // ── 整款共用反转条件 ──
+    /** 条件：活性等级 ≥10 */
+    public static final int REVERSE_MIN_ACTIVITY_LEVEL = 10;
+    /** 条件：生命值 ≥90% */
+    public static final float REVERSE_MIN_HEALTH_FRACTION = 0.9f;
+    /** 条件：一次 10000 点元素附加伤害 */
+    public static final float REVERSE_MIN_ELEMENT_BONUS = 10000f;
 
-    /** 造成伤害 +40% */
-    @SubscribeEvent
-    public static void onDealDamage(LivingDamageEvent.Pre event) {
-        if (event.getSource().getEntity() instanceof ServerPlayer player && hasFeather(player)) {
-            event.setNewDamage(event.getNewDamage() * DAMAGE_DEALT_MULTIPLIER);
-        }
-    }
+    /** 等级成长进度持久化键（PlayerPersisted 子键，跨死亡保留） */
+    private static final String KEY_STEPS = "lensouls:rise_steps";
+    private static final String KEY_NEXT = "lensouls:rise_next";
+    private static final String KEY_BASE = "lensouls:rise_base";
 
-    /** 常驻四种活性效果（信标式：无限时长 + ambient，无粒子无到期提醒） */
-    @SubscribeEvent
-    public static void onPlayerTick(PlayerTickEvent.Post event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (player.tickCount % 20 != 0) return;
-        if (hasFeather(player)) {
-            boostPotions(player);
-        } else {
-            removeBoostPotions(player);
-        }
-    }
-
-    private static final net.minecraft.core.Holder<MobEffect>[] INFUSIONS = new net.minecraft.core.Holder[]{
+    private static final Holder<MobEffect>[] INFUSIONS = new Holder[]{
             ModEffects.FIRE_INFUSION,
             ModEffects.WATER_INFUSION,
             ModEffects.EARTH_INFUSION,
             ModEffects.ENDER_INFUSION
     };
 
+    /** 高频日志节流（元素附加伤害达标提示） */
+    private static final Map<UUID, Long> LAST_BONUS_LOG = new HashMap<>();
+
     /**
-     * 在玩家现有药水活性基础上 +3 级（无限时长），周期性刷新兜底维持。
-     * <p>
-     * 防滚雪球：每 20 tick 都会重写效果等级，若直接「读当前等级再 +3」会无限叠加。
-     * 因此记录我们上次写入的等级；当读到的等级恰好等于它时，说明那是我们的产物，
-     * 基础等级沿用上次推算值，不参与 +3。
+     * 佩戴检测：{@link FeatherEquip#has}（只认本模组羽毛栏的 7 个槽位）。
      */
-    private static void boostPotions(ServerPlayer player) {
-        var pd = player.getPersistentData();
-        int recorded = pd.getInt(TAG_APPLIED);
-        var probe = player.getEffect(INFUSIONS[0]);
-        int current = probe == null ? -1 : probe.getAmplifier();
-        int base = (current >= 0 && current == recorded) ? pd.getInt(TAG_BASE) : Math.max(current, 0);
-        int target = base + INFUSION_LEVEL_BONUS;
+    public static boolean hasFeather(Player player) {
+        return FeatherEquip.has(player, ModItems.FEATHER_ELEMENTRISE.get());
+    }
 
-        pd.putInt(TAG_BASE, base);
-        pd.putInt(TAG_APPLIED, target);
+    /** 跨死亡持久化子键（NeoForge 复活只复制 PlayerPersisted 子键） */
+    private static CompoundTag persisted(Player player) {
+        return player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
+    }
 
-        for (net.minecraft.core.Holder<MobEffect> infusion : INFUSIONS) {
-            player.addEffect(new MobEffectInstance(infusion, INFUSION_DURATION, target, true, true, true));
+    private static void writeBack(Player player, CompoundTag tag) {
+        player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
+    }
+
+    // ==================== 受到伤害（e1 的每级 +5% / +2%） ====================
+
+    @SubscribeEvent
+    public static void onDamaged(LivingDamageEvent.Pre event) {
+        try {
+            if (!(event.getEntity() instanceof ServerPlayer player)) return;
+            float d = event.getNewDamage();
+            if (d <= 0f) return;
+            int level = activityLevel(player);
+            if (level <= 0) return;
+
+            // 受伤侧乘算（§2）
+            if (CurseManager.on(player, D, 0)) {
+                d *= 1.0f + E1_TAKEN_PER_LEVEL_CURSE * level;
+            } else if (CurseManager.rev(player, D, 0)) {
+                d *= 1.0f + E1_TAKEN_PER_LEVEL_REVERSED * level;
+            }
+            event.setNewDamage(d);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ③ e1 受伤结算异常", t);
         }
     }
 
-    /** 摘下羽毛时移除常驻灌注（仅限无限时长者，保留玩家自己喝的有限时长活性药水） */
-    private static void removeBoostPotions(ServerPlayer player) {
-        for (net.minecraft.core.Holder<MobEffect> infusion : INFUSIONS) {
+    // ==================== 每 tick：活性等级成长（e1） ====================
+
+    @SubscribeEvent
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (player.tickCount % 10 != 0) return;
+        try {
+            tick(player);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ③ 每 tick 结算异常", t);
+        }
+    }
+
+    private static void tick(ServerPlayer player) {
+        if (!CurseManager.isActive(player, D)) {
+            clearRamp(player);
+            return;
+        }
+
+        CompoundTag tag = persisted(player);
+        int[] base = tag.getIntArray(KEY_BASE);
+        if (base.length != INFUSIONS.length) base = new int[INFUSIONS.length];
+        int steps = tag.getInt(KEY_STEPS);
+        long next = tag.getLong(KEY_NEXT);
+        long now = player.level().getGameTime();
+
+        // 采纳外部等级：观测值与我们写过的（base + steps）不同 ⇒ 玩家自己改了等级（喝药水 / 效果到期）
+        for (int i = 0; i < INFUSIONS.length; i++) {
+            MobEffectInstance inst = player.getEffect(INFUSIONS[i]);
+            int observed = inst == null ? 0 : inst.getAmplifier() + 1;
+            int written = base[i] + steps;
+            if (observed != written) {
+                base[i] = Math.max(0, observed - Math.max(0, steps));
+            }
+        }
+
+        if (steps <= 0) {
+            // 初次佩戴：直接给 1 级起步（活性等级 0 会让 (4 × L²) 秒退化成 0）
+            steps = 1;
+            next = now + intervalTicks(1);
+        } else if (next > 0L && now >= next) {
+            steps++;
+            next = now + intervalTicks(Math.max(1, levelOf(base, steps)));
+        }
+
+        tag.putIntArray(KEY_BASE, base);
+        tag.putInt(KEY_STEPS, steps);
+        tag.putLong(KEY_NEXT, next);
+        writeBack(player, tag);
+
+        for (int i = 0; i < INFUSIONS.length; i++) {
+            int level = base[i] + steps;
+            if (level <= 0) continue;
+            MobEffectInstance cur = player.getEffect(INFUSIONS[i]);
+            boolean already = cur != null
+                    && cur.getAmplifier() + 1 == level
+                    && cur.getDuration() == MobEffectInstance.INFINITE_DURATION;
+            if (already) continue;
+            player.addEffect(new MobEffectInstance(INFUSIONS[i], MobEffectInstance.INFINITE_DURATION,
+                    level - 1, true, true, true));
+        }
+    }
+
+    /** 摘下 / 未选中：移除我们写的常驻活性（只动无限时长者，保留玩家自己喝的有限时长活性）并清状态 */
+    private static void clearRamp(ServerPlayer player) {
+        for (Holder<MobEffect> infusion : INFUSIONS) {
             MobEffectInstance inst = player.getEffect(infusion);
             if (inst != null && inst.getDuration() == MobEffectInstance.INFINITE_DURATION) {
                 player.removeEffect(infusion);
             }
         }
-        var pd = player.getPersistentData();
-        pd.remove(TAG_APPLIED);
-        pd.remove(TAG_BASE);
+        CompoundTag tag = persisted(player);
+        if (tag.contains(KEY_STEPS) || tag.contains(KEY_NEXT) || tag.contains(KEY_BASE)) {
+            tag.remove(KEY_STEPS);
+            tag.remove(KEY_NEXT);
+            tag.remove(KEY_BASE);
+            writeBack(player, tag);
+        }
+    }
+
+    private static long intervalTicks(int level) {
+        return (long) E1_INTERVAL_SECONDS_BASE * level * level * 20L;
+    }
+
+    private static int levelOf(int[] base, int steps) {
+        int max = 0;
+        for (int b : base) max = Math.max(max, b + steps);
+        return max;
+    }
+
+    /** 玩家当前「活性等级」= 四种元素活性效果里的最高等级（无 = 0） */
+    public static int activityLevel(Player player) {
+        if (player == null) return 0;
+        int max = 0;
+        for (Holder<MobEffect> infusion : INFUSIONS) {
+            MobEffectInstance inst = player.getEffect(infusion);
+            if (inst != null) max = Math.max(max, inst.getAmplifier() + 1);
+        }
+        return max;
+    }
+
+    // ==================== e2 余灰：DoT 曲线 ====================
+
+    /**
+     * DoT 伤害系数：随目标剩余血量百分比线性变化 ——
+     * 满血 ×2.0（+100%）、空血 ×0.5（-50%）；反转后下限抬到 ×0.8（-20%）。
+     */
+    public static float dotMultiplier(ServerPlayer attacker, LivingEntity target) {
+        if (attacker == null || target == null) return 1.0f;
+        boolean curse = CurseManager.on(attacker, D, 1);
+        boolean reversed = CurseManager.rev(attacker, D, 1);
+        if (!curse && !reversed) return 1.0f;
+
+        float maxHealth = target.getMaxHealth();
+        float frac = maxHealth > 0f ? Math.max(0f, Math.min(1f, target.getHealth() / maxHealth)) : 0f;
+        float mult = E2_DOT_MIN_MULT + (E2_DOT_MAX_MULT - E2_DOT_MIN_MULT) * frac;
+        float floor = reversed ? E2_DOT_MIN_MULT_REVERSED : E2_DOT_MIN_MULT;
+        return Math.max(floor, mult);
+    }
+
+    // ==================== 整款共用反转条件：一次 10000 点元素附加伤害 ====================
+
+    /**
+     * 由 {@code DamageHandler} 在算出本次「元素附加伤害」后回灌（见 {@code DamageHandler#onLivingDamagePre}）。
+     */
+    public static void onElementBonus(ServerPlayer player, float bonus) {
+        if (player == null || bonus <= 0f) return;
+        try {
+            if (!CurseManager.isActive(player, D)) return;
+            if (bonus < REVERSE_MIN_ELEMENT_BONUS) return;
+            if (activityLevel(player) < REVERSE_MIN_ACTIVITY_LEVEL) return;
+            if (player.getHealth() < player.getMaxHealth() * REVERSE_MIN_HEALTH_FRACTION) return;
+
+            long now = player.level().getGameTime();
+            Long last = LAST_BONUS_LOG.get(player.getUUID());
+            if (last == null || now - last > 200L) {
+                LAST_BONUS_LOG.put(player.getUUID(), now);
+                LenSouls.LOGGER.info("[Curse] ③ 元素附加伤害 {} 点达标（玩家 {}）",
+                        String.format("%.1f", bonus), player.getName().getString());
+            }
+
+            for (int i = 0; i < D.entries(); i++) {
+                CurseManager.tick(player, D, i, 1L, 1L);
+            }
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ③ 反转条件结算异常", t);
+        }
     }
 }

@@ -21,7 +21,6 @@
     "PhantomPushGuardMixin",
     "PhantomKillCreditMixin",
     "PhantomMoveTargetAccessor",
-    "PhantomFadeSyncMixin",
     "BlessingCrystalMixin"
   ],
     "client": [

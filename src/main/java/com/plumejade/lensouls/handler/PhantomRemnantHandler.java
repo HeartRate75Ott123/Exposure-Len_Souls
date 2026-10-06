@@ -31,7 +31,8 @@ import top.theillusivec4.curios.api.CuriosApi;
  * 随后的 {@code dropEquipment()} 面对空背包自然什么都掉不出来，不需要再去清掉落列表。
  * <p>
  * 与 Enigmatic Legacy 的差异（按需求）：额外抓取 <b>Curios 全部槽位</b>并原样归位；
- * <b>经验全额</b>收进容器（并掐掉原版经验球，避免翻倍）；开启 {@code keepInventory} 时完全不生效。
+ * <b>经验全额</b>收进容器（并掐掉原版经验球，避免翻倍）；开启 {@code keepInventory} 时默认不生效，
+ * 但 ② 羽·扭曲之人的「满值死亡」（{@link FeatherTwitcherHandler#KEY_FORCE_HOST}）例外 —— 与游戏规则解耦。
  */
 public class PhantomRemnantHandler {
 
@@ -46,9 +47,15 @@ public class PhantomRemnantHandler {
             if (level.isClientSide) return;
 
             if (level.getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY)) {
-                LenSouls.LOGGER.debug("[PhantomRemnant] 跳过：已开启死亡不掉落");
-                return;
+                // 设计文档 §7：② 的「满值死亡」托管与游戏规则**解耦** —— 开着死亡不掉落时，
+                // 本应被虚影核心托管的物品原来会原地落地，这里按标记放行。
+                if (!player.getPersistentData().getBoolean(FeatherTwitcherHandler.KEY_FORCE_HOST)) {
+                    LenSouls.LOGGER.debug("[PhantomRemnant] 跳过：已开启死亡不掉落");
+                    return;
+                }
+                LenSouls.LOGGER.info("[PhantomRemnant] keepInventory 开启，但本次为 ② 满值死亡 → 仍执行托管");
             }
+            player.getPersistentData().putBoolean(FeatherTwitcherHandler.KEY_FORCE_HOST, false);
             if (!hasCore(player)) {
                 LenSouls.LOGGER.debug("[PhantomRemnant] 跳过：未佩戴/未携带虚影核心");
                 return;

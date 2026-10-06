@@ -48,7 +48,7 @@ public class ClientPhantomHandler {
     public static boolean isPhantomEntity(Entity entity) {
         if (entity == null) return false;
         return PHANTOM_ENTITY_IDS.contains(entity.getId())
-                || entity.getPersistentData().getBoolean("lensouls:phantom");
+                || entity.getPersistentData().getBoolean(com.plumejade.lensouls.util.AllyFilter.PHANTOM_TAG);
     }
 
     /** 注册幻灵（由 LenSoulsClient 的 packet handler 调用） */

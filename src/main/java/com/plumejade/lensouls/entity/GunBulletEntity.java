@@ -4,6 +4,7 @@ import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.item.ModItems;
+import com.plumejade.lensouls.util.AllyFilter;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -16,7 +17,6 @@ import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.server.level.ServerLevel;
@@ -268,26 +268,15 @@ public class GunBulletEntity extends ThrowableItemProjectile {
         return !isFriendlyTarget(target, getOwner());
     }
 
-    /** 友方单位判定：其他玩家、驯养宠物（owned）、自身骑乘关系、同盟实体、玩家归属的构造体（gytrinket） */
+    /**
+     * 友方单位判定（枪械子弹）：<b>友方一律穿过</b>——直接用统一大过滤 {@link AllyFilter#isFriendly}
+     * （类别：玩家 / 任意驯服宠物 / 自家召唤物 / 任意第三方辅助作战单位，<b>不区分归属</b>；
+     * 外加同乘），视角 = 子弹 owner。
+     * <p>
+     * 与照片弹幕、定格、弹幕选敌共用同一份判定，不再各自定义"什么算友方"。
+     */
     private static boolean isFriendlyTarget(Entity target, Entity owner) {
-        if (target instanceof Player) return true;
-        if (owner instanceof LivingEntity lo) {
-            if (target instanceof TamableAnimal tame && tame.isOwnedBy(lo)) return true;
-            if (owner.getVehicle() == target || target.getVehicle() == owner) return true;
-            if (owner instanceof Player player && isOwnedConstruct(target, player)) return true;
-        }
-        return owner != null && target.isAlliedTo(owner);
-    }
-
-    /** gytrinket 构造体无人机的归属判定（反射调用 getOwnerUUID，无编译依赖）：拥有者 == 子弹射击者 */
-    private static boolean isOwnedConstruct(Entity target, Player owner) {
-        if (!target.getClass().getName().contains("gytrinket")) return false;
-        try {
-            var ownerUuid = target.getClass().getMethod("getOwnerUUID").invoke(target);
-            return ownerUuid != null && ownerUuid.equals(owner.getUUID());
-        } catch (Exception ignored) {
-            return false;
-        }
+        return AllyFilter.isFriendly(owner, target);
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) { super.readAdditionalSaveData(tag); damage = tag.getDouble("Damage"); armorPen = tag.getDouble("ArmorPen"); if (tag.contains("GunId")) { gunId = tag.getUUID("GunId"); } }
     @Override public void addAdditionalSaveData(CompoundTag tag) { super.addAdditionalSaveData(tag); tag.putDouble("Damage", damage); tag.putDouble("ArmorPen", armorPen); if (gunId != null) { tag.putUUID("GunId", gunId); } }

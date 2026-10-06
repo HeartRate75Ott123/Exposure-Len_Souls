@@ -8,7 +8,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
@@ -21,7 +20,7 @@ import java.lang.reflect.Modifier;
  * <p>
  * 基础判定：最大生命值 ≥ 200（替代原 BOSS 血条反射检测）。
  * 另受 {@link com.plumejade.lensouls.config.CopySoulFilter} 掉落黑白名单控制；
- * 佩戴羽·元素觉醒者/羽·荒厄遗咒的玩家击杀不掉落。
+ * <b>新改案</b>：羽毛（① 荒厄遗咒 / ③ 元素觉醒者）不再影响掉魂。
  * {@link #hasBossBar} 反射检测仍保留，供扭曲羽毛生成判定复用。
  */
 public class CopySoulDropHandler {
@@ -34,13 +33,8 @@ public class CopySoulDropHandler {
         // 首领清单（boss_entities/bosses.json）内的实体豁免血量门槛（如 the_gatekeeper 仅 175 血）
         if (entity.getMaxHealth() < 200f && !BossEntityLoader.isBoss(entity)) return;
 
-        // 佩戴羽·荒厄遗咒的玩家击杀 → 不掉落复制之魂
-        // （羽·元素觉醒者的「无法掉落复制之魂」已按需求移除：佩戴时 BOSS 照常掉落，
-        //   它仍保留「无法使用复制之魂」，由 CopySoulItem 的配方层拦截处理）
-        LivingEntity killer = entity.getKillCredit();
-        if (killer instanceof Player player && FeatherHardmanHandler.hasHardman(player)) {
-            return;
-        }
+        // 新改案：① 荒厄遗咒不再影响 BOSS 掉魂（e2 已移除复制之魂相关内容），
+        // ③ 元素觉醒者的「无法掉落复制之魂」旧版就已移除 → 这里不再按羽毛拦掉落。
 
         // 数据驱动掉落黑白名单：综合白/黑名单与 "all" 通配
         if (!CopySoulFilter.isDropAllowed(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()))) return;

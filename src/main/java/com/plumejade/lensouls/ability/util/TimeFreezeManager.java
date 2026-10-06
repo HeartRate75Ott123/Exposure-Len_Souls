@@ -58,9 +58,10 @@ public class TimeFreezeManager {
         this.remainingTicks = 100;
         frozenEntities.clear();
         accumulatedDamage.clear();
-        for (LivingEntity e : entitiesInFrame) {
-            if (e == null || e.isRemoved()) continue;
-            if (e instanceof Player) continue;
+        // 目标选取口径统一在 PhotoTargets.freezable（不要玩家 / 不要拍摄者本人 /
+        // 不要玩家驯服的宠物 / 不要本模组自己的召唤物——幻灵与幻影幻翼）
+        for (LivingEntity e : com.plumejade.lensouls.util.PhotoTargets.freezable(source, entitiesInFrame)) {
+            if (e.isRemoved()) continue;
             // 韧性目标：
             // 1) 破刹期间无法定格——100% miss（弹 miss 粒子）
             // 2) 未破刹时 30% 概率成功定身（首次掷骰锁定，失败弹 miss 粒子）

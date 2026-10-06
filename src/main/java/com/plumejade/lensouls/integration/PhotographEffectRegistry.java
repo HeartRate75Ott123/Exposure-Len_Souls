@@ -191,7 +191,7 @@ public class PhotographEffectRegistry {
         add("minecraft:cat", "§a周围 8 格内的 爬行者/幻翼 不会靠近", "");
         add("minecraft:ocelot", "§a移动 +10%", "");
         add("minecraft:parrot", "§a跳跃提升 + 免疫 摔落 伤害", "");
-        add("minecraft:bat", "§a创造飞行（飞行时造成的伤害 -90%）", "");
+        add("minecraft:bat", "§a创造飞行§c（飞行时造成的伤害 -90%）", "");
         add("minecraft:bee", "§a移动 +10%", "");
         add("minecraft:allay", "§a 8 格内的掉落物自动吸向玩家", "");
         add("minecraft:armadillo", "", "");
@@ -211,7 +211,7 @@ public class PhotographEffectRegistry {
         add("minecraft:iron_golem", "§a免疫 箭矢/弹射物 伤害", "");
         add("minecraft:llama", "", "");
         add("minecraft:trader_llama", "", "");
-        add("minecraft:phantom", "§a创造飞行（飞行时造成的伤害 -90%）", "");
+        add("minecraft:phantom", "§a创造飞行§c（飞行时造成的伤害 -90%）", "");
         add("minecraft:cod", "§a赋予 水下呼吸 效果；§a游泳 +10%", "");
         add("minecraft:salmon", "§a赋予 水下呼吸 效果；§a游泳 +10%", "");
         add("minecraft:tropical_fish", "§a赋予 水下呼吸 效果；§a游泳 +10%", "");
@@ -226,8 +226,8 @@ public class PhotographEffectRegistry {
         add("twilightforest:hydra", "§a赋予 火焰免疫 效果；§a你受到的远程伤害 -12%", "§c你受到的 冰冻 伤害 +12%");
         add("twilightforest:alpha_yeti", "§a免疫 冰冻 伤害；§a近战攻击 +10%", "");
         add("twilightforest:naga", "§a荆棘（受近战攻击反伤）", "");
-        add("twilightforest:snow_queen", "§a创造飞行（飞行时造成的伤害 -90%）", "§c你受到的 火 伤害 +12%");
-        add("twilightforest:ur_ghast", "§a创造飞行（飞行时造成的伤害 -90%）", "");
+        add("twilightforest:snow_queen", "§a创造飞行§c（飞行时造成的伤害 -90%）", "§c你受到的 火 伤害 +12%");
+        add("twilightforest:ur_ghast", "§a创造飞行§c（飞行时造成的伤害 -90%）", "");
         add("twilightforest:lich", "§a魔法攻击 +12%；§a你受到的魔法伤害 -12%", "§c近战伤害 -12%");
         add("twilightforest:minotaur", "§a近战攻击 +15%", "");
         add("twilightforest:troll", "§a近战攻击 +15%", "");

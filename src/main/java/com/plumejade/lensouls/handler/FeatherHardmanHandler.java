@@ -1,96 +1,100 @@
 package com.plumejade.lensouls.handler;
 
+import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.config.BossEntityLoader;
 import com.plumejade.lensouls.effect.ModEffects;
+import com.plumejade.lensouls.feather.CurseDef;
+import com.plumejade.lensouls.feather.CurseDefs;
+import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.FeatherEquip;
 import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
 /**
- * 羽·荒厄遗咒效果处理器。
+ * ① 羽·荒厄遗咒（新改案 · 3 条 · 整款共用反转条件）。
+ *
+ * <pre>
+ * e1 蚀灵(0)：诅咒 = 失去所有元素亲和力、药水活性对你无效
+ *             反转 = 元素亲和恢复；活性效果 -2；每有 1 级正数活性额外提供 1 点附加伤害
+ * e2 封器(1)：诅咒 = 无法使用相机（只禁能力照片）
+ *             反转 = 相机解禁；韧性伤害 -2（点数加算）；被拍摄的敌对生物受到「韧性伤害 × 当前近战伤害」的伤害
+ * e3 蚀峰(2)：诅咒 = 造成伤害 -35%、受到伤害 +35%；额外造成「当前伤害 × 空余照片饰品栏位 × 5%」的附加伤害（真伤）
+ *             反转 = 〔保留〕-35% / +35% 照旧；护甲 +5；系数改为 6%（真伤）
+ * 反转条件（整款共用）：空余照片饰品栏位 ≥5 时击杀 4 只不同 BOSS（bosslist）
+ * </pre>
+ *
+ * <b>叠加口径</b>（设计文档 §2）：受伤侧一律乘算；e3 的附加伤害与「每级活性 +1 点」属点数类、直接加算，
+ * 且因为是「真伤」所以在 {@link EventPriority#LOWEST} 才并入（此时韧性减伤与武器匹配惩罚都已结算完）。
  * <p>
- * 佩戴检测：Curios 任意槽位（findFirstCurio 遍历所有槽）。
- * 效果：
- * <ul>
- *   <li>基础护甲值 +10（transient 属性修饰符，20 tick 幂等维持，摘下移除）</li>
- *   <li>受到伤害 +75%（LivingDamageEvent.Pre 受害者为佩戴者）</li>
- *   <li>造成伤害 +125%（LivingDamageEvent.Pre 伤害来源为佩戴者）</li>
- *   <li><b>造成伤害时，其中的 30% 视为真伤</b>（不吃目标的 BOSS 韧性减伤），其余 70% 照常结算</li>
- *   <li>药水活性无效：每 20 tick 清除全部水火土末影活性效果（含自己喝的）</li>
- *   <li>攻击对敌人有 35% 概率附加随机原版负面效果，等级 1~20 随机、持续 5 秒</li>
- *   <li>每 60 秒自身获得随机原版负面效果 10 秒（计时器持久化在 PlayerPersisted 子键，掉线不丢）</li>
- * </ul>
- * 佩戴者击杀 BOSS 不掉落复制之魂、无法使用复制之魂、拍照注入失败由
- * CopySoulDropHandler / CopySoulItem 封印（配方层拦截）/ PhotoInjectionHandler 处理。
+ * 佩戴判定统一走 {@link FeatherEquip#has}；条目门控走 {@link CurseManager#on} / {@link CurseManager#rev}，
+ * 进度走 {@link CurseManager#tick}（逐条累加，达标即该条反转）。
  */
 public class FeatherHardmanHandler {
 
-    /** 受到伤害倍率（+75%） */
-    public static final float DAMAGE_TAKEN_MULTIPLIER = 1.75f;
-    /** 造成伤害倍率（总倍率 ×4.0，即增幅 +300%；原为 ×2.25 / +125%） */
-    public static final float DAMAGE_DEALT_MULTIPLIER = 4.0f;
-    /** 基础护甲值加成 */
-    public static final int ARMOR_BONUS = 10;
-    /** 每次伤害中「真伤」的占比：这部分完全不吃目标的韧性减伤，其余部分照常结算 */
-    public static final float TRUE_DAMAGE_SHARE = 0.30f;
+    private static final CurseDef D = CurseDefs.HARDMAN;
 
-    /**
-     * 本次伤害里「真伤」的比例：由佩戴荒厄遗咒的玩家造成时返回 {@link #TRUE_DAMAGE_SHARE}，否则 0。
-     * <p>
-     * 由 {@link com.plumejade.lensouls.boss.ToughnessDamageHandler} 在应用韧性减伤时调用
-     * （它在 {@code EventPriority.HIGHEST}，是最先跑的一批）。结算口径：
-     * <pre>最终 = D × share + (D − D × share) × (1 − 韧性减伤)</pre>
-     * 也就是「<b>三成真伤、七成照常吃韧性减伤</b>」——<b>不是概率触发</b>，每一次伤害都按这个比例拆分；
-     * 护甲与其它模组的减伤不受影响（它们在本事件之前就已结算）。
-     */
-    public static float trueDamageShare(LivingEntity target, net.minecraft.world.damagesource.DamageSource source) {
-        if (target == null || source == null) return 0f;
-        if (!(source.getEntity() instanceof ServerPlayer player)) return 0f;
-        if (target == player) return 0f;
-        return hasHardman(player) ? TRUE_DAMAGE_SHARE : 0f;
-    }
-    /** 攻击附加负面效果概率（35%） */
-    public static final int DEBUFF_PROC_PERCENT = 35;
-    /** 攻击附加负面效果时长：5 秒 */
-    public static final int ATTACK_DEBUFF_DURATION = 100;
-    /** 攻击附加负面效果最高等级（1~20 随机） */
-    public static final int ATTACK_DEBUFF_MAX_LEVEL = 20;
-    /** 自惩间隔：60 秒 */
-    public static final int CURSE_INTERVAL_TICKS = 1200;
-    /** 自惩持续：10 秒 */
-    public static final int CURSE_DURATION_TICKS = 200;
+    // ==================== 反转条件（整款共用） ====================
 
-    /** 自惩计时器持久化键（PlayerPersisted 子键，死亡/掉线保留） */
-    public static final String KEY_NEXT_CURSE = "lensouls:hardman_next_curse";
-    /** 护甲修饰符 ID（transient，可重复添加幂等替换） */
+    /** 空余照片饰品栏位要求（≥5） */
+    public static final int REQUIRED_FREE_PHOTO_SLOTS = 5;
+    /** 不同 BOSS 击杀数要求（4） */
+    public static final int DISTINCT_BOSS_GOAL = 4;
+    /** 「已击杀过的不同 BOSS」持久化键（逗号分隔的实体 id 列表） */
+    private static final String KEY_BOSS_KILLS = "lensouls:hardman_boss_kills";
+
+    // ==================== e1 蚀灵 ====================
+
+    /** 反转后「活性效果 -2」（级） */
+    public static final int ACTIVITY_PENALTY = 2;
+    /** 反转后「每有 1 级正数活性 → 额外 1 点附加伤害」（点数加算，§2③） */
+    public static final float ACTIVITY_FLAT_BONUS_PER_LEVEL = 1.0f;
+
+    // ==================== e2 封器 ====================
+
+    /** 反转后「韧性伤害 -2」（点数加算，§2③；由 BossToughnessManager 读取） */
+    public static final float REVERSED_TOUGHNESS_DAMAGE_DELTA = -2.0f;
+
+    // ==================== e3 蚀峰 ====================
+
+    /** 造成伤害 -35%（诅咒态与反转态都保留） */
+    public static final float E3_DEALT_MULTIPLIER = 0.65f;
+    /** 受到伤害 +35%（诅咒态与反转态都保留；受伤侧乘算） */
+    public static final float E3_TAKEN_MULTIPLIER = 1.35f;
+    /** 反转后护甲 +5（点数加算） */
+    public static final int E3_REVERSED_ARMOR = 5;
+    /** 附加伤害公式系数（诅咒态 5%） */
+    public static final float E3_BONUS_COEF_CURSE = 0.05f;
+    /** 附加伤害公式系数（反转态 6%） */
+    public static final float E3_BONUS_COEF_REVERSED = 0.06f;
+
+    /** 护甲修饰符 ID（transient，幂等替换） */
     private static final ResourceLocation ARMOR_MODIFIER_ID = ResourceLocation.parse("lensouls:hardman_armor");
 
-    /** 原版负面效果池（攻击附加与自惩共用） */
-    private static final Holder<MobEffect>[] DEBUFFS = new Holder[]{
-            MobEffects.MOVEMENT_SLOWDOWN,
-            MobEffects.WEAKNESS,
-            MobEffects.POISON,
-            MobEffects.HUNGER,
-            MobEffects.WITHER,
-            MobEffects.BLINDNESS,
-            MobEffects.CONFUSION,
-            MobEffects.DIG_SLOWDOWN
-    };
-
+    /** 元素活性效果（e1 的「元素亲和 / 药水活性」轴） */
     private static final Holder<MobEffect>[] INFUSIONS = new Holder[]{
             ModEffects.FIRE_INFUSION,
             ModEffects.WATER_INFUSION,
@@ -98,114 +102,331 @@ public class FeatherHardmanHandler {
             ModEffects.ENDER_INFUSION
     };
 
+    /** e1 反转：每元素「玩家自己的基础活性等级」 */
+    private static final Map<UUID, int[]> ACTIVITY_BASE = new HashMap<>();
+    /** e1 反转：每元素「我们写回去的等级」 */
+    private static final Map<UUID, int[]> ACTIVITY_APPLIED = new HashMap<>();
+    /** e1 反转：被扣减到 0 而移除时的剩余时长（用于摘下羽毛后还原） */
+    private static final Map<UUID, int[]> ACTIVITY_SAVED_DURATION = new HashMap<>();
+    /** e3 附加伤害的空余照片栏位数缓存：UUID → {gameTime, freeSlots} */
+    private static final Map<UUID, long[]> SLOT_CACHE = new HashMap<>();
+
     /**
-     * 佩戴检测：**Curios 任意槽位 ‖ 羽毛装配界面的 5 个槽位**（见 {@link FeatherEquip}）。
-     * <p>同种物品只生效一次（布尔语义，重复持有不叠加）。
+     * 佩戴检测：{@link FeatherEquip#has}（只认本模组羽毛栏的 7 个槽位）。
      */
     public static boolean hasHardman(Player player) {
         return FeatherEquip.has(player, ModItems.FEATHER_HARDMAN.get());
     }
 
-    /** 跨死亡持久化子键：NeoForge 复活（restoreFrom）只复制 persistentData 的 PlayerPersisted 子键 */
-    private static CompoundTag persisted(Player player) {
-        return player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
+    /**
+     * 旧版「每次伤害的 30% 视为真伤」机制已按新改案<b>移除</b>
+     * （新版真伤只存在于 e3 的附加伤害里，按公式在 {@link EventPriority#LOWEST} 并入）。
+     * <p>
+     * 方法保留是因为 {@code ToughnessDamageHandler} 仍会调用它；恒返回 0 即等于关闭该机制。
+     */
+    public static float trueDamageShare(LivingEntity target, net.minecraft.world.damagesource.DamageSource source) {
+        return 0f;
     }
 
-    private static void writeBack(Player player, CompoundTag tag) {
-        player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
-    }
+    // ==================== 事件：元素亲和 / 药水活性（e1） ====================
 
-    /** 受到伤害 +75% */
+    /**
+     * e1 诅咒态「药水活性对你无效」：在效果<b>施加前</b>拦截四种元素活性，
+     * 避免「事后移除 → 同 tick 重加」的闪烁（与 {@code SuppressHandler} 同款做法）。
+     */
     @SubscribeEvent
-    public static void onDamaged(LivingDamageEvent.Pre event) {
-        if (event.getEntity() instanceof ServerPlayer player && hasHardman(player)) {
-            event.setNewDamage(event.getNewDamage() * DAMAGE_TAKEN_MULTIPLIER);
+    public static void onEffectApplicable(MobEffectEvent.Applicable event) {
+        try {
+            if (!(event.getEntity() instanceof ServerPlayer player)) return;
+            if (!CurseManager.on(player, D, 0)) return;
+            MobEffectInstance inst = event.getEffectInstance();
+            if (inst == null) return;
+            for (Holder<MobEffect> infusion : INFUSIONS) {
+                if (infusion == inst.getEffect()) {
+                    event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+                    return;
+                }
+            }
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ① e1 活性拦截异常", t);
         }
     }
 
-    /** 造成伤害 +125%；攻击附加随机负面效果（35% 概率，等级 1~20 随机） */
-    @SubscribeEvent
-    public static void onDealDamage(LivingDamageEvent.Pre event) {
-        if (event.getSource().getEntity() instanceof ServerPlayer player && hasHardman(player)) {
-            event.setNewDamage(event.getNewDamage() * DAMAGE_DEALT_MULTIPLIER);
+    // ==================== 每 tick ====================
 
-            LivingEntity target = event.getEntity();
-            if (target != player && player.getRandom().nextFloat() * 100f < DEBUFF_PROC_PERCENT) {
-                Holder<MobEffect> debuff = DEBUFFS[player.getRandom().nextInt(DEBUFFS.length)];
-                int level = 1 + player.getRandom().nextInt(ATTACK_DEBUFF_MAX_LEVEL);
-                target.addEffect(new MobEffectInstance(debuff, ATTACK_DEBUFF_DURATION, level - 1));
+    @SubscribeEvent
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        try {
+            tick(player);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ① 每 tick 结算异常", t);
+        }
+    }
+
+    private static void tick(ServerPlayer player) {
+        boolean worn = hasHardman(player);
+
+        // ── e1 蚀灵 ──
+        if (!CurseManager.rev(player, D, 0)) {
+            // 非反转态（含诅咒态 / 未选中）：把我们写过的等级还原
+            restoreActivity(player);
+        }
+        if (worn && CurseManager.on(player, D, 0)) {
+            // 诅咒：失去元素亲和力、药水活性无效 —— 持续清除四种活性
+            for (Holder<MobEffect> infusion : INFUSIONS) {
+                player.removeEffect(infusion);
+            }
+        } else if (CurseManager.rev(player, D, 0)) {
+            applyActivityPenalty(player);
+        }
+
+        // ── e3 蚀峰：反转后护甲 +5 ──
+        if (CurseManager.rev(player, D, 2)) {
+            AttributeInstance armor = player.getAttribute(Attributes.ARMOR);
+            if (armor != null && armor.getModifier(ARMOR_MODIFIER_ID) == null) {
+                armor.addTransientModifier(new AttributeModifier(
+                        ARMOR_MODIFIER_ID, E3_REVERSED_ARMOR, AttributeModifier.Operation.ADD_VALUE));
+            }
+        } else {
+            removeArmor(player);
+        }
+
+        // 未选中本款 → 共用条件的「不同 BOSS」名单也不累计
+        if (!worn) {
+            clearBossKills(player);
+            SLOT_CACHE.remove(player.getUUID());
+        }
+    }
+
+    private static void removeArmor(ServerPlayer player) {
+        AttributeInstance armor = player.getAttribute(Attributes.ARMOR);
+        if (armor != null) armor.removeModifier(ARMOR_MODIFIER_ID);
+    }
+
+    /**
+     * e1 反转：活性效果 -2。逐元素维护「玩家自己的基础等级」与「我们写回去的等级」，
+     * 观测值不是我们的产物时说明玩家自己改了等级（喝药水 / 到期），把它采纳为新的基础等级。
+     */
+    private static void applyActivityPenalty(ServerPlayer player) {
+        UUID id = player.getUUID();
+        int[] base = ACTIVITY_BASE.computeIfAbsent(id, k -> new int[INFUSIONS.length]);
+        int[] applied = ACTIVITY_APPLIED.computeIfAbsent(id, k -> new int[INFUSIONS.length]);
+        int[] saved = ACTIVITY_SAVED_DURATION.computeIfAbsent(id, k -> new int[INFUSIONS.length]);
+
+        for (int i = 0; i < INFUSIONS.length; i++) {
+            MobEffectInstance inst = player.getEffect(INFUSIONS[i]);
+            int observed = inst == null ? 0 : inst.getAmplifier() + 1;
+            if (observed != applied[i]) {
+                base[i] = observed;
+                saved[i] = 0;
+            }
+            int desired = Math.max(0, base[i] - ACTIVITY_PENALTY);
+            if (desired != observed) {
+                if (inst != null) {
+                    saved[i] = inst.getDuration();
+                    player.removeEffect(INFUSIONS[i]);
+                }
+                if (desired > 0 && inst != null) {
+                    player.addEffect(new MobEffectInstance(INFUSIONS[i], inst.getDuration(), desired - 1,
+                            inst.isAmbient(), inst.isVisible(), inst.showIcon()));
+                } else if (desired > 0) {
+                    player.addEffect(new MobEffectInstance(INFUSIONS[i],
+                            MobEffectInstance.INFINITE_DURATION, desired - 1, true, true, true));
+                }
+            }
+            applied[i] = desired;
+        }
+    }
+
+    /** 非反转态：把我们扣减过的活性等级还原成玩家自己的基础等级，并清掉本地状态 */
+    private static void restoreActivity(ServerPlayer player) {
+        UUID id = player.getUUID();
+        int[] base = ACTIVITY_BASE.remove(id);
+        int[] applied = ACTIVITY_APPLIED.remove(id);
+        int[] saved = ACTIVITY_SAVED_DURATION.remove(id);
+        if (base == null || applied == null) return;
+
+        for (int i = 0; i < INFUSIONS.length; i++) {
+            MobEffectInstance inst = player.getEffect(INFUSIONS[i]);
+            int observed = inst == null ? 0 : inst.getAmplifier() + 1;
+            if (observed != applied[i]) continue;         // 不是我们的产物 → 不动它
+            if (observed == base[i]) continue;            // 本来就一致
+            if (inst != null) {
+                player.removeEffect(INFUSIONS[i]);
+                if (base[i] > 0) {
+                    player.addEffect(new MobEffectInstance(INFUSIONS[i], inst.getDuration(), base[i] - 1,
+                            inst.isAmbient(), inst.isVisible(), inst.showIcon()));
+                }
+            } else if (base[i] > 0 && saved != null && saved[i] != 0) {
+                // 是我们把它扣到 0 才删掉的 → 按当初记下的剩余时长还原
+                player.addEffect(new MobEffectInstance(INFUSIONS[i], saved[i], base[i] - 1, true, true, true));
             }
         }
     }
 
-    /** 20 tick 节流：护甲维持 / 清除活性 / 自惩计时；摘下时复位数据 */
-    @SubscribeEvent
-    public static void onPlayerTick(PlayerTickEvent.Post event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (player.tickCount % 20 != 0) return;
-
-        if (hasHardman(player)) {
-            applyArmorBonus(player);
-            clearFusions(player);
-            advanceCurse(player);
-        } else {
-            removeArmorBonus(player);
-            resetCurseTimer(player);
-        }
-    }
-
-    /** 基础护甲值 +10（幂等，摘下后由 removeArmorBonus 移除） */
-    private static void applyArmorBonus(ServerPlayer player) {
-        AttributeInstance armor = player.getAttribute(Attributes.ARMOR);
-        if (armor == null) return;
-        if (armor.getModifier(ARMOR_MODIFIER_ID) == null) {
-            armor.addTransientModifier(
-                    new AttributeModifier(ARMOR_MODIFIER_ID, ARMOR_BONUS, AttributeModifier.Operation.ADD_VALUE));
-        }
-    }
-
-    /** 摘下羽毛时移除护甲加成 */
-    private static void removeArmorBonus(ServerPlayer player) {
-        AttributeInstance armor = player.getAttribute(Attributes.ARMOR);
-        if (armor != null) {
-            armor.removeModifier(ARMOR_MODIFIER_ID);
-        }
-    }
-
-    /** 药水活性无效：清除全部水火土末影活性效果（含玩家自己喝的有限时长） */
-    private static void clearFusions(ServerPlayer player) {
+    /** e1 反转：每有 1 级正数活性 → 1 点附加伤害（点数加算，§2③） */
+    public static float activityFlatBonus(ServerPlayer player) {
+        if (player == null || !CurseManager.rev(player, D, 0)) return 0f;
+        int levels = 0;
         for (Holder<MobEffect> infusion : INFUSIONS) {
-            player.removeEffect(infusion);
+            MobEffectInstance inst = player.getEffect(infusion);
+            if (inst != null) levels += Math.max(0, inst.getAmplifier() + 1);
+        }
+        return levels * ACTIVITY_FLAT_BONUS_PER_LEVEL;
+    }
+
+    // ==================== 受到伤害（e3 保留项） ====================
+
+    @SubscribeEvent
+    public static void onDamaged(LivingDamageEvent.Pre event) {
+        try {
+            if (!(event.getEntity() instanceof ServerPlayer player)) return;
+            if (!CurseManager.on(player, D, 2) && !CurseManager.rev(player, D, 2)) return;
+            float d = event.getNewDamage();
+            if (d <= 0f) return;
+            // 受伤侧一律乘算（§2）
+            event.setNewDamage(d * E3_TAKEN_MULTIPLIER);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ① e3 受伤结算异常", t);
         }
     }
+
+    // ==================== 造成伤害（e3 + e1 反转） ====================
 
     /**
-     * 自惩计时：持久化 gameTime 时间戳（PlayerPersisted 子键，掉线/死亡不丢）。
-     * 初次佩戴 60 秒后开始第一次惩罚；间隔 60 秒，随机负面效果持续 10 秒。
+     * LOWEST：韧性减伤 / 武器匹配惩罚都已结算完，此时并入「真伤」符合设计口径
+     * （附加伤害不吃韧性减伤，也不被武器匹配 ×0.1 吃掉）。
      */
-    private static void advanceCurse(ServerPlayer player) {
-        CompoundTag tag = persisted(player);
-        long now = player.level().getGameTime();
-        long next = tag.getLong(KEY_NEXT_CURSE);
-        if (next <= 0L) {
-            tag.putLong(KEY_NEXT_CURSE, now + CURSE_INTERVAL_TICKS);
-            writeBack(player, tag);
-            return;
-        }
-        if (now >= next) {
-            Holder<MobEffect> debuff = DEBUFFS[player.getRandom().nextInt(DEBUFFS.length)];
-            player.addEffect(new MobEffectInstance(debuff, CURSE_DURATION_TICKS, 0));
-            tag.putLong(KEY_NEXT_CURSE, now + CURSE_INTERVAL_TICKS);
-            writeBack(player, tag);
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onDealDamage(LivingDamageEvent.Pre event) {
+        try {
+            if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
+            if (event.getEntity() == player) return;
+            float d = event.getNewDamage();
+            if (d <= 0f) return;
+
+            // e3 蚀峰：造成伤害 -35%（诅咒态与反转态都保留）
+            if (CurseManager.on(player, D, 2) || CurseManager.rev(player, D, 2)) {
+                d *= E3_DEALT_MULTIPLIER;
+                // 附加伤害（真伤）：当前伤害 × 空余照片饰品栏位 × 系数（5% / 反转 6%）
+                int free = freePhotoSlots(player);
+                if (free > 0) {
+                    float coef = CurseManager.rev(player, D, 2)
+                            ? E3_BONUS_COEF_REVERSED : E3_BONUS_COEF_CURSE;
+                    d += d * free * coef;
+                }
+            }
+
+            // e1 蚀灵 反转：每有 1 级正数活性 → 1 点附加伤害
+            d += activityFlatBonus(player);
+
+            event.setNewDamage(d);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ① 造成伤害结算异常", t);
         }
     }
 
-    /** 摘下羽毛：清除自惩计时器，重新戴上从新周期开始 */
-    private static void resetCurseTimer(ServerPlayer player) {
-        CompoundTag tag = persisted(player);
-        if (tag.contains(KEY_NEXT_CURSE)) {
-            tag.remove(KEY_NEXT_CURSE);
-            writeBack(player, tag);
+    // ==================== 反转条件：击杀 4 只不同 BOSS（空余栏位 ≥5） ====================
+
+    @SubscribeEvent
+    public static void onKill(LivingDeathEvent event) {
+        try {
+            if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
+            LivingEntity dead = event.getEntity();
+            if (dead == player) return;
+            if (!CurseManager.isActive(player, D)) return;
+            if (freePhotoSlots(player) < REQUIRED_FREE_PHOTO_SLOTS) return;
+
+            // BOSS 判定：首领清单（bosslist）
+            if (!BossEntityLoader.isBoss(dead)) return;
+            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(dead.getType());
+            if (id == null) return;
+
+            Set<String> seen = loadBossKills(player);
+            if (!seen.add(id.toString())) return;         // 必须是「不同」BOSS
+            saveBossKills(player, seen);
+
+            for (int i = 0; i < D.entries(); i++) {
+                CurseManager.tick(player, D, i, 1L, DISTINCT_BOSS_GOAL);
+            }
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ① 反转条件（BOSS 击杀）结算异常", t);
         }
     }
+
+    private static Set<String> loadBossKills(Player player) {
+        CompoundTag persisted = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
+        String raw = persisted.getString(KEY_BOSS_KILLS);
+        Set<String> set = new HashSet<>();
+        if (!raw.isEmpty()) {
+            for (String part : raw.split(",")) {
+                if (!part.isEmpty()) set.add(part);
+            }
+        }
+        return set;
+    }
+
+    private static void saveBossKills(Player player, Set<String> set) {
+        CompoundTag persisted = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
+        persisted.putString(KEY_BOSS_KILLS, String.join(",", set));
+        player.getPersistentData().put(Player.PERSISTED_NBT_TAG, persisted);
+    }
+
+    private static void clearBossKills(Player player) {
+        CompoundTag persisted = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
+        if (!persisted.contains(KEY_BOSS_KILLS)) return;
+        persisted.remove(KEY_BOSS_KILLS);
+        player.getPersistentData().put(Player.PERSISTED_NBT_TAG, persisted);
+    }
+
+    // ==================== 空余照片饰品栏位 ====================
+
+    /**
+     * 「空余照片饰品栏位」= Curios 的 {@code photograph} 槽位总数 − 已占用数（10 tick 缓存）。
+     */
+    public static int freePhotoSlots(ServerPlayer player) {
+        if (player == null) return 0;
+        long now = player.level().getGameTime();
+        long[] cached = SLOT_CACHE.get(player.getUUID());
+        if (cached != null && now - cached[0] < 10L) return (int) cached[1];
+        int free = computeFreePhotoSlots(player);
+        SLOT_CACHE.put(player.getUUID(), new long[]{now, free});
+        return free;
+    }
+
+    private static int computeFreePhotoSlots(ServerPlayer player) {
+        try {
+            var handlerOpt = CuriosApi.getCuriosInventory(player);
+            if (handlerOpt.isEmpty()) return 0;
+            var stacksHandler = handlerOpt.get().getCurios().get("photograph");
+            if (stacksHandler == null) return 0;
+            var stacks = stacksHandler.getStacks();
+            int total = stacks.getSlots();
+            int used = 0;
+            for (int i = 0; i < total; i++) {
+                if (!stacks.getStackInSlot(i).isEmpty()) used++;
+            }
+            return Math.max(0, total - used);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ① 空余照片栏位统计异常", t);
+            return 0;
+        }
+    }
+
+    /** 供 e2 判定：是否处于「相机已解禁」的反转态 */
+    public static boolean isCameraUnlocked(ServerPlayer player) {
+        return CurseManager.rev(player, D, 1);
+    }
+
+    /** 供 e2 判定：是否处于「无法使用相机」的诅咒态（只禁能力照片） */
+    public static boolean isCameraLocked(ServerPlayer player) {
+        return CurseManager.on(player, D, 1);
+    }
+
+    /** e2 反转的韧性伤害点数（点数加算，§2③） */
+    public static float toughnessDamageDelta(ServerPlayer player) {
+        return CurseManager.rev(player, D, 1) ? REVERSED_TOUGHNESS_DAMAGE_DELTA : 0f;
+    }
+
 }

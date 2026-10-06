@@ -2199,3 +2199,434 @@ FrameAddedEvent → PhotoInjectionHandler.onFrameAdded
   （用户口径是「镜魂物品」；要扩大范围再说一声）。
 - 交付：版本 `1.6.13`；jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.13.jar`（10,512,273 字节），
   MD5 `F3B2D8158639F6C8BECBB076413D88AA`；`1.6.12` 作废。**未提交**。
+
+### 84. 客机拍不出能力照片（`1.6.14`）——根因是**服务端 jar 落后**，代码侧补「其他玩家」那一格
+
+- 现象：多人客机的能力窃取照片**完全退化成普通照片**——没改名、没描述、**也没效果**；主机侧正常。
+- **事实 1：整条成片链都在服务端。** `CameraItem.onFrameAdded(holder, ServerLevel, …)`
+  → `PlatformHelper.postFrameAddedEvent` → `PhotoInjectionHandler` 缓存 → `PhotoInjector.inject`。
+  所以客机照片里写什么，**由服务端那支 jar 的代码决定**，与客户端的 `DatapackSyncPacket` 缓存无关
+  （缓存为空只会少几行套装/活性，不会连「实体：XXX」都没有）。
+- **事实 2：Exposure 的 `EntitiesInFrame.get` 列表包含相机持有者，且按到相机距离排序**
+  （持有者距离≈0 ⇒ 必然落在 `get(0)`）。我们到 **1.5.50** 才在 `FrameEntities.assemble` 排除持有者
+  （commit `e945786`，三处 `candidate == cameraHolder`）。在那之前的版本里
+  `stolen_entity = "minecraft:player"` ⇒ `PhotographEffectRegistry.hasEffect` 查不到 ⇒
+  `PhotoInjector` 置 `doInject = false` ⇒ 照片连 `lensouls:injected` 都不写。
+  **这就是「完全普通照片、无描述、无效果」的字面成因**，也就是「早期如出一辙」的那个坑。
+- **实测环境（当时快照，日志自证）**：02:30 那次会话里客户端
+  `E:\programs\PCL2\.minecraft\versions\9\mods\lensouls-1.5.52.jar`（内部 1.5.52，
+  MD5 `6F0D379BA9825A37CF638C06C9A12BC5`）连的确实是这台 MSL（客户端日志
+  `Connecting to fdfd::1aae:4469, 25565` 与服务端 `Plume_Jade[/[fdfd::1aae:4469]:56159] logged in` 对得上），
+  而**那一刻**服务端目录里是 `lensouls-1.5.48.jar`（内部 1.5.48，MD5 `EEBBF9DFB9DF6DDA1966B476E201C75F`，
+  服务器日志 `Found mod file "lensouls-1.5.48.jar" [locator: …\Server\mods]`
+  + `l2menustacker-3.0.9.jar [parent: lensouls-1.5.48.jar]`）⇒ 客机照片是那支**缺 1.5.50 持有者排除**的 jar 成片的。
+- ⚠ **更正（2026-10-05 复查）**：用户随后把 MSL 也换成了 `lensouls-1.5.52.jar` —— 与客户端**同一 MD5**
+  `6F0D379BA9825A37CF638C06C9A12BC5`（内部版本 1.5.52）。所以「48 vs 52 不一致」只是**那一时段**的环境事实，
+  不是长期结论；后续复现一律按「两端同版本」看。**教训：核对环境时要记时间点，别把一次性快照写成长期结论。**
+- **代码侧加固（`1.6.14`）**：新增 `ExposureHelper.isPlayerEntityId`，**只在「能力窃取选目标」时跳过玩家**
+  （`PhotoInjectionHandler#firstNonPlayerSubject`）：多人和局域网里队友完全可能比目标更近而排到帧首，
+  而玩家没有任何实体照片效果条目 ⇒ 选中它整张照片就退化成普通照片。
+- ⚠ **`1.6.15` 已撤回同一批改动里的另外两处**（`ExposureHelper#parseFirstEntityId`、
+  `WeaknessLensPhoto#subjectEntityId` 当时也一并跳过了玩家）：那是**改过头**——
+  `entity_weakness` 数据包里配了 `minecraft:player`，「拍玩家 ⇒ 武器对玩家获得该元素活性」是正经玩法，
+  一并跳过等于把这条链路整条废掉（用户实测反馈「违背了一些滤镜/照片效果」）。
+  持有者本身早在 `FrameEntities.assemble` 源头排除，这两处不需要再兜一层。
+- 交付：版本 `1.6.14`；桌面 `lensouls-1.6.14.jar`（10,512,715 字节，MD5 `5EA8CB8383D4B6E0D97D8AC753072034`）。
+  （当时把它连同 `.bak` 一起放进了测试客户端；**用户随后要求「不要动本地 jar」**，已按用户口径把
+  PCL2 与 MSL 两个 mods 目录**恢复原状**——现在两边都只有 `lensouls-1.5.52.jar`。）
+
+### 85. 幻翼崩溃（`1.6.15`）：别往原版实体的同步数据表里加槽 + 撤回改过头的玩家过滤
+
+**1. 原版幻翼被我们的同步数据槽打崩（2026-10-05 实测 crash-report）**
+
+- 崩溃：客户端 `java.lang.IllegalStateException: Invalid entity data item type for field 17 on entity
+  Phantom['幻翼'/…]: old=false(class java.lang.Boolean), new=5(class java.lang.Integer)`
+  （`SynchedEntityData.assignValue` ← `handleSetEntityData`）。
+- 根因：旧实现用 `SynchedEntityData.defineId(Phantom.class, …)` 往**原版** `Phantom` 上挂两个槽
+  （Boolean 标记 + Float 不透明度），而 **`defineId` 的 id 是按「谁先初始化」现场分配**的：
+  服务端由 `BossPhotoProjHelper` 读 `SwarmPhantomFade.DURATION_TICKS` 提前触发类初始化（id 早），
+  客户端由渲染层 `alphaOrNull` 触发（id 晚，正好落在 17）⇒ 同一个槽两端 id 不同，
+  客户端收到「id=17 的 Integer」而本地 17 是 Boolean，直接掉线。
+  **两端 jar 版本相同（都是 1.5.52，同一 MD5）也照样崩** —— 这跟版本无关，纯粹是初始化时序。
+- 修法（`1.6.15`）：**彻底不再碰原版 `Phantom` 的同步数据表**
+  - 删除 `mixin/PhantomFadeSyncMixin.java` 与 `lensouls.mixins.json` 里的登记；
+  - 时效改存**服务端 persistentData**（`SwarmPhantomFade.mark(ph, expireTick)`，本来就是服务端专属）；
+  - 新增 S2C 包 `SwarmPhantomPacket`（entityId + remainingTicks），在
+    `PlayerEvent.StartTracking` 时给该观察者发一次；
+  - 客户端 `client/phantom/SwarmPhantomClient` 按「到期刻 = 收包时 gameTime + 余命」缓存，
+    渐隐曲线用 `SwarmPhantomFade.alphaFor(remaining)` 本地推算 —— **整段淡出一个 tick 都不发包**；
+    区块重载/后加入/传送都会重新触发开始追踪 ⇒ 拿到的永远是当前余命，不会「淡到一半又复活成不透明」；
+  - 渲染层 `EntityRenderDispatcherMixin` 改查客户端缓存（不是自家幻翼仍返回 `null`，原版幻翼绝不套半透明管线）。
+- **铁律：不要往原版实体（尤其原版 `Phantom`）的同步数据表里加东西。**
+  `defineId` 的 id 取决于初始化顺序，任何「两端触发时机不同 / 模组集不同」都会错位；
+  要同步自家数据就自己发包 + 客户端缓存，或注册**自己的实体类型**。
+
+**2. 撤回改过头的「主体一律不认玩家」**
+
+- 用户反馈：先前那批「主体排除玩家」的改动违背了一些滤镜/照片效果。
+- 复查结论：`FilterPhotoHandler`（16 个相机滤镜）**并不读**我们那几个主体助手，它直接读
+  `event.getEntitiesInFrame()`；而帧内列表只排除了**相机持有者**（`FrameEntities.assemble`，1.5.50），
+  其他玩家一直在列表里 —— 所以滤镜本身没被改动波及。**真正被削掉的是「弱点透镜拍玩家」**：
+  `ExposureHelper#parseFirstEntityId` 与 `WeaknessLensPhoto#subjectEntityId` 当时也跳过了玩家，
+  而 `entity_weakness` 里配了 `minecraft:player`（玩家本该能被当主体记录弱点）。
+- 处理：这两处**恢复成「帧内第一个实体」**（玩家算合法主体），只保留能力窃取那一处的玩家跳过，
+  并在 `ExposureHelper.isPlayerEntityId` 的 javadoc 里写死「不要拿它去过滤照片主体」。
+
+**3. 交付与工作方式**
+
+- 版本 `1.6.15`；桌面 `C:/Users/volans/Desktop/lensouls-1.6.15.jar`（**10,515,451 字节**，
+  MD5 `7B00CCA303B6DE26B7E88704DD259470`）；构建通过（`javap`/jar 内检查：
+  `PhantomFadeSyncMixin.class` 已不存在、`SwarmPhantomPacket`/`SwarmPhantomClient` 在位、
+  `mixins.json` 仍是合法 JSON）。
+- **用户口径（本轮明确）：不要动他们本地的 jar**（`E:\programs\PCL2\…\mods`、`D:\programs\MSL\…\mods`），
+  **只改源码**；成品放桌面，是否替换由用户自己决定。本轮已把此前误放进两个 mods 目录的
+  1.6.14 / 1.6.15 与改名后的 `.bak` **全部还原成原状**（两边都只剩 `lensouls-1.5.52.jar`）。
+- **未提交**。
+
+### 86. 目标选取分离（`1.6.16`）——滤镜要玩家、能力主体不要玩家、定格两者都不要
+
+**1. 用户定案的口径（此前我两次都改偏过，这次记死）**
+
+| 玩法 | 目标语义 | 要玩家吗 | 备注 |
+|---|---|---|---|
+| 16 个相机滤镜（非自拍） | 多目标：**给队友上增益**，无论什么能力 | **要**（其他玩家） | 自拍不吃实体列表，走 `Frame.SELFIE` |
+| spider 滤镜（非自拍） | 多目标：画面内非玩家生物 | 否 | |
+| 药水玻璃板（非自拍） | 多目标：除自己外全部活体 | 要（含玩家） | |
+| 能力窃取 | 单主体：记录进照片 | **不要** | 玩家没有任何实体照片效果条目 |
+| 弱点透镜 | 单主体：记录弱点元素 | **不要**（用户本轮明确：弱点透镜不需要帧内有其他玩家） | |
+| 普通照片元素活性 | 单主体：帧内第一个有 `attacker_element` 的实体 | **按数据包说话、不特判** | 要排玩家就改数据包 |
+| 时间定格 | 多目标 | **不要玩家**（含拍摄者本人）、**不要玩家驯服的宠物**、**不要本模组自己的召唤物**（幻灵 + 幻影幻翼） | |
+| 韧性削韧 | 遍历全部、按 boss tier 过滤 | 天然不匹配 | |
+
+> 我两次改偏的经历：`1.6.14` 把「主体不认玩家」一刀切到三处（把弱点透镜拍玩家也废了）→
+> `1.6.15` 全撤回并改回「玩家算主体」→ `1.6.16` 按用户口径**只让"记录进照片的主体"不认玩家**，
+> 滤镜那条**完全不碰**。**教训：口径要一次问清，别在"全跳玩家 / 全不跳"之间来回晃。**
+
+**2. 落地：新增选择器层 `util/PhotoTargets`**
+
+三层各管各的，以后不要再混：
+
+```
+① 几何  CameraVisibility   看得见吗（视锥 / 多身体采样 / 遮挡 / 射程）
+② 入镜  FrameEntities      画面里有哪些活体（唯一硬规则：不含相机持有者；不带任何玩法过滤）
+③ 策略  PhotoTargets       这次要谁 —— 每个调用点一行可见
+```
+
+`PhotoTargets` 的 API 全部**把 viewer 当显式参数**（"不要选到自己"从此是这一层的职责，
+而不是各 handler 自觉写 `ent != player`——以前 `FilterPhotoHandler` 里到处是这类判断，漏一处就是给自己上 buff）：
+
+| 方法 | 语义 | 现用方 |
+|---|---|---|
+| `subject(viewer, frame, normalize)` | 帧内第一个**非玩家**（可带子部件→父体归一化） | 能力窃取 |
+| `subjectWithElement(viewer, frame)` | 帧内第一个带 `attacker_element` 活性者 | 普通照片元素组件 |
+| `otherPlayers(viewer, frame)` | 除自己外**玩家** | 16 滤镜非自拍 |
+| `othersNonPlayer(viewer, frame)` | 除自己外**非玩家生物** | spider 滤镜 |
+| `others(viewer, frame)` | 除自己外全部活体 | 药水玻璃板 |
+| `freezable(viewer, frame)` | 定格目标：非玩家 + 非驯服宠物 + 非自家召唤物 | `TimeFreezeManager.freeze` |
+
+**3. 连带改动**
+
+- `WeaknessLensPhoto.subjectEntityId(Frame)` 与 `ExposureHelper.parseFirstEntityId`（旧照片 NBT 兜底、
+  装机主路径 `writeInstalled`）都恢复「跳过玩家」——**注意 `EntityInFrame` 只有
+  `(id,name,pos,distance,extraData)`、没有 UUID**，旧照片里"哪一条是拍摄者"根本无法精确定位，
+  只能按「玩家不算主体」处理；这也是用户口径允许的简化。
+- `WeaknessLensPhoto` / `ExposureHelper.isPlayerEntityId` 的 javadoc 同步改成新口径，
+  并写明「滤镜那条链路不经过本判定」。
+- `FilterPhotoHandler` 三个分支改用 `PhotoTargets`（语义逐条对齐，`hasTarget`/`applied` 闸门保留，
+  冷却行为不变）。
+- `BossPhotoProjHelper.isSwarmPhantom` 由 `private` 改 `public`：给 `PhotoTargets.freezable` 复用，
+  避免再把 `lensouls:photo_swarm_phantom` 这个键复制一份字面量。
+- `TimeFreezeManager.freeze` 的循环改为遍历 `PhotoTargets.freezable(...)`（原有"跳过玩家"收进选择器）。
+
+**4. 交付**
+
+- 版本 `1.6.16`；桌面 `C:/Users/volans/Desktop/lensouls-1.6.16.jar`（**10,517,581 字节**，
+  MD5 `658ECEE4645D75D9A836E6609F1E6FE1`）；构建通过，jar 内 `util/PhotoTargets.class` 在位。
+- **测试环境依旧没动**（PCL2 / MSL 两边都还是 `lensouls-1.5.52.jar`）——按用户口径只改源码、成品放桌面。
+- **未提交**。
+
+### 87. 出片失败一律记 debug（`1.6.17`）+「重装才好」的因果拆解
+
+**1. 需求**：用户口径「失败日志进 debug 里」⇒ 出片链两端补 `[PhotoInject]` **debug** 日志；
+**不加动作栏提示、不打 info/warn**（出片是高频动作，会刷屏）。
+
+**2. 断点分布（排查「拍不出能力照片」就按这两头看）**
+
+| 端 | 位置 | 日志会告诉你的原因 |
+|---|---|---|
+| 缓存端 | `PhotoInjectionHandler.onFrameAdded` | frame 空 / 无 exposureId / 戴荒厄遗咒 / **相机没选中能力** / 即时能力按设计不产照片 / **手持相机没摄魂术**（日志写明「此刻手上没有/有其它相机」⇒ 拍完立刻切手就是这个）/ 能力窃取时帧内没有非玩家实体 |
+| 打印端 | `PhotoInjector.inject` | frame 空 / 无 exposureId / **没捕获到照片栈**（mixin 注入点未命中 ⇒ Exposure 版本变了）/ **没有能力缓存**（含「缓存已被同帧的另一次打印消费」）/ 已注入 / 窃取主体没有注册效果条目（拍到牛羊＝设计）/ 空帧降级 |
+
+- `inject` 新增 `path` 参数（`polaroid` / `lightroom`）——日志一眼看出是哪条出片路径断的。
+
+**3. 「重新安装就能拍出」的因果拆解（重要，别再被这个说法带走）**
+
+- **重装 = 重启 JVM + 去重旧 jar + 换版本 + 可能清配置 + 可能重启服务端**，五个变量一起动，
+  **不能当因果证据**。定性只要三组控制变量实验：
+  1. 只重启游戏（不换 jar）→ 恢复 ⇒ 会话内状态问题；不恢复 ⇒ jar/版本问题；
+  2. 只重启服务端（客机不动）→ 恢复 ⇒ 真因在服务端进程/旧 jar（**服务端才是出片方**）；
+  3. 只删 `config/lensouls-common.toml` → 恢复 ⇒ 配置残留
+     （`cameraMaxCaptureDistance` 默认 32，直接决定帧内实体列表能有多远；NeoForge **不会更新已有配置**，
+     老版本写下的值会一直生效）。
+- 实测过的那台 MSL：`cameraMaxCaptureDistance = 32.0`（默认值）⇒ 那台不是配置残留这条。
+
+**4. 代码里能造成「同版本、时好时坏」的机制（逐条核对过）**
+
+- **同一帧被印两次**：注入缓存是「取出即删」（`poll*`，按 exposureId）⇒ 暗房**创造模式反复点打印**
+  会对同一帧再走一次 `createPrintResult`，第一次成片、之后都是普通照片。
+  （曾怀疑「客户端预测偷吃缓存」，**已排除**：常规打印走 `LightroomBlockEntity.serverTick`，
+  创造打印在 `LightroomMenu.clickMenuButton` 里有 `!player.level().isClientSide()` 守卫；
+  拍立得那条本来就有 `ServerPlayer` 守卫。）
+- **拍摄瞬间手上没相机**：`FrameAddedEvent` 要读「当前手持相机 + 摄魂术等级」
+  （`CameraInputHandler.getWieldedCamera` 是直接读手，不是缓存）⇒ 拍完立刻切手/换物品/进传送门即失效。
+- **不是 bug**：帧内第一个非玩家实体没有效果条目（牛羊/村民/守卫者）⇒ 按设计出普通照片。
+
+**5. 刻意未做（等用户定夺）**：把 `PhotoInjector` 的 `poll*`（取出即删）改成**读—用—清**，
+以根治「同一帧二次打印」那一条。
+
+**6. 交付**：`1.6.17`；桌面 `C:/Users/volans/Desktop/lensouls-1.6.17.jar`（**10,519,097 字节**，
+MD5 `D1150193959A28F8546A13CE2BE6F543`）；`javap` 已确认新签名
+`inject(ItemStack, Frame, ServerPlayer, boolean, String)`。测试环境仍未动。**未提交**。
+
+**7. 口径修正：失败日志改 INFO + 按原因限流（`1.6.18`）**
+
+- **起因**：`1.6.17` 把失败日志放 debug，**实机默认配置根本看不到**。FML 的 `log4j2.xml`
+  在 `net.neoforged.fancymodloader:loader-*.jar` 里（**不在** neoforge jar，也不在客户端 jar），内容是：
+  `Root level="all"`；Console 与 `File`（= `logs/latest.log`）的 **appender 级 level 默认 `info`**；
+  `DebugFile`（= `logs/debug.log`）默认 **`debug`**。
+  ⇒ **debug 行只进 `logs/debug.log`，不进 `latest.log` 与控制台**。
+  实测 `【摄影奇境】Photo Wanderer` 实例：debug.log 有 **28875** 条 DEBUG，第三方模组
+  （`mezz.jei` 3000+、`dev.ftb.mods.ftbquests`、`artifacts.`、`ModernFix`、`com.quest_enhance`）的 DEBUG 都在里面
+  ⇒ 「mod 的 DEBUG 进不去 debug.log」是**错的**；我们自己一条都没有，只是因为那些行当时没触发
+  （或该实例的会话没走到那条路径）。要实机看 debug 得加 `-Dlog4j.configurationFile=` 自定义配置，
+  太麻烦 ⇒ 用户定案：**失败日志直接 INFO + 防刷屏**。
+- **`util/PhotoLog`（新增）**：`info(reason, Supplier<String>)` / `debug(reason, Supplier<String>)`。
+  **同一原因 60 秒最多一条；全场 40 条上限**，到顶只报一次「已达上限，本场已抑制 N 条」。
+  性能三要点：① 被限流时**连字符串都不拼**（Supplier 惰性求值）——这才是开销大头；
+  ② 热路径只有一次固定集合（十几个常量键）的 `HashMap` 查询；
+  ③ 限流表键是**常量**、不按玩家/帧 id 建键 ⇒ 永不增长、不需要清理。
+- **走 INFO 的**（真正的「没成片」症状）：
+  打印端 `frame-null` / `no-exposure-id` / `no-photo-stack` / `no-ability-cache` / `already-injected` /
+  `steal-no-target` / `steal-no-effect` / `empty-frame`；
+  缓存端 `cache-frame-null` / `cache-no-exposure-id` / `cache-hardman` / **`cache-no-ability`** /
+  **`cache-no-enchant`** / `cache-steal-no-subject`、`glimpse-unlocked`。
+- **仍留在 debug 的（刻意，别顺手改上去）**：「能力属即时生效、按设计不产照片」（`cache-instant-ability`）、
+  每次出片成功的明细 `[PhotoInject] onFrameAdded: …`、既有的 `[Polaroid] capture: …` ——
+  都是高频**正常路径**，放 INFO 会占满限流额度、把真正的故障挤掉。
+- **交付**：`1.6.18`；桌面 `C:/Users/volans/Desktop/lensouls-1.6.18.jar`（**10,521,779 字节**，
+  MD5 `294EF58DC0D5FEB0A5F3FDC95145C813`）；jar 内 `util/PhotoLog.class` 在位。测试环境仍未动。**未提交**。
+
+### 88. 友方单位收口：`util/AllyFilter`（`1.6.19`）——以后过滤只改一处
+
+**1. 需求**：把散在各处的「谁是自己人 / 谁是敌人」判定收拢，避免标准对不齐（真实事故：
+gytrinket 无人机漏进弹幕选敌、幻影幻翼差点被定格）。
+
+**2. `util/AllyFilter`（新增）= 唯一事实来源**，分两层：
+
+| 层 | 内容 |
+|---|---|
+| **分类**（只回答"属不属于这一类"） | `isPlayer` / `isTamedPet`（只认 `isTame()`，不分是谁的）/ `isTamedPetOf`（指定主人）/ `isPhantom`（幻灵本体+随从）/ `isPhantomSource`（含弹幕 owner 链）/ `isSwarmPhantom`（幻翼）/ `isOwnSummon`（幻灵+幻翼）/ `isAssistConstruct`（gytrinket 无人机·蜂群·僚机，按包名前缀+按类缓存）/ `isConstructOwnedBy`（反射 `getOwnerUUID`）/ `isAllied` / `isVehicleRelated` |
+| **口径**（组合好的既定策略） | `isProtectedFromOwnFire` / `isOwnSide` / `isEnemyOf` |
+
+标记键常量也搬来了：`AllyFilter.PHANTOM_TAG` / `PHANTOM_MINION_TAG` / `SWARM_PHANTOM_TAG`
+（`PhantomDamageHandler` 与 `BossPhotoProjHelper` 里改成**别名转发**，调用点不用改）。
+
+**3. 四档口径（刻意不同，别擅自合并！）**
+
+| 口径 | 含 | 用在哪 |
+|---|---|---|
+| `isProtectedFromOwnFire` | 玩家 + **任意**驯服宠物 | 照片弹幕免伤（`PhotoProjSafetyHandler`） |
+| `isOwnSide` | 上面 + 自家召唤物 | 时间定格目标（`PhotoTargets.freezable`） |
+| `isEnemyOf` | 上面 + 第三方辅助作战单位 | 弹幕选敌（`findNearestNonPlayer`） |
+| `GunBulletEntity.isFriendlyTarget`（第四档，就地拼） | 玩家 + **自己的**宠物 + 同乘 + 归属自己的构造体 + 结盟 | 枪械子弹 |
+
+「所有驯服宠物都不打」与「只让自己的宠物挡子弹」是**玩法选择**，不是笔误——但两者现在
+**共用同一套分类定义**，不会再各自定义一遍"什么算宠物 / 什么算归属构造体"。
+
+**4. 迁移清单**（行为除下述一处外完全不变）
+
+- `PhantomDamageHandler`：4 个 persistentData 常量改别名；`isPhantomEntity` / `isPhantomSource` /
+  `isTamedPet` 三个谓词改**委托**（`BossPhantomManager` 的 11 处调用点零改动）。
+- `BossPhotoProjHelper`：`isSwarmPhantom` 改委托、`SWARM_PHANTOM_TAG` 改别名；
+  `findNearestNonPlayer` 的过滤函数换成 `AllyFilter.isEnemyOf`；2 处 `PhotoTargetFilter.isIgnored` → `AllyFilter.isAssistConstruct`。
+- `util/PhotoTargetFilter`（旧类）**已删除**，其职责 = `AllyFilter.isAssistConstruct`；
+  `CameraVisibility` / `AimTargetUtil` 两处改用新名（同类包，无需 import）。
+- `PhotoProjSafetyHandler` → `AllyFilter.isProtectedFromOwnFire`；`PhotoTargets.freezable` → `AllyFilter.isOwnSide`；
+  `GunBulletEntity` 的 `isFriendlyTarget` / `isOwnedConstruct` 拆成 AllyFilter 分类组合；
+  `ClientPhantomHandler` 里裸字面量 `"lensouls:phantom"` 改用 `AllyFilter.PHANTOM_TAG`。
+- **唯一的行为变化（刻意对齐，可回退）**：`findNearestNonPlayer` 原来排除了幻翼却**没排幻灵**
+  （`lensouls:phantom` / `phantom_minion`）⇒ 幻灵演出期间，玩家自己的照片弹幕空挥可能把自家幻灵
+  当成"最近敌人"打。现在按 `isEnemyOf` 一并排除（与「幻灵之间不互殴」同口径）。
+  要回退就把 `isEnemyOf` 拆成调用点显式组合，别改 AllyFilter 的分类。
+
+**5. 铁律（写下来防复发）**
+
+- **以后新增自家单位/新辅助单位：只改 `AllyFilter` 一处**（`isOwnSummon` 加一条，或加一个新分类），
+  各调用点**不得**再写 `if (x instanceof ...) continue;` 这类内联判定。
+- 需要新组合时，在 AllyFilter 加一个**带 javadoc 的具名口径方法**，而不是在调用点手拼。
+- `getPersistentData()`（幻灵/幻翼标记）**不同步到客户端** ⇒ 服务端可用；客户端判断自家幻灵走
+  `ClientPhantomHandler` 的包同步 id 集合（那条是另一套机制，别混进来）。
+- 踩坑：`Projectile` 的包是 `net.minecraft.world.entity.projectile.Projectile`
+  （**不是** `net.minecraft.world.entity.Projectile`）——新建 ally 类时踩过一次编译错误。
+
+**6. 交付**：`1.6.19`；桌面 `C:/Users/volans/Desktop/lensouls-1.6.19.jar`（**10,522,402 字节**，
+MD5 `7AF7FF0C50EFA6795D1B1D8AF48E47CD`）；jar 内 `util/AllyFilter.class` 在位、
+`PhotoTargetFilter.class` 已不存在。测试环境仍未动。**未提交**。
+
+### 89. 虚影幻灵无敌改用原版无敌标签（`1.6.20`，撤掉「抗性提升 V」）
+
+**1. 需求**：幻灵的无敌从「抗性提升 V」改成原版无敌标签 —— 这样它**不会被索敌**，
+玩家也**根本砍不到**自己的召唤物。
+
+**2. 原版语义（全部 `javap -c` 在实机 remapped jar 上核实，不是印象）**
+
+| 结论 | 依据 |
+|---|---|
+| **带无敌标签 ⇒ 敌方 AI 不索敌** | `TargetingConditions.test` 的战斗分支 → `LivingEntity.canAttack` → `canBeSeenAsEnemy()` = `!isInvulnerable() && canBeSeenByAnyone()`。<b>注意：`TargetingConditions` 自己**没有** `isInvulnerable` 判定</b>，别在那一层找 |
+| 无敌标签挡什么 | `Entity.isInvulnerableTo` = `isRemoved() \|\| (invulnerable && !BYPASSES_INVULNERABILITY && !isCreativePlayer()) \|\| (火免 && IS_FIRE) \|\| …` ⇒ **创造模式玩家**与 `BYPASSES_INVULNERABILITY`（`/kill`、虚空）是放行的 |
+| 无敌实体收不到伤害事件 | `LivingEntity.hurt` 里 `isInvulnerableTo` 在第 **2** 条指令，`CommonHooks.onEntityIncomingDamage`（= `LivingIncomingDamageEvent`）在第 **81** 条 ⇒ 常规攻击**连事件都不触发**，所以不会闪红/被推动/被打断出招（抗性 V 是「照样挨打、伤害为 0」，三样都有） |
+
+**3. 实现（两处）**
+
+- `BossPhantomManager.startBorrowedEntity`：删掉
+  `addEffect(DAMAGE_RESISTANCE, PHANTOM_TOTAL_TICKS, 4, false, true, true)`，
+  改 `((LivingEntity) entity).setInvulnerable(true)`。
+- `PhantomDamageHandler.onIncomingDamage` 改为**两层**：
+  ① **幻灵自身** → 除 `BYPASSES_INVULNERABILITY` 外一律 `setCanceled(true)`（补住"创造模式玩家"
+  这个原版放行口，否则创造模式一刀就能秒掉幻灵、演出提前结束）；
+  ② 原有「幻灵来源不伤玩家」逻辑原样保留。
+  **刻意放行 BYPASS 伤害**（`/kill`、虚空）= 留一条管理员/环境后路（幻灵本来 600 tick 必回收）。
+- 降级路径 `BossPhantomEntity` **不用改**：`isPickable()` 已返回 `false` 且没有 `hurt` 覆写
+  ⇒ 玩家连准星都选不中它，本就砍不到。
+- 未动：玩家身上的定身抗性 255（`applyStunEffects`，那是另一件事）。
+
+**4. 对比：自家幻翼（swarm phantom）目前还没统一**
+
+幻翼走的是**事件层过滤**：`BossPhotoProjHelper.onSwarmPhantomIncomingDamage` 只取消**玩家来源**的伤害
+（近战/横扫/弓箭/照片弹幕/玩家召唤物代打；顺带兜住"幻翼互殴"），**不是**无敌标签
+⇒ **怪物仍能打幻翼、也仍会把幻翼当索敌目标**。要统一成无敌标签，就是
+「spawn 时 `setInvulnerable(true)` + 删掉那条事件取消」，等指示再动。
+
+**5. 交付**：`1.6.20`；桌面 `C:/Users/volans/Desktop/lensouls-1.6.20.jar`（**10,522,474 字节**，
+MD5 `4EEDA8DA15F00E62CC5862500E655843`）；字节码已核实 `BossPhantomManager` 调
+`LivingEntity.setInvulnerable(Z)`、`PhantomDamageHandler.onIncomingDamage` 引用
+`DamageTypeTags.BYPASSES_INVULNERABILITY`。测试环境仍未动。**未提交**。
+
+### 90. 幻翼同步为原版无敌标签（`1.6.21`）
+
+- **生成处**：`BossPhotoProjHelper` 里 `EntityType.PHANTOM.create(level)` 那段（紧挨 `SWARM_PHANTOM_TAG`
+  写入、`addFreshEntity` 之前）加 `ph.setInvulnerable(true)`。
+- **删除**了 `onSwarmPhantomIncomingDamage` + `isPlayerCaused` + `isPlayerChain`：
+  旧实现只在事件层取消**玩家来源**的伤害 ⇒ **怪物照样能打幻翼、也照样把幻翼当索敌目标**；
+  换成无敌标签后这两件事一起解决（连受击闪红/击退/音效都没有）。
+- `PhantomDamageHandler.onIncomingDamage` 的兜底分支从「幻灵」扩成 **`AllyFilter.isOwnSummon`**
+  （幻灵 + 幻翼）⇒ 原版无敌标签放行的「创造模式玩家挥砍」统一在这里取消；
+  `BYPASSES_INVULNERABILITY` 刻意放行（`/kill`、虚空，管理员与环境的出路）。
+- 幻翼互殴：伤害源是 `playerAttack(caster)`（直接实体是玩家），伤害侧认不出"自己人打自己人"，
+  现在由无敌标签挡住；`isSelectableAnchor` 仍是主防线（少放技能、少刷音效）。
+- 注意语义差异：幻翼**不打** `lensouls:phantom` 那种标记（那套会连带触发幻灵专属穿透伤害/目标硬拦截/
+  击杀归属改写），所以幻翼给的是普通幻翼伤害，与幻灵不是同一条链路，本次改动不影响其输出。
+- **交付**：`1.6.21`；桌面 `C:/Users/volans/Desktop/lensouls-1.6.21.jar`（**10,522,139 字节**，
+  MD5 `6DEE00A6CD165ED987BCCD10517E2ECC`）；字节码核实：`BossPhotoProjHelper` 出现
+  `Phantom.setInvulnerable(Z)`、旧事件层方法已不存在、`PhantomDamageHandler` 调用
+  `AllyFilter.isOwnSummon`。测试环境仍未动。**未提交**。
+- **待用户定夺**：见下方 §91 的「四档友方口径」现状，是否合并成两档。
+
+### 91. 友方单位口径现状（四档）与合并建议（待定夺）
+
+| # | 口径 | 含 | 用在哪 |
+|---|---|---|---|
+| 1 | `AllyFilter.isProtectedFromOwnFire` | 玩家 + **任意**驯服宠物 | 照片弹幕误伤免伤（`PhotoProjSafetyHandler`） |
+| 2 | `AllyFilter.isOwnSide` | 上面 + 自家召唤物（幻灵/幻翼） | 时间定格目标（`PhotoTargets.freezable`） |
+| 3 | `AllyFilter.isEnemyOf` | 上面 + 第三方辅助作战单位 | 弹幕选敌（`findNearestNonPlayer`） |
+| 4 | `GunBulletEntity.isFriendlyTarget`（就地拼） | 玩家 + **自己的**宠物 + 同乘 + 归属自己的构造体 + 结盟 | 枪械子弹 |
+
+- 差别来源：**1/2/3 是同一套分类的不同组合**（功能边界不同：免伤 / 定格 / 选敌），
+  **4 的判定轴不一样**——它按「归属」（我的/我队的）判定，1~3 按「类别」（所有驯服的宠物）判定。
+- 其中 **1 与 2 的差异（自家召唤物）是历史差异而非设计差异**：1 写在召唤物出现之前，
+  而召唤物已经从 3 的选敌里排除了，所以把 1 并进 2 基本无副作用（只会额外保护自家召唤物）。
+- 三个候选方向（用户选）：**A** 1 并进 2（剩三档）／**B** 4 也改成「类别」口径（剩两档：
+  「自己人」+「不索敌清单」）／**C** 保持四档，只在文档写清差异理由。
+- **⚠ 本节已被 §92 取代（2026-10 用户定案：统一）。** 下面是统一后的最终口径。
+
+### 92. 友方口径统一（`1.6.22`）——四档 → **一档 + 两个相对附加项**
+
+**1. 用户定案**：① 定格也纳入统一口径；② **不区分归属**（任意第三方辅助单位一律友方）。
+
+**2. 统一后的 `util/AllyFilter`**
+
+```java
+// 唯一判定（所有友方/敌我判定都走它）
+isFriendlyUnit(e) = 玩家 ‖ 任意驯服宠物 ‖ 自家召唤物（幻灵 + 幻翼）‖ 任意第三方辅助作战单位
+isEnemyOf(viewer, target) = target != viewer && !isFriendlyUnit(target)      // 弹幕选敌
+
+// 两个相对附加项：要看 viewer，刻意不进 isFriendlyUnit
+isAllied(viewer, target)        // 结盟（计分板队伍/模组友军）
+isVehicleRelated(a, b)          // 同乘
+```
+
+- **删除**了 `isProtectedFromOwnFire` / `isOwnSide`（旧三档合并）；
+  **删除**了 `isTamedPetOf` / `isConstructOwnedBy`（归属判定不再需要，不留死代码）。
+- 目前公开 API = 分类（isPlayer / isTamedPet / isPhantom / isPhantomSource / isSwarmPhantom /
+  isOwnSummon / isAssistConstruct）+ `isFriendlyUnit` / `isEnemyOf` + 两个相对附加项。
+
+**3. 四个消费方现在的行为**
+
+| 消费方 | 行为 |
+|---|---|
+| 照片弹幕误伤免伤（`PhotoProjSafetyHandler`） | 命中友方一律取消 ⇒ **不误伤任何友方**（含自家召唤物与任意辅助单位） |
+| 时间定格（`PhotoTargets.freezable`） | 友方一律不定 ⇒ **连队友/路人的无人机也不冻**（本次扩充点） |
+| 弹幕选敌（`findNearestNonPlayer`） | `isEnemyOf` ⇒ 只打敌人（不变） |
+| 次元枪子弹（`GunBulletEntity.canHitEntity`） | 友方一律**穿过**（新增：队友的宠物、队友/路人的构造体、自家召唤物），再叠加同乘/结盟 |
+
+**4. 已知代价与风险（用户明确接受 / 结构备忘）**
+
+- `isAssistConstruct` **不区分归属** ⇒ PvP 下**敌方的无人机/蜂群同样打不到、也会被弹幕放过**。
+  将来要精确化，就在 AllyFilter 里加"相对层"方法（归属+队伍），**别改 `isFriendlyUnit`**。
+- 统一的结构性代价：改 `isFriendlyUnit` 一处 = 同时改上表四方；以后若某方要开例外，
+  先把它拆回自己的判定方法，别在调用点打补丁。
+
+**5. 交付**：`1.6.22`；桌面 `C:/Users/volans/Desktop/lensouls-1.6.22.jar`（**10,521,600 字节**，
+MD5 `2CC04A61AA36E00297E54672B266B585`）；字节码核实 AllyFilter 公开 API 只剩上述内容、
+全仓库无 `isProtectedFromOwnFire|isOwnSide|isTamedPetOf|isConstructOwnedBy` 残留、
+四个消费方分别调用 `isFriendlyUnit`（3 处）与 `isEnemyOf`（1 处）。测试环境仍未动。**未提交**。
+
+### 93. 大过滤定型（`1.6.23`）：同乘并入、结盟删除、引力枪不动
+
+**1. 用户定案**：① 同乘（{@code isVehicleRelated}）**并进大过滤**；② 结盟（计分板同队）**删除**；
+③ 引力枪**不用管**。
+
+**2. 最终形态（两层 + 一个补集）**
+
+```java
+isFriendlyUnit(e)                  // 类别层（一元、无视角）
+    = 玩家 ‖ 任意驯服宠物 ‖ 自家召唤物（幻灵+幻翼）‖ 任意第三方辅助作战单位
+
+isFriendly(viewer, target)         // ★大过滤（所有友方判定都走它）
+    = isFriendlyUnit(target) || isVehicleRelated(viewer, target)
+
+isEnemyOf(viewer, target)          // 补集：非友方且非自己（不含存活判定）
+    = target != viewer && !isFriendly(viewer, target)
+```
+
+- **删除 `isAllied`**（`Entity.isAlliedTo` 分支）：原版语义 = `Team.isAlliedTo(t) = (t == 自己所在队伍)`，
+  没队伍时连自己都不算同盟；并进基础判定的三个害处（**二元相对判定强加视角 / 粒度是"队伍"一句 `/team join`
+  就能整体改变友方 / 可被任何模组覆写、行为不可复现**）写进了 AllyFilter 类注释，以后别再往里加。
+
+**3. 四个消费方与各自视角**
+
+| 消费方 | 调用 | 视角 viewer |
+|---|---|---|
+| 照片弹幕误伤免伤（`PhotoProjSafetyHandler`） | `isFriendly` | **弹幕发射者**（新增 `PhotoProjMarker.ownerOf(DamageSource)`：优先投影物 `getOwner()`，其次 causer；`isSelfHit` 也改用它，两处共用一份解析） |
+| 时间定格（`PhotoTargets.freezable`） | `isFriendly` | 拍摄者（顺带：不定住拍摄者自己骑的坐骑） |
+| 弹幕选敌（`findNearestNonPlayer`） | `isEnemyOf` | 玩家自己（顺带：不把自己的坐骑当"最近敌人"） |
+| 次元枪子弹（`GunBulletEntity.canHitEntity`） | `isFriendly` | 子弹 owner ⇒ **友方一律穿过** |
+
+**4. 刻意不动（已知不一致，别顺手"统一"）**：`GravityBulletEntity.canHitEntity` 仍然**只排除自己**
+（队友/宠物/构造体/自家幻翼都能被牵引）。用户明确说"引力枪不用管"；且它承担的是"牵引"而非伤害，
+口径本就与子弹/弹幕不同。
+
+**5. 交付**：`1.6.23`；桌面 `C:/Users/volans/Desktop/lensouls-1.6.23.jar`（**10,521,662 字节**，
+MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
+`isFriendlyUnit / isFriendly / isEnemyOf`（无 `isAllied`）、`PhotoProjMarker.ownerOf` 在位、
+四个消费方分别调用 `isFriendly`（3 处）与 `isEnemyOf`（1 处）。测试环境仍未动。**未提交**。

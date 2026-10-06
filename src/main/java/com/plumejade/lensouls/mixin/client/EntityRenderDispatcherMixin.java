@@ -8,7 +8,7 @@ import com.plumejade.lensouls.ability.client.ItemRenderTracker;
 import com.plumejade.lensouls.ability.client.StatusGlintBufferSource;
 import com.plumejade.lensouls.client.phantom.ClientPhantomHandler;
 import com.plumejade.lensouls.client.phantom.PhantomBufferSource;
-import com.plumejade.lensouls.entity.SwarmPhantomFade;
+import com.plumejade.lensouls.client.phantom.SwarmPhantomClient;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -86,9 +86,10 @@ public abstract class EntityRenderDispatcherMixin {
             renderer.render(entity, rotationYaw, partialTicks, poseStack, buffer, packedLight);
             return;
         }
-        // 幻术师照片召唤的幻影幻翼：alpha 逐 tick 由服务端同步（末尾渐隐到全透明）。
+        // 幻术师照片召唤的幻影幻翼：alpha 由 S2C 时效包（服务端只在开始追踪时发一次余命）
+        // 本地按时间推算，不再读原版 Phantom 的同步数据槽。
         // 放在状态光效判定之前，让渐隐永远胜过其它渲染包装——否则被冻结/上光效时淡出会失效。
-        Float swarmAlpha = SwarmPhantomFade.alphaOrNull(root);
+        Float swarmAlpha = SwarmPhantomClient.alphaOrNull(root);
         if (swarmAlpha != null) {
             renderer.render(entity, rotationYaw, partialTicks, poseStack,
                     new PhantomBufferSource(buffer, swarmAlpha), packedLight);

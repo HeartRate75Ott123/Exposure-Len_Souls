@@ -61,8 +61,8 @@ public class PolaroidPrintMixin {
 
         if (!(holder.asHolderEntity() instanceof ServerPlayer player)) return;
 
-        // 出片注入统一走 PhotoInjector（与暗房共用同一实现）
-        PhotoInjector.inject(photo, frame, player, true);
+        // 出片注入统一走 PhotoInjector（与暗房共用同一实现）；path 只用于 debug 日志区分来源
+        PhotoInjector.inject(photo, frame, player, true, "polaroid");
     }
 
 }

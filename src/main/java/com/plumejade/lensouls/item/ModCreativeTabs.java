@@ -114,6 +114,11 @@ public class ModCreativeTabs {
                         // ---- 羽·折翼沉渊 ----
                         output.accept(ModItems.FEATHER_ABYSS.get());
 
+                        // ---- ⑤ 羽·断时炉心 / ⑥ 羽·终焉秘仪 / ⑦ 羽·零号誓炉 ----
+                        output.accept(ModItems.FEATHER_TIMECORE.get());
+                        output.accept(ModItems.FEATHER_FINALRITE.get());
+                        output.accept(ModItems.FEATHER_ZEROFORGE.get());
+
                         // ---- 法师胸针 / 灵魂口哨（互斥新饰品） ----
                         output.accept(ModItems.MAGE_BROOCH.get());
                         output.accept(ModItems.SOUL_WHISTLE.get());

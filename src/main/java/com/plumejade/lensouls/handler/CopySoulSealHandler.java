@@ -27,9 +27,12 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 复制之魂「禁复制封印」的全容器扫描器。
  * <p>
- * 语义（沿用 {@link CopySoulItem} 的栈级封印设计）：佩戴禁复制羽毛（元素觉醒 / 铁人 / 深渊）
- * 期间，随身的复制之魂自动打上 {@link ModDataComponents#COPY_SOUL_SEALED}，配方层见到即拒绝匹配；
+ * 语义（沿用 {@link CopySoulItem} 的栈级封印设计）：佩戴禁复制羽毛（④ 折翼沉渊）期间，
+ * 随身的复制之魂自动打上 {@link ModDataComponents#COPY_SOUL_SEALED}，配方层见到即拒绝匹配；
  * 摘下羽毛 1~10 tick 内自动解封。
+ * <p>
+ * <b>2026-09 重设计</b>：① 荒厄遗咒与 ③ 元素觉醒者已不再封印复制之魂（旧版的
+ * 「元素觉醒 / 铁人」两路已移除），只有 ④ 仍在封印范围内。
  * <p>
  * 原实现只覆盖「物品栏槽位里的复制之魂」（靠 {@code ItemStack#inventoryTick}）。玩家实测的漏洞是：
  * 收在<b>精妙背包内容物</b>与<b>超越维度终端</b>里的复制之魂打不上标签——而这两处恰恰是玩家最常
@@ -90,9 +93,9 @@ public final class CopySoulSealHandler {
      */
     public static boolean wearsForbiddenFeather(Player player) {
         if (player == null) return false;
-        return FeatherElementRiseHandler.hasFeather(player)
-                || FeatherHardmanHandler.hasHardman(player)
-                || FeatherAbyssHandler.hasAbyss(player);
+        // 新改案：① 荒厄·封器 与 ③ 元素觉醒者都已移除「禁止复制之魂」相关内容，
+        // 目前只有 ④ 折翼沉渊（代码现状，未改）仍封印复制之魂。
+        return FeatherAbyssHandler.hasAbyss(player);
     }
 
     // ========== 事件 ==========

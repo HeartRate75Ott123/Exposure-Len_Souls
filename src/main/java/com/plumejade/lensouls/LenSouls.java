@@ -137,6 +137,16 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherTwitcherHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherHardmanHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherAbyssHandler.class);
+        // ---- 诅咒状态（反转掩码 / 逐条进度）：登录时同步给客户端 ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.feather.CurseManager.class);
+        // ---- 脱离 Curios：登录时把旧存档戴在饰品栏上的诅咒迁回背包 ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.CurseMigrationHandler.class);
+        // ---- ⑤ 羽·断时炉心（铁序 · 归一之律 23 条枷锁） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.curse.TimecoreCurse.class);
+        // ---- ⑥ 羽·终焉秘仪（秘仪 · 代价之律 7 条） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.curse.FinalriteCurse.class);
+        // ---- ⑦ 羽·零号誓炉（机誓 · 失控之律 7 诅咒 + 7 祝福） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.curse.ZeroforgeCurse.class);
         // ---- 元素活性 tooltip（客户端物品 hover 提示） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.ElementActivityTooltipHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.StaffItemTooltipHandler.class);

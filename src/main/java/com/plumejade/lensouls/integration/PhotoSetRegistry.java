@@ -405,13 +405,18 @@ public class PhotoSetRegistry {
         }
     }
 
-    /** 效果行配色：§c 进攻/伤害、§a 防御/生存、§9 增益/机动、§5 转化 */
+    /**
+     * 效果行配色按「对玩家自己有利 / 有害」判定：§a 有利、§7 中性。
+     * 「进攻类」词条（造成的元素伤害、元素 DoT、弹幕强化、给敌人挂负面/元素抑制、
+     * 对特定生物增伤、受到它们伤害减少）全部是<b>玩家打出去或吃到的增益</b>，因此统一绿色；
+     * §c 只留给真正对玩家有害的条目。§9 机动/增益与 §5 转化仍是分类色，不参与利弊判定。
+     */
     private static ChatFormatting effectColor(String inner) {
         String[] p = inner.split(":");
         if (p[0].startsWith("immune_")) return ChatFormatting.GREEN;
         return switch (p[0]) {
             case "dmg_mod", "dmg_taken", "barrage_trigger", "barrage_dmg", "on_hit_effect", "on_hit_suppress",
-                 "dmg_element", "dot_mult" -> ChatFormatting.RED;
+                 "dmg_element", "dot_mult" -> ChatFormatting.GREEN;
             case "maxhp", "armor", "kb_resist", "immune", "dodge", "death_revive" -> ChatFormatting.GREEN;
             case "speed", "speed_mult", "env", "infusion_boost", "elem_activity" -> ChatFormatting.BLUE;
             case "convert_eff", "convert_heal", "convert_buff" -> ChatFormatting.DARK_PURPLE;

@@ -5,7 +5,6 @@ import com.plumejade.lensouls.ability.handler.CameraInputHandler;
 import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.component.PotionFilterData;
 import com.plumejade.lensouls.effect.ModEffects;
-import com.plumejade.lensouls.handler.FeatherHardmanHandler;
 import io.github.mortuusars.exposure.Exposure;
 import io.github.mortuusars.exposure.server.CameraInstances;
 import io.github.mortuusars.exposure.data.Filters;
@@ -37,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 相机滤镜触发：手持已挂滤镜的相机自拍（或拍敌人）→ 施加对应滤镜效果 2 分钟，相机进入 30s 冷却。
- * 不要求摄魂术附魔，与既有照片注入能力系统解耦；荒厄遗咒佩戴者无法触发。
+ * 不要求摄魂术附魔，与既有照片注入能力系统解耦。
  */
 public class FilterPhotoHandler {
 
@@ -101,7 +100,7 @@ public class FilterPhotoHandler {
     public static void onFrameAdded(FrameAddedEvent event) {
         try {
             if (!(event.getCameraHolderEntity() instanceof ServerPlayer player)) return;
-            if (FeatherHardmanHandler.hasHardman(player)) return;
+            // 新改案：① e2「封器」只禁能力照片（普通拍照 / 滤镜拍照都不受影响）→ 这里不再拦截
 
             Frame frame = event.getFrame();
             if (frame == null) return;
@@ -135,15 +134,11 @@ public class FilterPhotoHandler {
             // 敌人易伤（蜘蛛）：仅非自拍，对取景框内全部非玩家生物生效；无生物则不消耗冷却
             if (filter.equals(ENEMY_FILTER)) {
                 if (!selfie) {
-                    boolean hasTarget = false;
-                    for (LivingEntity e : event.getEntitiesInFrame()) {
-                        if (e != player && !(e instanceof Player) && e.isAlive()) { hasTarget = true; break; }
-                    }
-                    if (!hasTarget) return;
-                    for (LivingEntity e : event.getEntitiesInFrame()) {
-                        if (e != player && !(e instanceof Player) && e.isAlive()) {
-                            e.addEffect(new MobEffectInstance(ModEffects.FILTER_SPIDER, SPECIAL_FILTER_DURATION));
-                        }
+                    List<LivingEntity> targets = com.plumejade.lensouls.util.PhotoTargets
+                            .othersNonPlayer(player, event.getEntitiesInFrame());
+                    if (targets.isEmpty()) return;
+                    for (LivingEntity e : targets) {
+                        e.addEffect(new MobEffectInstance(ModEffects.FILTER_SPIDER, SPECIAL_FILTER_DURATION));
                     }
                     scheduleCooldown(hand, 120);
                     lastFilterShot.put(player.getUUID(), now);
@@ -164,10 +159,13 @@ public class FilterPhotoHandler {
                 scheduleCooldown(hand, 120);
                 lastFilterShot.put(player.getUUID(), now);
             } else {
-                // 非自拍：仅对取景框内全部其他玩家生效；无玩家则不进冷却
+                // 非自拍：仅对取景框内**其他玩家**生效（滤镜的既定口径就是"给队友上增益"，无论什么能力，
+                // 与能力拍照的主体选取完全正交——后者不认玩家，见 PhotoTargets 的类注释）；无玩家则不进冷却
+                List<LivingEntity> targets = com.plumejade.lensouls.util.PhotoTargets
+                        .otherPlayers(player, event.getEntitiesInFrame());
                 boolean applied = false;
-                for (LivingEntity ent : event.getEntitiesInFrame()) {
-                    if (ent != player && ent instanceof ServerPlayer sp && ent.isAlive()) {
+                for (LivingEntity ent : targets) {
+                    if (ent instanceof ServerPlayer sp) {
                         if (effect == ModEffects.FILTER_ART) {
                             applyRandomBuffs(sp);
                         } else {
@@ -213,19 +211,15 @@ public class FilterPhotoHandler {
             scheduleCooldown(hand, 60);
             lastGlassShot.put(player.getUUID(), now);
         } else {
-            // 非自拍：入镜无生物则不消耗冷却
-            boolean hasTarget = false;
-            for (LivingEntity ent : event.getEntitiesInFrame()) {
-                if (ent != player && ent.isAlive()) { hasTarget = true; break; }
-            }
-            if (!hasTarget) return;
+            // 非自拍：入镜没有其他活体则不消耗冷却（选取口径见 PhotoTargets.others：除自己外全部活体）
+            List<LivingEntity> targets = com.plumejade.lensouls.util.PhotoTargets
+                    .others(player, event.getEntitiesInFrame());
+            if (targets.isEmpty()) return;
             // 先记冷却，避免下方效果施加异常被 onFrameAdded 的 try/catch 吞掉而跳过冷却
             scheduleCooldown(hand, 60);
             lastGlassShot.put(player.getUUID(), now);
-            for (LivingEntity ent : event.getEntitiesInFrame()) {
-                if (ent != player && ent.isAlive()) {
-                    instances.forEach(ent::addEffect);
-                }
+            for (LivingEntity ent : targets) {
+                instances.forEach(ent::addEffect);
             }
         }
     }

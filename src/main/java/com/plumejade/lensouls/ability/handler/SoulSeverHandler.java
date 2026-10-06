@@ -68,7 +68,11 @@ public class SoulSeverHandler {
             float current = target.getHealth();
             float ratio = 0.1f + player.getRandom().nextFloat() * 0.1f;
             // 夹在 50% 下限之上：这一刀最多把血削到线，绝不穿透
+            float before = current;
             target.setHealth(Math.max(floor, current - current * ratio));
+            // ⑤ 铁序·缚己 的反转条件：护甲 ≥30 时用夺魂索命累计造成 10000 点伤害
+            // （夺魂索命直接 setHealth，不走伤害事件，所以必须在这里回报）
+            com.plumejade.lensouls.handler.curse.TimecoreCurse.onSoulSever(player, before - target.getHealth());
             spawnShockwave((ServerLevel) player.level(), target);
             player.level().playSound(null, target.getX(), target.getY(), target.getZ(),
                     SoundEvents.TRIDENT_THUNDER, SoundSource.PLAYERS, 1.0f, 1.0f);

@@ -76,16 +76,28 @@ public final class PhotoProjMarker {
     }
 
     /**
+     * 该伤害的"发起者实体"：优先弹幕自己的 {@code Projectile#getOwner()}
+     * （被反弹/护盾弹回后 {@code getEntity()} 可能已经是别人），其次伤害的 causer。
+     * <p>
+     * 自伤判定（{@link #isSelfHit}）与友方判定（{@code AllyFilter#isFriendly} 的视角）
+     * <b>共用这一份解析</b>，避免两处各写一遍。
+     */
+    public static Entity ownerOf(DamageSource source) {
+        if (source == null) return null;
+        Entity direct = source.getDirectEntity();
+        Entity owner = null;
+        if (direct instanceof Projectile projectile) owner = projectile.getOwner();
+        return owner != null ? owner : source.getEntity();
+    }
+
+    /**
      * 弹幕是否打回了自己的发射者（被灾变等模组的反弹/护盾弹回后命中玩家自身）。
      * 直接实体必须是我们标记过的弹幕，才认为是「我们的弹幕自伤」。
      */
     public static boolean isSelfHit(DamageSource source, Entity victim) {
         if (source == null || victim == null) return false;
-        Entity direct = source.getDirectEntity();
-        if (!isBarrage(direct)) return false;
-        Entity owner = null;
-        if (direct instanceof Projectile projectile) owner = projectile.getOwner();
-        if (owner == null) owner = source.getEntity();
+        if (!isBarrage(source.getDirectEntity())) return false;
+        Entity owner = ownerOf(source);
         return owner != null && owner == victim;
     }
 }

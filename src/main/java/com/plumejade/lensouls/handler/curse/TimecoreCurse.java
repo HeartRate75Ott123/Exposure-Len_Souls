@@ -190,6 +190,9 @@ public final class TimecoreCurse {
             player.removeEffect(MobEffects.BLINDNESS);
         }
 
+        // e14 裁影：照片栏位 -2（诅咒态）/ +4（反转态）——「照片槽」就是 Curios 的 photograph 栏
+        updatePhotoSlots(player);
+
         // e13 余悸：大击窗口过期即清除
         Long until = FEAR_UNTIL.get(player.getUUID());
         if (until != null && player.level().getGameTime() > until) FEAR_UNTIL.remove(player.getUUID());
@@ -426,12 +429,16 @@ public final class TimecoreCurse {
         float d = event.getNewDamage();
         if (d <= 0.0f) return;
 
-        // e7 钝锋：造成所有伤害 -10%（乘算）；反转：无视 10% 护甲（在本事件里体现为 +10% 伤害）
+        // e7 钝锋：造成所有伤害 -10%（乘算）
         if (CurseManager.on(player, D, 6)) {
             d *= 0.9f;
             CurseManager.tick(player, D, 6, (long) Math.ceil(d), 10000L);
         } else if (CurseManager.rev(player, D, 6)) {
-            d *= 1.10f;
+            // 反转：**无视目标 10% 护甲**。按 ArmorPenHandler 的口径，把被护甲削掉的那部分加回 10%
+            // （NeoForge 1.21.1 护甲在 LivingDamageEvent.Pre 之前就已结算，这是唯一可行点）
+            float armorCut = event.getContainer()
+                    .getReduction(net.neoforged.neoforge.common.damagesource.DamageContainer.Reduction.ARMOR);
+            if (armorCut > 0.0f) d += armorCut * 0.10f;
         }
 
         // e12 缚己：每有一点护甲值，伤害 -0.5%（乘算）
@@ -477,6 +484,9 @@ public final class TimecoreCurse {
         levelFieldCounter(player, target);
 
         event.setNewDamage(d);
+
+        // e22 封镜 反转：Y≥100 时照片弹幕伤害 +50%（加算，在所有乘算之后收口）
+        photoBarrageBonus(player, event);
     }
 
     // ==================== 死亡 / 击杀 ====================
@@ -571,6 +581,66 @@ public final class TimecoreCurse {
     }
 
     // ==================== 生命周期 / 防跨存档污染 ====================
+
+    // ==================== e14 裁影 / e22 封镜 ====================
+
+    private static final String PHOTO_SLOT_TAG = "lensouls:curse_photo_slot";
+    private static final ResourceLocation PHOTO_SLOT_MOD = ResourceLocation.parse("lensouls:curse_trimmed_frame");
+
+    /**
+     * e14 裁影：照片栏位 **-2**（诅咒态）/ **+4**（反转态）。
+     * <p>
+     * 「照片槽」就是 Curios 的 {@code photograph} 栏位，加减走 Curios 官方的
+     * {@code addTransientSlotModifier}（口径与 {@code PhotoSpecialEffects.updatePhotoSlots} 一致：
+     * 加完必须 {@code stacks.update()} 把惰性 resize 落实，否则尺寸要等下次被读取才生效；
+     * 再把 {@code getUpdatingInventories()} 发一次同步包，客户端才会 applySyncTag）。
+     */
+    private static void updatePhotoSlots(ServerPlayer player) {
+        int want = 0;
+        if (CurseManager.on(player, D, 13)) want = -2;
+        else if (CurseManager.rev(player, D, 13)) want = 4;
+
+        if (player.getPersistentData().getInt(PHOTO_SLOT_TAG) == want) return;
+        player.getPersistentData().putInt(PHOTO_SLOT_TAG, want);
+        final int target = want;
+
+        try {
+            top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
+                handler.removeSlotModifier("photograph", PHOTO_SLOT_MOD);
+                if (target != 0) {
+                    handler.addTransientSlotModifier("photograph", PHOTO_SLOT_MOD, target,
+                            AttributeModifier.Operation.ADD_VALUE);
+                }
+                var stacks = handler.getCurios().get("photograph");
+                if (stacks != null) stacks.update();
+                var updates = handler.getUpdatingInventories();
+                if (!updates.isEmpty()) {
+                    net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                            new top.theillusivec4.curios.common.network.server.sync.SPacketSyncModifiers(
+                                    player.getId(), updates));
+                    updates.clear();
+                }
+            });
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ⑤ e14 照片栏位调整失败", t);
+        }
+    }
+
+    /** e22 封镜 的反转条件：在 Y≥200 处拍照（普通照片也算）——由 {@code PhotoInjectionHandler} 回调 */
+    public static void onPhotoTaken(ServerPlayer player) {
+        if (player == null) return;
+        if (!CurseManager.on(player, D, 21)) return;
+        if (player.getY() < 200.0) return;
+        CurseManager.tick(player, D, 21, 1L, 100L);
+    }
+
+    /** e22 封镜 反转：Y≥100 时照片弹幕伤害 +50%（加算） */
+    private static void photoBarrageBonus(ServerPlayer player, LivingDamageEvent.Pre event) {
+        if (!CurseManager.rev(player, D, 21)) return;
+        if (player.getY() < 100.0) return;
+        if (!com.plumejade.lensouls.util.PhotoProjMarker.isBarrageDamage(event.getSource())) return;
+        event.setNewDamage(event.getNewDamage() * 1.5f);
+    }
 
     /** 清掉该玩家的所有瞬时计时（退出世界 / 死亡时调用） */
     public static void clear(UUID id) {

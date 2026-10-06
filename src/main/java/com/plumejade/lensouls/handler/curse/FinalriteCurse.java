@@ -346,4 +346,23 @@ public final class FinalriteCurse {
             LenSouls.LOGGER.error("[Curse] ⑥ 反转条件结算异常", t);
         }
     }
+
+    // ==================== 生命周期 / 防跨存档污染 ====================
+
+    /** 清掉该玩家的瞬时计时（退出世界时调用） */
+    public static void clear(UUID id) {
+        if (id != null) LAST_DEALT.remove(id);
+    }
+
+    /**
+     * 退出世界即清瞬时计时。
+     * <p>
+     * 静态 Map 按 UUID 存，而单机玩家 UUID 由名字派生 —— 换个存档还是同一个 UUID，
+     * 不清会把上个存档的「最近一次造成伤害的时刻」带进新存档（跨存档污染）。
+     * 真正的进度在 {@code CurseStateData}（玩家附件 + copyOnDeath），**跨死亡保留**。
+     */
+    @SubscribeEvent
+    public static void onLogout(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() != null) clear(event.getEntity().getUUID());
+    }
 }

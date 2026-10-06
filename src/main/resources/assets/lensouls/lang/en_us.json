@@ -504,7 +504,7 @@
   "item.lensouls.feather_elementrise.cond_shared": "At activity 10+ and 90%+ HP, deal 10,000 elemental bonus damage in one hit",
   "item.lensouls.feather_elementrise.e1.name": "Element·Restless",
   "item.lensouls.feather_elementrise.e1.tag": "Activity growth",
-  "item.lensouls.feather_elementrise.e1.curse": "§cEvery (4 × activity³) seconds all activity +1; each activity level makes damage taken +5%",
+  "item.lensouls.feather_elementrise.e1.curse": "§cEvery (4 × activity²) seconds all activity +1; each activity level makes damage taken +5%",
   "item.lensouls.feather_elementrise.e1.after": "§aDamage taken per activity level becomes +2%",
   "item.lensouls.feather_elementrise.e2.name": "Element·Embers",
   "item.lensouls.feather_elementrise.e2.tag": "DoT scaling",

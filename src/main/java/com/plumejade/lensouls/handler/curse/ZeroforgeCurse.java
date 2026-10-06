@@ -531,37 +531,42 @@ public final class ZeroforgeCurse {
             if (d <= 0.0f) return;
             if (!active(player)) return;
 
-            // ── e4 誓约·断供：饱食度未满时伤害 -70%（乘算）；反转后不再罚、饱食度满时 +10% ──
+            // ── 输出侧叠加口径（§2「叠加口径（定稿）」）：**诅咒态乘算 / 反转·祝福态加算** ──
+            // 诅咒态：直接乘算
             boolean full = player.getFoodData().getFoodLevel() >= MAX_FOOD;
-            if (!full) {
-                if (CurseManager.on(player, D, 3)) d *= STARVED_DAMAGE_MULTIPLIER;
-            } else if (CurseManager.rev(player, D, 3)) {
-                d *= (1.0f + FED_BONUS);
+            if (!full && CurseManager.on(player, D, 3)) {
+                d *= STARVED_DAMAGE_MULTIPLIER;                     // e4 断供：饱食未满 -70%
             }
 
-            // ── e6 誓约·叛主 反转：无人机伤害 +100%（乘算） ──
+            // 反转 / 祝福态：先汇总 Σ，再在**所有乘算之后**一次性收口 d × (1 + Σ)
+            float additive = 0.0f;
+
+            // e4 誓约·断供 反转：饱食度满时伤害 +10%
+            if (full && CurseManager.rev(player, D, 3)) {
+                additive += FED_BONUS;
+            }
+            // e6 誓约·叛主 反转：无人机伤害 +100%（原乘算 ×2 ⇒ 加算 +1.0，单条生效时数值等价）
             if (CurseManager.rev(player, D, 5) && isDroneDamage(event.getSource())) {
-                d *= DRONE_DAMAGE_MULTIPLIER;
+                additive += DRONE_DAMAGE_MULTIPLIER - 1.0f;
             }
-
-            // ── e8 零号·神愤：元素附加伤害 +17%（未解锁）/ +25%（已解锁） ──
+            // e8 零号·神愤：元素附加伤害 +17%（未解锁）/ +25%（已解锁）
             // 只放大于「本次攻击确实有元素活性」时——这正是「元素附加伤害」的成立条件。
             if (elementalActivitySum(player, event.getSource()) > 0f) {
-                float bonus = CurseManager.rev(player, D, 7) ? ELEMENT_BONUS_UNLOCKED : ELEMENT_BONUS_BASE;
-                d *= (1.0f + bonus);
+                additive += CurseManager.rev(player, D, 7) ? ELEMENT_BONUS_UNLOCKED : ELEMENT_BONUS_BASE;
             }
-
-            // ── e10 零号·灵通 解锁：发光目标受到伤害 +7%（乘算） ──
+            // e10 零号·灵通 解锁：发光目标受到伤害 +7%
             if (CurseManager.rev(player, D, 9) && target.isCurrentlyGlowing()) {
-                d *= (1.0f + GLOW_DAMAGE_BONUS);
+                additive += GLOW_DAMAGE_BONUS;
             }
-
-            // ── e11 零号·博识：对击杀过的生物 +15%（未解锁）/ +30%（已解锁）（加算） ──
+            // e11 零号·博识：对击杀过的生物 +15%（未解锁）/ +30%（已解锁）
             String tid = typeId(target);
             if (tid != null && hasKilled(player, tid)) {
-                float bonus = CurseManager.rev(player, D, 10)
+                additive += CurseManager.rev(player, D, 10)
                         ? KNOWN_KILL_BONUS_UNLOCKED : KNOWN_KILL_BONUS;
-                d *= (1.0f + bonus);
+            }
+
+            if (additive > 0.0f) {
+                d *= (1.0f + additive);
             }
 
             event.setNewDamage(d);
@@ -898,10 +903,14 @@ public final class ZeroforgeCurse {
      * {@code lensouls:glimpsed_mobs} 累积种类数（只读，不改任何其它系统的数据）。
      */
     private static void tickGlow(ServerPlayer player) {
-        // 条件：累计记录到的生物种类数 ≥ 10（先累加再判定，达成一次即永久解锁）
+        // 条件：累计记录到的生物种类数 ≥ 10（进度直接写真实种类数，条件文本的 [N / 10] 才不会恒为 0）
         if (CurseManager.on(player, D, 9)) {
             scanGlimpsedPhotos(player);
-            if (glimpsedCount(player) >= GLIMPSE_GOAL) {
+            long n = glimpsedCount(player);
+            if (CurseManager.progress(player, D, 9) != n) {
+                CurseManager.setProgress(player, D, 9, n);
+            }
+            if (n >= GLIMPSE_GOAL) {
                 CurseManager.reach(player, D, 9);
             }
         }
@@ -1082,9 +1091,15 @@ public final class ZeroforgeCurse {
                 }
             }
             addList(player, KEY_ACCESSORIES, found, ACCESSORY_CAP);
-            if (CurseManager.on(player, D, 11)
-                    && persisted(player).getList(KEY_ACCESSORIES, Tag.TAG_STRING).size() >= ACCESSORY_GOAL) {
-                CurseManager.reach(player, D, 11);
+            if (CurseManager.on(player, D, 11)) {
+                // 进度直接写真实件数（条件文本的 [N / 12] 才不会恒为 0）
+                long n = persisted(player).getList(KEY_ACCESSORIES, Tag.TAG_STRING).size();
+                if (CurseManager.progress(player, D, 11) != n) {
+                    CurseManager.setProgress(player, D, 11, n);
+                }
+                if (n >= ACCESSORY_GOAL) {
+                    CurseManager.reach(player, D, 11);
+                }
             }
         });
     }
@@ -1149,9 +1164,15 @@ public final class ZeroforgeCurse {
             if (soulId != null) {
                 addToList(player, KEY_SOUL_KINDS, soulId.toString(), SOUL_KIND_CAP);
             }
-            if (CurseManager.on(player, D, 13)
-                    && persisted(player).getList(KEY_SOUL_KINDS, Tag.TAG_STRING).size() >= SOUL_KIND_GOAL) {
-                CurseManager.reach(player, D, 13);
+            if (CurseManager.on(player, D, 13)) {
+                // 进度直接写真实种类数（条件文本的 [N / 6] 才不会恒为 0）
+                long n = persisted(player).getList(KEY_SOUL_KINDS, Tag.TAG_STRING).size();
+                if (CurseManager.progress(player, D, 13) != n) {
+                    CurseManager.setProgress(player, D, 13, n);
+                }
+                if (n >= SOUL_KIND_GOAL) {
+                    CurseManager.reach(player, D, 13);
+                }
             }
 
             long remaining = cd.remainingTicks(now);

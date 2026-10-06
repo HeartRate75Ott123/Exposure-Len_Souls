@@ -208,15 +208,21 @@ public class FeatherElementRiseHandler {
         return max;
     }
 
-    /** 玩家当前「活性等级」= 四种元素活性效果里的最高等级（无 = 0） */
+    /**
+     * 玩家当前「活性等级」= 四种**药水活性**等级之**和**（无 = 0）。
+     * <p>
+     * 用户裁定：「求和（只算四种药水活性加和）」——
+     * 只累加四种元素灌注（药水活性）的等级，不含武器活性、damage_type 活性、攻击者实体活性。
+     * 口径与 ① 羽·荒厄遗咒 e1 的 {@code activityFlatBonus}（同样是四元素求和）保持一致。
+     */
     public static int activityLevel(Player player) {
         if (player == null) return 0;
-        int max = 0;
+        int sum = 0;
         for (Holder<MobEffect> infusion : INFUSIONS) {
             MobEffectInstance inst = player.getEffect(infusion);
-            if (inst != null) max = Math.max(max, inst.getAmplifier() + 1);
+            if (inst != null) sum += Math.max(0, inst.getAmplifier() + 1);
         }
-        return max;
+        return sum;
     }
 
     // ==================== e2 余灰：DoT 曲线 ====================

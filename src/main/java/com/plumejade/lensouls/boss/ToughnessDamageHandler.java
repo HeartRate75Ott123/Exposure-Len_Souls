@@ -26,10 +26,29 @@ public class ToughnessDamageHandler {
     /** BOSS 通用判定阈值：超过此血量的实体自动注册韧性 */
     private static final double GENERIC_BOSS_HP_THRESHOLD = 200.0;
 
+    /**
+     * 「韧性减伤**之前**」的伤害值（HIGHEST 写入、LOWEST 读取）。
+     * <p>
+     * ① 羽·荒厄遗咒 e3 的附加伤害是**真伤**（不吃韧性减伤），它需要以「还没被韧性减伤」的伤害作基数；
+     * 而它挂在 {@code EventPriority.LOWEST}、此时 {@code event.getNewDamage()} 已经是减伤后的值。
+     * 同一次伤害派发在**同一个调用栈 / 同一个线程**里从 HIGHEST 跑到 LOWEST，所以 ThreadLocal 足够，
+     * 不必引入额外的实体附件。
+     * <p>
+     * ⚠ 每次 {@code LivingDamageEvent.Pre} 在 HIGHEST 阶段都会**无条件重写**，所以不会读到上一次的残留。
+     */
+    private static final ThreadLocal<Float> PRE_TOUGHNESS = new ThreadLocal<>();
+
+    /** 韧性减伤前的伤害（HIGHEST 阶段记录；LOWEST 阶段读） */
+    public static Float preToughnessDamage() {
+        return PRE_TOUGHNESS.get();
+    }
+
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDamagePre(LivingDamageEvent.Pre event) {
         try {
             if (event.getEntity().level().isClientSide) return;
+            // 记录减伤前基数（放在最前面：任何早退都不能漏掉这次写入）
+            PRE_TOUGHNESS.set(event.getNewDamage());
             if (!(event.getEntity() instanceof LivingEntity target)) return;
             if (event.getOriginalDamage() <= 0f) return;
 

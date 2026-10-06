@@ -314,7 +314,13 @@ public class FeatherHardmanHandler {
                 if (free > 0) {
                     float coef = CurseManager.rev(player, D, 2)
                             ? E3_BONUS_COEF_REVERSED : E3_BONUS_COEF_CURSE;
-                    d += d * free * coef;
+                    // 「不吃韧性减伤」的实现：基数取**韧性减伤之前**的伤害（HIGHEST 阶段记录）。
+                    // 本处理器是 LOWEST，此时 d 已是减伤后的值；用减伤前基数算出的附加量直接相加，
+                    // 而相加发生在减伤之后 ⇒ 这 5%/6% 就是真伤。
+                    // （非 BOSS 目标没有韧性减伤，ThreadLocal 读到的是同一值，行为不变。）
+                    Float pre = com.plumejade.lensouls.boss.ToughnessDamageHandler.preToughnessDamage();
+                    float trueBase = (pre != null && pre > 0f) ? pre : d;
+                    d += trueBase * E3_DEALT_MULTIPLIER * free * coef;
                 }
             }
 

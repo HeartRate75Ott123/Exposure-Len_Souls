@@ -624,7 +624,7 @@
   "item.lensouls.feather_elementrise.cond_shared": "活性等级 ≥10 且生命值 ≥90% 时，造成一次 10000 点元素附加伤害",
   "item.lensouls.feather_elementrise.e1.name": "元素·躁动",
   "item.lensouls.feather_elementrise.e1.tag": "活性自增",
-  "item.lensouls.feather_elementrise.e1.curse": "§c每 (4 × 活性等级²) 秒，所有活性等级 +1；每个活性等级使受到伤害 +5%",
+  "item.lensouls.feather_elementrise.e1.curse": "§c每 (4 × 活性等级²) 秒，所有活性等级 +1；每个活性等级使受到伤害 +2.6%",
   "item.lensouls.feather_elementrise.e1.after": "§a每个活性等级使受到伤害改为 +2%",
   "item.lensouls.feather_elementrise.e2.name": "元素·余灰",
   "item.lensouls.feather_elementrise.e2.tag": "DoT 衰减",

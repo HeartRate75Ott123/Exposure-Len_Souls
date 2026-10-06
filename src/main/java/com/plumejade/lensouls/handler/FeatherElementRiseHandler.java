@@ -43,8 +43,8 @@ public class FeatherElementRiseHandler {
     // ── e1 躁动 ──
     /** 间隔基数：每 (4 × 活性等级**²**) 秒 +1 级（活性等级 = 四元素药水活性之和） */
     public static final int E1_INTERVAL_SECONDS_BASE = 4;
-    /** 每级活性使受到伤害 +5%（诅咒态） */
-    public static final float E1_TAKEN_PER_LEVEL_CURSE = 0.05f;
+    /** 每级活性使受到伤害 +2.6%（诅咒态） */
+    public static final float E1_TAKEN_PER_LEVEL_CURSE = 0.026f;
     /** 每级活性使受到伤害 +2%（反转态） */
     public static final float E1_TAKEN_PER_LEVEL_REVERSED = 0.02f;
 

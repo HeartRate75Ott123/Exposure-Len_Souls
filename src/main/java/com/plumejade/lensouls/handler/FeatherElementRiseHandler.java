@@ -154,14 +154,30 @@ public class FeatherElementRiseHandler {
             }
         }
 
+        // 活性等级统一口径 = **四元素药水活性之和**（与本类 activityLevel / 受伤增伤 / cond 同源）
         if (steps <= 0) {
             // 初次佩戴：直接给 1 级起步（活性等级 0 会让 (4 × L²) 秒退化成 0）
             steps = 1;
-            next = now + intervalTicks(1);
+            next = now + intervalTicks(Math.max(1, sumLevel(base, steps)));
         } else if (next > 0L && now >= next) {
             steps++;
-            next = now + intervalTicks(Math.max(1, levelOf(base, steps)));
+            next = now + intervalTicks(Math.max(1, sumLevel(base, steps)));
         }
+
+        // ── 等级实时变化 ⇒ 剩余时间按「新旧间隔」的**比例**折算 ──
+        // （不是从头重新计时，也不是沿用旧值：remaining × 新间隔 / 旧间隔）
+        // 例：活性 4（4×16×20 = 1280 tick）走到一半剩 640 tick，此时喝了药水使活性变 8
+        //     ⇒ 新间隔 4×64×20 = 5120 tick ⇒ 剩余折算为 640 × 5120/1280 = 2560 tick。
+        int prevIntervalLevel = tag.getInt(KEY_INTERVAL_LEVEL);
+        int curIntervalLevel = Math.max(1, sumLevel(base, steps));
+        if (prevIntervalLevel > 0 && curIntervalLevel != prevIntervalLevel && next > now) {
+            long oldInterval = intervalTicks(prevIntervalLevel);
+            long newInterval = intervalTicks(curIntervalLevel);
+            if (oldInterval > 0L) {
+                next = now + Math.max(1L, (next - now) * newInterval / oldInterval);
+            }
+        }
+        tag.putInt(KEY_INTERVAL_LEVEL, curIntervalLevel);
 
         tag.putIntArray(KEY_BASE, base);
         tag.putInt(KEY_STEPS, steps);
@@ -190,12 +206,24 @@ public class FeatherElementRiseHandler {
             }
         }
         CompoundTag tag = persisted(player);
-        if (tag.contains(KEY_STEPS) || tag.contains(KEY_NEXT) || tag.contains(KEY_BASE)) {
+        if (tag.contains(KEY_STEPS) || tag.contains(KEY_NEXT) || tag.contains(KEY_BASE)
+                || tag.contains(KEY_INTERVAL_LEVEL)) {
             tag.remove(KEY_STEPS);
             tag.remove(KEY_NEXT);
             tag.remove(KEY_BASE);
+            tag.remove(KEY_INTERVAL_LEVEL);
             writeBack(player, tag);
         }
+    }
+
+    /** 上次计时的活性等级（用于「等级变化 ⇒ 按比例折算剩余时间」） */
+    private static final String KEY_INTERVAL_LEVEL = "lensouls:rise_interval_level";
+
+    /** 当前活性等级（内部口径）= 四种药水活性**之和** = Σ(base + steps) */
+    private static int sumLevel(int[] base, int steps) {
+        int sum = 0;
+        for (int b : base) sum += Math.max(0, b + steps);
+        return sum;
     }
 
     private static long intervalTicks(int level) {

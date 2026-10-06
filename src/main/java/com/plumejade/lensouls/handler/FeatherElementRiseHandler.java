@@ -41,7 +41,7 @@ public class FeatherElementRiseHandler {
     private static final CurseDef D = CurseDefs.ELEMENTRISE;
 
     // ── e1 躁动 ──
-    /** 间隔基数：每 (4 × 活性等级²) 秒 +1 级 */
+    /** 间隔基数：每 (4 × 活性等级**³**) 秒 +1 级（活性等级 = 四元素药水活性之和） */
     public static final int E1_INTERVAL_SECONDS_BASE = 4;
     /** 每级活性使受到伤害 +5%（诅咒态） */
     public static final float E1_TAKEN_PER_LEVEL_CURSE = 0.05f;
@@ -235,7 +235,8 @@ public class FeatherElementRiseHandler {
     }
 
     private static long intervalTicks(int level) {
-        return (long) E1_INTERVAL_SECONDS_BASE * level * level * 20L;
+        // 三次方（用户口径）：间隔 = 4 × 活性等级³ 秒
+        return (long) E1_INTERVAL_SECONDS_BASE * level * level * level * 20L;
     }
 
     private static int levelOf(int[] base, int steps) {

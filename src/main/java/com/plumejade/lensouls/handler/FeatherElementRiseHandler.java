@@ -144,13 +144,19 @@ public class FeatherElementRiseHandler {
         long next = tag.getLong(KEY_NEXT);
         long now = player.level().getGameTime();
 
-        // 采纳外部等级：观测值与我们写过的（base + steps）不同 ⇒ 玩家自己改了等级（喝药水 / 效果到期）
+        // ── 采纳外部等级 ──
+        // 判据是「观测值 vs **我们上次写进去的总量**」（不是 base + steps）：
+        //   不同 ⇒ 外部（照片 / 药水 / 效果到期）改过等级 ⇒ 以**观测值本身**作为外部基准。
+        // ⚠ 不能写成 observed − steps：外部通常以**更高等级覆盖**我们写的那一份，
+        //   此时观测值里并不含我们的 steps，减掉就等于白扣一级
+        //   （用户实测 bug：照片提供 4 级时，躁动应把它加到 5，而不是停在 4 或退回 1）。
+        int[] lastWritten = tag.getIntArray(KEY_WRITTEN);
+        if (lastWritten.length != INFUSIONS.length) lastWritten = new int[INFUSIONS.length];
         for (int i = 0; i < INFUSIONS.length; i++) {
             MobEffectInstance inst = player.getEffect(INFUSIONS[i]);
             int observed = inst == null ? 0 : inst.getAmplifier() + 1;
-            int written = base[i] + steps;
-            if (observed != written) {
-                base[i] = Math.max(0, observed - Math.max(0, steps));
+            if (observed != lastWritten[i]) {
+                base[i] = Math.max(0, observed);
             }
         }
 
@@ -186,6 +192,8 @@ public class FeatherElementRiseHandler {
 
         for (int i = 0; i < INFUSIONS.length; i++) {
             int level = base[i] + steps;
+            // 记下「我们认定的总量」= 外部 + steps（无论下面是否因一致而跳过写入）
+            lastWritten[i] = Math.max(0, level);
             if (level <= 0) continue;
             MobEffectInstance cur = player.getEffect(INFUSIONS[i]);
             boolean already = cur != null
@@ -195,6 +203,9 @@ public class FeatherElementRiseHandler {
             player.addEffect(new MobEffectInstance(INFUSIONS[i], MobEffectInstance.INFINITE_DURATION,
                     level - 1, true, true, true));
         }
+        // 写入总量要落盘：下一 tick 就靠它判断「外部有没有改过等级」
+        tag.putIntArray(KEY_WRITTEN, lastWritten);
+        writeBack(player, tag);
     }
 
     /** 摘下 / 未选中：移除我们写的常驻活性（只动无限时长者，保留玩家自己喝的有限时长活性）并清状态 */
@@ -207,17 +218,20 @@ public class FeatherElementRiseHandler {
         }
         CompoundTag tag = persisted(player);
         if (tag.contains(KEY_STEPS) || tag.contains(KEY_NEXT) || tag.contains(KEY_BASE)
-                || tag.contains(KEY_INTERVAL_LEVEL)) {
+                || tag.contains(KEY_INTERVAL_LEVEL) || tag.contains(KEY_WRITTEN)) {
             tag.remove(KEY_STEPS);
             tag.remove(KEY_NEXT);
             tag.remove(KEY_BASE);
             tag.remove(KEY_INTERVAL_LEVEL);
+            tag.remove(KEY_WRITTEN);
             writeBack(player, tag);
         }
     }
 
     /** 上次计时的活性等级（用于「等级变化 ⇒ 按比例折算剩余时间」） */
     private static final String KEY_INTERVAL_LEVEL = "lensouls:rise_interval_level";
+    /** 我们上次写进去的**总量**（外部 + steps），用于判断外部等级有没有改过 */
+    private static final String KEY_WRITTEN = "lensouls:rise_written";
 
     /** 当前活性等级（内部口径）= 四种药水活性**之和** = Σ(base + steps) */
     private static int sumLevel(int[] base, int steps) {

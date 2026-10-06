@@ -74,6 +74,31 @@ public final class CurseManager {
         }
     }
 
+    /**
+     * 每 20 tick 推一次进度（心跳）。
+     * <p>
+     * tooltip 的 {@code [进度 N]} 与列表行的「已反转 N / M」都读**客户端镜像**，
+     * 而进度是每 tick 累加的（治疗量 / 伤害量 / 格数 / 分钟…）。只在反转时推会让数字长期停在旧值，
+     * 所以这里做低频心跳：20 tick = 1 秒，且**只有装了诅咒的玩家**才收（没装的一个字段判断就跳过）。
+     */
+    @SubscribeEvent
+    public static void onServerTick(net.neoforged.neoforge.event.tick.ServerTickEvent.Post event) {
+        if (event.getServer().getTickCount() % 20 != 0) return;
+        for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
+            if (anyEquipped(player)) CurseSyncPacket.send(player);
+        }
+    }
+
+    /** 是否至少装了一款诅咒（决定要不要发心跳同步） */
+    public static boolean anyEquipped(Player player) {
+        if (player == null) return false;
+        FeatherSlotData slots = FeatherAttachments.get(player);
+        for (int i = 0; i < FeatherSlotData.SLOTS; i++) {
+            if (!slots.get(i).isEmpty() && CurseDefs.byItem(slots.get(i).getItem()) != null) return true;
+        }
+        return false;
+    }
+
     // ========== 效果实装的便利 API ==========
 
     /** 该条的**诅咒态**是否生效（该款选中 且 该条未反转） */

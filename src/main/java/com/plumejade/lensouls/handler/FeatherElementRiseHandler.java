@@ -141,7 +141,7 @@ public class FeatherElementRiseHandler {
         int[] base = tag.getIntArray(KEY_BASE);
         if (base.length != INFUSIONS.length) base = new int[INFUSIONS.length];
         int steps = tag.getInt(KEY_STEPS);
-        long next = tag.getLong(KEY_NEXT);
+        long lastUp = tag.getLong(KEY_LAST_UP);
         long now = player.level().getGameTime();
 
         // ── 采纳外部等级 ──
@@ -161,33 +161,24 @@ public class FeatherElementRiseHandler {
         }
 
         // 活性等级统一口径 = **四元素药水活性之和**（与本类 activityLevel / 受伤增伤 / cond 同源）
+        //
+        // 计时口径（用户口径）：**不存「下一次到点的绝对时刻」**，只存「上次升级时刻」，
+        // 每次心跳都用**当下等级**重算间隔再比较 ⇒ 时长天然符合当下状态：
+        // 升/降级后剩余时间立刻按新间隔重算，既不会沿用旧值，也不需要额外做比例折算。
+        // （本方法每 tick 调用一次，心跳粒度比 1 秒更细。）
+        int curLevel = Math.max(1, sumLevel(base, steps));
         if (steps <= 0) {
             // 初次佩戴：直接给 1 级起步（活性等级 0 会让 (4 × L²) 秒退化成 0）
             steps = 1;
-            next = now + intervalTicks(Math.max(1, sumLevel(base, steps)));
-        } else if (next > 0L && now >= next) {
+            lastUp = now;
+        } else if (lastUp <= 0L || now - lastUp >= intervalTicks(curLevel)) {
             steps++;
-            next = now + intervalTicks(Math.max(1, sumLevel(base, steps)));
+            lastUp = now;
         }
-
-        // ── 等级实时变化 ⇒ 剩余时间按「新旧间隔」的**比例**折算 ──
-        // （不是从头重新计时，也不是沿用旧值：remaining × 新间隔 / 旧间隔）
-        // 例：活性 4（4×16×20 = 1280 tick）走到一半剩 640 tick，此时喝了药水使活性变 8
-        //     ⇒ 新间隔 4×64×20 = 5120 tick ⇒ 剩余折算为 640 × 5120/1280 = 2560 tick。
-        int prevIntervalLevel = tag.getInt(KEY_INTERVAL_LEVEL);
-        int curIntervalLevel = Math.max(1, sumLevel(base, steps));
-        if (prevIntervalLevel > 0 && curIntervalLevel != prevIntervalLevel && next > now) {
-            long oldInterval = intervalTicks(prevIntervalLevel);
-            long newInterval = intervalTicks(curIntervalLevel);
-            if (oldInterval > 0L) {
-                next = now + Math.max(1L, (next - now) * newInterval / oldInterval);
-            }
-        }
-        tag.putInt(KEY_INTERVAL_LEVEL, curIntervalLevel);
 
         tag.putIntArray(KEY_BASE, base);
         tag.putInt(KEY_STEPS, steps);
-        tag.putLong(KEY_NEXT, next);
+        tag.putLong(KEY_LAST_UP, lastUp);
         writeBack(player, tag);
 
         for (int i = 0; i < INFUSIONS.length; i++) {
@@ -228,7 +219,10 @@ public class FeatherElementRiseHandler {
         }
     }
 
-    /** 上次计时的活性等级（用于「等级变化 ⇒ 按比例折算剩余时间」） */
+    /** 上次**升级时刻**（gameTime）。只存这个、不存「下次到点时刻」，
+     *  每次心跳用当下等级重算间隔再比较 ⇒ 时长永远符合当下状态 */
+    private static final String KEY_LAST_UP = "lensouls:rise_last_up";
+    /** 旧口径遗留键（上次计时等级；现已不用，仅保留清理） */
     private static final String KEY_INTERVAL_LEVEL = "lensouls:rise_interval_level";
     /** 我们上次写进去的**总量**（外部 + steps），用于判断外部等级有没有改过 */
     private static final String KEY_WRITTEN = "lensouls:rise_written";

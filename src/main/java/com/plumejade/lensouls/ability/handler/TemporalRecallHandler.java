@@ -35,6 +35,10 @@ public class TemporalRecallHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (event.getEntity().level().isClientSide) return;
 
+        // ⑤ 铁序·无援（诅咒态）：时空回溯失效 —— 被动保命不触发
+        if (com.plumejade.lensouls.feather.CurseManager.on(player,
+                com.plumejade.lensouls.feather.CurseDefs.TIMECORE, 20)) return;
+
         // 不致命 → 跳过
         if (event.getNewDamage() < player.getHealth()) return;
 
@@ -119,6 +123,9 @@ public class TemporalRecallHandler {
 
     /** 公开消费入口——供主动触发包和被动保命共用 */
     public static TemporalSnapshot consumeTemporalPhoto(ServerPlayer player) {
+        // ⑤ 铁序·无援（诅咒态）：主动回溯同样失效
+        if (com.plumejade.lensouls.feather.CurseManager.on(player,
+                com.plumejade.lensouls.feather.CurseDefs.TIMECORE, 20)) return null;
         PhotoFindResult result = findTemporalPhoto(player);
         if (result.isEmpty()) return null;
         TemporalSnapshot snapshot = readSnapshot(result);

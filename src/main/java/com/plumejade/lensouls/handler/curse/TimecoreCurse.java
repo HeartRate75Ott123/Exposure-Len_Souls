@@ -112,7 +112,11 @@ public final class TimecoreCurse {
             CurseManager.tick(player, D, 1, 1L, 12000L);
             if (n >= 12000L) STARVE_TICKS.remove(player.getUUID());
         } else {
+            // 文案是「在饱食度 <5 状态下存活 10 分钟」⇒ 状态一断，进度必须清零（不是累计值）
             STARVE_TICKS.remove(player.getUUID());
+            if (CurseManager.progress(player, D, 1) != 0L) {
+                CurseManager.setProgress(player, D, 1, 0L);
+            }
         }
 
         // e8 止息 条件：连续 5 分钟不获得任何治疗并存活（6000 tick）
@@ -171,8 +175,9 @@ public final class TimecoreCurse {
                 if (CurseManager.on(player, D, 16) && mod != null && mod.amount() <= -0.30) {
                     CurseManager.tick(player, D, 16, (long) Math.ceil(dist), 3000L);
                 }
-                // e18 滞步 条件：缓慢状态下累计走地 10000 格
-                if (CurseManager.on(player, D, 17) && player.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)) {
+                // e18 滞步 条件：缓慢状态下累计走地 10000 格（文案「走地」/设计文档「仅计地面位移」）
+                if (CurseManager.on(player, D, 17) && player.onGround()
+                        && player.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)) {
                     double walked = SLOW_WALK.merge(player.getUUID(), dist, Double::sum);
                     CurseManager.tick(player, D, 17, (long) Math.ceil(dist), 10000L);
                     if (walked >= 10000.0) SLOW_WALK.remove(player.getUUID());
@@ -224,8 +229,11 @@ public final class TimecoreCurse {
         float healed = event.getAmount();
         if (healed <= 0.0f) return;
 
-        // e8 止息：有治疗 ⇒ 计时清零
+        // e8 止息：有治疗 ⇒ 计时清零（文案是「连续 5 分钟不获得任何治疗」）
         NO_HEAL_TICKS.remove(player.getUUID());
+        if (CurseManager.progress(player, D, 7) != 0L) {
+            CurseManager.setProgress(player, D, 7, 0L);
+        }
 
         // e1 绝疗 条件：累计治疗 2000 点生命（按实际到手计）
         if (CurseManager.on(player, D, 0)) {
@@ -403,8 +411,8 @@ public final class TimecoreCurse {
             player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, true, false, false));
         }
 
-        // e10 夺佑 条件：无任何正面效果时累计承受 5000 点伤害并存活
-        if (CurseManager.on(player, D, 9) && player.getActiveEffects().isEmpty()) {
+        // e10 夺佑 条件：无任何正面效果时累计承受 5000 点伤害并存活（累计跨死亡/掉线保留）
+        if (CurseManager.on(player, D, 9) && hasNoBeneficialEffect(player)) {
             CurseManager.tick(player, D, 9, (long) Math.ceil(d), 5000L);
         }
 
@@ -414,6 +422,11 @@ public final class TimecoreCurse {
                 && event.getSource().is(net.minecraft.tags.DamageTypeTags.IS_PROJECTILE) == false
                 && event.getSource().getDirectEntity() instanceof LivingEntity) {
             CurseManager.tick(player, D, 10, (long) Math.ceil(d), 2000L);
+        }
+
+        // e5 盈伤 条件：在满血状态下累计承受 3000 点伤害并存活（死亡即重置计数）
+        if (CurseManager.on(player, D, 4) && player.getHealth() >= player.getMaxHealth()) {
+            CurseManager.tick(player, D, 4, (long) Math.ceil(d), 3000L);
         }
 
         event.setAmount(d);
@@ -494,8 +507,10 @@ public final class TimecoreCurse {
     @SubscribeEvent
     public static void onDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        // e13 余悸：死亡即重置计数
+        // e13 余悸 / e5 盈伤 / e8 止息：文案都写了「并存活」⇒ 死亡即重置计数
         CurseManager.resetProgress(player, D, 12);
+        CurseManager.resetProgress(player, D, 4);
+        CurseManager.resetProgress(player, D, 7);
         FEAR_UNTIL.remove(player.getUUID());
         NO_HEAL_TICKS.remove(player.getUUID());
         STARVE_TICKS.remove(player.getUUID());
@@ -510,6 +525,14 @@ public final class TimecoreCurse {
     public static void onKill(LivingDeathEvent event) {
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         if (event.getEntity() == player) return;
+
+        // e9 断粮 条件：在饥饿 V（amplifier ≥4，需外部来源）状态下击杀 200 只生物
+        if (CurseManager.on(player, D, 8)) {
+            MobEffectInstance hunger = player.getEffect(MobEffects.HUNGER);
+            if (hunger != null && hunger.getAmplifier() >= 4) {
+                CurseManager.tick(player, D, 8, 1L, 200L);
+            }
+        }
 
         // e15 厄运 条件：累计击杀 500 只生物
         if (CurseManager.on(player, D, 14)) {
@@ -640,6 +663,14 @@ public final class TimecoreCurse {
         if (player.getY() < 100.0) return;
         if (!com.plumejade.lensouls.util.PhotoProjMarker.isBarrageDamage(event.getSource())) return;
         event.setNewDamage(event.getNewDamage() * 1.5f);
+    }
+
+    /** e10 条件用：当前没有任何**正面**效果（文案是「无任何正面效果」，不是「无任何效果」） */
+    private static boolean hasNoBeneficialEffect(ServerPlayer player) {
+        for (MobEffectInstance inst : player.getActiveEffects()) {
+            if (inst.getEffect().value().isBeneficial()) return false;
+        }
+        return true;
     }
 
     /** 清掉该玩家的所有瞬时计时（退出世界 / 死亡时调用） */

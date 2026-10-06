@@ -849,5 +849,11 @@
   "gui.lensouls.curse.hint": "Click a feather installed elsewhere to swap; survival cannot remove it, creative can right-click to remove",
   "message.lensouls.curse.migrated": "§eCurses no longer use trinket slots: %s feather item(s) moved back to your inventory",
   "message.lensouls.curse.reversed": "§d[%s] reversal achieved",
-  "message.lensouls.twitcher.defy": "§cTwist surge: death blocked for 3s (999 true damage when it ends)"
+  "message.lensouls.twitcher.defy": "§cTwist surge: death blocked for 3s (999 true damage when it ends)",
+  "message.lensouls.zeroforge.library_sealed": "§cVault sealed: backpacks and the dimension network cannot be opened",
+  "message.lensouls.zeroforge.strength_x": "§aHands blessed: Strength X for %s seconds",
+  "message.lensouls.zeroforge.hand_drop": "§cFumbled: an item dropped at your feet",
+  "message.lensouls.zeroforge.hand_swap": "§eOath·Swapped Hands: main and off hand forced to swap",
+  "message.lensouls.zeroforge.cooldown_cut": "§aSoul cooldown -%s%%",
+  "message.lensouls.curse.unlocked": "§d[%s] unlocked"
 }

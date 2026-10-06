@@ -848,5 +848,11 @@
   "gui.lensouls.curse.hint": "点击其他已装备的羽毛可交换位置；生存模式不可撤下，创造模式可右键撤下",
   "message.lensouls.curse.migrated": "§e诅咒已脱离饰品栏：从饰品栏取回 %s 件羽毛道具",
   "message.lensouls.curse.reversed": "§d【%s】反转达成",
-  "message.lensouls.twitcher.defy": "§c扭曲值爆冲：阻死 3 秒（时间到受 999 点真伤）"
+  "message.lensouls.twitcher.defy": "§c扭曲值爆冲：阻死 3 秒（时间到受 999 点真伤）",
+  "message.lensouls.zeroforge.library_sealed": "§c库存封锁：精妙背包与维度网络已无法打开",
+  "message.lensouls.zeroforge.strength_x": "§a换手赐力：力量 X（%s 秒）",
+  "message.lensouls.zeroforge.hand_drop": "§c换手失手：一件物品掉在脚下",
+  "message.lensouls.zeroforge.hand_swap": "§e誓约·易手：主副手已强制交换",
+  "message.lensouls.zeroforge.cooldown_cut": "§a镜魂冷却 -%s%%",
+  "message.lensouls.curse.unlocked": "§d【%s】解锁达成"
 }

@@ -137,7 +137,10 @@ public final class CurseManager {
         if (!isActive(player, def)) return;
         if (isReversed(player, def, entry)) return;
         reverse(player, def, entry);
-        player.displayClientMessage(Component.translatable("message.lensouls.curse.reversed",
+        // ⑦ 的祝福不是「反转」而是「解锁」，聊天消息也要区分（tooltip 已按 sectionAt 区分）
+        boolean blessing = def.sectionAt() > 0 && entry >= def.sectionAt();
+        player.displayClientMessage(Component.translatable(
+                blessing ? "message.lensouls.curse.unlocked" : "message.lensouls.curse.reversed",
                 Component.translatable(def.entryKey(entry) + ".name")), false);
     }
 

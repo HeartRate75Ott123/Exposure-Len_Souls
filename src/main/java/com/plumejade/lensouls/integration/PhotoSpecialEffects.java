@@ -1145,26 +1145,57 @@ public class PhotoSpecialEffects {
      *   <li>现有<b>负值</b>保留——那是刻意给强力照片配的缺点，不应被抹平；</li>
      *   <li>完全没有移速条目的<b>弱照片</b>（复用 {@link #WEAK_SLOT_BONUS} 名单）补一条 +20%，作为功能性补偿。</li>
      * </ol>
+     * <b>线程安全（重要）</b>：本方法会被<b>渲染线程</b>（tooltip → {@link #describeAttributes}）与
+     * <b>服务端线程</b>（Curios 佩戴 → {@link #buildAttributeModifiers}）同时调到，
+     * 而两个读者随后都会遍历 {@code ATTRIBUTES} 里的 {@code List}。
+     * 因此这里<b>不原地改</b>集合，而是构造一份调整后的映射整体发布：
+     * <ul>
+     *   <li>未改动的条目沿用原列表（它们在静态初始化后不再变），改动/新增的条目在锁内建新列表，
+     *       构造完成才 put，put 之后不再触碰——即「调校后彻底只读」，读者无需加锁、也不可能
+     *       撞上迭代器失效；</li>
+     *   <li>只给 root 映射写值（{@code Map#put}），不触碰已发布列表的内部数组，
+     *       因此并发读者连理论上的 {@code ConcurrentModificationException} 都没有；</li>
+     *   <li>标志与整份发布都在同一个 {@code synchronized} 块内、块结束才返回，
+     *       监视器给出的 happens-before 保证读者能看到完整结果（沿用项目里
+     *       {@code WireframeRenderTypes} / {@code BossPhantomType} 的双重检查惯例）。</li>
+     * </ul>
+     *
+     * @return 调整后的映射；{@code ATTRIBUTES} 始终指向它
      */
-    private static void tuneMovementSpeed() {
-        if (speedTuned) return;
-        speedTuned = true;
-        for (String id : new ArrayList<>(ATTRIBUTES.keySet())) {
-            List<AttributeEntry> list = ATTRIBUTES.get(id);
-            if (list == null) continue;
-            boolean hasSpeed = false;
-            for (int i = 0; i < list.size(); i++) {
-                AttributeEntry ae = list.get(i);
-                if (ae.attribute() != Attributes.MOVEMENT_SPEED.value()) continue;
-                hasSpeed = true;
-                if (ae.amount() <= 0) continue;
-                list.set(i, new AttributeEntry(ae.attribute(), ae.modName(), boostFromOld(ae.amount()),
-                        AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+    private static Map<String, List<AttributeEntry>> tuneMovementSpeed() {
+        if (speedTuned) return ATTRIBUTES;
+        synchronized (PhotoSpecialEffects.class) {
+            if (speedTuned) return ATTRIBUTES; // 拿到锁后复核，避免重复调校
+            for (String id : new ArrayList<>(ATTRIBUTES.keySet())) {
+                List<AttributeEntry> list = ATTRIBUTES.get(id);
+                if (list == null) continue;
+                List<AttributeEntry> tuned = new ArrayList<>(list.size() + 1);
+                boolean hasSpeed = false;
+                boolean changed = false;
+                for (AttributeEntry ae : list) {
+                    if (ae.attribute() != Attributes.MOVEMENT_SPEED.value()) {
+                        tuned.add(ae);
+                        continue;
+                    }
+                    hasSpeed = true;
+                    if (ae.amount() <= 0) {
+                        tuned.add(ae); // 负值是刻意配的缺点，保留
+                        continue;
+                    }
+                    tuned.add(new AttributeEntry(ae.attribute(), ae.modName(), boostFromOld(ae.amount()),
+                            AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+                    changed = true;
+                }
+                if (!hasSpeed && WEAK_SLOT_BONUS.containsKey(id)) {
+                    tuned.add(new AttributeEntry(Attributes.MOVEMENT_SPEED.value(), "weak_spd", 0.20,
+                            AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+                    changed = true;
+                }
+                // 没改动的条目保留原列表实例（静态初始化后不再变），避免整表无谓重建
+                if (changed) ATTRIBUTES.put(id, tuned);
             }
-            if (!hasSpeed && WEAK_SLOT_BONUS.containsKey(id)) {
-                list.add(new AttributeEntry(Attributes.MOVEMENT_SPEED.value(), "weak_spd", 0.20,
-                        AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
-            }
+            speedTuned = true; // 最后置位：置位即代表整份调校已完成并可见
+            return ATTRIBUTES;
         }
     }
 
@@ -1183,9 +1214,9 @@ public class PhotoSpecialEffects {
      * 元素弱点按（实体, 元素）派生稳定 UUID（同样去重、跨种叠加）。
      */
     public static Multimap<Holder<Attribute>, AttributeModifier> buildAttributeModifiers(String entityId) {
-        tuneMovementSpeed();
+        Map<String, List<AttributeEntry>> attrs = tuneMovementSpeed(); // 调校后的冻结映射
         Multimap<Holder<Attribute>, AttributeModifier> map = HashMultimap.create();
-        List<AttributeEntry> list = ATTRIBUTES.get(entityId);
+        List<AttributeEntry> list = attrs.get(entityId);
         if (list != null) {
             for (AttributeEntry ae : list) {
                 map.put(holder(ae.attribute()),
@@ -1224,9 +1255,9 @@ public class PhotoSpecialEffects {
      * 若静态描述已提及某属性/元素，则跳过该行，避免 tooltip 重复。
      */
     public static List<Component> describeAttributes(String entityId, String skipText) {
-        tuneMovementSpeed();
+        Map<String, List<AttributeEntry>> attrs = tuneMovementSpeed(); // 调校后的冻结映射
         List<Component> lines = new ArrayList<>();
-        List<AttributeEntry> list = ATTRIBUTES.get(entityId);
+        List<AttributeEntry> list = attrs.get(entityId);
         if (list != null) {
             for (AttributeEntry ae : list) {
                 // 命中率不进手工摘要：它由 Curios 原生属性行渲染，且若计入会让

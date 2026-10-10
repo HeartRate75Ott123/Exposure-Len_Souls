@@ -74,6 +74,16 @@ public class DamageHandler {
                 : WeaknessLensPhoto.Installed.NONE;
         ElementDamage lensElement = weaponLens.element();
 
+        // 佩戴照片的元素追伤加成：**一次算完四个元素**，供下面整轮元素循环查表。
+        // 原实现把 getPhotoElementBonus 放在元素循环里逐元素调用，每次都要重扫 Curios 装备照片、
+        // 逐张 copyTag、逐张 ResourceLocation.parse（一次命中最多四遍）。现在走
+        // PhotoSetEffects 的 tick 级装备缓存 + id 只解析一次，无加成时是空表、零额外分配。
+        // ⚠ 这里只是「把表算出来」：**生效条件仍在循环内的 activitySum 闸里**（逐元素独立），
+        // 见下面元素循环里的注释——不要因为表在循环外就把加成当成无条件项。
+        Map<ElementDamage, Float> photoElementBonuses = isPlayer && player instanceof ServerPlayer sp
+                ? com.plumejade.lensouls.integration.PhotoSetEffects.computeElementBonuses(sp)
+                : java.util.Map.of();
+
         // 次元枪子弹固有元素（模组内设计，活性固定 2.0）
         ElementDamage bulletElement = null;
         if (source.getDirectEntity() instanceof com.plumejade.lensouls.entity.GunBulletEntity gunBullet) {
@@ -141,9 +151,14 @@ public class DamageHandler {
 
             if (activitySum <= 0f) continue;
 
-            // 照片元素强化（佩戴者造成）：照片 mob 的 attacker_element 等级 ×3% 追伤
-            if (isPlayer && player instanceof ServerPlayer serverPlayer) {
-                totalBonusMultiplier += PhotoSpecialEffects.getPhotoElementBonus(serverPlayer, element);
+            // 照片元素强化（佩戴者造成）：照片 mob 的 attacker_element 等级 ×3% 追伤。
+            // ⚠ 必须在 activitySum 闸**之内**（逐元素独立）：这句话的语义是「该元素有活性时，
+            // 佩戴照片再按元素追加」，不是「照片自己凭空加伤害」。曾经把加法提到循环外，
+            // 结果空手/无该元素活性也能吃照片加成（火照片=无条件 +3%/级），是行为回归。
+            // 现在只是把「算表」提到循环外（表在 photoElementBonuses，tick 级缓存一次算完），
+            // 这里的判据与逐元素特性完全保持原样。
+            if (isPlayer) {
+                totalBonusMultiplier += photoElementBonuses.getOrDefault(element, 0f);
             }
 
             // 免伤对抗：受击方药水等级 ≥ 攻击方等级 → 该元素追加完全免疫

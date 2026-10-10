@@ -1,7 +1,6 @@
 package com.plumejade.lensouls.ability;
 
 import com.plumejade.lensouls.ability.handler.PhotoInjectionHandler;
-import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import com.plumejade.lensouls.util.PhotoLog;
 import io.github.mortuusars.exposure.world.camera.frame.Frame;
@@ -13,8 +12,6 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
-
-import java.util.Map;
 
 /**
  * 出片注入的唯一实现——拍立得与暗房共用。
@@ -81,20 +78,20 @@ public final class PhotoInjector {
         CompoundTag tag = photo.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         boolean injected = tag.getBoolean("lensouls:injected");
 
-        // 通用元素活性组件：普通拍照/能力拍照都注入（组件驱动抑制判定，与 attacker_element 数据对齐）
-        Map<ElementDamage, Integer> levels = PhotoInjectionHandler.pollElementLevels(exposureId);
+        // 通用元素「活性实体」标记：普通拍照/能力拍照都注入。
+        // 只写 lensouls:element_entity 一个 id，**不写等级表**——等级是 attacker_element 数据包的内容，
+        // 由消费端（PhotoSetEffects / PhotoSpecialEffects#getPhotoElementBonus）按 id 实时推导；
+        // 早先那份 lensouls:element_levels 快照没有任何读点，且会与数据包 /reload 脱节，已删除
+        // （不要重新引入：它等于在物品上缓存一份会过期的第二真值）。
         String elemEntity = PhotoInjectionHandler.pollElementEntity(exposureId);
-        if (!injected && levels != null && elemEntity != null && !levels.isEmpty()) {
-            CompoundTag el = new CompoundTag();
-            for (var en : levels.entrySet()) el.putInt(en.getKey().getSerializedName(), en.getValue());
-            tag.put("lensouls:element_levels", el);
+        if (!injected && elemEntity != null) {
             tag.putString("lensouls:element_entity", elemEntity);
             tag.putBoolean("lensouls:photograph_curio", true);
         }
 
         if (ability == null) {
-            // 普通照片：仅补元素组件，不标 injected
-            if (tag.contains("lensouls:element_levels")) {
+            // 普通照片：仅补元素活性实体标记，不标 injected
+            if (tag.contains("lensouls:element_entity")) {
                 photo.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
             }
             PhotoLog.info("no-ability-cache", () -> "出片未注入（" + path + "）：没有能力缓存，按普通照片出片"
@@ -124,7 +121,6 @@ public final class PhotoInjector {
                         + " 没有注册的照片效果条目——拍到牛羊/村民这类本来就是普通照片，"
                         + "属设计（exposureId=" + exposureId + "）");
             } else {
-                tag.putBoolean("lensouls:ability_steal", true);
                 tag.putString("lensouls:stolen_entity", entityId);
                 tag.putBoolean("lensouls:photograph_curio", true);
                 // ⑤ 铁序·裁影 的反转条件：累计拍过 50 种不同的能力窃取照片（同种生物不重复计）
@@ -149,6 +145,14 @@ public final class PhotoInjector {
 
             // 能力专属数据（空间扭曲球心 / 回溯快照 / 后续新能力）
             AbilityBehavior.writePhotoData(ability, frame, player, tag);
+
+            if (ability == AbilityType.WEAKNESS_LENS) {
+                // 「已按新主体口径扫过」标记：主体因是友方/玩家而没记录元素时，
+                // 装机与 GUI 的「按实体 id 反查弱点」旧兜底据此失效（见 WeaknessLensPhoto）。
+                // ⚠ 必须写进本方法的 tag —— 它才是下面唯一落盘的 CUSTOM_DATA 来源；
+                // 直接改 photo 的组件会被这一行的 photo.set(...) 覆盖掉。
+                tag.putBoolean(com.plumejade.lensouls.util.WeaknessLensPhoto.PHOTO_SCANNED, true);
+            }
 
             if (applyDisplayName) {
                 MutableComponent name = Component.literal("")

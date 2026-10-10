@@ -157,10 +157,10 @@ public class PhotoSetRegistry {
     }
 
     private static void addPhotoEntity(List<String> ids, ItemStack photo) {
-        String id = PhotographEffectRegistry.getStolenEntity(photo);
-        if (id == null) id = PhotographEffectRegistry.getElementEntity(photo);
-        if (id == null) return;
-        String n = norm(id);
+        // 一次 copyTag 读两个键（stolen 优先、其次 element），口径见 PhotographEffectRegistry.readPhotoEntity
+        var pe = PhotographEffectRegistry.readPhotoEntity(photo);
+        if (pe == null) return;
+        String n = norm(pe.id());
         if (!ids.contains(n)) ids.add(n);
     }
 

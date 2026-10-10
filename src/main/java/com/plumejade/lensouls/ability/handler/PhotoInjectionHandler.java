@@ -5,7 +5,6 @@ import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.config.AttackerElementLoader;
 import com.plumejade.lensouls.config.BossEntityLoader;
-import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
 import com.plumejade.lensouls.util.PhotoLog;
 import com.plumejade.lensouls.util.PhotoTargets;
@@ -32,17 +31,21 @@ public class PhotoInjectionHandler {
     private static final Map<String, AbilityType> pendingAbilities = new ConcurrentHashMap<>();
     private static final Map<String, String> stolenEntityCache = new ConcurrentHashMap<>();
     private static final Map<String, Boolean> bossFlagCache = new ConcurrentHashMap<>();
-    /** 帧标识符 → 帧内带元素活性实体的元素等级（普通拍照也注入照片组件） */
-    private static final Map<String, Map<ElementDamage, Integer>> elementCache = new ConcurrentHashMap<>();
+    /**
+     * 帧标识符 → 帧内带元素活性实体的**实体 id**（普通拍照也注入照片组件）。
+     * <p>
+     * <b>只存 id、不存等级</b>：等级的唯一真值是 {@code attacker_element} 数据包，运行时由
+     * {@link AttackerElementLoader#getLevels} 按 id 推导（照片饰品那条链路
+     * {@code PhotoSetEffects} / {@code PhotoSpecialEffects#getPhotoElementBonus} 就是这么算的）。
+     * 早先这里还往照片上写过一份 {@code lensouls:element_levels} 的等级快照，但那个组件
+     * <b>全仓库没有任何读点</b>（只有 PhotoInjector 自己 {@code contains()} 当布尔用），
+     * 属第二份真值、且会与数据包热重载脱节（等级快照在 {@link net.minecraft.world.item.ItemStack}
+     * 上，无法感知 {@code AttackerElementLoader} 重载）——已删除，别再往照片上写等级表。
+     */
     private static final Map<String, String> elementEntityCache = new ConcurrentHashMap<>();
 
     public static Boolean pollBoss(String exposureId) {
         return exposureId != null ? bossFlagCache.remove(exposureId) : null;
-    }
-
-    /** 消费帧内活性实体信息（元素等级 + 实体 id） */
-    public static Map<ElementDamage, Integer> pollElementLevels(String exposureId) {
-        return exposureId != null ? elementCache.remove(exposureId) : null;
     }
 
     public static String pollElementEntity(String exposureId) {
@@ -152,8 +155,9 @@ public class PhotoInjectionHandler {
                     cacheStolenEntity(exposureId, stolenId);
                     bossFlagCache.put(exposureId, BossEntityLoader.isBoss(target));
                 } else {
-                    PhotoLog.info("cache-steal-no-subject", () -> "能力窃取未缓存主体：帧内没有「非玩家」实体"
-                            + "（exposureId=" + exposureId + "）——这一帧出片会是普通照片");
+                    PhotoLog.info("cache-steal-no-subject", () -> "能力窃取未缓存主体：帧内没有「非玩家且非友方」实体"
+                            + "（exposureId=" + exposureId + "）——驯服宠物算友方、会被跳过（口径见 AllyFilter）；"
+                            + "这一帧出片会是普通照片");
                 }
             }
         } catch (Exception e) {
@@ -161,17 +165,21 @@ public class PhotoInjectionHandler {
         }
     }
 
-    /** 缓存帧内第一个带元素活性实体的元素等级与 id（选取口径见 {@link PhotoTargets#subjectWithElement}） */
+    /**
+     * 缓存帧内第一个带元素活性实体的 <b>id</b>（选取口径见 {@link PhotoTargets#subjectWithElement}）。
+     * <p>
+     * 只缓存 id —— 等级由 {@link AttackerElementLoader} 在消费端按 id 推导（见 {@link #elementEntityCache}）。
+     * 这里的 {@code getLevels(...).isEmpty()} 仍要查一次：它回答的是「这个实体算不算活性实体」，
+     * 判据必须与消费端同源，不能换成别的。
+     */
     private static void cacheFrameElements(LivingEntity viewer, String exposureId,
                                            List<LivingEntity> frameEntities) {
         LivingEntity e = PhotoTargets.subjectWithElement(viewer, frameEntities);
         if (e == null) return;
         ResourceLocation rl = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType());
         if (rl == null) return;
-        Map<ElementDamage, Integer> levels = AttackerElementLoader.getLevels(rl);
-        if (levels.isEmpty()) return;
+        if (AttackerElementLoader.getLevels(rl).isEmpty()) return;
         elementEntityCache.put(exposureId, rl.toString());
-        elementCache.put(exposureId, levels);
     }
 
     /**

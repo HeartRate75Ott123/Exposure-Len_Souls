@@ -52,10 +52,15 @@ public class CuriosIntegration {
 
     /** exposure/拍立得照片是否带镜魂拍摄数据（能力窃取/注入照片） */
     private static boolean hasLensoulsPhotoData(ItemStack stack) {
-        if (stack.get(DataComponents.CUSTOM_DATA) == null) return false;
-        var tag = stack.get(DataComponents.CUSTOM_DATA).copyTag();
-        return tag.getBoolean("lensouls:photograph_curio")
-                || tag.contains("lensouls:stolen_entity");
+        var data = stack.get(DataComponents.CUSTOM_DATA);
+        if (data == null) return false;
+        // 「能力窃取照片」用 contains 判定即可，**不要走 copyTag()**——那样为了一个存在性判断
+        // 就复制整份照片 NBT（本方法在「能否装备进照片槽」的判定路径上会被反复调用）。
+        if (data.contains("lensouls:stolen_entity")) return true;
+        // photograph_curio 要读值：CustomData 没有直接取布尔的口子，必须先判存在再复制 tag
+        // （普通照片连这一步都省掉，不产生任何副本）。
+        return data.contains("lensouls:photograph_curio")
+                && data.copyTag().getBoolean("lensouls:photograph_curio");
     }
 
     @SubscribeEvent

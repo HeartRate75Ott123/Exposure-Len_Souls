@@ -91,6 +91,7 @@ public class PhotoGuiMenu extends AbstractContainerMenu {
             tag.remove(WeaknessLensPhoto.WEAPON_PHOTO);
             tag.remove(WeaknessLensPhoto.WEAPON_ENTITY);
             tag.remove(WeaknessLensPhoto.WEAPON_ELEMENT);
+            tag.remove(WeaknessLensPhoto.WEAPON_NO_ELEMENT);
         } else {
             var access = player.registryAccess();
             CompoundTag photoTag = new CompoundTag();
@@ -103,13 +104,18 @@ public class PhotoGuiMenu extends AbstractContainerMenu {
                 ElementDamage element = WeaknessLensPhoto.resolveElement(photo, entityId);
                 if (element != null) {
                     tag.putString(WeaknessLensPhoto.WEAPON_ELEMENT, element.getSerializedName());
+                    tag.remove(WeaknessLensPhoto.WEAPON_NO_ELEMENT);
                     WeaknessLensPhoto.recordElementIfAbsent(photo, element);
                 } else {
+                    // 与右击装机（writeInstalled）同口径：刻意没元素 ⇒ 武器标上「别反查」，
+                    // 否则 inspect 会按实体 id 反查一个回来，把照片侧的跳过撤销掉。
                     tag.remove(WeaknessLensPhoto.WEAPON_ELEMENT);
+                    tag.putBoolean(WeaknessLensPhoto.WEAPON_NO_ELEMENT, true);
                 }
             } else {
                 tag.remove(WeaknessLensPhoto.WEAPON_ENTITY);
                 tag.remove(WeaknessLensPhoto.WEAPON_ELEMENT);
+                tag.remove(WeaknessLensPhoto.WEAPON_NO_ELEMENT);
             }
         }
         weaponStack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));

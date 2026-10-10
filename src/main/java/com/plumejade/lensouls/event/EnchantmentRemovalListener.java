@@ -58,6 +58,7 @@ public class EnchantmentRemovalListener {
         tag.remove(com.plumejade.lensouls.util.WeaknessLensPhoto.WEAPON_PHOTO);
         tag.remove(com.plumejade.lensouls.util.WeaknessLensPhoto.WEAPON_ENTITY);
         tag.remove(com.plumejade.lensouls.util.WeaknessLensPhoto.WEAPON_ELEMENT);
+        tag.remove(com.plumejade.lensouls.util.WeaknessLensPhoto.WEAPON_NO_ELEMENT);
         weaponStack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 
     }

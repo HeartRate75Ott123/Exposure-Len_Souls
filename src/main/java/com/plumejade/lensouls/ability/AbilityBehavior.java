@@ -80,7 +80,12 @@ public final class AbilityBehavior {
             case WEAKNESS_LENS -> {
                 // 弱点透镜：识别照片主体的弱点元素并记进照片——装到武器上时该武器获得
                 // 该元素的 2 级武器活性（武器自身更高则按自身的），见 util/WeaknessLensPhoto。
-                var weak = WeaknessLensPhoto.weaknessElementOf(WeaknessLensPhoto.subjectEntityId(frame));
+                // 主体跳过玩家与友方（含驯服宠物，只认 isTame()、不分是谁的）；
+                // 友方判定要 live 实体 ⇒ 把拍摄者传进去（帧里只有 id/pos，判不出驯没驯服）。
+                // 反过来说：主体全被跳过时这里不写 PHOTO_ELEMENT，而 PhotoInjector 会补
+                // lensouls:weakness_scanned 标记 ⇒ 装机/GUI 不会再按实体 id 反查补回来。
+                var weak = WeaknessLensPhoto.weaknessElementOf(
+                        WeaknessLensPhoto.subjectEntityId(frame, player));
                 if (weak != null) {
                     tag.putString(WeaknessLensPhoto.PHOTO_ELEMENT, weak.getSerializedName());
                 }

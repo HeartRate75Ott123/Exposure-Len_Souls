@@ -33,7 +33,10 @@ import java.util.function.UnaryOperator;
  * <ul>
  *   <li><b>滤镜 / 药水玻璃板</b>：多目标，<b>要玩家</b>——本来就是"给队友上增益"，无论什么能力，
  *       与能力拍照完全正交（自拍走 {@code Frame.SELFIE}，不靠实体列表）；</li>
- *   <li><b>能力窃取 / 弱点透镜</b>：单主体，<b>玩家不算主体</b>
+ *   <li><b>能力窃取</b>：单主体，<b>玩家不算主体</b>、<b>驯服宠物也不算主体</b>——
+ *       驯服宠物属于友方阵营（口径同 {@link AllyFilter#isTamedPet}，只认 {@code isTame()}、
+ *       <b>不分是谁的</b>），拍它只会抢走真正要窃取的生物；</li>
+ *   <li><b>弱点透镜</b>：单主体，<b>玩家不算主体</b>
  *       （玩家没有窃取效果条目；弱点透镜也不以玩家为拍摄对象）；</li>
  *   <li><b>时间定格</b>：多目标，<b>不要玩家</b>（含拍摄者本人）、
  *       <b>不要玩家驯服的宠物</b>、<b>不要本模组自己的召唤物</b>（幻灵 / 幻影幻翼）。</li>
@@ -48,7 +51,24 @@ public final class PhotoTargets {
 
     // ========== 单主体：记录进照片的那一个 ==========
 
-    /** 帧内第一个<b>非玩家</b>实体（弱点透镜、能力窃取）。 {@code normalize} 可做「子部件→父体」追溯。 */
+    /**
+     * 帧内第一个<b>可窃取主体</b>（能力窃取）：跳过<b>玩家</b>与<b>友方单位</b>（当前口径含驯服宠物）。
+     * {@code normalize} 可做「子部件→父体」追溯（多部件 boss 取本体）。
+     * <p>
+     * <b>为什么跳友方（2026-09 需求）</b>：驯服宠物归入友方阵营（分类见
+     * {@link AllyFilter#isTamedPet}，<b>只认 {@code isTame()}、不分是谁的</b>），
+     * 拍照时它常常离相机最近、挤在 {@code get(0)} 上，于是「想偷后面的怪」变成「偷了自家狗」
+     * ——狗没有注册照片效果条目，整张照片还会退化成普通照片。
+     * 现在跳过它并<b>继续看下一个候选</b>（本方法只做选取，不做别的判断）。
+     * <p>
+     * 口径走 {@link AllyFilter#isFriendly}（= 玩家 ‖ 任意驯服宠物 ‖ 自家召唤物 ‖ 第三方辅助单位
+     * ‖ 同乘），与「弹幕免伤 / 定格免选 / 弹幕选敌」共用同一份定义：
+     * 以后新增友方类别只改 {@code AllyFilter} 一处，这里自动跟随。
+     * <p>
+     * <b>注意</b>：弱点透镜主体<b>不走这里</b>（见 {@code WeaknessLensPhoto#subjectEntityId}）——
+     * 它同样跳玩家与友方，但要按帧里记的 {@code (id, pos)} 定位 live 实体才能判出「驯没驯服」，
+     * 所以那一份实现在 {@code WeaknessLensPhoto} 里，口径同样取自 {@link AllyFilter}。
+     */
     public static <T extends LivingEntity> T subject(Entity viewer, Collection<T> frame,
                                                     UnaryOperator<T> normalize) {
         if (frame == null) return null;
@@ -56,7 +76,9 @@ public final class PhotoTargets {
             if (candidate == null) continue;
             T resolved = normalize != null ? normalize.apply(candidate) : candidate;
             if (resolved == null || resolved == viewer) continue;
-            if (resolved instanceof Player) continue;
+            // 友方不算可窃取主体（含玩家、任意驯服宠物、自家召唤物、第三方辅助单位），
+            // 同乘那一档顺带覆盖「自己正骑着的东西」；命中即跳过、继续看下一个候选
+            if (AllyFilter.isFriendly(viewer, resolved)) continue;
             return resolved;
         }
         return null;

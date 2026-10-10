@@ -533,11 +533,57 @@ public class PhotographEffectRegistry {
 
     /** 照片记录的实体 id：能力窃取照片取 stolen_entity，普通照片取 element_entity */
     public static String getPhotoEntity(ItemStack stack) {
+        PhotoEntity e = readPhotoEntity(stack);
+        return e == null ? null : e.id();
+    }
+
+    /**
+     * 照片记录的实体 id + 它是哪一类（{@code stolen = true} 表示能力窃取照片）。
+     * <p>
+     * <b>为什么要有这个「一次读两个键」的方法</b>：{@link #getStolenEntity} 与
+     * {@link #getElementEntity} 各自都做一次 {@code CustomData.copyTag()}（复制整份照片 NBT），
+     * 而「先看 stolen、没有再看 element」这个组合写在三处（{@code PhotoSpecialEffects#collectGearEntities} /
+     * {@code PhotoSetRegistry#addPhotoEntity} / {@code BossPhotoProjHelper}）。
+     * 热路径上（每次伤害 × 每个元素 × 每张装备照片）这等于把同一份 NBT 复制两遍 ⇒ 收敛到这里。
+     * <p>
+     * <b>语义必须与那两个方法逐字一致</b>：判据是 {@code contains} 而<b>不是</b>非空——
+     * 键存在但值为空串时旧实现返回空串、不会回退到另一个键。改这里时别顺手改成 isEmpty() 判断。
+     */
+    public static PhotoEntity readPhotoEntity(ItemStack stack) {
         var data = stack.get(DataComponents.CUSTOM_DATA);
         if (data == null) return null;
-        var tag = data.copyTag();
-        if (tag.contains("lensouls:stolen_entity")) return tag.getString("lensouls:stolen_entity");
-        return tag.contains("lensouls:element_entity") ? tag.getString("lensouls:element_entity") : null;
+        // CustomData 没有「直接取字符串」的口子（只有 copyTag/read/contains），所以按需复制：
+        // 命中哪个键才复制那一次，未命中的键一次副本都不产生。
+        if (data.contains("lensouls:stolen_entity")) {
+            return new PhotoEntity(data.copyTag().getString("lensouls:stolen_entity"), true);
+        }
+        if (data.contains("lensouls:element_entity")) {
+            return new PhotoEntity(data.copyTag().getString("lensouls:element_entity"), false);
+        }
+        return null;
+    }
+
+    /** 照片记录的实体 id（{@code stolen} = 来自能力窃取的 {@code stolen_entity} 键） */
+    public record PhotoEntity(String id, boolean stolen) {
+    }
+
+    /**
+     * <b>照片记录元素的唯一读取口径</b>：先认能力窃取照片的 {@code stolen_entity}，再认普通照片的
+     * {@code element_entity}，然后按 id 到 {@code attacker_element} 数据包现查等级。
+     * <p>
+     * <b>不要往照片上写等级快照</b>（历史包袱：{@code lensouls:element_levels} 曾是一份无人读取的第二真值，
+     * 会与数据包热重载脱节，已删）。等级的唯一真值是数据包，照片只负责记「拍到了哪个活性实体」。
+     */
+    public static Map<ElementDamage, Integer> photoElementLevels(ItemStack stack) {
+        String id = getPhotoEntity(stack);
+        if (id == null) return Map.of();
+        ResourceLocation rl;
+        try {
+            rl = ResourceLocation.parse(id);
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+        return AttackerElementLoader.getLevels(rl);
     }
 
     /**

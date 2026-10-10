@@ -955,15 +955,13 @@ public class PhotoSpecialEffects {
                         // 相册：等效装备其内全部照片（去重 + 边界安全）
                         ItemContainerContents contents = stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
                         for (ItemStack photo : contents.nonEmptyItems()) {
-                            String stolen = PhotographEffectRegistry.getStolenEntity(photo);
-                            if (stolen == null) stolen = PhotographEffectRegistry.getElementEntity(photo);
-                            if (stolen != null && !ids.contains(stolen)) ids.add(stolen);
+                            var pe = PhotographEffectRegistry.readPhotoEntity(photo);   // 单次 copyTag
+                            if (pe != null && !ids.contains(pe.id())) ids.add(pe.id());
                         }
                         continue;
                     }
-                    String stolen = PhotographEffectRegistry.getStolenEntity(stack);
-                    if (stolen == null) stolen = PhotographEffectRegistry.getElementEntity(stack);
-                    if (stolen != null && !ids.contains(stolen)) ids.add(stolen);
+                    var pe = PhotographEffectRegistry.readPhotoEntity(stack);       // 单次 copyTag
+                    if (pe != null && !ids.contains(pe.id())) ids.add(pe.id());
                 }
             }
         });
@@ -1282,7 +1280,13 @@ public class PhotoSpecialEffects {
         return false;
     }
 
-    /** 佩戴照片提供的该元素追伤加成（照片 mob attacker_element 等级 ×3%，供 DamageHandler 查询） */
+    /**
+     * 佩戴照片提供的该元素追伤加成（照片 mob attacker_element 等级 ×3%，供 DamageHandler 查询）。
+     * <p>
+     * ⚠ <b>现已不在伤害路径上调用</b>：{@code DamageHandler} 改用
+     * {@link PhotoSetEffects#computeElementBonuses(ServerPlayer)}（tick 级装备缓存 + 每个元素只算一次，
+     * 不再「每次伤害 × 每个元素 × 每张照片」地重复解析）。本方法留给确实只问单一元素的调用点。
+     */
     public static float getPhotoElementBonus(ServerPlayer player, com.plumejade.lensouls.damage.ElementDamage element) {
         float bonus = 0f;
         for (String id : collectGearEntities(player)) {
@@ -1318,6 +1322,8 @@ public class PhotoSpecialEffects {
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        // 顺带清掉 PhotoSetEffects 为这个玩家缓存的装备列表/套装计划（那两个 map 自己不会缩）
+        PhotoSetEffects.evictPlayer(player.getUUID());
         Multimap<Holder<Attribute>, AttributeModifier> prev = APPLIED_ATTRS.remove(player.getUUID());
         if (prev != null) {
             for (var e : prev.entries()) {

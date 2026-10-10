@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.integration;
 
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.config.AttackerElementLoader;
 import com.plumejade.lensouls.config.PhotoSetDefs;
 import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.effect.ModEffects;
@@ -87,14 +88,64 @@ public class PhotoSetEffects {
         applyPlan(player, getPlan(player));
     }
 
-    /** 本 tick 的装备实体集合：同 tick 内复用，避免每次伤害事件都重算 */
-    private static List<String> getGear(ServerPlayer player) {
+    /**
+     * 本 tick 的装备实体集合：同 tick 内复用，避免每次伤害事件都重算。
+     * <p>
+     * <b>这里是「已装备照片实体集合」的唯一 tick 级缓存</b>——{@link PhotoSpecialEffects} 不再另建一份，
+     * 否则同一 tick 内两处遍历 Curios 又各自 copyTag 一遍照片 NBT。
+     */
+    public static List<String> getGear(ServerPlayer player) {
         long t = player.level().getGameTime();
         GearCache c = GEAR_CACHE.get(player.getUUID());
         if (c != null && c.tick == t) return c.gear;
         List<String> gear = PhotoSpecialEffects.collectGearEntities(player);
         GEAR_CACHE.put(player.getUUID(), new GearCache(t, gear));
         return gear;
+    }
+
+    /**
+     * 各元素的「佩戴照片追伤加成」（照片 mob attacker_element 等级 ×3%，与
+     * {@link PhotoSpecialEffects#getPhotoElementBonus} 同口径，只是<b>一趟算完四个元素</b>）。
+     * <p>
+     * 伤害结算原本在元素循环里逐元素调 {@code getPhotoElementBonus}：每次调用都重扫一遍 Curios +
+     * 每张照片 copyTag + 每张照片 {@code ResourceLocation.parse}，一次近战命中最多四遍。
+     * 现在 gear 走 tick 缓存、id 只解析一次、四个元素一起返回（无加成时返回 {@link Map#of()} 空表）。
+     * <p>
+     * <b>本方法只算表，不含任何生效条件</b>：调用方 {@code DamageHandler} 必须把查表放在
+     * 「该元素 activitySum &gt; 0」的闸之内，四个元素各自的加成依旧互不干涉、也依旧不能脱离元素活性生效。
+     * 把这张表当成「无条件加成」直接加总，会改变逐元素独立的特性。
+     */
+    public static Map<ElementDamage, Float> computeElementBonuses(ServerPlayer player) {
+        List<String> gear = getGear(player);
+        if (gear.isEmpty()) return Map.of();
+        EnumMap<ElementDamage, Float> bonuses = new EnumMap<>(ElementDamage.class);
+        for (String id : gear) {
+            ResourceLocation rl;
+            try {
+                rl = ResourceLocation.parse(id);
+            } catch (Exception ignored) {
+                continue;
+            }
+            for (ElementDamage el : ElementDamage.values()) {
+                if (el == ElementDamage.PROJECTILE) continue;
+                int lvl = AttackerElementLoader.getLevel(rl, el);
+                if (lvl > 0) bonuses.merge(el, lvl * 0.03f, Float::sum);
+            }
+        }
+        return bonuses.isEmpty() ? Map.of() : bonuses;
+    }
+
+    /**
+     * 玩家登出时清掉本类为它缓存的两份数据（{@code GEAR_CACHE} / {@code PLAN_CACHE}）。
+     * <p>
+     * 这两个 map 以 UUID 为键、只在玩家 tick 时覆盖写入，<b>没有清理就永远不会缩小</b>——
+     * 长期运行的服务器上每个来过的玩家都会永久留下一条装备列表与一份套装计划。
+     * 由 {@code PhotoSpecialEffects.onPlayerLogout}（既有的登出监听里）调用，不另注册监听。
+     */
+    public static void evictPlayer(UUID uuid) {
+        if (uuid == null) return;
+        GEAR_CACHE.remove(uuid);
+        PLAN_CACHE.remove(uuid);
     }
 
     /** 取激活套装计划；仅当装备签名变化时重新解析描述符 */

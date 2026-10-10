@@ -3,12 +3,15 @@ package com.plumejade.lensouls.config;
 import com.google.gson.*;
 import com.plumejade.lensouls.LenSouls;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
+import net.minecraft.tags.TagKey;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.EntityType;
@@ -20,7 +23,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-import java.lang.ref.WeakReference;
 import java.util.*;
 
 /**
@@ -55,10 +57,16 @@ import java.util.*;
  * 白名单 {@code "all"} + 黑名单点名 → 仅黑名单禁止。空白名单 = 无白名单约束（默认放行）。
  *
  * <h2>标签如何解析</h2>
- * 用静态注册表把 {@code #tag} <b>展开成 ID 集合</b>（{@code Registry#getTags()}，含子标签继承），
- * 而不是查物品栈自身的标签 —— 后者漏掉 {@code minecraft:logs} 这类「只挂子标签、无直接成员」的空壳标签。
- * 展开结果按注册表建索引缓存，并在 {@link TagsUpdatedEvent}（服务端数据包重载 / 客户端收包）时整体失效，
+ * 扫描注册表的每个 Holder，读它<b>自己</b>的标签集合，聚合成「标签 → 成员 ID」索引
+ * （子标签继承由标签绑定阶段写进各成员 Holder，聚合天然含继承）。这与游戏里
+ * {@code 物品.is(标签)} 同源，因此既能覆盖只会挂在子标签上的空壳标签（如 {@code minecraft:logs}），
+ * 也能覆盖模组在运行时把 TagKey 直接写进物品 Holder 的标签（如 gytrinket 的
+ * {@code random_build_pool}，其数据文件里是空 values 数组）—— 后者读注册表的
+ * {@code Registry#getTags()} / {@code getTag()} 永远是空集。
+ * <p>
+ * 索引按注册表缓存，并在 {@link TagsUpdatedEvent}（服务端数据包重载 / 客户端收包）时整体失效，
  * 因此其它数据包往 {@code #minecraft:saplings} 里塞树苗后本黑名单会自动跟上。
+ * 失效只丢不建，重建推迟到首次真正判定（惰性），所以 {@code /reload} 路径零成本。
  * <p>
  * 不存在的标签只记 WARN 并忽略该条（与无效 ID 同口径），不会让整份名单失效。
  * <p>
@@ -89,10 +97,17 @@ public class CopySoulFilter extends SimpleJsonResourceReloadListener {
 
     private static final CopySoulFilter INSTANCE = new CopySoulFilter();
 
-    /** 最近一次编译结果（按注册表索引）；标签重绑或数据包重载时整体失效 */
-    private static volatile Compiled compiled;
-    /** 已解析缓存：注册表身份 → 「标签 → 成员 ID」索引（弱键，避免吊住注册表类） */
-    private static final List<CacheEntry> CACHE = new ArrayList<>();
+    /**
+     * 编译结果<b>按注册表各留一个槽位</b>（只有物品与实体类型两种）。
+     * 不能共用一个槽位：掉落判定用实体类型、复制判定用物品，二者交替发生，
+     * 共用会让每次交替都重扫一遍注册表重新展开标签（热路径上纯浪费）。
+     */
+    private static volatile Compiled itemCompiled;
+    private static volatile Compiled dropCompiled;
+    /** 标签 → 成员 ID 索引：物品侧（惰性建立，标签重绑/数据包重载时置空） */
+    private static volatile Map<ResourceLocation, Set<ResourceLocation>> itemTagIndex;
+    /** 标签 → 成员 ID 索引：实体类型侧（同样惰性、可空） */
+    private static volatile Map<ResourceLocation, Set<ResourceLocation>> dropTagIndex;
 
     // ===== 原始配置（apply 时写入，按注册表延迟编译） =====
     private static volatile List<String> dropWlTokens = List.of();
@@ -185,6 +200,44 @@ public class CopySoulFilter extends SimpleJsonResourceReloadListener {
                            List<String> whitelistHits, List<String> blacklistHits, String matchedRule) {
     }
 
+    /**
+     * 标签诊断：本过滤器的索引里该标签有多少成员、注册表绑定表里有多少成员。
+     * <p>
+     * 两者不一致即为「运行时给物品补标签」的模组（如 gytrinket）：本过滤器认索引那一列，
+     * 因为它与 {@code stack.is(tag)} 同源。整包物品标签总数供确认索引已建立。
+     */
+    public record TagDiagnostic(List<ResourceLocation> indexedMembers, int registryMembers, int totalIndexedTags) {
+    }
+
+    /** 诊断某个物品标签（只用于 {@code /lensouls copysoul #tag}） */
+    public static TagDiagnostic diagnoseItemTag(ResourceLocation tagId) {
+        Registry<Item> registry = BuiltInRegistries.ITEM;
+        Map<ResourceLocation, Set<ResourceLocation>> index = tagIndex(registry); // 按需建索引
+        Set<ResourceLocation> indexed = index.get(tagId);
+        List<ResourceLocation> list = new ArrayList<>(indexed == null ? Set.of() : indexed);
+        list.sort(Comparator.comparing(ResourceLocation::toString));
+        int bound = 0;
+        HolderSet.Named<Item> named = registry.getTag(TagKey.create(Registries.ITEM, tagId)).orElse(null);
+        if (named != null) bound = named.size();
+        return new TagDiagnostic(list, bound, index.size());
+    }
+
+    /**
+     * 索引里的全部物品标签 → 成员数（按 {@code 命名空间:路径}）。
+     * <p>
+     * 与 {@code Registry#getTags()} 的区别：这里含<b>运行时被直接写进物品 Holder</b> 的标签
+     * （如 gytrinket 的 {@code random_build_pool}，其数据文件里是空 values 数组），
+     * 因为索引是逐 Holder 读 {@code Holder#tags()} 建立的。首次调用会触发建索引。
+     */
+    public static Map<String, Integer> indexedItemTags() {
+        Map<ResourceLocation, Set<ResourceLocation>> index = tagIndex(BuiltInRegistries.ITEM); // 按需建索引
+        Map<String, Integer> out = new TreeMap<>();
+        for (Map.Entry<ResourceLocation, Set<ResourceLocation>> e : index.entrySet()) {
+            out.put(e.getKey().toString(), e.getValue().size());
+        }
+        return out;
+    }
+
     // ===================== 判定核心 =====================
 
     private static boolean evaluate(Compiled c, boolean copyList, ResourceLocation id) {
@@ -200,33 +253,60 @@ public class CopySoulFilter extends SimpleJsonResourceReloadListener {
 
     // ===================== 编译（按注册表展开标签） =====================
 
+    /**
+     * 取某注册表的编译结果，未建或已失效则就地建（同步，调用方通常是服务端线程）。
+     * <p>
+     * 物品与实体类型各有独立槽位，交替判定不会互相顶掉。
+     */
     private static <T> Compiled compiled(Registry<T> registry) {
-        Compiled c = compiled;
-        if (c != null && c.owner == registry) return c;
-        synchronized (CopySoulFilter.class) {
-            c = compiled;
-            if (c != null && c.owner == registry) return c;
-            Compiled built = new Compiled(registry);
-            built.partition(dropWlTokens, true, registry, "掉落");
-            built.partition(dropBlTokens, false, registry, "掉落");
-            if ((Object) registry == BuiltInRegistries.ITEM) {
-                built.partition(copyWlTokens, true, registry, "复制");
-                built.partition(copyBlTokens, false, registry, "复制");
+        boolean items = (Object) registry == BuiltInRegistries.ITEM;
+        if (items) {
+            Compiled c = itemCompiled;
+            if (c != null) return c;
+            synchronized (CopySoulFilter.class) {
+                if ((c = itemCompiled) != null) return c;
+                itemCompiled = c = buildCompiled(registry, items);
+                return c;
             }
-            compiled = built;
-            return built;
+        }
+        Compiled c = dropCompiled;
+        if (c != null) return c;
+        synchronized (CopySoulFilter.class) {
+            if ((c = dropCompiled) != null) return c;
+            dropCompiled = c = buildCompiled(registry, false);
+            return c;
         }
     }
 
-    /** 标签重绑（数据包重载 / 客户端收包）→ 丢弃展开缓存与编译结果，下次判定按新标签重建 */
+    /** 建编译结果：掉落名单对所有注册表生效；复制名单只在物品注册表上展开 */
+    private static <T> Compiled buildCompiled(Registry<T> registry, boolean includeCopyLists) {
+        Compiled built = new Compiled(registry);
+        built.partition(dropWlTokens, true, registry, "掉落");
+        built.partition(dropBlTokens, false, registry, "掉落");
+        if (includeCopyLists) {
+            built.partition(copyWlTokens, true, registry, "复制");
+            built.partition(copyBlTokens, false, registry, "复制");
+        }
+        return built;
+    }
+
+    /**
+     * 标签重绑（数据包重载 / 客户端收包）→ 丢弃索引与编译结果。
+     * <p>
+     * <b>只丢不建</b>：这里不做任何重活，重建推迟到下次真正需要判定时（惰性），
+     * 所以 {@code /reload} 本身不会被本过滤器拖慢。默认名单（黑名单为空）走早退，一次都不会建。
+     * <p>
+     * 刻意不以 {@code shouldUpdateStaticData()} 过滤：客机在单人/局域网下也会建自己的
+     * {@code CraftingMenu} 并走到判定，若跳过客户端收包，它的索引会永久停在旧标签上。
+     * 清空是 O(1)，多清一次无成本。
+     */
     @SubscribeEvent
     public static void onTagsUpdated(TagsUpdatedEvent event) {
-        if (!event.shouldUpdateStaticData()) return;
         synchronized (CopySoulFilter.class) {
-            synchronized (CACHE) {
-                CACHE.clear();
-            }
-            compiled = null;
+            itemTagIndex = null;
+            dropTagIndex = null;
+            itemCompiled = null;
+            dropCompiled = null;
         }
     }
 
@@ -268,7 +348,11 @@ public class CopySoulFilter extends SimpleJsonResourceReloadListener {
             dropBlTokens = freeze(dBl, dBlAll[0]);
             copyWlTokens = freeze(cWl, cWlAll[0]);
             copyBlTokens = freeze(cBl, cBlAll[0]);
-            compiled = null;
+            // 只丢不建：建索引是惰性的，避免在 /reload 路径上同步扫注册表
+            itemTagIndex = null;
+            dropTagIndex = null;
+            itemCompiled = null;
+            dropCompiled = null;
         }
         LOGGER.info("复制之魂过滤加载完成：掉落 白[{}]黑[{}]，复制 白[{}]黑[{}]",
                 describe(dWl, dWlAll[0]), describe(dBl, dBlAll[0]),
@@ -456,55 +540,66 @@ public class CopySoulFilter extends SimpleJsonResourceReloadListener {
 
     /**
      * 把 {@code #tag} 展开成 ID 集合，含子标签继承。标签不存在返回 null。
-     * 结果按注册表建索引缓存，{@link TagsUpdatedEvent} 时整体失效。
+     * 索引按注册表建立并缓存，{@link TagsUpdatedEvent} 时整体失效。
      */
     @Nullable
     private static Set<ResourceLocation> resolveTag(ResourceLocation tagId, Registry<?> registry) {
-        synchronized (CACHE) {
-            for (CacheEntry entry : CACHE) {
-                if (entry.owner.get() == registry) return entry.resolve(tagId, registry);
-            }
-            CacheEntry entry = new CacheEntry(registry);
-            CACHE.add(entry);
-            return entry.resolve(tagId, registry);
+        return tagIndex(registry).get(tagId);
+    }
+
+    /** 取某注册表的标签索引（惰性建立）。只有物品与实体类型两种注册表会走到这里。 */
+    private static Map<ResourceLocation, Set<ResourceLocation>> tagIndex(Registry<?> registry) {
+        boolean items = (Object) registry == BuiltInRegistries.ITEM;
+        Map<ResourceLocation, Set<ResourceLocation>> index = items ? itemTagIndex : dropTagIndex;
+        if (index != null) return index;
+        synchronized (CopySoulFilter.class) {
+            index = items ? itemTagIndex : dropTagIndex;
+            if (index != null) return index;
+            index = Collections.unmodifiableMap(buildTagIndex(registry));
+            if (items) itemTagIndex = index; else dropTagIndex = index;
+            return index;
         }
     }
 
-    /** 单个注册表的「标签 → 成员 ID」索引，惰性建立 */
-    private static final class CacheEntry {
-        final WeakReference<Registry<?>> owner;
-        private Map<ResourceLocation, Set<ResourceLocation>> byTag; // null = 尚未建索引
-
-        CacheEntry(Registry<?> registry) {
-            this.owner = new WeakReference<>(registry);
-        }
-
-        @Nullable
-        Set<ResourceLocation> resolve(ResourceLocation tagId, Registry<?> registry) {
-            Map<ResourceLocation, Set<ResourceLocation>> map = byTag;
-            if (map == null) {
-                map = build(registry);
-                byTag = map;
-            }
-            return map.get(tagId);
-        }
-
-        /** 遍历注册表全部标签建立索引（{@code getTags} 返回的成员已含子标签继承） */
-        private Map<ResourceLocation, Set<ResourceLocation>> build(Registry<?> registry) {
-            Map<ResourceLocation, Set<ResourceLocation>> map = new HashMap<>();
-            try {
-                registry.getTags().forEach(pair -> {
-                    Set<ResourceLocation> ids = new HashSet<>();
-                    for (Holder<?> holder : pair.getSecond()) {
-                        ResourceKey<?> id = holder.unwrapKey().orElse(null);
-                        if (id != null) ids.add(id.location());
+    /**
+     * 建立「标签 → 成员 ID」索引：扫描该注册表的每个 Holder，读它<b>自己</b>的标签集合。
+     * <p>
+     * <b>必须从 Holder 侧读，不能读注册表的标签绑定表。</b>
+     * 反例：gytrinket 的 {@code BuildPoolTagInjector} 在 {@code TagsUpdatedEvent} 里遍历物品，
+     * 把 TagKey 直接写回每个 {@code Holder.Reference} 的私有 {@code tags} 集合（靠它自带的
+     * {@code HolderReferenceAccessor} mixin），而 {@code random_build_pool.json} 里是空 values 数组。
+     * 于是 {@code Registry#getTags()} / {@code getTag()} 永远返回空集，但 {@code stack.is(tag)} 成立
+     * —— 只读注册表就会漏掉整类「运行时给物品补标签」的模组。逐 Holder 读与 {@code stack.is(tag)} 同源。
+     * <p>
+     * 子标签继承已由标签绑定阶段写进每个成员 Holder 的 tags 集合，因此逐 Holder 聚合天然含继承。
+     * <p>
+     * 全程只读注册表、不触碰同步容器，因此只与建索引的那一次调用有关，锁外无副作用。
+     */
+    private static Map<ResourceLocation, Set<ResourceLocation>> buildTagIndex(Registry<?> registry) {
+        long t0 = System.nanoTime();
+        Map<ResourceLocation, Set<ResourceLocation>> map = new HashMap<>();
+        int[] counters = new int[2]; // [0]=Holder 数, [1]=标签数（用数组是因为 lambda 里要写）
+        try {
+            registry.holders().forEach(holder -> {
+                ResourceLocation holderId = holder.unwrapKey().map(ResourceKey::location).orElse(null);
+                if (holderId == null) return;
+                counters[0]++;
+                holder.tags().forEach(key -> {
+                    Set<ResourceLocation> members = map.get(key.location());
+                    if (members == null) {
+                        members = new HashSet<>();
+                        map.put(key.location(), members);
+                        counters[1]++;
                     }
-                    map.put(pair.getFirst().location(), Collections.unmodifiableSet(ids));
+                    members.add(holderId);
                 });
-            } catch (Exception ex) {
-                LOGGER.warn("复制之魂过滤展开标签失败（注册表 {}）: {}", registry.key().location(), ex.toString());
-            }
-            return map;
+            });
+        } catch (Exception ex) {
+            LOGGER.warn("复制之魂过滤展开标签失败（注册表 {}）: {}", registry.key().location(), ex.toString());
         }
+        // INFO 级：每次建索引只打一行，方便在整合包里直接量到真实耗时（不是估算）
+        LOGGER.info("复制之魂过滤标签索引建立：注册表 {}，扫描 {} 个 Holder，聚合 {} 个标签，耗时 {} ms",
+                registry.key().location(), counters[0], counters[1], (System.nanoTime() - t0) / 1_000_000.0);
+        return map;
     }
 }

@@ -1149,7 +1149,6 @@ public class PhotoSpecialEffects {
     private static void tuneMovementSpeed() {
         if (speedTuned) return;
         speedTuned = true;
-        int raised = 0, added = 0;
         for (String id : new ArrayList<>(ATTRIBUTES.keySet())) {
             List<AttributeEntry> list = ATTRIBUTES.get(id);
             if (list == null) continue;
@@ -1161,15 +1160,12 @@ public class PhotoSpecialEffects {
                 if (ae.amount() <= 0) continue;
                 list.set(i, new AttributeEntry(ae.attribute(), ae.modName(), boostFromOld(ae.amount()),
                         AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
-                raised++;
             }
             if (!hasSpeed && WEAK_SLOT_BONUS.containsKey(id)) {
                 list.add(new AttributeEntry(Attributes.MOVEMENT_SPEED.value(), "weak_spd", 0.20,
                         AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
-                added++;
             }
         }
-        com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoSpeed] 移速词条调整：{} 条抬升到 +12%~+30%，{} 条弱照片新增 +20%", raised, added);
     }
 
     /** 旧移速值（+3%~+15% 量级）→ 铺满新区间 +12%~+30%，保持相对强弱次序 */

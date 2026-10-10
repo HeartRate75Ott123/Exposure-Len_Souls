@@ -301,21 +301,29 @@ public class LensoulsCommand {
             }
             head.append("§7主手：§f").append(id).append(" §7×").append(held.getCount()).append('\n');
         } else if (arg.startsWith("#")) {
-            // 标签自省：列出该标签的成员，方便确认展开结果
+            // 标签自省：列出索引里该标签的成员，并对照注册表绑定表，暴露「运行时补标签」的差异
             ResourceLocation tagId = ResourceLocation.tryParse(arg.substring(1));
             if (tagId == null) {
                 source.sendFailure(Component.literal("§c标签名不合法：" + arg));
                 return 0;
             }
-            List<String> members = visibleItemTagMembers(tagId);
-            if (members == null) {
-                source.sendFailure(Component.literal("§c物品标签不存在：§e" + arg
-                        + " §7（用 §e/lensouls copysoul tags §7看可用标签）"));
+            CopySoulFilter.TagDiagnostic diag = CopySoulFilter.diagnoseItemTag(tagId);
+            List<String> members = new ArrayList<>();
+            for (ResourceLocation m : diag.indexedMembers()) members.add(m.toString());
+            final String head2 = "§e" + arg + "§7：索引内成员 §f" + members.size()
+                    + " §7个，注册表绑定表 §f" + diag.registryMembers() + " §7个｜整包物品标签 §f"
+                    + diag.totalIndexedTags() + " §7个";
+            source.sendSuccess(() -> Component.literal(head2), false);
+            if (diag.registryMembers() != members.size()) {
+                source.sendSuccess(() -> Component.literal(
+                        "§7两列不一致：可能是模组在运行时直接写进物品 Holder（如 gytrinket），"
+                                + "也可能只是「只挂子标签、没有直接成员」。§a本名单一律认索引那一列"
+                                + "§7（与 §f物品.is(标签)§7 同源）"), false);
+            }
+            if (members.isEmpty()) {
+                source.sendSuccess(() -> Component.literal("§7该标签当前没有任何成员。"), false);
                 return 0;
             }
-            members.sort(String::compareTo);
-            final String l1 = "§e" + arg + " §7共 §f" + members.size() + " §7个可见成员：";
-            source.sendSuccess(() -> Component.literal(l1), false);
             source.sendSuccess(() -> Component.literal(String.join("§7, §f", members)), false);
             return members.size();
         } else {
@@ -345,48 +353,30 @@ public class LensoulsCommand {
         return String.valueOf(rank);
     }
 
-    /** 某物品标签的可见成员 ID（不存在返回 null） */
-    private static List<String> visibleItemTagMembers(ResourceLocation tagId) {
-        Registry<Item> registry = BuiltInRegistries.ITEM;
-        Optional<? extends HolderSet.Named<Item>> tag = registry.getTag(TagKey.create(Registries.ITEM, tagId));
-        if (tag.isEmpty()) return null;
-        List<String> out = new ArrayList<>();
-        for (Holder<Item> holder : tag.get()) {
-            ResourceLocation id = holder.unwrapKey().map(ResourceKey::location).orElse(null);
-            if (id != null) out.add(id.toString());
-        }
-        return out;
-    }
-
-    /** {@code /lensouls copysoul tags}：列出可用的物品标签与继承后的成员数 */
+    /** {@code /lensouls copysoul tags}：列出索引里的物品标签与成员数 */
     private static int copySoulTags(CommandContext<CommandSourceStack> ctx) {
         var source = ctx.getSource();
-        Registry<Item> registry = BuiltInRegistries.ITEM;
-        Map<String, List<String>> byNamespace = new TreeMap<>();
-        int total = 0;
+        Map<String, Integer> tags;
         try {
-            // getTags() 一次性给出「标签 → 成员」，成员已含子标签继承，且泛型不受通配符捕获影响
-            for (var pair : registry.getTags().toList()) {
-                ResourceLocation loc = pair.getFirst().location();
-                Set<ResourceLocation> members = new LinkedHashSet<>();
-                for (Holder<Item> holder : pair.getSecond()) {
-                    holder.unwrapKey().map(ResourceKey::location).ifPresent(members::add);
-                }
-                byNamespace.computeIfAbsent(loc.getNamespace(), k -> new ArrayList<>())
-                        .add("#" + loc + " §8(" + members.size() + ")");
-                total++;
-            }
+            tags = CopySoulFilter.indexedItemTags();
         } catch (Exception e) {
             source.sendFailure(Component.literal("§c枚举标签失败：" + e));
             return 0;
         }
-        if (total == 0) {
-            source.sendFailure(Component.literal("§7没有可用的物品标签"));
+        if (tags.isEmpty()) {
+            source.sendFailure(Component.literal("§7索引里没有物品标签"));
             return 0;
         }
-        final int count = total;
-        source.sendSuccess(() -> Component.literal("§7物品标签共 §f" + count
-                + " §7个，写进名单时前缀 §e#§7；括号内为 §8继承后§7的成员总数："), false);
+        Map<String, List<String>> byNamespace = new TreeMap<>();
+        for (Map.Entry<String, Integer> e : tags.entrySet()) {
+            int colon = e.getKey().indexOf(':');
+            String ns = colon < 0 ? "?" : e.getKey().substring(0, colon);
+            byNamespace.computeIfAbsent(ns, k -> new ArrayList<>())
+                    .add("#" + e.getKey() + " §8(" + e.getValue() + ")");
+        }
+        final int count = tags.size();
+        source.sendSuccess(() -> Component.literal("§7索引内物品标签共 §f" + count
+                + " §7个（含模组运行时给物品补的标签），写进名单时前缀 §e#§7；括号内为成员数："), false);
         for (Map.Entry<String, List<String>> e : byNamespace.entrySet()) {
             List<String> list = e.getValue();
             list.sort(String::compareTo);

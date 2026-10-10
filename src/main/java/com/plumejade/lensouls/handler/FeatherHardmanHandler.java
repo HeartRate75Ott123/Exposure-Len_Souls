@@ -102,12 +102,9 @@ public class FeatherHardmanHandler {
             ModEffects.ENDER_INFUSION
     };
 
-    /** e1 反转：每元素「玩家自己的基础活性等级」 */
-    private static final Map<UUID, int[]> ACTIVITY_BASE = new HashMap<>();
-    /** e1 反转：每元素「我们写回去的等级」 */
-    private static final Map<UUID, int[]> ACTIVITY_APPLIED = new HashMap<>();
-    /** e1 反转：被扣减到 0 而移除时的剩余时长（用于摘下羽毛后还原） */
-    private static final Map<UUID, int[]> ACTIVITY_SAVED_DURATION = new HashMap<>();
+    // 注：e1 反转的活性账本（base / applied / saved）已改为**持久化**（见下方 KEY_ACT_* 与 loadAct/saveAct），
+    // 不再使用内存静态 Map —— 静态 Map 是进程级的，单机换存档 UUID 不变会串档，且重登即丢。
+
     /** e3 附加伤害的空余照片栏位数缓存：UUID → {gameTime, freeSlots} */
     private static final Map<UUID, long[]> SLOT_CACHE = new HashMap<>();
 

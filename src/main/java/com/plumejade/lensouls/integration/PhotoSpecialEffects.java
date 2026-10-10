@@ -544,10 +544,6 @@ public class PhotoSpecialEffects {
         attr("twilightforest:pinch_beetle", Attributes.ARMOR.value(), "pbe_armor", 2.0, AttributeModifier.Operation.ADD_VALUE);
         attr("twilightforest:pinch_beetle", Attributes.ATTACK_KNOCKBACK.value(), "pbe_knock", 0.5, AttributeModifier.Operation.ADD_VALUE);
         attr("twilightforest:pinch_beetle", Attributes.MOVEMENT_SPEED.value(), "pbe_spd", -0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("twilightforest:plateau_boss", Attributes.ATTACK_DAMAGE.value(), "plb_atk", 0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("twilightforest:plateau_boss", Attributes.KNOCKBACK_RESISTANCE.value(), "plb_kb", 0.6, AttributeModifier.Operation.ADD_VALUE);
-        attr("twilightforest:plateau_boss", Attributes.MOVEMENT_SPEED.value(), "plb_spd", -0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("twilightforest:plateau_boss", Attributes.JUMP_STRENGTH.value(), "plb_jump", -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("twilightforest:redcap", Attributes.ATTACK_DAMAGE.value(), "red_atk", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("twilightforest:redcap", Attributes.ARMOR.value(), "red_armor", 2.0, AttributeModifier.Operation.ADD_VALUE);
         attr("twilightforest:redcap", Attributes.MOVEMENT_SPEED.value(), "red_spd", -0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
@@ -708,9 +704,6 @@ public class PhotoSpecialEffects {
         attr("eternal_starlight:aethersent_golem", Attributes.ARMOR.value(), "asg_armor", 3.0, AttributeModifier.Operation.ADD_VALUE);
         attr("eternal_starlight:aethersent_golem", Attributes.KNOCKBACK_RESISTANCE.value(), "asg_kb", 0.5, AttributeModifier.Operation.ADD_VALUE);
         attr("eternal_starlight:aethersent_golem", Attributes.MOVEMENT_SPEED.value(), "asg_spd", -0.08, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("eternal_starlight:astral_golem", Attributes.ARMOR.value(), "ast_armor", 3.0, AttributeModifier.Operation.ADD_VALUE);
-        attr("eternal_starlight:astral_golem", Attributes.KNOCKBACK_RESISTANCE.value(), "ast_kb", 0.5, AttributeModifier.Operation.ADD_VALUE);
-        attr("eternal_starlight:astral_golem", Attributes.MOVEMENT_SPEED.value(), "ast_spd", -0.08, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("eternal_starlight:grimstone_golem", Attributes.ARMOR.value(), "grg_armor", 3.0, AttributeModifier.Operation.ADD_VALUE);
         attr("eternal_starlight:grimstone_golem", Attributes.KNOCKBACK_RESISTANCE.value(), "grg_kb", 0.5, AttributeModifier.Operation.ADD_VALUE);
         attr("eternal_starlight:grimstone_golem", Attributes.MOVEMENT_SPEED.value(), "grg_spd", -0.08, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
@@ -736,9 +729,6 @@ public class PhotoSpecialEffects {
         attr("eternal_starlight:zombified_ratlin", Attributes.MAX_HEALTH.value(), "zrat_hp", -2.0, AttributeModifier.Operation.ADD_VALUE);
         attr("eternal_starlight:gleech", Attributes.MOVEMENT_SPEED.value(), "gle_spd", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("eternal_starlight:gleech", Attributes.MAX_HEALTH.value(), "gle_hp", -2.0, AttributeModifier.Operation.ADD_VALUE);
-        attr("eternal_starlight:boarwarf", Attributes.ATTACK_DAMAGE.value(), "bw_atk", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-        attr("eternal_starlight:boarwarf", Attributes.ATTACK_KNOCKBACK.value(), "bw_knock", 0.5, AttributeModifier.Operation.ADD_VALUE);
-        attr("eternal_starlight:boarwarf", Attributes.MOVEMENT_SPEED.value(), "bw_spd", -0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("eternal_starlight:aurora_deer", Attributes.MOVEMENT_SPEED.value(), "ad_spd", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("eternal_starlight:aurora_deer", Attributes.JUMP_STRENGTH.value(), "ad_jump", 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         attr("eternal_starlight:crystallized_moth", Attributes.KNOCKBACK_RESISTANCE.value(), "cm_kb", -0.2, AttributeModifier.Operation.ADD_VALUE);
@@ -803,7 +793,6 @@ public class PhotoSpecialEffects {
         ATTACK_KIND_BONUS.put("minecraft:evoker", new float[]{0.88f, 1.0f, 1.15f});
         ATTACK_KIND_BONUS.put("cataclysm:the_watcher", new float[]{0.88f, 1.15f, 1.0f});
         ATTACK_KIND_BONUS.put("legendary_monsters:wandering_eye", new float[]{1.0f, 1.1f, 1.0f});
-        ATTACK_KIND_BONUS.put("twilightforest:adherent", new float[]{1.0f, 1.1f, 1.0f});
         ATTACK_KIND_BONUS.put("twilightforest:death_tome", new float[]{1.0f, 1.0f, 1.1f});
         ATTACK_KIND_BONUS.put("twilightforest:skeleton_druid", new float[]{1.0f, 1.0f, 1.1f});
         ATTACK_KIND_BONUS.put("twilightforest:lich", new float[]{0.88f, 1.0f, 1.12f});

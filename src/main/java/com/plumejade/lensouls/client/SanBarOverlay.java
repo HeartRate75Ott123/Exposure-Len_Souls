@@ -36,8 +36,10 @@ public class SanBarOverlay {
     public static void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.options.hideGui) return;
-        // 扭曲羽毛 / 折翼沉渊 均可显示（值按各自上限等比例换算，扭曲 0-100，沉渊 0-200 发来的是 /2）
-        if (!FeatherTwitcherHandler.hasTwitcher(mc.player) && !FeatherAbyssHandler.hasAbyss(mc.player)) return;
+        // 显示与否由**服务端**随包下发（TwistSyncPacket.barVisible）：
+        // 客户端读不到羽毛槽附件（附件刻意不同步），用 hasTwitcher/hasAbyss 判断会导致
+        // 「只有开过一次诅咒界面、被菜单同步过之后才显示」。
+        if (!TwistClientCache.barVisible()) return;
 
         GuiGraphics g = event.getGuiGraphics();
         // 用 round 保证 34px 纹理完整映射（int 截断会裁掉底部像素并压缩比例）

@@ -13,21 +13,28 @@ import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.boss.BossToughnessAttributes;
 import com.plumejade.lensouls.boss.BossToughnessData;
 import com.plumejade.lensouls.boss.BossToughnessManager;
+import com.plumejade.lensouls.config.CopySoulFilter;
 import com.plumejade.lensouls.item.DimensionalGunItem;
 import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -37,8 +44,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -243,8 +253,147 @@ public class LensoulsCommand {
                                 .executes(LensoulsCommand::dumpMobs)
                         )
                 )
+                .then(Commands.literal("copysoul")
+                        .then(Commands.literal("tags")
+                                .executes(ctx -> copySoulTags(ctx))
+                        )
+                        .then(Commands.argument("target", StringArgumentType.greedyString())
+                                .executes(ctx -> copySoulCheck(ctx, StringArgumentType.getString(ctx, "target")))
+                        )
+                        .executes(ctx -> copySoulCheck(ctx, ""))
+                )
         );
 
+    }
+
+    // ===================== /lensouls copysoul =====================
+
+    /**
+     * {@code /lensouls copysoul [<物品ID>|#<标签>|all|held]}（无参 = 主手物品）
+     * <p>
+     * 打印复制之魂复制名单对目标的最终判定、双方各自命中的条目与**决定胜负的那一条规则**，
+     * 用来核验「具体&gt;标签&gt;all，同级黑名单胜」的合并语义。
+     * {@code /lensouls copysoul tags [命名空间]} 列出可用的物品标签（带成员数与所属命名空间）。
+     */
+    private static int copySoulCheck(CommandContext<CommandSourceStack> ctx, String raw) {
+        var source = ctx.getSource();
+        Registry<Item> registry = BuiltInRegistries.ITEM;
+        String arg = raw.trim();
+        StringBuilder head = new StringBuilder();
+        ResourceLocation id;
+
+        if (arg.isEmpty() || arg.equalsIgnoreCase("held")) {
+            ServerPlayer player = source.getPlayer();
+            if (player == null) {
+                source.sendFailure(Component.literal("§c控制台执行请显式给出物品 ID，例如 §e/lensouls copysoul minecraft:oak_sapling"));
+                return 0;
+            }
+            ItemStack held = player.getMainHandItem();
+            if (held.isEmpty()) {
+                source.sendFailure(Component.literal("§c主手是空的：请手持物品，或显式给出物品 ID"));
+                return 0;
+            }
+            Item item = held.getItem();
+            id = registry.getKey(item);
+            if (id == null) {
+                source.sendFailure(Component.literal("§c主手物品未注册，无法判定"));
+                return 0;
+            }
+            head.append("§7主手：§f").append(id).append(" §7×").append(held.getCount()).append('\n');
+        } else if (arg.startsWith("#")) {
+            // 标签自省：列出该标签的成员，方便确认展开结果
+            ResourceLocation tagId = ResourceLocation.tryParse(arg.substring(1));
+            if (tagId == null) {
+                source.sendFailure(Component.literal("§c标签名不合法：" + arg));
+                return 0;
+            }
+            List<String> members = visibleItemTagMembers(tagId);
+            if (members == null) {
+                source.sendFailure(Component.literal("§c物品标签不存在：§e" + arg
+                        + " §7（用 §e/lensouls copysoul tags §7看可用标签）"));
+                return 0;
+            }
+            members.sort(String::compareTo);
+            final String l1 = "§e" + arg + " §7共 §f" + members.size() + " §7个可见成员：";
+            source.sendSuccess(() -> Component.literal(l1), false);
+            source.sendSuccess(() -> Component.literal(String.join("§7, §f", members)), false);
+            return members.size();
+        } else {
+            id = ResourceLocation.tryParse(arg);
+            if (id == null || !registry.containsKey(id)) {
+                source.sendFailure(Component.literal("§c物品 ID 不存在：§e" + arg));
+                return 0;
+            }
+            head.append("§7目标：§f").append(id).append('\n');
+        }
+
+        CopySoulFilter.Decision d = CopySoulFilter.describeCopyDecision(registry, id);
+        final String report = head
+                + "§7白名单命中：" + (d.whitelistBest() == null ? "§8无" : "§a" + d.whitelistBest())
+                + "  §8[具体度 " + rankText(d.whitelistRank()) + "]\n"
+                + "§7黑名单命中：" + (d.blacklistBest() == null ? "§8无" : "§c" + d.blacklistBest())
+                + "  §8[具体度 " + rankText(d.blacklistRank()) + "]\n"
+                + "§7裁决：" + d.matchedRule() + "\n"
+                + (d.allowed() ? "§a✔ 允许复制" : "§c✘ 禁止复制");
+        source.sendSuccess(() -> Component.literal(report), false);
+        return d.allowed() ? 1 : 0;
+    }
+
+    private static String rankText(int rank) {
+        if (rank == Integer.MIN_VALUE) return "未命中";
+        if (rank == 1_000_000) return "点名";
+        return String.valueOf(rank);
+    }
+
+    /** 某物品标签的可见成员 ID（不存在返回 null） */
+    private static List<String> visibleItemTagMembers(ResourceLocation tagId) {
+        Registry<Item> registry = BuiltInRegistries.ITEM;
+        Optional<? extends HolderSet.Named<Item>> tag = registry.getTag(TagKey.create(Registries.ITEM, tagId));
+        if (tag.isEmpty()) return null;
+        List<String> out = new ArrayList<>();
+        for (Holder<Item> holder : tag.get()) {
+            ResourceLocation id = holder.unwrapKey().map(ResourceKey::location).orElse(null);
+            if (id != null) out.add(id.toString());
+        }
+        return out;
+    }
+
+    /** {@code /lensouls copysoul tags}：列出可用的物品标签与继承后的成员数 */
+    private static int copySoulTags(CommandContext<CommandSourceStack> ctx) {
+        var source = ctx.getSource();
+        Registry<Item> registry = BuiltInRegistries.ITEM;
+        Map<String, List<String>> byNamespace = new TreeMap<>();
+        int total = 0;
+        try {
+            // getTags() 一次性给出「标签 → 成员」，成员已含子标签继承，且泛型不受通配符捕获影响
+            for (var pair : registry.getTags().toList()) {
+                ResourceLocation loc = pair.getFirst().location();
+                Set<ResourceLocation> members = new LinkedHashSet<>();
+                for (Holder<Item> holder : pair.getSecond()) {
+                    holder.unwrapKey().map(ResourceKey::location).ifPresent(members::add);
+                }
+                byNamespace.computeIfAbsent(loc.getNamespace(), k -> new ArrayList<>())
+                        .add("#" + loc + " §8(" + members.size() + ")");
+                total++;
+            }
+        } catch (Exception e) {
+            source.sendFailure(Component.literal("§c枚举标签失败：" + e));
+            return 0;
+        }
+        if (total == 0) {
+            source.sendFailure(Component.literal("§7没有可用的物品标签"));
+            return 0;
+        }
+        final int count = total;
+        source.sendSuccess(() -> Component.literal("§7物品标签共 §f" + count
+                + " §7个，写进名单时前缀 §e#§7；括号内为 §8继承后§7的成员总数："), false);
+        for (Map.Entry<String, List<String>> e : byNamespace.entrySet()) {
+            List<String> list = e.getValue();
+            list.sort(String::compareTo);
+            final String line = "§e" + e.getKey() + "§7：§f" + String.join("§7, §f", list);
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+        return count;
     }
 
     /**

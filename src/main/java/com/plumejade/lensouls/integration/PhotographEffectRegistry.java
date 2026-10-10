@@ -253,7 +253,6 @@ public class PhotographEffectRegistry {
         add("twilightforest:snow_guardian", "§a免疫 冰冻 伤害", "");
         add("twilightforest:maze_slime", "§a免疫 摔落 伤害", "");
         add("twilightforest:pinch_beetle", "", "");
-        add("twilightforest:plateau_boss", "§a近战攻击 +15%", "");
         add("twilightforest:redcap", "§a近战攻击 +10%", "");
         add("twilightforest:redcap_sapper", "§a近战攻击 +10%", "");
         add("twilightforest:lower_goblin_knight", "§a近战攻击 +10%", "");
@@ -266,7 +265,6 @@ public class PhotographEffectRegistry {
         add("twilightforest:kobold", "§a移动 +10%", "");
         add("twilightforest:slime_beetle", "", "");
         add("twilightforest:skeleton_druid", "§a魔法攻击 +10%", "");
-        add("twilightforest:adherent", "§a远程攻击 +10%", "");
         add("twilightforest:bighorn_sheep", "§a免疫 细雪 减速", "");
         add("twilightforest:boar", "§a近战攻击 +5%", "");
         add("twilightforest:deer", "§a移动 +10%", "");
@@ -353,7 +351,6 @@ public class PhotographEffectRegistry {
         add("eternal_starlight:the_gatekeeper", "§a你受到的所有来源伤害 -12%；§a魔法攻击 +10%", "");
         add("eternal_starlight:starlight_golem", "", "");
         add("eternal_starlight:aethersent_golem", "", "");
-        add("eternal_starlight:astral_golem", "", "");
         add("eternal_starlight:grimstone_golem", "", "");
         add("eternal_starlight:ent", "§a赋予 再生1 效果", "");
         add("eternal_starlight:freeze", "§a免疫 冰冻 伤害", "");
@@ -368,7 +365,6 @@ public class PhotographEffectRegistry {
         add("eternal_starlight:ratlin", "§a移动 +10%", "");
         add("eternal_starlight:zombified_ratlin", "§a移动 +10%", "");
         add("eternal_starlight:gleech", "§a移动 +10%", "");
-        add("eternal_starlight:boarwarf", "§a近战攻击 +10%", "");
         add("eternal_starlight:aurora_deer", "§a移动 +10%", "");
         add("eternal_starlight:creteor", "§a你受到的魔法伤害 -12%", "");
         add("eternal_starlight:tiny_creteor", "§a你受到的魔法伤害 -12%", "");
@@ -394,7 +390,6 @@ public class PhotographEffectRegistry {
         add("block_factorys_bosses:dragon_guard_sword", "§a近战攻击 +10%", "");
         add("block_factorys_bosses:flaming_skeleton_guard_fireball", "§a赋予 火焰免疫 效果；§a近战攻击 +10%", "§c你受到的 冰冻 伤害 +12%");
         add("block_factorys_bosses:flaming_skeleton_guard_sword", "§a赋予 火焰免疫 效果；§a近战攻击 +10%", "§c你受到的 冰冻 伤害 +12%");
-        add("block_factorys_bosses:ghost_tentacle", "§a赋予 水下呼吸 效果；§a游泳 +15%", "");
         add("block_factorys_bosses:kraken_tentacle", "§a近战攻击 +5%", "");
         add("block_factorys_bosses:pile_of_bones", "", "");
         add("block_factorys_bosses:pirate_captain", "§a近战攻击 +10%；§a远程攻击 +5%", "");
@@ -477,7 +472,6 @@ public class PhotographEffectRegistry {
         potion("block_factorys_bosses:underworld_knight", "minecraft:fire_resistance", 0);
         potion("block_factorys_bosses:infernal_dragon", "minecraft:fire_resistance", 0);
         potion("block_factorys_bosses:kraken", "minecraft:water_breathing", 0);
-        potion("block_factorys_bosses:ghost_tentacle", "minecraft:water_breathing", 0);
         potion("block_factorys_bosses:flaming_skeleton_guard_fireball", "minecraft:fire_resistance", 0);
         potion("block_factorys_bosses:flaming_skeleton_guard_sword", "minecraft:fire_resistance", 0);
     }

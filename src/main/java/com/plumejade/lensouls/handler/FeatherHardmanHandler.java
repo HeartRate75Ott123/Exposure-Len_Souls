@@ -208,11 +208,43 @@ public class FeatherHardmanHandler {
      * e1 反转：活性效果 -2。逐元素维护「玩家自己的基础等级」与「我们写回去的等级」，
      * 观测值不是我们的产物时说明玩家自己改了等级（喝药水 / 到期），把它采纳为新的基础等级。
      */
+    // ==================== e1 反转：活性 -2 的**持久化**账本 ====================
+    // ⚠ 必须是持久化（PlayerPersisted 子键），不能只用内存 Map：
+    //   重进游戏内存 Map 清空 ⇒ 每次重登都会「再扣一次 2 级」（累积扣减，活性被越扣越少、
+    //   看起来就像「反转后活性仍被禁用」），而且 restoreActivity 也因拿不到记录永远还原不了。
+
+    /** 玩家自己的基础等级（未扣减）；下标与 INFUSIONS 对齐 */
+    private static final String KEY_ACT_BASE = "lensouls:hardman_act_base";
+    /** 我们写回去的等级（已扣减） */
+    private static final String KEY_ACT_APPLIED = "lensouls:hardman_act_applied";
+    /** 被我们删掉时的剩余时长（用于原样还原） */
+    private static final String KEY_ACT_SAVED = "lensouls:hardman_act_saved";
+
+    private static int[] loadAct(ServerPlayer player, String key) {
+        int[] a = player.getPersistentData()
+                .getCompound(Player.PERSISTED_NBT_TAG).getIntArray(key);
+        return a.length == INFUSIONS.length ? a : new int[INFUSIONS.length];
+    }
+
+    private static void saveAct(ServerPlayer player, String key, int[] a) {
+        CompoundTag tag = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
+        tag.putIntArray(key, a);
+        player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
+    }
+
+    private static void clearAct(ServerPlayer player) {
+        CompoundTag tag = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
+        if (!tag.contains(KEY_ACT_BASE) && !tag.contains(KEY_ACT_APPLIED) && !tag.contains(KEY_ACT_SAVED)) return;
+        tag.remove(KEY_ACT_BASE);
+        tag.remove(KEY_ACT_APPLIED);
+        tag.remove(KEY_ACT_SAVED);
+        player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
+    }
+
     private static void applyActivityPenalty(ServerPlayer player) {
-        UUID id = player.getUUID();
-        int[] base = ACTIVITY_BASE.computeIfAbsent(id, k -> new int[INFUSIONS.length]);
-        int[] applied = ACTIVITY_APPLIED.computeIfAbsent(id, k -> new int[INFUSIONS.length]);
-        int[] saved = ACTIVITY_SAVED_DURATION.computeIfAbsent(id, k -> new int[INFUSIONS.length]);
+        int[] base = loadAct(player, KEY_ACT_BASE);
+        int[] applied = loadAct(player, KEY_ACT_APPLIED);
+        int[] saved = loadAct(player, KEY_ACT_SAVED);
 
         for (int i = 0; i < INFUSIONS.length; i++) {
             MobEffectInstance inst = player.getEffect(INFUSIONS[i]);
@@ -237,15 +269,19 @@ public class FeatherHardmanHandler {
             }
             applied[i] = desired;
         }
+        // 账本落盘：下一 tick / 下次登录都靠它，避免重复扣减
+        saveAct(player, KEY_ACT_BASE, base);
+        saveAct(player, KEY_ACT_APPLIED, applied);
+        saveAct(player, KEY_ACT_SAVED, saved);
     }
 
     /** 非反转态：把我们扣减过的活性等级还原成玩家自己的基础等级，并清掉本地状态 */
     private static void restoreActivity(ServerPlayer player) {
-        UUID id = player.getUUID();
-        int[] base = ACTIVITY_BASE.remove(id);
-        int[] applied = ACTIVITY_APPLIED.remove(id);
-        int[] saved = ACTIVITY_SAVED_DURATION.remove(id);
-        if (base == null || applied == null) return;
+        CompoundTag persistedTag = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
+        if (!persistedTag.contains(KEY_ACT_BASE)) return;      // 没有账本 ⇒ 不是我们改过，别动
+        int[] base = loadAct(player, KEY_ACT_BASE);
+        int[] applied = loadAct(player, KEY_ACT_APPLIED);
+        int[] saved = loadAct(player, KEY_ACT_SAVED);
 
         for (int i = 0; i < INFUSIONS.length; i++) {
             MobEffectInstance inst = player.getEffect(INFUSIONS[i]);
@@ -263,6 +299,7 @@ public class FeatherHardmanHandler {
                 player.addEffect(new MobEffectInstance(INFUSIONS[i], saved[i], base[i] - 1, true, true, true));
             }
         }
+        clearAct(player);
     }
 
     /** e1 反转：每有 1 级正数活性 → 1 点附加伤害（点数加算，§2③） */

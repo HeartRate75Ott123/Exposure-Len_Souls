@@ -29,12 +29,50 @@ data/lensouls/
 | `copy_whitelist.json` | 哪些物品可被复制之魂复制（白名单） |
 | `copy_blacklist.json` | 哪些物品不可被复制（黑名单） |
 
-字符串 `"all"` 表示全部。通配语义（任一组）：
-- **黑名单含 `"all"`**：默认全禁，仅白名单中列出的 ID 回加（即“只有这些可以”）；
-- **白名单含 `"all"`**：默认全许，仅黑名单中列出的 ID 排除（即“只有这些不行”）；
-- 两者均无 `"all"`：白名单非空则仅白名单可，否则仅排除黑名单。
+每个文件里可以写三类条目：
 
-掉落基础判定：实体最大生命值 **≥ 200**（不再检测 BOSS 血条）。复制之魂本身默认不可复制（硬编码拒绝，名单无法覆盖）。
+| 写法 | 含义 |
+|------|------|
+| `"minecraft:oak_sapling"` | 点名一个具体 ID |
+| `"#minecraft:saplings"` | **标签**，代表该标签下的全部成员（含子标签继承） |
+| `"all"` | 通配，代表该领域全部内容 |
+
+### 合并规则：谁更「具体」谁赢
+
+对目标取白名单与黑名单各自命中的**最具体条目**，比「具体度」：
+
+```
+点名具体 ID          具体度 1000000
+具名标签             具体度 = 路径层级 + 1（#a:group/child = 1 胜过 #a:group = 0）
+"all"               具体度 -1（严格低于任何具名标签）
+未命中              不参与比较
+```
+
+- 白名单更具体 → **允许**
+- 黑名单更具体 → **禁止**
+- **两边具体度相同 → 黑名单胜**（收紧）
+
+推论（也就是这套规则的常见用法）：
+
+| 配置 | 结果 |
+|------|------|
+| 黑名单 `["#minecraft:saplings"]` | 所有树苗物品不可复制 |
+| 黑名单 `["#minecraft:saplings"]` + 白名单 `["minecraft:oak_sapling"]` | 只有橡树树苗可复制（白名单点名更具体） |
+| 白名单 `["#minecraft:saplings"]` + 黑名单 `["minecraft:oak_sapling"]` | 除橡树树苗外都可复制（黑名单点名更具体） |
+| 白名单 `["#minecraft:logs"]` + 黑名单 `["minecraft:oak_log"]` | 橡木原木不可复制，其余原木可复制（父标签只是在挂子标签，点名依然更具体） |
+| 黑名单 `["all"]` + 白名单 `["minecraft:stone"]` | 只有石头可复制 |
+| 黑名单 `["all"]` + 白名单 `["#minecraft:saplings"]` | 只有树苗可复制（标签比 all 具体） |
+| 白名单 `["all"]` + 黑名单 `["minecraft:bedrock"]` | 除基岩外都可复制 |
+| 白名单与黑名单**都含 `"all"`** | 全部禁止（同级 → 黑名单胜），要靠白名单点名/标签才能回加 |
+| 黑名单 `[]` | 全部允许（默认形态，不做任何标签查表） |
+| 白名单 `[]` | 等于「无白名单约束」= 默认放行 |
+
+> **标签是按注册表展开的**，不是看物品栈自身挂了什么标签。所以 `#minecraft:logs` 这类
+> 「只挂子标签、没有直接成员」的空壳标签同样有效（展开后含全部原木、木板等成员）。
+> 其它数据包往 `#minecraft:saplings` 里加了模组树苗，本名单会自动跟上。
+> 标签不存在（模组没装或拼写错误）只记 WARN 并在日志里点名该条，不会让整份名单失效。
+
+掉落基础判定：实体最大生命值 **≥ 200**（`boss_entities/bosses.json` 内的首领豁免该门槛）。复制之魂本身默认不可复制（硬编码拒绝，名单无法覆盖）。
 
 ```json
 // drop_whitelist.json（默认）
@@ -46,16 +84,43 @@ data/lensouls/
 // copy_blacklist.json（默认）
 []
 
-// 示例：仅灾变/传奇怪物 BOSS 可掉，末影龙除外
+// 示例：禁用整类树苗，但放行橡树树苗与金合欢树苗
+// copy_blacklist.json
+[ "#minecraft:saplings" ]
+// copy_whitelist.json
+[ "minecraft:oak_sapling", "minecraft:acacia_sapling" ]
+
+// 示例：仅灾变/传奇怪物 BOSS 可掉，末影龙与整类袭击者除外
 // drop_whitelist.json
 [ "cataclysm:ignis", "legendary_monsters:posessed_paladin" ]
 // drop_blacklist.json
-[ "minecraft:ender_dragon" ]
+[ "minecraft:ender_dragon", "#minecraft:raiders" ]
 ```
 
 可用 ID 为各模组注册名（命名空间:路径），例如原版 `minecraft:wither`、灾变 `cataclysm:ignis`、传奇怪物 `legendary_monsters:posessed_paladin`、物品 `minecraft:netherite_block`。
+可用标签用游戏内 `/lensouls copysoul tags` 列出（物品标签）。
+
+### 游戏内核验（`/lensouls copysoul`）
+
+| 指令 | 作用 |
+|------|------|
+| `/lensouls copysoul` | 查主手物品能否被复制（判定 + 双方命中条目 + 决定胜负的规则） |
+| `/lensouls copysoul minecraft:oak_sapling` | 查指定物品 |
+| `/lensouls copysoul #minecraft:saplings` | 列出该标签展开后的成员，确认标签内容 |
+| `/lensouls copysoul tags` | 列出全部物品标签及继承后的成员数 |
+
+输出示例：
+
+```
+目标：minecraft:oak_sapling
+白名单命中：minecraft:oak_sapling（点名白名单，具体度 1000000）  [具体度 点名]
+黑名单命中：#minecraft:saplings（标签，含 12 个 ID，具体度 1）  [具体度 1]
+裁决：白名单更具体 → 允许
+✔ 允许复制
+```
 
 ---
+
 
 ## entity_weakness —— 实体弱点
 

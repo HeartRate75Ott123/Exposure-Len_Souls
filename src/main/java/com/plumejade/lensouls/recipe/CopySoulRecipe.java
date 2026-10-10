@@ -5,7 +5,6 @@ import com.plumejade.lensouls.config.CopySoulFilter;
 import com.plumejade.lensouls.item.CopySoulItem;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CraftingInput;
@@ -46,9 +45,9 @@ public class CopySoulRecipe extends CustomRecipe {
         }
         if (!hasSoul || target == null) return false;
         if (sealed) return false;
-        // 复制之魂本身不可复制；数据驱动复制黑白名单
+        // 复制之魂本身不可复制；数据驱动复制黑白名单（支持 #tag 标签）
         if (target.getItem() instanceof CopySoulItem) return false;
-        if (!CopySoulFilter.isCopyAllowed(BuiltInRegistries.ITEM.getKey(target.getItem()))) return false;
+        if (!CopySoulFilter.isCopyAllowed(target)) return false;
         return true;
     }
 
@@ -64,7 +63,7 @@ public class CopySoulRecipe extends CustomRecipe {
         // 动态输出：原物品完整副本（组件/NBT/附魔/数量全保留）
         for (ItemStack stack : input.items()) {
             if (!stack.isEmpty() && !(stack.getItem() instanceof CopySoulItem)
-                    && CopySoulFilter.isCopyAllowed(BuiltInRegistries.ITEM.getKey(stack.getItem()))) {
+                    && CopySoulFilter.isCopyAllowed(stack)) {
                 return stack.copy();
             }
         }

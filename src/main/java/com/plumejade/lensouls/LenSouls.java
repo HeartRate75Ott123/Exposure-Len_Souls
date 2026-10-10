@@ -199,7 +199,7 @@ public class LenSouls {
         event.addListener(new com.plumejade.lensouls.config.DamageTypeElementLoader());
         event.addListener(new com.plumejade.lensouls.config.AttackerElementLoader());
         event.addListener(new com.plumejade.lensouls.config.BossEntityLoader());
-        event.addListener(new com.plumejade.lensouls.config.CopySoulFilter());
+        event.addListener(com.plumejade.lensouls.config.CopySoulFilter.instance());
         event.addListener(new com.plumejade.lensouls.config.PhotoSetLoader());
         event.addListener(new com.plumejade.lensouls.config.PhotoSetDefs());
         event.addListener(new com.plumejade.lensouls.config.StaffItemLoader());

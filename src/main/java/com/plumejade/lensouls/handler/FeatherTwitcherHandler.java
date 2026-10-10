@@ -116,6 +116,31 @@ public class FeatherTwitcherHandler {
         }
     }
 
+    // ==================== 登录 / 重生 / 跨维度 补发同步 ====================
+    // 左侧扭曲条读的是客户端缓存，而这些时机客户端会重建玩家实例（缓存丢失）⇒ 必须补发，
+    // 否则表现为「重进游戏 / 跨维度 / 死亡重生后条子消失，得再操作一次才出现」。
+
+    @SubscribeEvent
+    public static void onLoginSync(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer sp) {
+            TwistSyncPacket.send(sp, getTwist(sp));
+        }
+    }
+
+    @SubscribeEvent
+    public static void onRespawnSync(net.neoforged.neoforge.event.entity.player.PlayerEvent.Clone event) {
+        if (event.getEntity() instanceof ServerPlayer sp) {
+            TwistSyncPacket.send(sp, getTwist(sp));
+        }
+    }
+
+    @SubscribeEvent
+    public static void onDimensionSync(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer sp) {
+            TwistSyncPacket.send(sp, getTwist(sp));
+        }
+    }
+
     /**
      * 佩戴检测：{@link FeatherEquip#has}（只认本模组羽毛栏的 7 个槽位）。
      */

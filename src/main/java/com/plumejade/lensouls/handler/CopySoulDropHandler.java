@@ -3,7 +3,6 @@ package com.plumejade.lensouls.handler;
 import com.plumejade.lensouls.config.BossEntityLoader;
 import com.plumejade.lensouls.config.CopySoulFilter;
 import com.plumejade.lensouls.item.ModItems;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.entity.LivingEntity;
@@ -36,8 +35,8 @@ public class CopySoulDropHandler {
         // 新改案：① 荒厄遗咒不再影响 BOSS 掉魂（e2 已移除复制之魂相关内容），
         // ③ 元素觉醒者的「无法掉落复制之魂」旧版就已移除 → 这里不再按羽毛拦掉落。
 
-        // 数据驱动掉落黑白名单：综合白/黑名单与 "all" 通配
-        if (!CopySoulFilter.isDropAllowed(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()))) return;
+        // 数据驱动掉落黑白名单：综合白/黑名单与 "all" 通配、"#标签"（按实体类型标签展开）
+        if (!CopySoulFilter.isDropAllowed(entity.getType())) return;
 
         spawnCopySoulDrop((ServerLevel) entity.level(), entity.getX(), entity.getY(), entity.getZ(),
                 copySoulMult(event.getSource().getEntity()));

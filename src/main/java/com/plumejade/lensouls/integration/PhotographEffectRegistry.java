@@ -103,7 +103,10 @@ public class PhotographEffectRegistry {
         add("cataclysm:maledictus",
                 "§a挥击/远程命中时 15% 概率朝视线方向散射 3 支 追踪灵魂箭",
                 "§a灵魂箭：追踪目标；每支造成 等同攻击面板 的幽灵伤害",
-                "§a佩戴时免疫 灾变/传奇怪物 的诅咒类减益效果",
+                // 文案必须与 PhotoSpecialEffects.CURSE_EFFECTS 逐条对应：
+                // cataclysm:abyssal_curse(深渊诅咒) / cataclysm:curse_of_desert(沙漠诅咒)
+                // / legendary_monsters:curse_of_desert(沙漠诅咒，与灾变同名)
+                "§a佩戴时免疫 深渊诅咒、沙漠诅咒 效果",
                 "§a佩戴时受到的魔法伤害 -12%");
         add("cataclysm:scylla",
                 "§a挥击/远程命中时 15% 概率掀起 3 道水波（扇形扩散）",
@@ -646,6 +649,23 @@ public class PhotographEffectRegistry {
             if (line != null && !line.isEmpty()) count++;
         }
         return count;
+    }
+
+    /**
+     * 该照片的**静态描述纯文本**（已剥掉 § 颜色码）——供图鉴「按 tooltip 搜索」使用。
+     * <p>
+     * 描述数组是本类私有静态表，外面读不到，所以这里开一个只读出口；
+     * 不要图省事去反射 DESCRIPTIONS，也不要在图鉴里另抄一份文案（那就成了第二真值）。
+     */
+    public static String descriptionText(String entityId) {
+        List<String> lines = DESCRIPTIONS.get(entityId);
+        if (lines == null || lines.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            if (line == null || line.isEmpty()) continue;
+            sb.append(' ').append(ChatFormatting.stripFormatting(line));
+        }
+        return sb.toString();
     }
 
     public static String entityIdToTranslationKey(String entityId) {

@@ -66,7 +66,9 @@ public final class FinalriteCurse {
     private static final float EROSION = 0.10f;
     /** e4 枯井：扣血间隔（5 秒 = 100 tick） */
     private static final long DRAIN_INTERVAL_TICKS = 100L;
-    /** e2 / e4 共用的「周围 4 格」检索半径 */
+    /** e4 枯井 诅咒态：周围 32 格内没有掉落物 → 持续扣血 */
+    private static final double CURSE_DRAIN_RADIUS = 32.0;
+    /** e2 血偿 反转 / e4 枯井 反转 共用的「周围 4 格」检索半径 */
     private static final double NEARBY_RADIUS = 4.0;
     /** e4 枯井 反转：每 1 个掉落物增加 1% 伤害，上限 +20% */
     private static final int DROP_BONUS_CAP = 20;

@@ -313,5 +313,24 @@ public class PacketHandler {
                 SwarmPhantomPacket.STREAM_CODEC,
                 SwarmPhantomPacket::handle
         );
+
+        // ---- 照片图鉴：全量同步 S2C（登录 / 每次写入 / 开屏拉取，可捎带界面提示） ----
+        registrar.playToClient(
+                PhotoGallerySyncPacket.TYPE,
+                PhotoGallerySyncPacket.STREAM_CODEC,
+                PhotoGallerySyncPacket::handle
+        );
+        // ---- 照片图鉴：界面操作 C2S（拉取同步 / 收藏 / 规则 / 点格子） ----
+        registrar.playToServer(
+                PhotoGalleryActionPacket.TYPE,
+                PhotoGalleryActionPacket.STREAM_CODEC,
+                PhotoGalleryActionPacket::handle
+        );
+        // ---- 照片图鉴：快捷功能 C2S（清空装备照片 / 剔除重复） ----
+        registrar.playToServer(
+                PhotoGalleryShortcutPacket.TYPE,
+                PhotoGalleryShortcutPacket.STREAM_CODEC,
+                PhotoGalleryShortcutPacket::handle
+        );
     }
 }

@@ -126,6 +126,9 @@ public final class PhotoInjector {
                 // ⑤ 铁序·裁影 的反转条件：累计拍过 50 种不同的能力窃取照片（同种生物不重复计）
                 if (player != null) {
                     com.plumejade.lensouls.handler.curse.TimecoreCurse.onStolenPhoto(player, entityId);
+                    // 照片图鉴：解锁该条目（只记首次时间）+ 同步客户端镜像。
+                    // 「拍过即解锁」与上面那条诅咒统计共用同一份出片事实，别在别处再写一遍记录逻辑。
+                    com.plumejade.lensouls.photogallery.PhotoGalleryRecorder.onStolenPhoto(player, entityId);
                 }
                 Boolean isBoss = PhotoInjectionHandler.pollBoss(exposureId);
                 if (isBoss != null && isBoss) tag.putBoolean("lensouls:is_boss", true);

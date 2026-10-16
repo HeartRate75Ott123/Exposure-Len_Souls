@@ -73,6 +73,11 @@ public class LenSoulsClient {
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onClientLogout);
         // 客户端断线时清空能力缓存，防止切换存档跨档污染
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.ability.client.ClientAbilityCache::onClientLogout);
+        // 照片图鉴的客户端镜像：进/出世界都清空（跨存档污染防护）
+        NeoForge.EVENT_BUS.addListener(
+                com.plumejade.lensouls.client.photogallery.PhotoGalleryClientCache::onClientLogout);
+        NeoForge.EVENT_BUS.addListener(
+                com.plumejade.lensouls.client.photogallery.PhotoGalleryClientCache::onClientLogin);
         // 客户端元素螺旋粒子 Tick 驱动
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.particle.ClientElementSpiralHandler::onClientTick);
         // N公司2级员工 BGM 距离控制（客户端 tick）
@@ -100,6 +105,8 @@ public class LenSoulsClient {
         event.register(ModMenus.PHOTO_ALBUM.get(), com.plumejade.lensouls.gui.AlbumScreen::new);
         event.register(ModMenus.REINFORCE.get(), com.plumejade.lensouls.gui.ReinforceScreen::new);
         event.register(ModMenus.FEATHER.get(), com.plumejade.lensouls.client.feather.FeatherScreen::new);
+        event.register(ModMenus.PHOTO_GALLERY.get(),
+                com.plumejade.lensouls.client.photogallery.PhotoGalleryScreen::new);
     }
 
     /**

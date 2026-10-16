@@ -53,6 +53,14 @@ public class ModMenus {
                     (IContainerFactory<FeatherSlotMenu>) (id, inv, buf) -> new FeatherSlotMenu(id, inv)));
 
     /**
+     * 照片图鉴界面（{@code /lensouls photos}）：41 个隐藏玩家背包槽 + 2 条 ContainerData（规则/版本）。
+     * 界面全部自绘；这些槽只为「服务端改背包 → 客户端可见」而存在（发放/清空/剔除都会改背包）。
+     */
+    public static final DeferredHolder<MenuType<?>, MenuType<PhotoGalleryMenu>> PHOTO_GALLERY =
+            MENUS.register("photo_gallery", () -> IMenuTypeExtension.create(
+                    (IContainerFactory<PhotoGalleryMenu>) (id, inv, buf) -> new PhotoGalleryMenu(id, inv)));
+
+    /**
      * 在玩家背包中查找第一个转换器物品。
      */    public static ItemStack findConverter(Player player) {
         for (ItemStack stack : player.getInventory().items) {

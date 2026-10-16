@@ -61,6 +61,8 @@ public class LenSouls {
         com.plumejade.lensouls.boss.ModAttachments.register(modEventBus);
         // 羽毛槽（5 槽 + 永久锁定标记，玩家附件，copyOnDeath）
         com.plumejade.lensouls.feather.FeatherAttachments.register(modEventBus);
+        // 照片图鉴（解锁表 / 收藏 / 点击规则，玩家附件，copyOnDeath）
+        com.plumejade.lensouls.photogallery.PhotoGalleryAttachments.register(modEventBus);
         ModEntities.register(modEventBus);
         com.plumejade.lensouls.recipe.DimensionalGunRecipes.register(modEventBus);
         com.plumejade.lensouls.recipe.CopySoulRecipes.register(modEventBus);
@@ -167,6 +169,8 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.CopySoulSealHandler.class);
         // ---- 弱点透镜照片：双持右键装机 / 耐久 100 / tooltip ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.WeaknessLensHandler.class);
+        // ---- 照片图鉴：登录迁移 + 登录同步（解锁记录的写入点见 PhotoInjector 回调） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.photogallery.PhotoGalleryRecorder.class);
 
         // BOSS 韧性 — 伤害减免 + 自动注册事件处理器
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.boss.ToughnessDamageHandler.class);

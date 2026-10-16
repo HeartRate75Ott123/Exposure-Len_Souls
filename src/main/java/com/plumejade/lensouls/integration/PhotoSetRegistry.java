@@ -287,7 +287,8 @@ public class PhotoSetRegistry {
                     }
                 }
                 have = Math.min(have, need);
-                head.append(Component.literal(" 已装 " + have + "/" + need)
+                // 硬编码中文 → lang 键（与图鉴套装页共用一条进度口径，文案不会再各写一份）
+                head.append(Component.translatable("gui.lensouls.photos.prog.equipped", have, need)
                         .withStyle(have >= need ? ChatFormatting.GREEN : ChatFormatting.DARK_GRAY));
             }
             event.getToolTip().add(head);

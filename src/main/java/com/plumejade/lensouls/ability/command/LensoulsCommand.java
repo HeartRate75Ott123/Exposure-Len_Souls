@@ -63,13 +63,24 @@ public class LensoulsCommand {
             new DynamicCommandExceptionType(id ->
                     Component.translatable("command.lensouls.skill.invalid", id));
 
+    /**
+     * OP 门槛。
+     * <p>
+     * <b>必须挂在每个 OP 子命令上，不能挂在根字面量 {@code lensouls} 上</b>：
+     * Brigadier 的 {@code requires} 会被所有子命令继承，挂在根上普通玩家就执行不了
+     * {@code /lensouls photos}（图鉴是玩家功能）。
+     */
+    private static final java.util.function.Predicate<CommandSourceStack> OP =
+            source -> source.hasPermission(2);
+
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
 
         dispatcher.register(Commands.literal("lensouls")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("skill")
+                // 玩家功能：无门槛
+                .then(Commands.literal("photos").executes(ctx -> openPhotoGallery(ctx)))
+                .then(Commands.literal("skill").requires(OP)
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
                                         Arrays.stream(AbilityType.values()).map(AbilityType::getId),
@@ -92,7 +103,7 @@ public class LensoulsCommand {
                                 )
                         )
                 )
-                .then(Commands.literal("toughness")
+                .then(Commands.literal("toughness").requires(OP)
                         .then(Commands.literal("register")
                                 .then(Commands.argument("target", EntityArgument.entity())
                                         .executes(ctx -> {
@@ -212,7 +223,7 @@ public class LensoulsCommand {
                                 )
                         )
                 )
-                .then(Commands.literal("dimension_gun")
+                .then(Commands.literal("dimension_gun").requires(OP)
                         .then(Commands.argument("kills", IntegerArgumentType.integer(0, 10000))
                                 .executes(ctx -> {
                                     int kills = IntegerArgumentType.getInteger(ctx, "kills");
@@ -231,7 +242,7 @@ public class LensoulsCommand {
                                 })
                         )
                 )
-                .then(Commands.literal("abyss_calamity_test")
+                .then(Commands.literal("abyss_calamity_test").requires(OP)
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                             com.plumejade.lensouls.handler.FeatherAbyssHandler.triggerTestCalamity(player);
@@ -240,7 +251,7 @@ public class LensoulsCommand {
                             return 1;
                         })
                 )
-                .then(Commands.literal("gui")
+                .then(Commands.literal("gui").requires(OP)
                         .then(Commands.literal("photo_set")
                                 .then(Commands.literal("testopen")
                                         .executes(ctx -> setPhotoSetDebug(ctx, true)))
@@ -248,12 +259,12 @@ public class LensoulsCommand {
                                         .executes(ctx -> setPhotoSetDebug(ctx, false)))
                         )
                 )
-                .then(Commands.literal("dump")
+                .then(Commands.literal("dump").requires(OP)
                         .then(Commands.literal("mobs")
                                 .executes(LensoulsCommand::dumpMobs)
                         )
                 )
-                .then(Commands.literal("copysoul")
+                .then(Commands.literal("copysoul").requires(OP)
                         .then(Commands.literal("tags")
                                 .executes(ctx -> copySoulTags(ctx))
                         )
@@ -264,6 +275,35 @@ public class LensoulsCommand {
                 )
         );
 
+    }
+
+    // ===================== /lensouls photos =====================
+
+    /**
+     * {@code /lensouls photos} —— 打开照片图鉴界面（能力窃取照片 / 照片套装）。
+     * <p>
+     * 命令在服务端执行 ⇒ 直接 {@code openMenu}：客户端收到 {@code ClientboundOpenScreenPacket}
+     * 后经 {@code RegisterMenuScreensEvent} 建屏（不需要额外开屏包，与 l2tabs 分页那种纯客户端触发不同）。
+     * <p>
+     * 开屏前先推一份全量同步，界面 init 里还会再主动拉一次（兜底登录时序 / 断线重连）。
+     */
+    private static int openPhotoGallery(CommandContext<CommandSourceStack> ctx) {
+        ServerPlayer player = ctx.getSource().getPlayer();
+        if (player == null) {
+            ctx.getSource().sendFailure(Component.literal("§c只有玩家可以打开照片图鉴"));
+            return 0;
+        }
+        try {
+            com.plumejade.lensouls.photogallery.PhotoGallerySync.send(player);
+            player.openMenu(new net.minecraft.world.SimpleMenuProvider(
+                    (id, inv, p) -> new com.plumejade.lensouls.gui.PhotoGalleryMenu(id, inv),
+                    Component.translatable("gui.lensouls.photos.title")));
+            return 1;
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[PhotoGallery] 打开照片图鉴失败", t);
+            ctx.getSource().sendFailure(Component.literal("§c打开照片图鉴失败，详见日志"));
+            return 0;
+        }
     }
 
     // ===================== /lensouls copysoul =====================

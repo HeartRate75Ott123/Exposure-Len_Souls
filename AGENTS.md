@@ -2630,3 +2630,219 @@ isEnemyOf(viewer, target)          // 补集：非友方且非自己（不含存
 MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
 `isFriendlyUnit / isFriendly / isEnemyOf`（无 `isAllied`）、`PhotoProjMarker.ownerOf` 在位、
 四个消费方分别调用 `isFriendly`（3 处）与 `isEnemyOf`（1 处）。测试环境仍未动。**未提交**。
+
+
+## 2026-10 需求批次：照片图鉴界面（`/lensouls photos`）
+
+### 一句话结构
+
+`/lensouls photos`（**普通玩家可用**）→ `PhotoGalleryMenu`（41 隐藏背包槽 + 2 条 ContainerData）
+→ `PhotoGalleryScreen`（cover 背景 + 磨砂玻璃面板 + 5×4 网格 + 分页滑钮 + 搜索补全 + 开关行 + 快捷功能）
+→ 点击格子 C2S 结算（发放 / 装备）→ S2C 全量同步 + 界面内提示（`FeatherToast`）。
+
+### 关键文件
+
+| 文件 | 职责 |
+|------|------|
+| `photogallery/PhotoGalleryData.java` | 玩家附件数据：`stolen`（entityId→首次窃取时间）/ 计数 / 收藏（`entity:` `set:` 前缀）/ `clickRule` / `revision` |
+| `photogallery/PhotoGalleryAttachments.java` | 附件注册（`serializable + copyOnDeath`，**刻意不 sync**，见下） |
+| `photogallery/PhotoGalleryRecorder.java` | **解锁数据唯一写入点**：出片回调 + 登录迁移（扫背包/副手/饰品/相册，补记时间 0）+ 登录同步 |
+| `photogallery/PhotoGalleryRules.java` | 「照片饰品」判定与 Curios 遍历（清空/剔除共用） |
+| `photogallery/PhotoGallerySettlement.java` | 服务端权威结算：点格子（发放/装备）、清空、剔除重复；回执 = toast lang 键 + 数字 |
+| `photogallery/PhotoGallerySync.java` | 数据 → 客户端的唯一出口 |
+| `network/PhotoGallery{Sync,Action,Shortcut}Packet.java` | S2C 全量同步（可捎带 toast）/ C2S 操作 / C2S 快捷功能 |
+| `gui/PhotoGalleryMenu.java` | 菜单：41 隐藏背包槽（服务端改背包要能同步回客户端）+ ContainerData（规则/版本号） |
+| `client/photogallery/PhotoGalleryScreen.java` | 主界面：版式、渲染管线、输入分发、格子渲染 |
+| `client/photogallery/PhotoGalleryCatalog.java` | 候选池 / 过滤 / 排序 / 套装 tooltip 文本（进度口径与照片 tooltip 同源） |
+| `client/photogallery/PhotoGalleryNameIndex.java` | 拼音 + **中英双语名** + 实体 id 搜索（复用 `reinforce.pinyin`，字典只此一份） |
+| `client/photogallery/PhotoGalleryEntityCache.java` | 生物模型实例缓存（后台建、可自愈、带诊断日志） |
+| `client/photogallery/PhotoGallery{SearchWidget,HoverArt,PageSlider,ShortcutPanel}.java` | 搜索补全 / 悬停光带弹簧 / 分页滑钮 / 快捷功能列表 |
+| `docs/照片图鉴界面设计.md` | 设计文档（版式实测 + 实现口径 + 坑 + 落地记录） |
+
+### 必须知道的坑（本轮实测）
+
+- **附件刻意不做 `.sync`**：附件 sync 每次写入都整包下发、且没法附带「清空了几件」这类结算回执；
+  改用 `PhotoGallerySyncPacket`（数据 + toast 一起走一个通道），登录 / 每次写入 / 开屏主动拉取三处触发。
+- **命令的 OP 门槛不能挂在根字面量上**：Brigadier 的 `requires` 会被子命令继承，挂在 `lensouls` 上普通玩家就执行不了 `photos`。
+  现改为每个 OP 子命令各自 `.requires(OP)`（`OP = source.hasPermission(2)`）。
+- **未解锁的格子也要渲染模型**：首版只画已解锁 ⇒ 玩家没解锁任何条目时整页空框，被当成「模型没渲染」。
+  另外模型实例要在**进世界时**就开始建（`ClientPlayerNetworkEvent.LoggingIn`），开屏才建的话首屏往往还没好；
+  未就绪时用 `PhotoBadgeIcon`（刷怪蛋/代表物）兜底，`level == null` 或 `create` 返回 null **不算永久失败**（下轮重试）。
+- **`PoseStack.clear()` 在 1.21.1 只是「栈深是否为 1」的查询，不清栈**（javap 核实）。
+  模型渲染异常时用「自己 pushPose 一对 + catch 里还原矩阵快照 + finally popPose」收尾，不能指望 clear()。
+- **`EditBox.setBordered(false)` 后文字贴左缘**（没有 4px 内边距）⇒ 搜索框 widget 整体右移 5px、宽度 −10px 制造留白。
+- **格子内文字一律走 `drawFitted`（超宽缩字号）/ `ellipsize`（省略号）**：原字号居中会让长名字溢出到相邻格。
+- **pwsh 的 `Set-Content -Encoding UTF8` 会写 BOM**（PS 5.1），Java 直接报 `非法字符: '﻿'`；
+  用 pwsh 批量改 `.java` / `.gradle.properties` 后必须剥 BOM。
+- 版式不是「按参考图 1:1」：首版实机反馈「网格过小 / 整体紧凑」，现把非网格区压到最小、k 上限提到 92
+  （640×360 下 k=48、960×540 下 k=74），见 `docs/照片图鉴界面设计.md` §6.1.1。
+
+### 交付
+
+- 版本 `1.6.46`（首版）→ `1.6.47`（版式重调 + 模型渲染条件修正）→ `1.6.48`（模型缓存诊断日志）；
+  `.\gradlew.bat build` 通过（只剩既有的 JEI 弃用 API 警告）。
+  jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.48.jar`（13,538,549 字节），
+  MD5 `3F941E30699F1BD28AE488C84879D14E`。**1.6.46 / 1.6.47 作废，别分发。**
+- 新增资源：`textures/gui/photo_gallery_background.png`（1920×1080，来自桌面 `杂项\background2` 同级目录的 `background2.png`）、
+  `textures/gui/photo_gallery_hover.png`（505×988，来自桌面 `杂项\button.png`，原文件是 WebP，必须转 PNG）。
+- 实机启动验证：`[PhotoGallery] 生物模型缓存：成功 263 · 本轮 263 · 判定失败 0 · 待重试 0`（0 失败）。
+
+### 追加交付（1.6.49 · 二轮实机反馈修订）
+
+- **非网格区全部压缩、可见行数 4 → 3**：`k = clamp(floor(min((w-20)/8.826, (h-20)/5.30)), 24, 92)` ⇒
+  640×360 下 k=64、960×540 下 k=92（格子 39 → 48 → 64）。
+- **格内模型改为按可用区域适配**：`size = min((cellW-6)/bbW, (baselineY-y-2)/bbH)`，
+  基线 `y + cellH - 名称条(10) - 2` —— 首版 `34/max(bb)` 会把高个生物的头顶裁掉。
+- **套装格只留 套装名 + `已收集 x/x`**；「集齐 x/x/x」与逐条效果只在悬停 tooltip。
+- **GUI 绘制顺序的通用坑**：`RoundedRect` / `GlassPanel` 是**立即模式**，`GuiGraphics.fill/blit/drawString/renderItem`
+  是**延迟批处理**；混排时必须用显式 `graphics.flush()` 划边界（本轮就是光带被格子底压住、甚至漂到名称条上方）。
+  照片图鉴的层级靠两次 flush 钉死：格子底 → flush → 光带 → flush → 模型。
+- **搜索框文字居中**：`EditBox` 无边框时文字贴 widget 左缘、按 widget 高度居中 ⇒ **四边内缩** widget
+  （左右 6px、上下 `max(3,(searchH-10)/2)`），补全面板改显式锚点。
+- 交付：`lensouls-1.6.49.jar`（13,538,937 字节，MD5 `6EEA57A53577EA312FB4C543812220C3`），桌面。
+  **1.6.46 ~ 1.6.48 作废。**
+
+### 追加交付（1.6.50 · 三轮实机反馈修订：面板区域回归参考图比例）
+
+- **面板尺寸不是自由变量**：实机反馈「面板太大、脱离区域设定、背景几乎全被模糊」——二轮为了放大格子去抬 k 上限，
+  把面板撑到近满屏。现在定为 **`面板区域 = 窗口 × (0.614, 0.796)`（参考图 1179×860 / 1920×1080），
+  `k = clamp(floor(min(区域宽/8.32, 区域高/6.47)), 20, 96)`**，面板实际尺寸必然 ≤ 该区域
+  ⇒ 想放大格子只能压非网格区（按钮/搜索条/行距）。算例：1080p@3 k=44（面板 366×285 = 57%×79%）、
+  1080p@2 k=66（549×427）。
+- **所有「按钮类」模块统一 0.40k 高**（开关行 / 快捷功能 / 搜索条 / 页滑钮）；页滑钮宽 0.95k、
+  滑块尺寸改由滑钮自身宽高推导（圆形滑块 `pad = 0.14·高`）—— 二轮滑钮 0.50k 比按钮 0.34k 高 47%，看着大一圈。
+- **可见行数回到 4**：3 行会让面板变成 1.56 的宽板，与参考图 1.37 的观感不符；4 行时面板 1.28，接近参考图。
+- **滚动时网格滑到搜索框下方**：首轮只给模型加了 scissor，**圆角格子底/遮罩/名称条是裸画的** ⇒
+  半露格子会画到 gridY 以上。现在**整个网格区套一层 scissor**（底/光带/模型/遮罩全在里面）；
+  `GuiGraphics` 的 scissor 是**栈式并自动求交**（javap 核实），每格自己的 scissor 只给格子矩形即可。
+- **悬停贴图「放大渐入没效果」的真因是光带被模型整块盖住**：素材 505×988 是细长光带，等比缩放后只剩中间一条，
+  而模型正好占满中间。现在**不保持长宽比**，拉伸到 `1.18×格宽 / 1.22×格高`（光晕底衬），
+  缩放 0.45 → 1.0（峰值 ≈1.15），弹出时从圆角格四周明显鼓出来。
+- 交付：`lensouls-1.6.50.jar`（13,538,990 字节，MD5 `70B47C75D4159C5B75508FB1AEBB7EA7`）。**1.6.46 ~ 1.6.49 作废。**
+
+### 追加交付（1.6.51 · 四轮实机反馈：搜索对齐 / 弹窗遮挡 / 悬停屏蔽）
+
+- **两页搜索规则对齐**：统一走 `PhotoGalleryCatalog.parseTextQuery`（`名称:` / `套装:` / `tooltip:`
+  + 显式条件取交集 + 无前缀时名称没命中再兜底试 tooltip）。照片页的 tooltip 文本 = 照片效果描述
+  （新增 `PhotographEffectRegistry.descriptionText`，剥 § 颜色码）+ 所属套装名。
+  **不要再给两页各写一套解析/匹配**，否则口径必然漂移。
+- **提示语简化**：`名称 / tooltip 搜索`、`套装名 / tooltip 搜索`；模式名单独出键
+  `gui.lensouls.photos.search.mode.name` / `.mode.set`。
+- **列表展开时下方网格不该悬停**：`indexAt` 只按网格矩形判定，而补全弹窗（6×14px ≈ 1.5 行）恰好压在网格上。
+  新增 `mouseOverPopup()`（补全弹窗 + 快捷功能面板）在 `updateHover` / `renderTooltips` 里短路，
+  并**每帧重算悬停**（弹窗可能在鼠标不动时展开）；另外**开屏不再自动聚焦搜索框**。
+- **弹窗底板必须先 `graphics.flush()`**：底板是立即模式（`RoundedRect`），而格子名称/开关文字是**延迟批处理** ——
+  不先落盘，旧文字会在之后才画、**盖在底板上**（实测症状「小方框没遮住文字、文字重叠」）。
+  补全弹窗与快捷功能面板各 flush 一次。
+- 交付：`lensouls-1.6.51.jar`（13,540,002 字节，MD5 `0C22CB8F6BC7A36C42803AD6DFE59B33`）。**1.6.46 ~ 1.6.50 作废。**
+
+### 追加交付（1.6.52 · 五轮定稿）
+
+- **放弃「悬停贴图弹簧弹出」**：删 `client/photogallery/PhotoGalleryHoverArt.java` 与
+  `textures/gui/photo_gallery_hover.png`（jar 少约 600KB）。悬停反馈只剩「格子底色 + 描边提亮」
+  （描边 `0x33FFFFFF → 0x88FFFFFF`），层级简化为 `格子底（立即）→ flush → 模型 → 清深度 → 遮罩/名称/tooltip`。
+  **不要再把这个 asset 加回来**。
+- **页滑钮归位**：从「搜索条右侧、0.50k 高」改为「**快捷功能按钮正下方、同宽(1.24k)同高(0.40k)右缘对齐**」
+  （`x = contentX + CONTENT_W - SLIDER_W`、`y = row2Y`）。
+- **格子名称不再画黑色底衬**：改 `drawString(..., shadow = true)` 的 1px 投影。
+- **圆角统一随 k 缩放**（不再写死）：面板 `0.22k`、格子 `0.18k`、搜索条/弹窗 `0.16k`、方块/按钮 `0.10k`、
+  滑钮/滚动条 = 高/2。补全弹窗的**行高亮也从直角 fill 改成 RoundedRect**（半径 = 弹窗圆角 − 1）。
+- 交付：`lensouls-1.6.52.jar`（12,936,354 字节，MD5 `482292C16BB8300F61E4F33E0D40E086`）。**1.6.46 ~ 1.6.51 作废。**
+
+### 追加交付（1.6.53 · 六轮反馈：弹窗不透明 / 圆角统一）
+
+- **浮层底板必须不透明**：补全弹窗原来 `0xE6`（90%），下方网格白字会**透上来**，症状是「列表与网格文字重叠」。
+  现在弹窗与快捷功能面板都是 `0xFF10161E / 0xFF0A0F16`。**凡是要遮挡内容的浮层，底色一律 0xFF。**
+- **圆角收敛为三档**（同类必须同值）：模块 `0.12k`（开关方块/快捷按钮/搜索条/**页滑钮**/滚动条轨道与滑块/弹窗及行高亮）、
+  格子 `0.18k`、面板 `0.22k`。**页滑钮以前是胶囊（高/2）**，比同宽同高的快捷功能按钮圆一倍，已改成模块档；
+  滚动条同样从胶囊改模块档。
+- **页滑钮的滑块加大**：边距 `0.14×高 → 0.09×高`（k=44 → 14/18px、k=66 → 22/26px），保持正圆。
+- 交付：`lensouls-1.6.53.jar`（12,936,410 字节，MD5 `C87B88B68F1D9CD6EB06F529F92577FD`）。**1.6.46 ~ 1.6.52 作废。**
+
+### 追加交付（1.6.54 · 七轮反馈：不点外关闭 / 右键清空 / 弹窗压字 / 滑钮宽度）
+
+- **点面板以外不再关闭界面**：删掉 `mouseClicked` 末尾的「面板外点击 = 关闭」；关闭只走右上 `×` / `Esc`。
+- **聚焦时右键清空搜索框**：`mouseClicked` 最优先处理 `button == 1 && search.isFocused()`。
+- **弹窗与网格名称「重叠」的真凶是几何，不是绘制顺序**：前两轮分别修了 flush 顺序与底板不透明度都没根治 ——
+  弹窗只压住首行上沿，而**名称条在格子底部 10px**，正好从列表下沿露出半截。
+  现在 `renderCellOverlays` 用 `coveredByPopup()` 对**被弹窗矩形压住的格子整格跳过浮层**（名称/进度/星星）；
+  弹窗矩形由 `PhotoGallerySearchWidget.isSuggestionsVisible()/suggestionPanelRect()` 暴露。
+  **以后遇到「浮层与下层文字重叠」，先量几何再看顺序与不透明度。**
+- **页滑钮宽度口径**：`PhotoGalleryPageSlider.widthFor(height) = 2·(height−2·pad) + 2·pad`（`pad = 0.09·height`）
+  ⇒ 高度仍与快捷功能按钮一致、**右缘对齐、左侧收窄**，两个静止位各占轨道一半（k=44 → 宽 32/滑块 14；k=66 → 48/22）。
+- 交付：`lensouls-1.6.54.jar`（12,936,887 字节，MD5 `4E06ADDD867B1101547FACACE0F7C039`）。**1.6.46 ~ 1.6.53 作废。**
+
+### 追加交付（1.6.55 · 八轮反馈：补全列表去掉收藏动作项）
+
+- **照片页补全列表**只保留 `名称:` / `tooltip:` 两个模式前缀 + 生物名称候选：
+  删掉 `Suggestion.action("仅显示收藏夹")`，并同步删掉 `setOnAccept` 里「动作项 = 打开收藏过滤」的死分支。
+- 收藏过滤的**唯一入口**回到开关行「是否仅显示收藏」（`favoritesOnly[page]`）。
+- `gui.lensouls.photos.search.favorites` 语言键**保留未用**（语言文件只追加不删键），以后恢复动作项可直接复用。
+- 交付：`lensouls-1.6.55.jar`（12,936,795 字节，MD5 `1D2874922984B9727993F5513098EA8D`）。**1.6.46 ~ 1.6.54 作废。**
+
+### 追加交付（1.6.56 · 九轮反馈：快捷功能面板宽度）
+
+- **快捷功能弹窗与下方文字「重叠」= 几何问题（第二次同类）**：面板宽度原按「最长规则文案」定（≈246px），
+  左缘 `contentW − 246` 在 **k ∈ [40,52]**（1080p + GUI 缩放 3 → k=44）正好切进
+  搜索条 hint（6..132px）与开关行 2 标签（6..69px）的中段 ⇒ 露半截文字。
+  现在面板宽度 = **`CONTENT_W·k`（铺满内容区）**，左缘 = `contentX`，横向完整覆盖下方两行，任何 k 都不露半截。
+- **规律（第三次踩到，务必记住）**：本界面凡「浮层盖住下层文字」的报障，**先画几何切线**（哪条边切进哪段文字），
+  再看绘制顺序与不透明度。三次的真凶依次是：顺序（flush）、不透明度（0xE6→0xFF）、**几何**（弹窗/面板边缘切字）。
+- 交付：`lensouls-1.6.56.jar`（12,493,973 字节，MD5 `3F183ACF0157200E073B4D403F59F59A`）。**1.6.46 ~ 1.6.55 作废。**
+- 注：本轮构建时 `textures/gui/photo_gallery_background.png` 已由外部替换为 **1920×1080 的 RGB（colortype 2）**
+  版本（2,213,210 → 1,771,457 字节），尺寸仍与代码常量 `BG_W/BG_H = 1920/1080` 一致，cover 逻辑无需改动。
+
+### 追加交付（1.6.57 · 十轮反馈：浮层置顶 / 暗罩圆角）
+
+- **浮层（补全弹窗 + 快捷功能面板）改为整帧最后绘制**，前面显式 `graphics.flush()`：
+  `… 搜索框文字 → 页滑钮 → tooltip → 浮动提示 → flush() → 补全弹窗 → flush() → 快捷功能面板 → 关闭按钮`。
+  底板是立即模式（`RoundedRect`），而搜索框文字/格子名称/开关文字/tooltip 全是延迟批处理 ⇒
+  **只"在浮层前 flush"不够**（浮层之后还有延迟提交就仍可能被反超，本项目连踩三次）。这条顺序是硬约束。
+- **未解锁暗罩改圆角**：照片格与套装格都从 `graphics.fill` 直角矩形改为 `RoundedRect.roundedRect(..., radiusCell(), 0x88000000, 0x88000000, 0x33FFFFFF, 1.0F)`
+  —— 与格子同半径，并保留 1px 描边。
+- 交付：`lensouls-1.6.57.jar`（12,513,991 字节，MD5 `48230CD3F66AF57DB9FB7F760B2A8386`）。**1.6.46 ~ 1.6.56 作废。**
+
+### 追加交付（1.6.58 · 十一轮反馈：行高亮内缩）
+
+- **列表行高亮的矩形会压到底板描边上**：原先只内缩 1px，而底板描边正好 1px 宽、`RoundedRect` 的
+  SDF `EdgeSoftness = 1.0` 还会向外渗 ~0.5~1px ⇒ 悬停框看着"超出到描边上"。
+  现在统一 `ROW_INSET_X = 3 / ROW_INSET_Y = 2`，**内圆角 = 外圆角 − 内缩量**（两层同心），
+  行文字右移到 `x + 内缩 + 3`。补全弹窗与快捷功能面板**同一口径**（后者顺带从直角 `graphics.fill` 改成圆角）。
+- **通则**：任何"浮层内的高亮块"，内缩量必须 > 描边宽 + SDF 抗锯齿半径（本项目取 3px 安全）。
+- 交付：`lensouls-1.6.58.jar`（11,654,088 字节，MD5 `BFC7367753716C185078D0AD29B5A637`）。**1.6.46 ~ 1.6.57 作废。**
+
+### 追加交付（1.6.59 · 十二轮反馈：菜单展开时不提交搜索框文字 + 两浮层互斥）
+
+- 用户澄清压在快捷功能菜单上的是**搜索框未聚焦时的 hint 文字**。逐项核实过 `flush()` 语义
+  （`GuiGraphics.flush()` = `disableDepthTest()` + `bufferSource.endBatch()`；`endBatch()` 先 `endLastBatch()`
+  再逐个结束 `fixedBuffers`，文字缓冲在其中 ⇒ 顺序确实是先落盘）、浮层已排到最后、面板几何完全覆盖搜索条那一行。
+  **于是改用最直接的做法：菜单展开期间根本不提交搜索框文字**（`if (!this.shortcuts.isOpen()) this.search.render(...)`）
+  —— 无字可压，与绘制顺序彻底解耦。
+- **两浮层互斥**：展开菜单时 `search.setFocused(false)`（补全列表随之关），点搜索框时 `shortcuts.close()`，
+  避免两个浮层同屏、边界相撞。
+- 交付：`lensouls-1.6.59.jar`（12,408,084 字节，MD5 `5474280918AB4BA5DD9093270BE67C77`）。**1.6.46 ~ 1.6.58 作废。**
+- 备注：本轮曾临时搭过 `-Dlensouls.pgshot=1` + `--quickPlaySingleplayer` + `Screenshot.grab` 的自动截图脚手架
+  用来实证，**已全部拆除**（build.gradle / `PgDebugShot.java` / 界面钩子 / LenSoulsClient 注册均已还原，
+  已 grep 确认无残留）。需要时可按同样思路快速重建。
+
+### 追加交付（1.6.60 · 十三轮反馈：大面板上下外扩 7px）
+
+- **面板矩形与内容盒拆成两套口径**：`panelY`/`panelH` 仍是内容盒（`contentY`、关闭按钮等全部照旧），
+  只有磨砂玻璃与描边改用 `panelRectY() = panelY − 7`、`panelRectH() = panelH + 14` ⇒
+  **网格 / 搜索框 / 开关行 / 页滑钮 / 关闭按钮一个像素不动**，面板上下各多 7px。上下对称，面板依旧居中，
+  不违反「面板区域 = 窗口 × 0.614/0.796」。
+- 本版同时包含 1.6.59 的修订：**菜单展开期间不提交搜索框文字**（`if (!this.shortcuts.isOpen()) this.search.render(...)`）
+  与**两浮层互斥**（展开菜单时收起搜索框、点搜索框时收起菜单）。
+- 交付：`lensouls-1.6.60.jar`（12,408,159 字节，MD5 `88A2849AAF1B81E440BFB1A20619589C`）。**1.6.46 ~ 1.6.59 作废。**
+
+### 追加交付（1.6.61 · 十四轮微调：面板外扩改为上 0 / 下 9）
+
+- 拆成两个独立常量 `PANEL_EXTEND_TOP = 0` / `PANEL_EXTEND_BOTTOM = 9`：
+  `panelRectY() = panelY − TOP`、`panelRectH() = panelH + TOP + BOTTOM` ⇒ **上方不再外扩、下方外扩 9px**；
+  内容物（网格 / 搜索框 / 开关行 / 页滑钮 / 关闭按钮）仍用内容盒 `panelY`/`panelH`，**一个像素不动**。
+- 交付：`lensouls-1.6.61.jar`（12,408,196 字节，MD5 `D24508BBB09172632DDBB33F8EE84BDA`）。**1.6.46 ~ 1.6.60 作废。**
+
+### 追加交付（1.6.62 · 面板下方外扩 9 → 11）
+
+- `PANEL_EXTEND_TOP = 0` / `PANEL_EXTEND_BOTTOM = 11`（上方不外扩、下方 11px；内容物一个像素不动）。
+- 交付：`lensouls-1.6.62.jar`（12,408,195 字节，MD5 `2F48DFA135FA1F4D04D3193D9748C532`）。**1.6.46 ~ 1.6.61 作废。**

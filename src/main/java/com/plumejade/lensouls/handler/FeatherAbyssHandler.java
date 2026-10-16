@@ -208,7 +208,7 @@ public class FeatherAbyssHandler {
     /** e9：累计食用 50 种不同食物 */
     private static final int E9_FOOD_KIND_GOAL = 50;
     /** e10：湮灭构造体实体 id（空手击杀即可反转） */
-    private static final String ANNIHILATION_PURSUER = "legendary_monsters:the_obliterator";
+    private static final String E10_OBLITERATOR = "legendary_monsters:the_obliterator";
     /** e11：目标最大生命 ≥6 万 */
     private static final float E11_TARGET_MAX_HEALTH = 60000.0f;
     /** e11：「移速大于 4」阈值（按 {@code Attributes.MOVEMENT_SPEED} 的**属性值**判定，不是速度 deltaMovement） */
@@ -1270,7 +1270,7 @@ public class FeatherAbyssHandler {
             if (CurseManager.on(player, DEF, E10_AMNESIA)
                     && player.getMainHandItem().isEmpty() && player.getOffhandItem().isEmpty()) {
                 ResourceLocation deadId = BuiltInRegistries.ENTITY_TYPE.getKey(dead.getType());
-                if (deadId != null && ANNIHILATION_PURSUER.equals(deadId.toString())) {
+                if (deadId != null && E10_OBLITERATOR.equals(deadId.toString())) {
                     CurseManager.reach(player, DEF, E10_AMNESIA);
                 }
             }

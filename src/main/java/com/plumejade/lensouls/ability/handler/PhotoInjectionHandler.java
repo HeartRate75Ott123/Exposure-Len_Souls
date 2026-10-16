@@ -79,14 +79,16 @@ public class PhotoInjectionHandler {
     public static void onFrameAdded(FrameAddedEvent event) {
         try {
             if (!(event.getCameraHolderEntity() instanceof ServerPlayer player)) return;
+            // ⑤ 铁序·封镜 的反转条件：在 Y≥200 处拍照（普通照片也算）
+            // ⚠ 必须回报在下面「Y≥50 不记录能力」的早退**之前**：条件是 Y≥200，而 Y≥200 必然满足 Y≥50，
+            //   放在早退之后就永远走不到（e22 进度恒为 0 ⇒ 永远无法反转）。
+            com.plumejade.lensouls.handler.curse.TimecoreCurse.onPhotoTaken(player);
             // ⑤ 铁序·封镜（诅咒态）：Y≥50 时**不记录能力** ⇒ 出片是普通照片（只禁能力照片，不禁拍照）
             if (com.plumejade.lensouls.feather.CurseManager.on(player,
                     com.plumejade.lensouls.feather.CurseDefs.TIMECORE, 21)
                     && player.getY() >= 50.0) {
                 return;
             }
-            // ⑤ 铁序·封镜 的反转条件：在 Y≥200 处拍照（普通照片也算）
-            com.plumejade.lensouls.handler.curse.TimecoreCurse.onPhotoTaken(player);
             var frame = event.getFrame();
             if (frame == null) {
                 PhotoLog.info("cache-frame-null", () -> "未缓存：事件里的 frame 为空");

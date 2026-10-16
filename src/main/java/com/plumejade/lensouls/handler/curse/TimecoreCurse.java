@@ -645,11 +645,39 @@ public final class TimecoreCurse {
         }
     }
 
-    /** e21 无援 条件：生命 ≤2 时用拍立得拍 10 张瞬间照片（由 PhotoInjectionHandler 回调） */
+    /** e21 无援 条件：生命 ≤2 时用拍立得拍 10 张瞬间照片（回调，唯一入口见 {@link #onFrameAdded}） */
     public static void onInstantPhotoAtLowHealth(ServerPlayer player) {
         if (!CurseManager.on(player, D, 20)) return;
         if (player.getHealth() > 2.0f) return;
         CurseManager.tick(player, D, 20, 1L, 10L);
+    }
+
+    /** 拍立得（{@code exposure_polaroid:instant_camera}）——e21 条件里的「拍立得」 */
+    private static final ResourceLocation INSTANT_CAMERA =
+            ResourceLocation.parse("exposure_polaroid:instant_camera");
+
+    /**
+     * e21 无援 反转条件的**唯一入口**：用拍立得拍出照片（生命 ≤2 时计数，目标 10 张）。
+     * <p>
+     * <b>为什么补在这里</b>：此前只有 {@link #onInstantPhotoAtLowHealth} 这个「回调方法」，
+     * 而全仓库**没有任何调用点** ⇒ 条件进度恒为 0、e21 永远无法反转
+     * （与 ⑤ e5 / e9 当年「完全没有 cond 分支 ⇒ 永远无法反转」是同一类缺陷）。
+     * <p>
+     * 拍立得出片必然先经过 Exposure 的 {@code FrameAddedEvent}（与 {@code PhotoInjectionHandler}
+     * 同源），这里按「相机是拍立得」筛选后回报；普通相机 / 暗房不计数（文案写明「用拍立得」）。
+     */
+    @SubscribeEvent
+    public static void onFrameAdded(io.github.mortuusars.exposure.neoforge.api.event.FrameAddedEvent event) {
+        try {
+            if (!(event.getCameraHolderEntity() instanceof ServerPlayer player)) return;
+            ItemStack camera = event.getCamera();
+            if (camera == null || camera.isEmpty()) return;
+            ResourceLocation id = BuiltInRegistries.ITEM.getKey(camera.getItem());
+            if (id == null || !INSTANT_CAMERA.equals(id)) return;
+            onInstantPhotoAtLowHealth(player);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ⑤ e21 拍立得拍照计数异常", t);
+        }
     }
 
     /** e23 平势：目标最大生命比你高一倍时，它被你打就反击你（诅咒态） */

@@ -208,7 +208,7 @@ public class FeatherAbyssHandler {
     /** e9：累计食用 50 种不同食物 */
     private static final int E9_FOOD_KIND_GOAL = 50;
     /** e10：湮灭构造体实体 id（空手击杀即可反转） */
-    private static final String ANNIHILATION_PURSUER = "legendary_monsters:annihilation_pursuer";
+    private static final String ANNIHILATION_PURSUER = "legendary_monsters:the_obliterator";
     /** e11：目标最大生命 ≥6 万 */
     private static final float E11_TARGET_MAX_HEALTH = 60000.0f;
     /** e11：「移速大于 4」阈值（按 {@code Attributes.MOVEMENT_SPEED} 的**属性值**判定，不是速度 deltaMovement） */

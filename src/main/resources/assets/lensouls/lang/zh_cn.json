@@ -763,5 +763,15 @@
   "message.lensouls.zeroforge.hand_drop": "§c换手失手：一件物品掉在脚下",
   "message.lensouls.zeroforge.hand_swap": "§e誓约·易手：主副手已强制交换",
   "message.lensouls.zeroforge.cooldown_cut": "§a镜魂冷却 -%s%%",
-  "message.lensouls.curse.unlocked": "§d【%s】解锁达成"
+  "message.lensouls.curse.unlocked": "§d【%s】解锁达成",
+  "gui.lensouls.curse.prog.generic": "%s / %s",
+  "gui.lensouls.curse.prog.blocks": "%s 格 / %s 格",
+  "gui.lensouls.curse.prog.points": "%s 点 / %s 点",
+  "gui.lensouls.curse.prog.kills": "%s 只 / %s 只",
+  "gui.lensouls.curse.prog.times": "%s 次 / %s 次",
+  "gui.lensouls.curse.prog.kinds": "%s 种 / %s 种",
+  "gui.lensouls.curse.prog.cells": "%s 格 / %s 格",
+  "gui.lensouls.curse.prog.days": "%s 天 / %s 天",
+  "gui.lensouls.curse.prog.time": "%s / %s",
+  "gui.lensouls.curse.prog.none": "%s"
 }

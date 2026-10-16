@@ -763,5 +763,15 @@
   "message.lensouls.zeroforge.hand_drop": "§cFumbled: an item dropped at your feet",
   "message.lensouls.zeroforge.hand_swap": "§eOath·Swapped Hands: main and off hand forced to swap",
   "message.lensouls.zeroforge.cooldown_cut": "§aSoul cooldown -%s%%",
-  "message.lensouls.curse.unlocked": "§d[%s] unlocked"
+  "message.lensouls.curse.unlocked": "§d[%s] unlocked",
+  "gui.lensouls.curse.prog.generic": "%s / %s",
+  "gui.lensouls.curse.prog.blocks": "%s / %s blocks",
+  "gui.lensouls.curse.prog.points": "%s / %s points",
+  "gui.lensouls.curse.prog.kills": "%s / %s kills",
+  "gui.lensouls.curse.prog.times": "%s / %s times",
+  "gui.lensouls.curse.prog.kinds": "%s / %s kinds",
+  "gui.lensouls.curse.prog.cells": "%s / %s blocks",
+  "gui.lensouls.curse.prog.days": "%s / %s days",
+  "gui.lensouls.curse.prog.time": "%s / %s",
+  "gui.lensouls.curse.prog.none": "%s"
 }

@@ -2,6 +2,7 @@ package com.plumejade.lensouls.item;
 
 import com.plumejade.lensouls.client.CurseClientCache;
 import com.plumejade.lensouls.feather.CurseDef;
+import com.plumejade.lensouls.feather.CurseGoals;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -21,7 +22,7 @@ import java.util.List;
  * <ul>
  *   <li><b>常显</b>：逐条显示「该条当前实际生效的效果」——未反转用 {@code .curse}（红），
  *       已反转用 {@code .after}（绿）；标〔保留〕的条目用 {@code .merged}（红绿合并）</li>
- *   <li><b>按住 Shift</b>：未反转条目两行（条件+进度 / 反转后效果），已反转条目只剩一行「原条件」；
+ *   <li><b>按住 Shift</b>：未反转条目两行（条件+「当前 / 目标」进度 / 反转后效果），已反转条目只剩一行「原条件」；
  *       ①②③ 的整款共用条件在顶部显示一次；全铺开、不折叠</li>
  * </ul>
  */
@@ -104,7 +105,7 @@ public class FeatherCurseItem extends Item {
                 tooltip.add(Component.literal("§8    └ §a" + stateLabel + " §8· " + condLabel + "：").append(cond));
             } else {
                 tooltip.add(Component.literal("§8    ├ §7" + stateLabel + " §8· §7" + condLabel + "：").append(cond)
-                        .append(Component.literal(" §8[进度 " + CurseClientCache.progress(def.maskOffset() + i) + "]")));
+                        .append(progressSuffix(def, i)));
                 tooltip.add(Component.literal("§8    └ §7" + afterLabel + "：")
                         .append(Component.translatable(def.entryKey(i) + ".after")));
             }
@@ -113,6 +114,21 @@ public class FeatherCurseItem extends Item {
         if (def.grand()) {
             tooltip.add(Component.translatable(key + ".grand"));
         }
+    }
+
+    /**
+     * Shift 视图里的进度后缀：有数值目标的条目显示 {@code §8[当前 / 目标 + 单位]}（单位与格式化见
+     * {@link CurseGoals}，挖方块是「x 格 / x 格」、存活时间是「Xm Ys / Xm」等）；
+     * <b>无目标的条目（条件由 {@code reach} 直判、进度恒为 0）不加方括号</b>，避免显示一个永远不动的 0。
+     * <p>
+     * 当前值读的是客户端镜像 {@link CurseClientCache}（服务端 {@code CurseStateData} 按 20 tick 心跳同步）。
+     */
+    private static Component progressSuffix(CurseDef def, int entry) {
+        long goal = CurseGoals.goal(def, entry);
+        if (goal <= 0L) return Component.empty();
+        long current = CurseClientCache.progress(def.maskOffset() + entry);
+        String text = CurseGoals.format(current, CurseGoals.unitKey(def, entry), goal);
+        return Component.literal(" §8[" + text + "]");
     }
 
     /** 统计 [from, to) 区间里已反转/已解锁的条数（⑦ 的诅咒段与祝福段分开算） */

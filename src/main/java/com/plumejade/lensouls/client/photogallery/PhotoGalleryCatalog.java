@@ -343,14 +343,40 @@ public final class PhotoGalleryCatalog {
                 lines.addAll(PhotoSetRegistry.formatTier(tier));
             }
         }
+        // 「集齐 <成员生物名> 照片」——把原来的三个数字换成**该套装成员的具体生物名**
+        // （2026-10 反馈：数字看不出这套到底要哪些生物）
         lines.add(Component.translatable("gui.lensouls.photos.set.prog.need",
-                entry.photoHave(), entry.photoNeed(), entry.memberTotal()));
+                memberNames(entry.id())));
         lines.add(Component.translatable("gui.lensouls.photos.set.prog.collected",
                 entry.collected(), entry.collectedTotal()));
         if (!entry.unlocked()) {
             lines.add(Component.translatable("gui.lensouls.photos.locked.set"));
         }
         return lines;
+    }
+
+    /** 成员名列表最多列出几个（超出的折成「等 N 只」，免得 boss_barrage 那类套装把提示撑爆） */
+    private static final int MEMBER_NAME_LIMIT = 6;
+
+    /**
+     * 套装成员生物名：**本地化显示名**、`/` 连接、按实体 id 定序（与数据文件顺序一致、不随语言跳序）。
+     * 成员过多时只列前 {@link #MEMBER_NAME_LIMIT} 个，其余折成「等 N 只」。
+     */
+    private static String memberNames(String setId) {
+        List<String> members = new ArrayList<>(PhotoSetRegistry.getMembers(setId));
+        if (members.isEmpty()) return "-";
+        members.sort(Comparator.naturalOrder());
+        int shown = Math.min(members.size(), MEMBER_NAME_LIMIT);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < shown; i++) {
+            if (i > 0) sb.append('/');
+            sb.append(PhotoGalleryNameIndex.displayName(members.get(i)));
+        }
+        if (members.size() > shown) {
+            sb.append(' ').append(Component.translatable(
+                    "gui.lensouls.photos.set.prog.more", members.size() - shown).getString());
+        }
+        return sb.toString();
     }
 
     /** 套装的 tooltip 纯文本（按 tooltip 搜索用；懒构建 + 缓存） */

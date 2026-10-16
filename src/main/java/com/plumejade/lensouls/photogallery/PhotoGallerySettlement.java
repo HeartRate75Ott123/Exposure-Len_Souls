@@ -57,7 +57,8 @@ public final class PhotoGallerySettlement {
                     return new Settlement(TOAST_ALREADY, 0);
                 }
                 case NO_SLOT -> {
-                    // 照片栏位已满 ⇒ 退化为发放到物品栏（默认口径，见文档 §14 待确认 ⑨）
+                    // 照片栏没有可用空位（或写入未落槽、被 Curios 退回）⇒ **如实回退为发放到物品栏**；
+                    // 若实例已被 Curios 退回背包，give() 收到空堆会安全跳过，不会重复发放。
                     boolean added = give(player, photo);
                     return new Settlement(added ? TOAST_NO_SLOT : TOAST_DROPPED, 0);
                 }
@@ -75,7 +76,15 @@ public final class PhotoGallerySettlement {
 
     private enum EquipResult { EQUIPPED, ALREADY, NO_SLOT, NO_CURIOS }
 
-    /** 装备到第一个空闲的照片槽；已装备同种则直接返回 ALREADY（不覆盖任何已有内容） */
+    /**
+     * 装备到第一个空闲的照片槽；已装备同种则直接返回 ALREADY（不覆盖任何已有内容）。
+     * <p>
+     * <b>写入后必须回读校验。</b>{@code setEquippedCurio} 在「饰品与槽位不匹配 / 槽位被修饰符裁掉 /
+     * 该槽此刻不可用」这类情况下**不抛异常也不落槽**，Curios 会把那件饰品直接退回玩家背包
+     * （同一个 ItemStack 实例被消耗）。不回读就会出现「实物进了背包、提示却写『已装备照片』」。
+     * 校验不过就继续找下一个空槽；全都不行返回 {@link EquipResult#NO_SLOT}，
+     * 由调用方**如实**回退成「发放到物品栏」的提示。
+     */
     private static EquipResult equip(ServerPlayer player, String entityId, ItemStack photo) {
         // 「已装备」口径与照片 tooltip / 套装统计完全一致（照片槽 + 相册内容物，按实体去重）
         try {
@@ -94,10 +103,17 @@ public final class PhotoGallerySettlement {
             IDynamicStackHandler stacks = handler.get().getStacks();
             // 槽位数量是动态的（诅咒 e14 会 -2/+4、弱属性照片套装会加槽），所以每次现查
             for (int i = 0; i < stacks.getSlots(); i++) {
-                if (stacks.getStackInSlot(i).isEmpty()) {
-                    opt.get().setEquippedCurio(PhotoGalleryRules.PHOTO_SLOT, i, photo);
+                if (!stacks.getStackInSlot(i).isEmpty()) continue;
+                opt.get().setEquippedCurio(PhotoGalleryRules.PHOTO_SLOT, i, photo);
+
+                // ★ 回读校验：真落进这一格、且就是这张照片，才算装备成功
+                ItemStack landed = stacks.getStackInSlot(i);
+                if (!landed.isEmpty() && entityId.equals(PhotoGalleryRules.photoEntityId(landed))) {
                     return EquipResult.EQUIPPED;
                 }
+                // 没落槽。若我们的实例已被 Curios 退回背包（被消耗），说明照片其实已经「发放」了，
+                // 不能再往下试、也不能由调用方补发（那会变两份），直接按 NO_SLOT 如实提示。
+                if (photo.isEmpty()) return EquipResult.NO_SLOT;
             }
             return EquipResult.NO_SLOT;
         } catch (Throwable ignored) {

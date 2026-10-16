@@ -2874,3 +2874,25 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
 - **通则**：`Inventory.add` / `ItemHandler.insertItem` 这类 API 的契约就是**消耗入参**，
   任何「先搬再统计」的写法都会读到 0；要计数必须在搬运前取 `getCount()`（或传 `copy()`）。
 - 交付：`lensouls-1.6.65.jar`（12,408,477 字节，MD5 `B15ECBDCB8F2C51A6B3D1EDFF2059DB9`）。**1.6.46 ~ 1.6.64 作废。**
+
+### 追加交付（1.6.66 · 照片栏满 / 未落槽时如实提示「发放到物品栏」）
+
+- **`setEquippedCurio` 不保证落槽**：槽位此刻不可用（被槽位修饰符裁掉、饰品与槽不匹配等）时，
+  Curios 会把该饰品**退回玩家背包**（同一个 ItemStack 实例被消耗），且**不抛异常**。
+  原实现写入后直接 `return EQUIPPED` ⇒ 「实物进了背包、提示却写『已装备照片』」。
+- 修法：`PhotoGallerySettlement.equip` 写入后**回读校验**（`getStackInSlot(i)` 非空且实体 id 一致才算成功），
+  失败继续下一个空槽；`photo.isEmpty()`（被 Curios 退回）时直接返回 `NO_SLOT` —— 避免调用方补发成两份。
+  全失败 → 调用方如实走发放回退（`give()` 收空堆安全跳过）。
+- 文案：`gui.lensouls.photos.toast.no_slot` → zh「照片栏已满，发放到物品栏」/ en「Photo slots full - given to your inventory」。
+- 交付：`lensouls-1.6.66.jar`（12,408,537 字节，MD5 `8E5E2771044F31E16E7704D1D5BAFC5A`）。**1.6.46 ~ 1.6.65 作废。**
+
+### 追加交付（1.6.67 · 套装 tooltip「集齐」列生物名）
+
+- `PhotoGalleryCatalog.setTooltip` 的「集齐 x/x/x 照片」原本传三个数字（已装/需求/成员数），
+  改为传**成员名列表**（`memberNames(setId)`）：`PhotoSetRegistry.getMembers` 按实体 id 定序 →
+  `PhotoGalleryNameIndex.displayName` 取本地化显示名（来自各生物模组自己的 lang，如 TF 的
+  `entity.twilightforest.hedge_spider` = 树篱蜘蛛）→ `/` 连接。
+- 成员超过 `MEMBER_NAME_LIMIT = 6` 时截断为「前 6 个 等 N 只」（新 lang 键 `…set.prog.more`），
+  避免 `boss_barrage` 这类几十只 BOSS 的套装把 tooltip 撑爆；「已收集 x/x」那行保留。
+- 文案：zh「集齐 %s 照片」/ en「Need %s photos」。
+- 交付：`lensouls-1.6.67.jar`（12,408,898 字节，MD5 `15A1914258D0A616669A6402600AD25C`）。**1.6.46 ~ 1.6.66 作废。**

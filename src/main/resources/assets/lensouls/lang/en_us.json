@@ -793,7 +793,8 @@
   "gui.lensouls.photos.locked.set": "Locked",
   "gui.lensouls.photos.hint": "Use a camera (Ability Steal) on it to unlock",
   "gui.lensouls.photos.locked.hint": "Use a camera (Ability Steal) on it to unlock",
-  "gui.lensouls.photos.set.prog.need": "Need %s/%s/%s photos",
+  "gui.lensouls.photos.set.prog.need": "Need %s photos",
+  "gui.lensouls.photos.set.prog.more": "and %s more",
   "gui.lensouls.photos.set.prog.collected": "Collected %s/%s",
   "gui.lensouls.photos.prog.equipped": "Equipped %s/%s",
   "gui.lensouls.photos.toggle.hint": "%s entries hidden",
@@ -803,7 +804,7 @@
   "gui.lensouls.photos.toast.dropped": "Inventory full - photo dropped at your feet",
   "gui.lensouls.photos.toast.equipped": "Photo equipped",
   "gui.lensouls.photos.toast.already": "That photo is already equipped",
-  "gui.lensouls.photos.toast.no_slot": "No free photo slot - given to inventory",
+  "gui.lensouls.photos.toast.no_slot": "Photo slots full - given to your inventory",
   "gui.lensouls.photos.toast.cleared": "Cleared %s photo curios",
   "gui.lensouls.photos.toast.deduped": "Removed %s duplicate photo curios",
   "gui.lensouls.photos.search.mode.name": "name"

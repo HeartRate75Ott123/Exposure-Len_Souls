@@ -2896,3 +2896,37 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
   避免 `boss_barrage` 这类几十只 BOSS 的套装把 tooltip 撑爆；「已收集 x/x」那行保留。
 - 文案：zh「集齐 %s 照片」/ en「Need %s photos」。
 - 交付：`lensouls-1.6.67.jar`（12,408,898 字节，MD5 `15A1914258D0A616669A6402600AD25C`）。**1.6.46 ~ 1.6.66 作废。**
+
+### 追加交付（1.6.68 / 1.6.69 · 未窃取也显示效果 + 首领套「集齐 N 张首领」）
+
+- **1.6.68**：照片格 tooltip 的「已窃取 / 未窃取」合并为**同一条路径**（都用照片物品 tooltip ⇒
+  效果描述来自 `PhotographEffectRegistry.onTooltip`，与窃取状态无关），未窃取时只在末尾补两行状态
+  （「尚未窃取该生物的能力」`§7` / 「用相机（能力窃取）…可解锁」`§8`）。效果文案保持**单一真值**。
+- **1.6.69**：图鉴套装页的「集齐」对 `boss_barrage` 改走**照片 tooltip 同口径** ——
+  `memberNames` 里特判该套装 → 新 lang 键 `gui.lensouls.photos.set.prog.boss`（zh「%s 张首领」）
+  + `requiredPhotos(def)`（= `effectiveCount` 的**最大**档 = 5）⇒ 显示「集齐 5 张首领 照片」，
+  与 `PhotoSetRegistry.appendTooltip` 的首领套写法同源、永远一致；普通套装仍列具体生物名。
+- 交付：`lensouls-1.6.69.jar`（12,409,079 字节，MD5 `2084B3395088A19F0C310AB9B3B6F76B`）。**1.6.46 ~ 1.6.68 作废。**
+
+### 追加交付（1.6.70 · 点补全不再清空输入，改为叠加）
+
+- 原 `PhotoGallerySearchWidget.accept()` 里 `setValue(suggestion.payload())` 是**整段覆盖**，把已输入的内容清掉，
+  与「叠加搜索」的设计意图相反。现改为 `compose(payload)`：只补全**光标所在这一段**（最后一个空格之后），
+  前面叠好的条件保留 —— 前缀类（`名称:`/`tooltip:`/`套装:`）接在当前这段前面（或当前段已完整时新开一段），
+  具体条目补全当前段并**末尾留一个空格**，于是可以点成 `名称:僵尸 tooltip:火`。
+- 记下查询语法的既有语义：`parseTextQuery` 把名称类与无前缀词**拼进同一个 name 串**、tooltip 类拼进 tip 串，
+  两者 AND ⇒ 实际可叠加的是「一个名称条件 + 一个 tooltip 条件」（+ 开关行的仅显示收藏）；
+  同类型叠第二次会被拼接（**本轮未改**）。
+- 交付：`lensouls-1.6.70.jar`（12,409,645 字节，MD5 `77FF349ED93095B76E1EC400B12A2915`）。**1.6.46 ~ 1.6.69 作废。**
+
+### 追加交付（1.6.71 · 点套装格一次成套发放 / 安装）
+
+- 原来客户端把套装格的点击**吞掉**（`if (!entry.isSet())` 才发包）⇒ 点了没反应。新增
+  `PhotoGalleryActionPacket.ACTION_CLICK_SET` + `PhotoGallerySettlement.clickSetCell`：
+  按当前规则把该套装**已窃取的成员**一次成套处理；安装走既有 `equip()`，`ALREADY` 直接跳过（不重复安装），
+  装不下的**退化为发放**（`photo` 已被 Curios 退回背包时不再补发，避免两份）。
+- **首领套特判**：没有手工成员清单（语义 = 任意 N 只 BOSS）⇒ 取**最近窃取**的 N 只
+  （`stolenSnapshot` 的值就是首次窃取时间，按时间降序取前 N；N = `PhotoSetDefs.effectiveCount` 的最大档 = 5）。
+- 提示（与照片页同一条通道）：新增 `toast.partial`「照片栏已满，无法放入的照片已发放到物品栏」/
+  `toast.already.set`「该套装已全部装备」/ `toast.locked.set`「尚未集齐该套装的成员」；其余复用既有键。
+- 交付：`lensouls-1.6.71.jar`（12,411,663 字节，MD5 `8CC523AEA0A78F650573FC19CC18106F`）。**1.6.46 ~ 1.6.70 作废。**

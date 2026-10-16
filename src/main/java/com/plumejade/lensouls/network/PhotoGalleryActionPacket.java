@@ -29,6 +29,8 @@ public record PhotoGalleryActionPacket(int action, String key) implements Custom
     public static final int ACTION_SET_RULE = 2;
     /** 点击网格槽位（key = 实体 id） */
     public static final int ACTION_CLICK_CELL = 3;
+    /** 点击套装格子（key = 套装 id）：一次成套发放 / 安装 */
+    public static final int ACTION_CLICK_SET = 4;
 
     public static final CustomPacketPayload.Type<PhotoGalleryActionPacket> TYPE =
             new CustomPacketPayload.Type<>(
@@ -56,6 +58,10 @@ public record PhotoGalleryActionPacket(int action, String key) implements Custom
 
     public static PhotoGalleryActionPacket clickCell(String entityId) {
         return new PhotoGalleryActionPacket(ACTION_CLICK_CELL, entityId);
+    }
+
+    public static PhotoGalleryActionPacket clickSet(String setId) {
+        return new PhotoGalleryActionPacket(ACTION_CLICK_SET, setId);
     }
 
     @Override
@@ -90,6 +96,12 @@ public record PhotoGalleryActionPacket(int action, String key) implements Custom
                     case ACTION_CLICK_CELL -> {
                         PhotoGallerySettlement.Settlement result =
                                 PhotoGallerySettlement.clickCell(player, data, packet.key());
+                        toastKey = result.toastKey();
+                        toastArg = result.count();
+                    }
+                    case ACTION_CLICK_SET -> {
+                        PhotoGallerySettlement.Settlement result =
+                                PhotoGallerySettlement.clickSetCell(player, data, packet.key());
                         toastKey = result.toastKey();
                         toastArg = result.count();
                     }

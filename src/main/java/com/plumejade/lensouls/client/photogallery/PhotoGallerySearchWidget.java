@@ -201,6 +201,34 @@ public class PhotoGallerySearchWidget extends EditBox {
         return true;
     }
 
+    /**
+     * 「叠加搜索」口径（2026-10 反馈：点补全**不该清空**已输入的内容）：
+     * 只处理**光标所在的这一段**（最后一个空格之后），前面已经叠好的条件原样保留。
+     * <ul>
+     *   <li><b>模式前缀</b>（{@code 名称:} / {@code tooltip:} / {@code 套装:} 这类以 {@code :} 结尾的）：
+     *       当前这段还是半截 ⇒ 接在它前面（{@code 僵尸} → {@code 名称:僵尸}）；
+     *       当前这段已是完整的「前缀:值」⇒ 新开一段（{@code 名称:僵尸} → {@code 名称:僵尸 tooltip:}）。</li>
+     *   <li><b>具体条目</b>：补全当前这一段（带上已有的 {@code 名称:} 前缀），并在末尾留一个空格，
+     *       于是还能接着点下一个条件继续叠加（{@code 名称:僵尸 tooltip:火}）。</li>
+     * </ul>
+     */
+    private String compose(String payload) {
+        String current = getValue() == null ? "" : getValue();
+        String add = payload == null ? "" : payload;
+        int tokenStart = current.lastIndexOf(' ') + 1;
+        String head = current.substring(0, tokenStart);
+        String token = current.substring(tokenStart);
+        if (add.endsWith(":")) {
+            int colon = token.indexOf(':');
+            boolean tokenComplete = colon >= 0 && colon < token.length() - 1;
+            return tokenComplete ? head + token + " " + add : head + add + token;
+        }
+        String prefix = "";
+        int colon = token.indexOf(':');
+        if (colon >= 0) prefix = token.substring(0, colon + 1);
+        return head + prefix + add + " ";
+    }
+
     private void keepSelectionVisible() {
         if (selected < 0) return;
         if (selected < scroll) scroll = selected;
@@ -217,7 +245,7 @@ public class PhotoGallerySearchWidget extends EditBox {
                 setSuggestions(List.of());
                 return;
             }
-            setValue(suggestion.payload());
+            setValue(compose(suggestion.payload()));
             setCursorPosition(getValue().length());
             onAccept.accept(suggestion);
             if (!suggestion.keepOpen()) setSuggestions(List.of());

@@ -1,5 +1,7 @@
 package com.plumejade.lensouls.photogallery;
 
+import com.plumejade.lensouls.config.BossEntityLoader;
+import com.plumejade.lensouls.config.PhotoSetDefs;
 import com.plumejade.lensouls.integration.PhotoSetRegistry;
 import com.plumejade.lensouls.item.EntityPhotographItem;
 import net.minecraft.server.level.ServerPlayer;
@@ -10,6 +12,7 @@ import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -34,11 +37,105 @@ public final class PhotoGallerySettlement {
     private static final String TOAST_EQUIPPED = "gui.lensouls.photos.toast.equipped";
     private static final String TOAST_ALREADY = "gui.lensouls.photos.toast.already";
     private static final String TOAST_NO_SLOT = "gui.lensouls.photos.toast.no_slot";
+    /** 成套：一部分进了照片栏、其余因栏位满而发放到物品栏 */
+    private static final String TOAST_PARTIAL = "gui.lensouls.photos.toast.partial";
+    /** 成套：该套装已全部装备（安装规则下没有可做的事） */
+    private static final String TOAST_ALREADY_SET = "gui.lensouls.photos.toast.already.set";
+    /** 成套：一个成员都还没窃取过 */
+    private static final String TOAST_LOCKED_SET = "gui.lensouls.photos.toast.locked.set";
 
     private PhotoGallerySettlement() {
     }
 
     // ========== 点击网格 ==========
+    // （套装格见下方 clickSetCell：一次成套发放 / 安装）
+
+    /**
+     * 点击**套装页**的一个格子：把该套装**已经窃取过的成员**一次性成套发放 / 安装。
+     * <p>
+     * 口径（2026-10 反馈）：
+     * <ul>
+     *   <li>发放 / 安装都遵守当前的点击规则（与照片格同一条规则行）。</li>
+     *   <li>只处理**已窃取**的成员 —— 没窃取过的生物本来就没有照片（照片页的同一铁律）；
+     *       套装格只有在成员集齐时才会解锁，所以正常路径下这就是「一整套」。</li>
+     *   <li>安装规则下**不重复安装已有的**（照片槽或相册里已有的直接跳过）。</li>
+     *   <li>照片栏放不下的部分**退化为发放到物品栏**，提示如实交代（部分放入 ⇒ 「照片栏已满，无法放入的照片已发放到物品栏」）。</li>
+     * </ul>
+     */
+    public static Settlement clickSetCell(ServerPlayer player, PhotoGalleryData data, String setId) {
+        if (setId == null || setId.isEmpty()) return Settlement.NONE;
+
+        List<String> members = new ArrayList<>();
+        if ("boss_barrage".equals(setId)) {
+            // 首领套没有手工成员清单 —— 成员的语义是「**任意 N 只 BOSS**」（N = 该档 count，现为 5）。
+            // 用户口径：点它就直接发放**最新拍的**那 N 只（stolenSnapshot 的值就是「首次窃取」的时间），
+            // 而不是把已窃取的全部 BOSS 都发一遍。
+            int need = bossSetNeed(setId);
+            List<Map.Entry<String, Long>> newest = new ArrayList<>();
+            for (Map.Entry<String, Long> e : data.stolenSnapshot().entrySet()) {
+                if (data.isUnlocked(e.getKey()) && BossEntityLoader.isBoss(e.getKey())) newest.add(e);
+            }
+            newest.sort((a, b) -> Long.compare(b.getValue(), a.getValue()));   // 时间新 → 前
+            for (int i = 0; i < newest.size() && i < need; i++) members.add(newest.get(i).getKey());
+        } else {
+            for (String member : PhotoSetRegistry.getMembers(setId)) {
+                if (data.isUnlocked(member)) members.add(member);
+            }
+        }
+        if (members.isEmpty()) return new Settlement(TOAST_LOCKED_SET, 0);
+
+        boolean equip = data.clickRule() == PhotoGalleryData.ClickRule.EQUIP;
+        int installed = 0;   // 装进照片栏
+        int granted = 0;     // 按发放规则进物品栏
+        int fallback = 0;    // 安装规则下因栏位满而退化为发放
+        int dropped = 0;     // 物品栏也满，丢在脚下
+
+        for (String member : members) {
+            ItemStack photo = EntityPhotographItem.create(member);
+            if (equip) {
+                switch (equip(player, member, photo)) {
+                    case EQUIPPED -> {
+                        installed++;
+                        continue;
+                    }
+                    case ALREADY -> {
+                        continue;   // ★ 不重复安装已有的（照片槽 / 相册里已有）
+                    }
+                    default -> {
+                        // NO_SLOT / NO_CURIOS ⇒ 退化为发放（见下）
+                    }
+                }
+                if (photo.isEmpty()) {
+                    // 已被 Curios 退回背包：照片其实已经「发放」了，别再补发（那会变两份）
+                    fallback++;
+                    continue;
+                }
+                if (give(player, photo)) fallback++;
+                else dropped++;
+            } else {
+                if (give(player, photo)) granted++;
+                else dropped++;
+            }
+        }
+
+        int given = granted + fallback;
+        if (installed > 0 && (given > 0 || dropped > 0)) return new Settlement(TOAST_PARTIAL, 0);
+        if (installed > 0) return new Settlement(TOAST_EQUIPPED, 0);
+        if (dropped > 0) return new Settlement(TOAST_DROPPED, 0);
+        if (fallback > 0) return new Settlement(TOAST_NO_SLOT, 0);
+        if (granted > 0) return new Settlement(TOAST_GRANTED, 0);
+        // 成员都在、但一件都没动手 ⇒ 安装规则下该套装已全部装备
+        return new Settlement(TOAST_ALREADY_SET, 0);
+    }
+
+
+    /** 首领套一次要发几只：取该套装各档 {@code effectiveCount} 的**最大**档（与照片 tooltip / 图鉴同行口径） */
+    private static int bossSetNeed(String setId) {
+        PhotoSetDefs.SetDef def = PhotoSetDefs.get(setId);
+        if (def == null) return 1;
+        return def.tiers().stream()
+                .mapToInt(t -> PhotoSetDefs.effectiveCount(setId, t)).max().orElse(1);
+    }
 
     /** 点击照片页的一个格子：未解锁 → 只提示；否则按当前规则发放 / 装备 */
     public static Settlement clickCell(ServerPlayer player, PhotoGalleryData data, String entityId) {

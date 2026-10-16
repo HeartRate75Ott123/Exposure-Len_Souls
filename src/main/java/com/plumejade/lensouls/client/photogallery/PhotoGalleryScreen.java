@@ -7,6 +7,7 @@ import com.plumejade.lensouls.client.feather.FeatherToast;
 import com.plumejade.lensouls.client.feather.GlassPanel;
 import com.plumejade.lensouls.client.feather.RoundedRect;
 import com.plumejade.lensouls.gui.PhotoGalleryMenu;
+import net.minecraft.ChatFormatting;
 import com.plumejade.lensouls.item.EntityPhotographItem;
 import com.plumejade.lensouls.network.PhotoGalleryActionPacket;
 import com.plumejade.lensouls.network.PhotoGalleryShortcutPacket;
@@ -867,15 +868,18 @@ public class PhotoGalleryScreen extends Screen implements MenuAccess<PhotoGaller
             if (entry.isSet()) {
                 graphics.renderTooltip(this.font, PhotoGalleryCatalog.setTooltip(entry),
                         java.util.Optional.empty(), mouseX, mouseY);
-            } else if (entry.unlocked()) {
-                ItemStack stack = EntityPhotographItem.create(entry.id());
-                List<Component> lines = getTooltipFromItem(this.minecraft, stack);
-                graphics.renderTooltip(this.font, lines, stack.getTooltipImage(), stack, mouseX, mouseY);
             } else {
-                graphics.renderTooltip(this.font, List.of(entry.name(),
-                                Component.translatable("gui.lensouls.photos.locked.entity"),
-                                Component.translatable("gui.lensouls.photos.locked.hint")),
-                        java.util.Optional.empty(), mouseX, mouseY);
+                // 照片格：**未窃取也走同一份 tooltip**，玩家得先看得见「这只生物能窃到什么能力」
+                // 才谈得上去窃取（2026-10 反馈：原来未解锁只显示一行「尚未窃取」，看不到具体效果）。
+                ItemStack stack = EntityPhotographItem.create(entry.id());
+                List<Component> lines = new ArrayList<>(getTooltipFromItem(this.minecraft, stack));
+                if (!entry.unlocked()) {
+                    lines.add(Component.translatable("gui.lensouls.photos.locked.entity")
+                            .withStyle(ChatFormatting.GRAY));
+                    lines.add(Component.translatable("gui.lensouls.photos.locked.hint")
+                            .withStyle(ChatFormatting.DARK_GRAY));
+                }
+                graphics.renderTooltip(this.font, lines, stack.getTooltipImage(), stack, mouseX, mouseY);
             }
         }
     }
@@ -1010,7 +1014,10 @@ public class PhotoGalleryScreen extends Screen implements MenuAccess<PhotoGaller
                 PacketDistributor.sendToServer(PhotoGalleryActionPacket.toggleFavorite(entry.favoriteKey()));
                 return true;
             }
-            if (!entry.isSet()) {
+            if (entry.isSet()) {
+                // 套装格：一次成套发放 / 安装（服务端结算，已窃取的成员才会被处理）
+                PacketDistributor.sendToServer(PhotoGalleryActionPacket.clickSet(entry.id()));
+            } else {
                 PacketDistributor.sendToServer(PhotoGalleryActionPacket.clickCell(entry.id()));
             }
             return true;

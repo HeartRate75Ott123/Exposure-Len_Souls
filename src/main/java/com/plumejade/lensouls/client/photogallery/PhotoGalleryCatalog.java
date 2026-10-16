@@ -363,6 +363,13 @@ public final class PhotoGalleryCatalog {
      * 成员过多时只列前 {@link #MEMBER_NAME_LIMIT} 个，其余折成「等 N 只」。
      */
     private static String memberNames(String setId) {
+        // 首领套：与**照片 tooltip** 同一口径（PhotoSetRegistry.appendTooltip 里 boss_barrage 分支）——
+        // 不列几十只 BOSS 的名字，而是「N 张首领」（数量取 effectiveCount 的**最大**档）。
+        if ("boss_barrage".equals(setId)) {
+            PhotoSetDefs.SetDef def = PhotoSetDefs.get(setId);
+            return Component.translatable("gui.lensouls.photos.set.prog.boss",
+                    def == null ? 1 : requiredPhotos(def)).getString();
+        }
         List<String> members = new ArrayList<>(PhotoSetRegistry.getMembers(setId));
         if (members.isEmpty()) return "-";
         members.sort(Comparator.naturalOrder());

@@ -2,6 +2,8 @@ package com.plumejade.lensouls.handler;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.component.ModDataComponents;
+import com.plumejade.lensouls.feather.CurseDefs;
+import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.item.CopySoulItem;
 import com.plumejade.lensouls.reinforce.BeyondDimensionsCompat;
 import net.minecraft.server.level.ServerPlayer;
@@ -86,16 +88,25 @@ public final class CopySoulSealHandler {
     }
 
     /**
-     * 玩家是否戴着任一种「禁复制羽毛」。
+     * 玩家是否处于「禁复制」状态 —— 即戴着 ④ 折翼沉渊**且其 e10 失忆尚未反转**。
+     * <p>
+     * e10 反转（空手击杀湮灭构造体）后**彻底解封**：随身物品栏、容器内容物与超越维度网络
+     * 一并放行，不再需要任何「事后摘封印」的补偿逻辑。
      * <p>
      * 超越维度终端是<b>共享网络</b>：解封方向必须逐个检查在线成员，
      * 所以这个判定要对别的玩家也能调用（见 {@code BeyondDimensionsCompat.sealCopySouls}）。
      */
     public static boolean wearsForbiddenFeather(Player player) {
         if (player == null) return false;
-        // 新改案：① 荒厄·封器 与 ③ 元素觉醒者都已移除「禁止复制之魂」相关内容，
-        // 目前只有 ④ 折翼沉渊（代码现状，未改）仍封印复制之魂。
-        return FeatherAbyssHandler.hasAbyss(player);
+        try {
+            // 新改案：① 荒厄·封器 与 ③ 元素觉醒者都已移除「禁止复制之魂」相关内容，
+            // 目前只有 ④ 折翼沉渊仍封印复制之魂，且 e10 反转让它彻底解封。
+            return FeatherAbyssHandler.hasAbyss(player)
+                    && !CurseManager.rev(player, CurseDefs.ABYSS, 9);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[CopySoul] 禁复制羽毛判定异常", t);
+            return FeatherAbyssHandler.hasAbyss(player);
+        }
     }
 
     // ========== 事件 ==========

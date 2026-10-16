@@ -4,6 +4,7 @@ import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,6 +25,7 @@ import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -294,19 +296,37 @@ public final class TimecoreCurse {
         // e4 徒劳：挖任意原版方块 30% 概率不掉落（用 BlockDropsEvent 清空；这里只做概率与计数）
         if (CurseManager.on(player, D, 3) && isVanillaBlock(state)) {
             if (player.getRandom().nextFloat() < 0.30f) {
-                SWALLOW_FLAG.add(player.getUUID());
+                // 按**方块坐标**记账：创造模式 / 不可采掘破坏不会触发 BlockDropsEvent，
+                // 用 UUID 记账会残留标志、误吞下一块掉落（见 onBlockDrops 与 onServerTick）
+                SWALLOW_POS.add(event.getPos().immutable());
                 CurseManager.tick(player, D, 3, 1L, 150L);
             }
         }
     }
 
-    /** 本次破坏是否要吞掉落（由 BlockDropsEvent 消费） */
-    private static final java.util.Set<UUID> SWALLOW_FLAG = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /**
+     * 本次破坏是否要吞掉落（由 {@link #onBlockDrops} 消费）。
+     * <p>
+     * 记的是**方块坐标**而不是玩家 UUID：创造模式 / 不可采掘的破坏不会派发
+     * {@code BlockDropsEvent}，UUID 版标志会残留到下一次真实破坏、把下一块掉落误吞。
+     * 坐标版由 {@link #onServerTick} 每服务器 tick 清空一次，残留最多存活一个 tick。
+     */
+    private static final java.util.Set<BlockPos> SWALLOW_POS = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** 每服务器 tick（所有维度 tick 之后）清空一次「待吞掉落」记账，杜绝跨 tick 残留 */
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+        try {
+            if (!SWALLOW_POS.isEmpty()) SWALLOW_POS.clear();
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ⑤ e4 吞掉落记账清理异常", t);
+        }
+    }
 
     @SubscribeEvent
     public static void onBlockDrops(net.neoforged.neoforge.event.level.BlockDropsEvent event) {
         if (!(event.getBreaker() instanceof ServerPlayer player)) return;
-        if (SWALLOW_FLAG.remove(player.getUUID())) {
+        if (SWALLOW_POS.remove(event.getPos())) {
             event.getDrops().clear();
             return;
         }
@@ -539,13 +559,7 @@ public final class TimecoreCurse {
             int level = res == null ? 0 : res.getAmplifier() + 1;
             if (level > 0) additive += 0.05f * level;
         }
-        // e20 垂翅 反转：腾空 / 飞行时造成伤害 +25%。
-        // 与照片「创造飞行」−90% 的关系：那张照片的惩罚里**已经含**这 +25%
-        // （§2 实例：−90% + 25% = 净 −65%），所以这里只在**没有**该照片标记（非创造飞行）时补，
-        // 避免同一份加成被计两次。
-        if (CurseManager.rev(player, D, 19) && !player.onGround() && !player.getAbilities().flying) {
-            additive += 0.25f;
-        }
+        // e20 垂翅 反转的 +25% 是本条唯一的例外：**不并入 Σ**，见下面 Σ 收口之后的独立乘算
         // e21 无援 反转：保命触发后 10 秒内造成伤害 +50%
         if (noAidGraceActive(player)) {
             additive += 0.50f;
@@ -558,6 +572,13 @@ public final class TimecoreCurse {
 
         if (additive > 0.0f) {
             d *= (1.0f + additive);
+        }
+
+        // e20 垂翅 反转：**只要处于创造飞行**就追加 +25%，且**不并入上面的 Σ 加算**，
+        // 而是独立乘算 ×1.25（放在 Σ 收口之后）。与照片「创造飞行」的 −90% 纯惩罚相乘：
+        // 0.1 × 1.25 = 0.125 = 净 −87.5%（设计文档 §2 实例）。
+        if (CurseManager.rev(player, D, 19) && player.getAbilities().flying) {
+            d *= 1.25f;
         }
 
         // e17 重负 反转：每 1% 移速损失 → +1 点伤害（**点数加算**，§2③，与上面的百分比乘区分）
@@ -880,7 +901,8 @@ public final class TimecoreCurse {
         LAST_POS.remove(id);
         SLOW_WALK.remove(id);
         FEAR_UNTIL.remove(id);
-        SWALLOW_FLAG.remove(id);
+        // e4「待吞掉落」按**方块坐标**记账（见 SWALLOW_POS），且每服务器 tick 清空一次，
+        // 与玩家 UUID 无关，这里不再需要清理。
     }
 
     /**

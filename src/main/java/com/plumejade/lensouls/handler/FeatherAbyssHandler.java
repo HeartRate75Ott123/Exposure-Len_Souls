@@ -1,12 +1,10 @@
 package com.plumejade.lensouls.handler;
 
 import com.plumejade.lensouls.LenSouls;
-import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.FeatherEquip;
-import com.plumejade.lensouls.item.CopySoulItem;
 import com.plumejade.lensouls.item.ModItems;
 import com.plumejade.lensouls.mixin.EntityInvulnerableTimeAccessor;
 import com.plumejade.lensouls.network.AbyssCountdownPacket;
@@ -87,8 +85,9 @@ import java.util.UUID;
  *   <li>厄运：挖方块 0.8% 生成 15 蠹虫；每分钟 2 个不重复 debuff（20s, 等级3-20）</li>
  *   <li>祸之可能性：充能 15min（扭曲值越高越短，下限 2min），充能完毕且身边 7 格内 5+ 怪物时引动末影龙之吼 + 3s 倒计时，随后召唤 5 只（僵尸/骷髅/洞穴蜘蛛其一）</li>
  *   <li>挫败：受击攻击面板 ×0.94/层（5s）</li>
- *   <li>食之无味：由 FoodDataMixin 阻断食物回血</li>
- *   <li>失忆：由 CopySoulItem 封印禁复制之魂合成（配方层拦截，掉落保留）</li>
+ *   <li>食之无味：由 FoodDataMixin 阻断食物回血；e9 反转后放行并按营养值 ×2 回血</li>
+ *   <li>失忆：佩戴期间由 CopySoulSealHandler 封印禁复制之魂（配方层拦截，掉落保留）；
+ *       e10 反转后由 {@code CopySoulSealHandler.wearsForbiddenFeather} 直接放行（含容器内容物与超越维度网络）</li>
  *   <li>疯狂：合成 +1 扭曲值（上限 200），受击 +0.2%/点、造成 +1%/点，死亡归零，击杀怪物 3% 降 1</li>
  *   <li>恶意：元素附加伤害 +12%（DamageHandler 内应用）</li>
  * </ul>
@@ -102,14 +101,14 @@ import java.util.UUID;
  * e1  虚无的承诺(0)  无反转
  * e2  神秘雪球(1)    反转条件=累计受到 100 次敌对雪球伤害 → 伤害 1 点、数量 3 个
  * e3  安魂曲(2)      条件=天数&lt;5 且生命上限&gt;20 → 每天最大生命 +1、受伤 −13%/天
- * e4  愚钝(3)        条件=一次性获取 2000 点经验 → 经验 ×2
- * e5  自闭(4)        条件=16 格内同 tick 加入 50 只生物且非旁观、存活 → 护甲每层 +5%
+ * e4  愚钝(3)        条件=单次**实际到手** 2000 点经验（本条减半/翻倍后的最终值） → 经验 ×2
+ * e5  自闭(4)        条件=16 格内 10 tick 窗口内加入 50 只生物且非旁观、存活 → 护甲每层 +5%
  * e6  厄运(5)        条件=累计挖掘 200 个方块 → 不再生蠹虫、每分钟改给 2 个正面效果
  * e7  祸之可能性(6)  条件=累计击杀召唤物 100 只 → 不再召唤，改为 7 格落雷 15 点魔法伤害
  * e8  挫败(7)        条件=挫败层数 ≥3 时击杀 1 只 BOSS → 每层 ×1.06
  * e9  食之无味(8)    条件=累计食用 50 种不同食物 → 进食回血 ×2
  * e10 失忆(9)        条件=空手击杀湮灭构造体 → 复制之魂解禁
- * e11 疯狂(10)       条件=移速&gt;4 时一击杀死最大生命 ≥6 万的生物 → 每点受伤 −0.2%
+ * e11 疯狂(10)       条件=移速**属性值** &gt;4 时一击杀死最大生命 ≥6 万的生物 → 每点受伤 −0.2%
  * e12 恶意(11)       条件=承受一次 ≥50 点元素附加伤害并存活 → 受到的元素附加伤害 −12%
  * </pre>
  * 生命周期防护：登录同步/清残留、登出恢复创造并清内存层、死亡清层+扭曲归零，
@@ -196,8 +195,10 @@ public class FeatherAbyssHandler {
     private static final int E3_DAY_LIMIT = 5;
     /** e4：一次性获取 2000 点经验 */
     private static final int E4_XP_GOAL = 2000;
-    /** e5：16 格内一次性（同一 tick）加入 50 只生物 */
+    /** e5：16 格内一次性（{@link #E5_BATCH_WINDOW} tick 窗口内）加入 50 只生物 */
     private static final long E5_BATCH_GOAL = 50L;
+    /** e5：「一次性」的时间窗（tick）：以**首次加入**为起点，窗口内的加入都算同一批，超时重开一批 */
+    private static final long E5_BATCH_WINDOW = 10L;
     /** e6：累计挖掘 200 个方块 */
     private static final long E6_BLOCK_GOAL = 200L;
     /** e7：累计击杀由祸之可能性召唤的怪物 100 只 */
@@ -210,10 +211,8 @@ public class FeatherAbyssHandler {
     private static final String ANNIHILATION_PURSUER = "legendary_monsters:annihilation_pursuer";
     /** e11：目标最大生命 ≥6 万 */
     private static final float E11_TARGET_MAX_HEALTH = 60000.0f;
-    /** e11：移速阈值 4（格/秒 = 水平速度 × 20） */
+    /** e11：「移速大于 4」阈值（按 {@code Attributes.MOVEMENT_SPEED} 的**属性值**判定，不是速度 deltaMovement） */
     private static final double E11_SPEED_THRESHOLD = 4.0;
-    /** e11：「移速大于 4」的判定窗口（tick）：致命一击落在最近 1 秒内的移动状态下即算 */
-    private static final long E11_SPEED_WINDOW = 20L;
     /** e12：一次元素附加伤害 ≥50 点 */
     private static final float E12_ELEMENT_BONUS_GOAL = 50.0f;
 
@@ -258,9 +257,7 @@ public class FeatherAbyssHandler {
     private static final Map<UUID, Long> PENDING_AT = new HashMap<>();
     /** e11：一击必杀候选（目标实体 id → 致命一击的 gameTime） */
     private static final Map<Integer, Long> ONESHOT_KILL = new HashMap<>();
-    /** e11：最近一次「移速 > 4」的到期 gameTime */
-    private static final Map<UUID, Long> FAST_MOVE_UNTIL = new HashMap<>();
-    /** e5：同一 tick 内加入的生物计数（UUID → {gameTime, count}） */
+    /** e5：加入批次（UUID → {批次起点 gameTime, 计数}） */
     private static final Map<UUID, long[]> JOIN_BATCH = new HashMap<>();
     /** e12：本次受伤我们施加的倍率（玩家实体 id → 倍率），供 LOWEST 阶段还原元素附加伤害 */
     private static final Map<Integer, Float> TAKEN_FACTOR = new HashMap<>();
@@ -333,8 +330,6 @@ public class FeatherAbyssHandler {
         if (has) {
             // e3 安魂曲：每天 −1（诅咒态）/ +1（反转态）最大生命上限
             applyRequiem(player, CurseManager.rev(player, DEF, E3_REQUIEM));
-            // e11 条件：记录「移速 > 4」的时间窗
-            trackFastMovement(player);
             // e5 / e12 的「且存活」待结算
             resolvePending(player);
         } else {
@@ -631,15 +626,15 @@ public class FeatherAbyssHandler {
     }
 
     /**
-     * e11 条件预判：移速 &gt; 4 时对最大生命 ≥6 万的生物打出**致死一击**即记候选，
-     * 真正的反转在 {@link #onMobKilled}（必须确实死亡）里落地。
+     * e11 条件预判：{@code Attributes.MOVEMENT_SPEED} 的**属性值** &gt; 4 时，对最大生命 ≥6 万的生物打出
+     * **致死一击**即记候选，真正的反转在 {@link #onMobKilled}（必须确实死亡）里落地。
      */
     private static void checkOneShotKill(ServerPlayer player, LivingDamageEvent.Pre event) {
         if (!CurseManager.on(player, DEF, E11_MADNESS)) return;
         LivingEntity target = event.getEntity();
         if (target == player) return;
         if (target.getMaxHealth() < E11_TARGET_MAX_HEALTH) return;
-        if (!movedFastRecently(player)) return;
+        if (player.getAttributeValue(Attributes.MOVEMENT_SPEED) <= E11_SPEED_THRESHOLD) return;
         if (event.getNewDamage() < target.getHealth()) return;   // 必须是一击致死
         ONESHOT_KILL.put(target.getId(), player.level().getGameTime());
     }
@@ -758,16 +753,15 @@ public class FeatherAbyssHandler {
             if (!hasAbyss(player)) return;
             int amount = event.getAmount();
             if (amount <= 0) return;
-            // e4 条件：一次性获取 2000 点经验（按**来源给的原值**判定，不受本条减半影响）
-            if (CurseManager.on(player, DEF, E4_DULLNESS) && amount >= E4_XP_GOAL) {
+            boolean curse = CurseManager.on(player, DEF, E4_DULLNESS);
+            boolean reversed = CurseManager.rev(player, DEF, E4_DULLNESS);
+            if (!curse && !reversed) return;
+            // 本条结算后**玩家实际到手**的数值：诅咒态减半（至少 1）、反转态 ×2
+            int effective = curse ? Math.max(1, (int) Math.ceil(amount / 2.0)) : amount * 2;
+            event.setAmount(effective);
+            // e4 条件：单次**最终到手** ≥2000 点经验（取末端数据，不受来源原值影响）
+            if (curse && effective >= E4_XP_GOAL) {
                 CurseManager.reach(player, DEF, E4_DULLNESS);
-            }
-            if (CurseManager.on(player, DEF, E4_DULLNESS)) {
-                // 诅咒态：经验减半但至少保留 1（避免小数值直接归零完全阻止获取）
-                event.setAmount(Math.max(1, (int) Math.ceil(amount / 2.0)));
-            } else if (CurseManager.rev(player, DEF, E4_DULLNESS)) {
-                // 反转态：经验获取 ×2
-                event.setAmount(amount * 2);
             }
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ④ e4 经验结算异常", t);
@@ -777,11 +771,9 @@ public class FeatherAbyssHandler {
     // ========== 食之无味：禁食回血 / 反转进食回血 ×2 ==========
 
     /**
-     * e9 食之无味。诅咒态的「无法通过食物回血」由 {@code FoodDataMixin}（按 {@link #hasAbyss}
-     * 拦截 {@code FoodData.tick} 里的 {@code Player#heal}）实现，本任务范围外、保持原样；
-     * 这里补的是**反转态**：进食（含食物组件的物品用完）时按营养值回血 ×2。
-     * <p>
-     * 同一次进食也用来累计 e9 的条件「累计食用 50 种不同食物」（物品 id 去重，持久化）。
+     * e9 食之无味。诅咒态的「无法通过食物回血」与反转态的「进食回血 ×2」**都已移入**
+     * {@code FoodDataMixin}（自然恢复那一处），这里只负责累计 e9 的条件
+     * 「累计食用 50 种不同食物」（物品 id 去重，持久化）。
      */
     @SubscribeEvent
     public static void onUseItemFinish(LivingEntityUseItemEvent.Finish event) {
@@ -793,13 +785,9 @@ public class FeatherAbyssHandler {
             FoodProperties food = stack.get(DataComponents.FOOD);
             if (food == null) return;
 
-            // e9 条件：累计食用 50 种不同食物
+            // e9 条件：累计食用 50 种不同食物（回血本体已由 FoodDataMixin 处理）
             if (CurseManager.on(player, DEF, E9_TASTELESS)) {
                 recordFoodKind(player, stack);
-            }
-            // e9 反转：进食回血 ×2
-            if (CurseManager.rev(player, DEF, E9_TASTELESS) && food.nutrition() > 0) {
-                player.heal(food.nutrition() * 2.0f);
             }
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ④ e9 进食结算异常", t);
@@ -845,7 +833,7 @@ public class FeatherAbyssHandler {
                 ((EntityInvulnerableTimeAccessor) (Object) player).lensouls$setInvulnerableTime(0);
                 player.hurt(player.level().damageSources().magic(), 0.5f);
                 addArmorStack(player);
-                // e5 条件：16 格内一次性（同一 tick）加入 50 只生物，且非旁观者、存活
+                // e5 条件：16 格内一次性（10 tick 窗口内）加入 50 只生物，且非旁观者、存活
                 if (curse && !player.isSpectator()) {
                     countJoinBatch(player);
                 }
@@ -856,15 +844,25 @@ public class FeatherAbyssHandler {
     }
 
     /**
-     * e5 条件计数：`一次性加入` 按**同一 gameTime** 归为一批；达到 50 只即登记待结算
+     * e5 条件计数：`一次性加入` 按**首次加入为起点、{@link #E5_BATCH_WINDOW} tick 窗口**归为一批
+     * （超时则重开一批）；达到 50 只即登记待结算
      * （「且存活」由 {@link #resolvePending} 在 2 tick 后判定，`死亡即失败`）。
      */
     private static void countJoinBatch(ServerPlayer player) {
         long now = player.level().getGameTime();
         long[] state = JOIN_BATCH.get(player.getUUID());
-        long count = (state != null && state[0] == now) ? state[1] + 1L : 1L;
-        JOIN_BATCH.put(player.getUUID(), new long[]{now, count});
+        long count;
+        if (state != null && now - state[0] <= E5_BATCH_WINDOW) {
+            // 窗口内：沿用批次起点，继续累加
+            count = state[1] + 1L;
+            JOIN_BATCH.put(player.getUUID(), new long[]{state[0], count});
+        } else {
+            // 窗口已过（或首次加入）：重开一批，以当刻为起点
+            count = 1L;
+            JOIN_BATCH.put(player.getUUID(), new long[]{now, count});
+        }
         if (count >= E5_BATCH_GOAL) {
+            JOIN_BATCH.remove(player.getUUID());
             markPendingReverse(player, E5_AUTISM);
         }
     }
@@ -1340,23 +1338,6 @@ public class FeatherAbyssHandler {
 
     // ========== 反转条件 / 反转态的公共支撑 ==========
 
-    // ---- e11 条件：移速 > 4 的时间窗 ----
-
-    /** 水平速度（格/秒 = 格/tick × 20）超过 4 即记下 1 秒窗口 */
-    private static void trackFastMovement(ServerPlayer player) {
-        double blocksPerSecond = player.getDeltaMovement().horizontalDistance() * 20.0;
-        if (blocksPerSecond > E11_SPEED_THRESHOLD) {
-            FAST_MOVE_UNTIL.put(player.getUUID(),
-                    player.level().getGameTime() + E11_SPEED_WINDOW);
-        }
-    }
-
-    /** 最近 1 秒内是否有过「移速 > 4」 */
-    private static boolean movedFastRecently(ServerPlayer player) {
-        Long until = FAST_MOVE_UNTIL.get(player.getUUID());
-        return until != null && player.level().getGameTime() <= until;
-    }
-
     /**
      * e11：清掉超过 60 tick 仍未死亡的一击必杀候选。
      * <p>候选按**目标实体 id** 存（{@link #checkOneShotKill}），而实体 id 会随新实体递增，
@@ -1391,47 +1372,6 @@ public class FeatherAbyssHandler {
         }
     }
 
-    // ---- e10 失忆 反转：复制之魂解禁 ----
-
-    /**
-     * e10「复制之魂解禁」。封印由 {@code CopySoulItem#inventoryTick} 与
-     * {@code CopySoulSealHandler}（本任务范围外）按 {@link #hasAbyss} 反复打上，
-     * 所以只能在**每 tick 的 {@code PlayerTickEvent.Post} 最末**（LOWEST，晚于该处理器
-     * 自己的 Post 扫描）把封印摘掉。
-     * <p>
-     * 时机依据（1.21.1 源码）：`MinecraftServer.tickChildren` 先跑完所有 level tick
-     * （玩家的物品栏 tick 与 PlayerTickEvent.Post 都在这里），**之后**才 `connection.tick()`
-     * 处理数据包 —— 也就是说玩家点击合成格时，物品栏里的复制之魂一定是「未封印」状态；
-     * 而同 tick 的 inventoryTick 即便重新打标，也会被这里的清理覆盖。
-     */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onPlayerTickLast(PlayerTickEvent.Post event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        try {
-            if (!CurseManager.rev(player, DEF, E10_AMNESIA)) return;
-            stripCopySoulSeals(player);
-        } catch (Throwable t) {
-            LenSouls.LOGGER.error("[Curse] ④ e10 解封异常", t);
-        }
-    }
-
-    /** 摘掉随身复制之魂的封印组件（就地改 ItemStack，组件变化由框架同步） */
-    private static void stripCopySoulSeals(ServerPlayer player) {
-        int stripped = 0;
-        var inventory = player.getInventory();
-        for (int i = 0; i < inventory.getContainerSize(); i++) {
-            ItemStack stack = inventory.getItem(i);
-            if (stack.isEmpty() || !(stack.getItem() instanceof CopySoulItem)) continue;
-            if (stack.has(ModDataComponents.COPY_SOUL_SEALED.get())) {
-                stack.remove(ModDataComponents.COPY_SOUL_SEALED.get());
-                stripped++;
-            }
-        }
-        if (stripped > 0) {
-            player.inventoryMenu.broadcastChanges();
-        }
-    }
-
     // ---- 生命周期：清瞬时状态 ----
 
     /**
@@ -1443,7 +1383,6 @@ public class FeatherAbyssHandler {
         if (id == null) return;
         PENDING_REVERSE.remove(id);
         PENDING_AT.remove(id);
-        FAST_MOVE_UNTIL.remove(id);
         JOIN_BATCH.remove(id);
     }
 }

@@ -118,8 +118,11 @@ public final class PhotoGallerySettlement {
         for (PhotoGalleryRules.SlotRef ref : refs) {
             ItemStack taken = extract(player, ref.identifier(), ref.index());
             if (taken.isEmpty()) continue;
+            // ★ 必须先读数量再 give()：Inventory.add 会把入参 stack **原地消耗成 0**，
+            //   放在 give 之后读就会恒为 0（实测「卸下 N 个却提示 0 个」的根因）。
+            int count = taken.getCount();
             give(player, taken);
-            moved += taken.getCount();
+            moved += count;
         }
         return moved;
     }
@@ -170,8 +173,9 @@ public final class PhotoGallerySettlement {
         for (PhotoGalleryRules.SlotRef ref : duplicates) {
             ItemStack taken = extract(player, ref.identifier(), ref.index());
             if (taken.isEmpty()) continue;
+            int count = taken.getCount();      // 同上：务必在 give() 之前读
             give(player, taken);
-            removed += taken.getCount();
+            removed += count;
         }
         return removed;
     }
@@ -193,7 +197,15 @@ public final class PhotoGallerySettlement {
         }
     }
 
-    /** 退回物品栏，满了丢在脚下；@return true = 进了物品栏 */
+    /**
+     * 退回物品栏，满了丢在脚下。
+     * <p>
+     * <b>注意：会消耗入参 {@code stack}。</b>{@code Inventory.add(ItemStack)} 是把数量搬进背包后
+     * **原地把该 stack 清成 0**（原版语义），所以调用方若要统计件数，**必须先 `getCount()` 再 give()**
+     * —— 放到之后读会恒为 0（照片图鉴「一键卸下」曾因此永远提示 0 个）。
+     *
+     * @return true = 进了物品栏
+     */
     private static boolean give(ServerPlayer player, ItemStack stack) {
         if (stack == null || stack.isEmpty()) return true;
         if (player.getInventory().add(stack)) return true;

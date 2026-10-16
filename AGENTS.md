@@ -2846,3 +2846,31 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
 
 - `PANEL_EXTEND_TOP = 0` / `PANEL_EXTEND_BOTTOM = 11`（上方不外扩、下方 11px；内容物一个像素不动）。
 - 交付：`lensouls-1.6.62.jar`（12,408,195 字节，MD5 `2F48DFA135FA1F4D04D3193D9748C532`）。**1.6.46 ~ 1.6.61 作废。**
+
+### 追加交付（1.6.63 · 快捷功能底板上扩 2px + 默认显示未解锁）
+
+- `PhotoGalleryShortcutPanel.PANEL_EXTEND_TOP = 2`：底板改为 `(x, y − 2, width, height() + 2)`，
+  **只往上长 2px**，三行内容/行高亮位置不动；`isOver()` 同步含这 2px（落在外扩条里的点击算消费，不点穿下层控件）。
+- `showLocked = {true, true}`：**「是否显示未解锁」默认勾选**（照片页=是否显示未窃取过能力的生物、
+  套装页=是否显示未解锁的套装，两页各自一份）；`favoritesOnly` 仍默认不勾。
+- 交付：`lensouls-1.6.63.jar`（12,408,243 字节，MD5 `435D38F5EA5F475AEF57ABA3A4085825`）。**1.6.46 ~ 1.6.62 作废。**
+
+### 追加交付（1.6.64 · 打开图鉴时光标居中）
+
+- `CursorKeeper.center()` 新增：`xpos/ypos = window.getScreenWidth()/2.0 / getScreenHeight()/2.0` +
+  `GLFW.glfwSetCursorPos` —— **与原版 `MouseHandler.releaseMouse()/grabMouse()` 同一口径**
+  （javap 核实：两者都写这两个私有字段再 `InputConstants.grabOrReleaseMouse(window, mode, x, y)`，
+  坐标是**窗口物理像素**）。
+- 图鉴 `init()` 由 `CursorKeeper.restore()`（羽毛页的「切屏不挪光标」）改为 `CursorKeeper.center()`
+  ⇒ 打开界面即居中；`onClose()` 的 `remember()/restore()` 保留（关屏仍不跳光标）。
+- 交付：`lensouls-1.6.64.jar`（12,408,447 字节，MD5 `7B30E21BA03E6998EA0B2A835352BD79`）。**1.6.46 ~ 1.6.63 作废。**
+
+### 追加交付（1.6.65 · 一键清空恒提示「卸下 0 个」）
+
+- **根因：`Inventory.add(ItemStack)` 会把入参 stack 原地消耗成 0**（原版语义）。
+  原代码「先 `give()` 再 `taken.getCount()`」⇒ 统计恒为 0（但物品确实搬走了，所以只有提示错）。
+  `PhotoGallerySettlement.clearEquipped` / `dedupe` 两处同病同修：**先 `int count = taken.getCount()` 再 give**；
+  并把这条写进 `give()` 的 javadoc（它现在明确标注「会消耗入参 stack」）。
+- **通则**：`Inventory.add` / `ItemHandler.insertItem` 这类 API 的契约就是**消耗入参**，
+  任何「先搬再统计」的写法都会读到 0；要计数必须在搬运前取 `getCount()`（或传 `copy()`）。
+- 交付：`lensouls-1.6.65.jar`（12,408,477 字节，MD5 `B15ECBDCB8F2C51A6B3D1EDFF2059DB9`）。**1.6.46 ~ 1.6.64 作废。**

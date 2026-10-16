@@ -26,6 +26,8 @@ public final class PhotoGalleryShortcutPanel {
     /** 行高亮相对底板的左右/上下内缩（同补全弹窗，避免 SDF 抗锯齿溢到 1px 描边上） */
     private static final int ROW_INSET_X = 3;
     private static final int ROW_INSET_Y = 2;
+    /** 底板**上方**额外外扩的像素：只放大底板矩形，三行内容与行高亮位置一律不动 */
+    private static final int PANEL_EXTEND_TOP = 2;
 
     public static final int ROW_CLEAR = 0;
     public static final int ROW_DEDUPE = 1;
@@ -65,7 +67,9 @@ public final class PhotoGalleryShortcutPanel {
     }
 
     public boolean isOver(double mouseX, double mouseY) {
-        return open && mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height();
+        // 命中区与底板一致（含上方外扩的 2px），免得那一条点穿到下面的控件
+        return open && mouseX >= x && mouseX < x + width
+                && mouseY >= y - PANEL_EXTEND_TOP && mouseY < y + height();
     }
 
     private int rowAt(double mouseX, double mouseY) {
@@ -82,7 +86,7 @@ public final class PhotoGalleryShortcutPanel {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, Component ruleLabel) {
         if (!open) return;
         // 不透明底板（0xF0 会让下方文字隐约透出，看着像重叠）
-        RoundedRect.roundedRect(graphics, x, y, width, height(), radius,
+        RoundedRect.roundedRect(graphics, x, y - PANEL_EXTEND_TOP, width, height() + PANEL_EXTEND_TOP, radius,
                 0xFF10161E, 0xFF0A0F16, 0x40FFFFFF, 1.0F);
 
         List<Component> rows = List.of(
@@ -133,8 +137,8 @@ public final class PhotoGalleryShortcutPanel {
         if (!open) return false;
         int row = rowAt(mouseX, mouseY);
         if (row < 0) {
-            // 点列表外：先不关（由界面决定是否关闭），也不算消费
-            return false;
+            // 落在底板的外扩条里：算消费（不触发任何行），避免点穿到下面的控件
+            return isOver(mouseX, mouseY);
         }
         if (row != ROW_RULE) open = false;
         onRow.accept(row);

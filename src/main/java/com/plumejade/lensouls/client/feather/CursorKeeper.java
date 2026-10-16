@@ -59,6 +59,33 @@ public final class CursorKeeper {
         }
     }
 
+    /**
+     * 把光标**移到窗口正中心** —— 复刻原版口径：{@code MouseHandler.releaseMouse()/grabMouse()} 就是
+     * {@code xpos = window.getScreenWidth() / 2.0; ypos = window.getScreenHeight() / 2.0}，
+     * 再 {@code InputConstants.grabOrReleaseMouse(window, mode, x, y)}（内部就是
+     * {@code GLFW.glfwSetCursorPos}）。坐标单位是**窗口物理像素**，与 {@code MouseHandler} 内部一致。
+     * <p>
+     * 照片图鉴界面在 {@code init()} 里调它，得到「开界面即居中」的原版手感
+     * （与羽毛页刻意「留在原位」的 {@link #remember()}/{@link #restore()} 相反）。
+     */
+    public static void center() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.getWindow() == null) return;
+        try {
+            MouseHandler handler = mc.mouseHandler;
+            double cx = mc.getWindow().getScreenWidth() / 2.0;
+            double cy = mc.getWindow().getScreenHeight() / 2.0;
+            write(handler, "xpos", cx);
+            write(handler, "ypos", cy);
+            long handle = mc.getWindow().getWindow();
+            if (handle != 0L) {
+                GLFW.glfwSetCursorPos(handle, cx, cy);
+            }
+        } catch (Throwable t) {
+            // 非致命：居中失败就保持原样
+        }
+    }
+
     private static double read(MouseHandler handler, String name) throws Exception {
         Field field = MouseHandler.class.getDeclaredField(name);
         field.setAccessible(true);

@@ -128,7 +128,8 @@ public class PhotoGalleryScreen extends Screen implements MenuAccess<PhotoGaller
     // ===== 状态 =====
     /** 0 = 能力窃取照片，1 = 照片套装 */
     private int page;
-    private final boolean[] showLocked = {false, false};
+    /** 开关行 1：是否显示未解锁（**默认勾选**，两页各自一份） */
+    private final boolean[] showLocked = {true, true};
     private final boolean[] favoritesOnly = {false, false};
     private final String[] searchText = {"", ""};
     private List<GalleryEntry> entries = List.of();
@@ -242,7 +243,9 @@ public class PhotoGalleryScreen extends Screen implements MenuAccess<PhotoGaller
                 contentX + round(CONTENT_W * k) - shortcutW, quickY + quickH + 2, shortcutW, shortcutH,
                 radiusModule());
 
-        CursorKeeper.restore();
+        // ★ 打开时**按原版把光标重定位到屏幕中心**（原版 MouseHandler.releaseMouse/grabMouse 就是这么做的）。
+        //   刻意不用 CursorKeeper.restore()：那是羽毛页「切屏时不挪光标」的口径，图鉴要的是原版手感。
+        CursorKeeper.center();
 
         // 开屏即拉一次全量（兜底登录时序 / 断线重连），并预热索引与模型
         PacketDistributor.sendToServer(PhotoGalleryActionPacket.requestSync());

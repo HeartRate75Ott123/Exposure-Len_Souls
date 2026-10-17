@@ -146,6 +146,7 @@ public class PhotoSetEffects {
         if (uuid == null) return;
         GEAR_CACHE.remove(uuid);
         PLAN_CACHE.remove(uuid);
+        com.plumejade.lensouls.handler.ElementActivityMath.clearSetBonus(uuid);
     }
 
     /** 取激活套装计划；仅当装备签名变化时重新解析描述符 */
@@ -270,7 +271,15 @@ public class PhotoSetEffects {
                 speedMult - 1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL, desired);
         reconcile(player, desired);
 
-        for (ElementActivity ea : elems) applyInfusion(player, ea.el(), ea.lvl() + infusionBoost);
+        // 活性加成并入活性层（不再自己 addEffect 灌注）：
+        // 变成「我们自己那份」的加项，与 ③ 的 boost 并列 ⇒ 同一元素出现第二来源时不会互相每 tick 抢写。
+        int[] setBonus = new int[4];
+        for (ElementActivity ea : elems) {
+            int idx = infusionIndex(ea.el());
+            if (idx < 0) continue;
+            setBonus[idx] = Math.max(setBonus[idx], ea.lvl() + infusionBoost);
+        }
+        com.plumejade.lensouls.handler.ElementActivityMath.setSetBonus(player, setBonus);
         for (String env : envs) {
             if (!"flight".equals(env)) applyEnv(player, env);
         }
@@ -376,28 +385,15 @@ public class PhotoSetEffects {
         APPLIED.put(player.getUUID(), desired);
     }
 
-    private static void applyInfusion(Player player, ElementDamage el, int lvl) {
-        Holder<MobEffect> effect = switch (el) {
-            case FIRE -> ModEffects.FIRE_INFUSION;
-            case WATER -> ModEffects.WATER_INFUSION;
-            case EARTH -> ModEffects.EARTH_INFUSION;
-            case ENDER -> ModEffects.ENDER_INFUSION;
-            default -> null;
+    /** 元素 → 活性层下标（与 ElementActivityMath.INFUSIONS 对齐）；−1 = 该元素不提供活性 */
+    private static int infusionIndex(ElementDamage el) {
+        return switch (el) {
+            case FIRE -> 0;
+            case WATER -> 1;
+            case EARTH -> 2;
+            case ENDER -> 3;
+            default -> -1;
         };
-        if (effect == null) return;
-        int amp = Math.max(0, lvl - 1);
-        var inst = player.getEffect(effect);
-        // ⚠ 判据不能看可见等级（会被活性修整成别的数字）⇒ 否则每 tick 重发、时长卡在 300。
-        boolean need;
-        if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
-            need = com.plumejade.lensouls.handler.ElementActivityMath.needSource(
-                    sp, com.plumejade.lensouls.handler.ElementActivityMath.indexOf(effect), lvl);
-        } else {
-            need = inst == null || inst.getDuration() < 100 || inst.getAmplifier() != amp;
-        }
-        if (need) {
-            player.addEffect(new MobEffectInstance(effect, 300, amp, false, false, true));
-        }
     }
 
     private static void applyEnv(Player player, String kind) {

@@ -133,6 +133,9 @@ public class BossPhotoProjHelper {
         if (event.getEntity() instanceof ServerPlayer player) {
             com.plumejade.lensouls.network.BarrageStatePacket.send(
                     player, com.plumejade.lensouls.util.BarrageToggle.isEnabled(player));
+            // 同一条口径：拍摄主体开关（驯服生物是否纳入）也在这里对齐客户端镜像
+            com.plumejade.lensouls.network.TamedPhotoSubjectStatePacket.send(
+                    player, com.plumejade.lensouls.util.TamedPhotoSubject.isEnabled(player));
         }
     }
 

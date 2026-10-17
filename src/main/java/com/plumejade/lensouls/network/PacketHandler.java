@@ -100,6 +100,18 @@ public class PacketHandler {
                 BarrageStatePacket::handle
         );
 
+        // ---- 拍摄主体开关（驯服生物是否纳入）：[ 键 C2S 切换 / S2C 回发权威值 ----
+        registrar.playToServer(
+                TamedPhotoSubjectTogglePacket.TYPE,
+                TamedPhotoSubjectTogglePacket.STREAM_CODEC,
+                TamedPhotoSubjectTogglePacket::handle
+        );
+        registrar.playToClient(
+                TamedPhotoSubjectStatePacket.TYPE,
+                TamedPhotoSubjectStatePacket.STREAM_CODEC,
+                TamedPhotoSubjectStatePacket::handle
+        );
+
         // ---- 能力系统 C2S 包 ----
         registrar.playToServer(
                 AbilityOpenGuiPacket.TYPE,

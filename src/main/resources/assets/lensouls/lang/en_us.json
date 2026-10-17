@@ -58,6 +58,7 @@
   "key.category.lensouls": "Len Souls",
   "key.lensouls.converter": "Activate Converter (G)",
   "key.lensouls.barrage": "Toggle Photo Barrage (B)",
+  "key.lensouls.tamed_subject": "Include Tamed Creatures in Camera Photo Subjects",
   "message.lensouls.ability.unlocked": "§aUnlocked ability: §f%s",
   "message.lensouls.soul_activated": "%s activated!",
   "message.lensouls.soul_cooldown": "Cooldown: %s seconds remaining.",

@@ -3,6 +3,7 @@ package com.plumejade.lensouls.key;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.client.ClientBarrageState;
+import com.plumejade.lensouls.client.ClientTamedPhotoSubject;
 import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.gui.SoulSelectOverlay;
 import com.plumejade.lensouls.item.ConverterItem;
@@ -12,6 +13,7 @@ import com.plumejade.lensouls.network.ConverterMenuRequestPacket;
 import com.plumejade.lensouls.network.ConverterModeSwitchPacket;
 import com.plumejade.lensouls.network.ConverterTriggerPacket;
 import com.plumejade.lensouls.network.PhotoOpenPacket;
+import com.plumejade.lensouls.network.TamedPhotoSubjectTogglePacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -44,6 +46,8 @@ public class KeyBindings {
     public static final String KEY_CONVERTER = "key.lensouls.converter";
     public static final String KEY_PHOTO_GUI = "key.lensouls.photo_gui";
     public static final String KEY_BARRAGE = "key.lensouls.barrage";
+    /** 拍摄主体开关：驯服过的生物是否纳入相机拍摄主体选取 */
+    public static final String KEY_TAMED_SUBJECT = "key.lensouls.tamed_subject";
 
     /** 触发模式常量落在公共类上（物品组件与 tooltip 共用），此处仅作别名 */
     public static final int MODE_FAST = ModDataComponents.CONVERTER_MODE_FAST;
@@ -67,6 +71,15 @@ public class KeyBindings {
             Lazy.of(() -> new net.minecraft.client.KeyMapping(
                     KEY_BARRAGE, KeyConflictContext.IN_GAME,
                     InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, KEY_CATEGORY));
+
+    /**
+     * 拍摄主体开关（默认 {@code [}）：切换「驯服过的生物是否纳入相机拍摄主体选取」，
+     * 状态显示在物品栏上方（与弹幕开关同一套提示做法）。
+     */
+    private static final Lazy<net.minecraft.client.KeyMapping> TAMED_SUBJECT_KEY =
+            Lazy.of(() -> new net.minecraft.client.KeyMapping(
+                    KEY_TAMED_SUBJECT, KeyConflictContext.IN_GAME,
+                    InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_BRACKET, KEY_CATEGORY));
 
     private static boolean converterKeyHeld = false;
     private static long pressStartNanos = 0;
@@ -107,6 +120,7 @@ public class KeyBindings {
         event.register(CONVERTER_KEY.get());
         event.register(PHOTO_GUI_KEY.get());
         event.register(BARRAGE_KEY.get());
+        event.register(TAMED_SUBJECT_KEY.get());
     }
 
     @SubscribeEvent
@@ -123,6 +137,13 @@ public class KeyBindings {
             boolean nowOn = ClientBarrageState.toggle();
             PacketDistributor.sendToServer(new BarrageTogglePacket());
             mc.player.displayClientMessage(barrageStatusMessage(nowOn), true);
+        }
+
+        // 拍摄主体开关（[ 键）：同上一套做法——本地乐观翻转，服务端权威裁决
+        if (TAMED_SUBJECT_KEY.get().consumeClick()) {
+            boolean nowIncluded = ClientTamedPhotoSubject.toggle();
+            PacketDistributor.sendToServer(new TamedPhotoSubjectTogglePacket());
+            mc.player.displayClientMessage(tamedSubjectStatusMessage(nowIncluded), true);
         }
 
         // 激活键物理状态（Sus 式状态机）
@@ -183,7 +204,8 @@ public class KeyBindings {
                         ? "§a触发模式：快速（按 "
                         : "§a触发模式：精准（长按 ")
                         .append(keyName)
-                        .append(mode == MODE_FAST ? " 直接触发）" : " 呼出菜单）"),
+                        // 键名之后补颜色码：§ 不跨 Component 继承，不补就成了白字（同弹幕/拍摄主体提示）
+                        .append(mode == MODE_FAST ? "§a 直接触发）" : "§a 呼出菜单）"),
                 true);
     }
 
@@ -192,11 +214,32 @@ public class KeyBindings {
      * <p>
      * 措辞里嵌 {@code getTranslatedKeyMessage()}，所以玩家在「操作设置」里改了键之后，
      * 提示会跟着显示新键名，而不是永远写死一个「B」——与转换器模式的提示同一套做法。
+     * <p>
+     * <b>颜色码要补在键名之后</b>：{@code getTranslatedKeyMessage()} 返回的是<b>另一个</b>
+     * {@code Component}，{@code §} 只作用在自己那一段文本里（那不是 style，不会向下继承），
+     * 所以键名之后的「 切换）」必须自己再带一次颜色码，否则永远是白字——
+     * 键名本身保持白色是刻意要的效果。
      */
     private static Component barrageStatusMessage(boolean enabled) {
         return Component.literal(enabled ? "§a弹幕：开启（按 " : "§c弹幕：关闭（按 ")
                 .append(BARRAGE_KEY.get().getTranslatedKeyMessage())
-                .append(" 切换）");
+                .append(enabled ? "§a 切换）" : "§c 切换）");
+    }
+
+    /**
+     * 拍摄主体开关状态提示（物品栏上方的动作栏）。
+     * <p>
+     * 措辞同样嵌 {@code getTranslatedKeyMessage()}：玩家在「操作设置」里改键后提示会跟着变。
+     * <p>
+     * <b>颜色码要补在键名之后</b>：键名是<b>另一个</b> {@code Component}，{@code §} 只作用在自己那一段
+     * 文本里（它不是 style、不向下继承），不补就成了白字「 切换）」——键名本身保持白色是刻意要的效果。
+     */
+    private static Component tamedSubjectStatusMessage(boolean included) {
+        return Component.literal(included
+                        ? "§a拍摄主体：含驯服生物（按 "
+                        : "§c拍摄主体：不含驯服生物（按 ")
+                .append(TAMED_SUBJECT_KEY.get().getTranslatedKeyMessage())
+                .append(included ? "§a 切换）" : "§c 切换）");
     }
 
     private static boolean isConverterKeyEvent(InputEvent.Key event) {

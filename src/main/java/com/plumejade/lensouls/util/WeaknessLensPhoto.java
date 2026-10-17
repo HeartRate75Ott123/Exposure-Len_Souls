@@ -139,6 +139,10 @@ public final class WeaknessLensPhoto {
      * （分类见 {@link AllyFilter#isTamedPet}，<b>只认 {@code isTame()}、不分是谁的</b>），
      * 它常常离相机最近、挤在 {@code get(0)} 上 ⇒ 跳过它并继续看后面真正的怪。
      * <p>
+     * <b>玩家可以把它放回来</b>：{@code [} 键开关 {@link TamedPhotoSubject} <b>默认开启</b>，
+     * 即驯服生物同样算拍摄主体；关掉后回到上面的旧口径（野生生物才拿得到弱点）。
+     * 开关只豁免驯服生物，玩家 / 自家召唤物 / 辅助作战单位永远跳过。
+     * <p>
      * <b>为什么要 live 实体</b>：{@link EntityInFrame} 只存 {@code (id, name, pos, distance)}、
      * <b>没有 UUID</b>（Exposure 的设计：帧是存档数据，不持有实体引用），而「驯没驯服」是
      * <b>实例状态</b>、同一个 {@code minecraft:wolf} 既可能是野生的也可能是某人的狗 ——
@@ -165,9 +169,10 @@ public final class WeaknessLensPhoto {
         for (EntityInFrame entry : list) {
             if (entry == null || entry.id() == null) continue;
             if (ExposureHelper.isPlayerEntityId(entry.id())) continue;
-            // 友方不算主体（口径与能力窃取/定格/弹幕一致，定义全在 AllyFilter）
+            // 友方不算主体（口径与能力窃取/定格/弹幕一致，定义全在 AllyFilter）；
+            // 例外：`[` 键开关（TamedPhotoSubject）打开时驯服生物放行
             Entity live = resolveFrameEntity(level, entry);
-            if (live != null && AllyFilter.isFriendlyUnit(live)) continue;
+            if (live != null && TamedPhotoSubject.skipFriendlyUnit(viewer, live)) continue;
             return entry.id();
         }
         return null;

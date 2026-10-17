@@ -114,16 +114,16 @@ public final class ElementActivityMath {
         int pen = penalty(p);
         boolean block = blocked(p);
         java.util.List<String> out = new java.util.ArrayList<>();
-        out.add("§b[活性] §fboost(③)=" + b + " §7penalty(①)=" + pen + " §7禁=" + block
-                + " §7computed=" + (block ? 0 : "见下"));
+        out.add("§b[活性] §fboost(③)=" + b + " §7penalty(①)=" + pen + " §7禁=" + block);
         for (int i = 0; i < INFUSIONS.length; i++) {
             MobEffectInstance cur = p.getEffect(INFUSIONS[i]);
             int observed = cur == null ? 0 : cur.getAmplifier() + 1;
             boolean task = end[i] != 0 && (end[i] == NEVER || end[i] > now);
-            int want = block ? 0 : Math.max(0, src[i] + b - pen);
+            int set = setBonus(p, i);
+            int want = block ? 0 : Math.max(0, src[i] + b + set - pen);
             String name = INFUSIONS[i].value().getDescriptionId().replace("effect.lensouls.", "");
-            out.add(String.format("§7%-14s §f可见=%d §7源=%d §7源余=%s §7应为=%d §8实例=%s",
-                    name, observed, src[i],
+            out.add(String.format("§7%-14s §f可见=%d §7源=%d §7套装=%d §7源余=%s §7应为=%d §8实例=%s",
+                    name, observed, src[i], set,
                     task ? (end[i] == NEVER ? "∞" : (end[i] - now) + "t") : "无",
                     want, cur == null ? "无" : (cur.getDuration() < 0 ? "∞" : cur.getDuration() + "t")
                             + (cur.isAmbient() ? " 蓝框" : "")));
@@ -158,11 +158,41 @@ public final class ElementActivityMath {
         return CurseManager.on(p, CurseDefs.HARDMAN, 0);
     }
 
+    // ==================== 套装加成（照片套装的 elem_activity / infusion_boost） ====================
+    // 由 PhotoSetEffects.applyPlan（每 tick）写入，按下标对齐 INFUSIONS；空计划写全 0 ⇒ 自动清空。
+    // 它现在是「我们自己那份」的一个加项（与 ③ 的 boost 并列），不再伪装成外部源：
+    // 于是 /effect clear 后一步重建、① 反转直接 −2、① 诅咒态清零全都自动一致。
+
+    private static final Map<UUID, int[]> SET_BONUS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 覆盖式写入；调用方每 tick 传一个新数组（所有权转移，不复制） */
+    public static void setSetBonus(ServerPlayer p, int[] bonus) {
+        if (p == null) return;
+        if (bonus == null) {
+            SET_BONUS.remove(p.getUUID());
+        } else {
+            SET_BONUS.put(p.getUUID(), bonus);
+        }
+    }
+
+    /** 某元素的套装活性加成（0 = 无） */
+    public static int setBonus(ServerPlayer p, int index) {
+        int[] a = SET_BONUS.get(p.getUUID());
+        return a != null && index >= 0 && index < a.length ? Math.max(0, a[index]) : 0;
+    }
+
+    /** 登出清理（PhotoSetEffects#evictPlayer 调用） */
+    public static void clearSetBonus(UUID uuid) {
+        if (uuid == null) return;
+        SET_BONUS.remove(uuid);
+        LAST_WRITE.remove(uuid);
+    }
+
     /** 最终可见等级（≤0 表示「不施加」） */
-    public static int resolve(ServerPlayer p, int sourceLevel) {
+    public static int resolve(ServerPlayer p, int index, int sourceLevel) {
         if (sourceLevel <= 0) return 0;
         if (blocked(p)) return 0;
-        return Math.max(0, sourceLevel + boost(p) - penalty(p));
+        return Math.max(0, sourceLevel + boost(p) + setBonus(p, index) - penalty(p));
     }
 
     // ==================== 第二种模式：源记账（由施加钩子调用） ====================
@@ -184,12 +214,51 @@ public final class ElementActivityMath {
         end[index] = until;
         saveInts(p, KEY_SRC, src);
         saveLongs(p, KEY_SRC_END, end);
+        logSourceOrigin(p, index, level, duration);
+    }
+
+    /** 每种「元素+等级+时长」只抓一次调用栈（回声污染排查用，稳态下只做一次 int 查表） */
+    private static final java.util.Set<Integer> ORIGIN_SEEN = new java.util.HashSet<>();
+
+    private static void logSourceOrigin(ServerPlayer p, int index, int level, int duration) {
+        try {
+            int key = index * 1_000_000 + Math.min(level, 999) * 1_000 + Math.max(0, Math.min(duration, 999));
+            if (!ORIGIN_SEEN.add(key)) return;
+            if (ORIGIN_SEEN.size() > 512) ORIGIN_SEEN.clear();
+            String who;
+            try {
+                StackTraceElement[] st = new Throwable().getStackTrace();
+                StringBuilder sb = new StringBuilder();
+                for (int i = 2; i < Math.min(st.length, 8); i++) {
+                    String cls = st[i].getClassName();
+                    sb.append(cls.substring(cls.lastIndexOf('.') + 1))
+                            .append('.').append(st[i].getMethodName()).append(" ← ");
+                }
+                who = sb.toString();
+            } catch (Throwable t) {
+                who = "?";
+            }
+            com.plumejade.lensouls.LenSouls.LOGGER.info(
+                    "[ActSrc] {} {} 记账 源={} 时长={} ← {}",
+                    p.getName().getString(), INFUSIONS[index].value().getDescriptionId(),
+                    level, duration, who);
+        } catch (Throwable ignored) {
+        }
     }
 
     /** 源最近一次被记下的等级（0 = 无）；供日志/排查用 */
     public static int sourceLevel(ServerPlayer p, int index) {
         int[] src = loadInts(p, KEY_SRC);
         return index >= 0 && index < src.length ? src[index] : 0;
+    }
+
+    /** 该元素**活跃源**的等级（0 = 没有活跃源） */
+    public static int activeSourceLevel(ServerPlayer p, int index) {
+        int[] src = loadInts(p, KEY_SRC);
+        long[] end = loadLongs(p, KEY_SRC_END);
+        long now = p.level().getGameTime();
+        boolean task = end[index] != 0 && (end[index] == NEVER || end[index] > now);
+        return task ? Math.max(0, src[index]) : 0;
     }
 
     /**
@@ -200,6 +269,7 @@ public final class ElementActivityMath {
      * 表现就是「时长永远卡在 300（15 秒）、一直往下发任务」。
      * <p>
      * 判据改成我们自己的账本：该元素有没有活跃源、源等级是不是同一个、剩余时长还够不够。
+     * 另外，**同元素已有更高等级的活跃源时，低等级那份不再发放**（等级高者胜）。
      *
      * @param level 来源这次打算给的等级（可见等级 ≠ 它）
      */
@@ -209,9 +279,14 @@ public final class ElementActivityMath {
         long[] end = loadLongs(p, KEY_SRC_END);
         long now = p.level().getGameTime();
         boolean task = end[index] != 0 && (end[index] == NEVER || end[index] > now);
+        // 等级高者胜：已有更高等级的活跃源 ⇒ 这一份不要发，免得来回抢
+        if (task && src[index] > level) return false;
         MobEffectInstance cur = p.getEffect(INFUSIONS[index]);
-        int left = cur == null ? -1 : cur.getDuration();
-        boolean holds = task && src[index] == level && (left < 0 || left >= 100);
+        // ⚠ 效果不存在时必须"要发"，不能因为 getDuration 的哨兵值把它当成无限时长：
+        //   cur == null 之前写成 left = -1，于是 (left < 0) 成立 ⇒ 判定"还稳着、不用发"，
+        //   结果 /effect clear 抹掉之后来源永远不补发（实测：clear 后永久 0，等到记录到期才回来）。
+        boolean holds = task && cur != null && src[index] == level
+                && (cur.getDuration() < 0 || cur.getDuration() >= 100);
         return !holds;
     }
 
@@ -241,7 +316,7 @@ public final class ElementActivityMath {
             int observed = cur == null ? 0 : cur.getAmplifier() + 1;
 
             // 先算「本该是多少」：task 已退队时 src 必为 0
-            int want = block ? 0 : Math.max(0, src[i] + b - pen);
+            int want = block ? 0 : Math.max(0, src[i] + b + setBonus(p, i) - pen);
 
             // ── 外部清除的侦测：源还没到期、我们也没打算清零，效果却没了 ──
             // 只有"外部把它清掉"能满足这一条（/effect clear、牛奶、死亡、别的模组 remove）：
@@ -250,12 +325,15 @@ public final class ElementActivityMath {
             //   不能当成外部清除，否则源会被我们记丢（实测：反转后 1 级源被清 → 源被误判丢弃，
             //   解除反转也回不来了）。
             if (task && cur == null && want > 0) {
+                // ── 外部清除：缓存直接抛弃（用户的模型：clear 时刷新缓存）──
+                // 之后仍活着的来源会自己重新记账，等级按「源 + boost + 套装 − pen」重算；
+                // 绝不按旧记录复活（那是"clear 了却自己长回来"），也不保留半秒窗口。
                 src[i] = 0;
                 end[i] = 0;
                 dirty = true;
                 task = false;
-                want = block ? 0 : Math.max(0, b - pen);
-                logPush(p, i, "外部清除→放弃源", want);
+                want = block ? 0 : Math.max(0, b + setBonus(p, i) - pen);
+                logPush(p, i, "外部清除→抛弃缓存", want);
             }
             int target = want;
 

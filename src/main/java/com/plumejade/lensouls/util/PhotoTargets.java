@@ -35,7 +35,8 @@ import java.util.function.UnaryOperator;
  *       与能力拍照完全正交（自拍走 {@code Frame.SELFIE}，不靠实体列表）；</li>
  *   <li><b>能力窃取</b>：单主体，<b>玩家不算主体</b>、<b>驯服宠物也不算主体</b>——
  *       驯服宠物属于友方阵营（口径同 {@link AllyFilter#isTamedPet}，只认 {@code isTame()}、
- *       <b>不分是谁的</b>），拍它只会抢走真正要窃取的生物；</li>
+ *       <b>不分是谁的</b>），拍它只会抢走真正要窃取的生物；
+ *       玩家可用 {@code [} 键（{@link TamedPhotoSubject}）把驯服生物<b>排除</b>回旧口径，默认<b>纳入</b>；</li>
  *   <li><b>弱点透镜</b>：单主体，<b>玩家不算主体</b>
  *       （玩家没有窃取效果条目；弱点透镜也不以玩家为拍摄对象）；</li>
  *   <li><b>时间定格</b>：多目标，<b>不要玩家</b>（含拍摄者本人）、
@@ -77,8 +78,9 @@ public final class PhotoTargets {
             T resolved = normalize != null ? normalize.apply(candidate) : candidate;
             if (resolved == null || resolved == viewer) continue;
             // 友方不算可窃取主体（含玩家、任意驯服宠物、自家召唤物、第三方辅助单位），
-            // 同乘那一档顺带覆盖「自己正骑着的东西」；命中即跳过、继续看下一个候选
-            if (AllyFilter.isFriendly(viewer, resolved)) continue;
+            // 同乘那一档顺带覆盖「自己正骑着的东西」；命中即跳过、继续看下一个候选。
+            // 例外：`[` 键开关（TamedPhotoSubject）打开时，驯服生物不再因"友方"被跳过
+            if (TamedPhotoSubject.skipFriendly(viewer, resolved)) continue;
             return resolved;
         }
         return null;

@@ -53,6 +53,7 @@
   "key.category.lensouls": "镜魂",
   "key.lensouls.converter": "激活转换器 (G)",
   "key.lensouls.barrage": "切换照片弹幕 (B)",
+  "key.lensouls.tamed_subject": "驯服过的生物是否纳入相机拍摄主体选取",
   "message.lensouls.soul_activated": "%s 已激活！",
   "message.lensouls.soul_cooldown": "冷却中：剩余 %s 秒。",
   "message.lensouls.effect_expiring": "%s 还有 %s 秒结束！",

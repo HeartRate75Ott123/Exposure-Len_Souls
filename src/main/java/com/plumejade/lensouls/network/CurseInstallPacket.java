@@ -42,6 +42,13 @@ public record CurseInstallPacket(int slot, String curseId) implements CustomPack
             try {
                 if (!(player.containerMenu instanceof FeatherSlotMenu menu)) return;
                 menu.onInstallCurse(packet.slot(), packet.curseId());
+
+                // ② 扭曲条（左侧条）的"是否显示"标志由服务端随包下发——客户端读不到羽毛槽附件
+                // （附件刻意不做 sync）。装入 / 卸下羽毛后必须立刻重发一次，否则刚装上时
+                // 客户端标志仍是 false，左侧条不会渲染（实测：创造模式从诅咒列表装入后没有槽）。
+                if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                    TwistSyncPacket.send(sp, com.plumejade.lensouls.handler.FeatherTwitcherHandler.getTwist(sp));
+                }
             } catch (Throwable t) {
                 // 任何异常都不能冒泡到服务端主循环
                 LenSouls.LOGGER.error("[Curse] 列表装入失败 slot={} id={}",

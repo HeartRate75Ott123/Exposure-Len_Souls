@@ -1275,7 +1275,12 @@ public class PhotoSpecialEffects {
                         && skipText.contains(Component.translatable(ae.attribute().getDescriptionId()).getString())) {
                     continue;
                 }
-                lines.add(formatAttribute(ae.attribute(), ae.amount(), ae.operation()));
+                // 这条 tooltip 全是对玩家不利的描述：属性行也一律红字，
+                // 不沿用 MC 的「正值为蓝」自动着色（用户明确要求整行统一红）。
+                // 用 getString() 重新包一层 literal，才能覆盖 formatAttribute 内部已写死的颜色样式。
+                lines.add(Component.literal(
+                                formatAttribute(ae.attribute(), ae.amount(), ae.operation()).getString())
+                        .withStyle(ChatFormatting.RED));
             }
         }
         var weak = DataPackLoader.getAllWeaknesses(ResourceLocation.parse(entityId));
@@ -1358,7 +1363,12 @@ public class PhotoSpecialEffects {
                 if (skipText != null && skipText.contains(name)) {
                     continue;
                 }
-                lines.add(formatAttribute(ae.attribute(), ae.amount(), ae.operation()));
+                // 这条 tooltip 全是对玩家不利的描述：属性行也一律红字，
+                // 不沿用 MC 的「正值为蓝」自动着色（用户明确要求整行统一红）。
+                // 用 getString() 重新包一层 literal，才能覆盖 formatAttribute 内部已写死的颜色样式。
+                lines.add(Component.literal(
+                                formatAttribute(ae.attribute(), ae.amount(), ae.operation()).getString())
+                        .withStyle(ChatFormatting.RED));
             }
         }
         var weak = DataPackLoader.getAllWeaknesses(ResourceLocation.parse(entityId));

@@ -57,11 +57,27 @@ public class TwistSyncPacket implements CustomPacketPayload {
         return barVisible;
     }
 
-    /** 服务端发送给指定玩家（自动带上「该不该显示」：戴着 ② 或 ④ 才显示） */
+    /**
+     * 服务端发送给指定玩家。
+     * <p>
+     * <b>数值以"实际佩戴的那一款"的真实值为准</b>，不再信任调用点传入的 value：
+     * 不同调用点各自算值（例如装入 ④ 折翼沉渊时它自己的扭曲值刚初始化 = 0），
+     * 会把已经存在的 ② 扭曲之人的真实值短暂覆盖成 0（实测症状：已装 ② 再装 ④，
+     * 左侧条停在 0 直到下次更新）。这里统一收口：
+     * ② 优先（0–100）→ 否则 ④（其内部 0–200，除以 2 映射到同一条）→ 都没有才用传入值。
+     */
     public static void send(ServerPlayer player, int value) {
-        boolean visible = com.plumejade.lensouls.handler.FeatherTwitcherHandler.hasTwitcher(player)
-                || com.plumejade.lensouls.handler.FeatherAbyssHandler.hasAbyss(player);
-        PacketDistributor.sendToPlayer(player, new TwistSyncPacket(value, visible));
+        boolean twitcher = com.plumejade.lensouls.handler.FeatherTwitcherHandler.hasTwitcher(player);
+        boolean abyss = com.plumejade.lensouls.handler.FeatherAbyssHandler.hasAbyss(player);
+        // ② 与 ④ 各自独立存值，而左侧条只有一根 ⇒ 显示**两者中较大者**（④ 的值 ÷2 归一到 0–100）。
+        // 否则同时佩戴时，④ 的"每合成 1 个物品 +1"永远看不见（实测：②+④ 一起戴，
+        // 疯狂合成一堆物品，条仍停在 ② 的旧值）。
+        int tw = twitcher
+                ? com.plumejade.lensouls.handler.FeatherTwitcherHandler.getTwist(player) : -1;
+        int ab = abyss
+                ? Math.round(com.plumejade.lensouls.handler.FeatherAbyssHandler.getTwist(player) / 2.0f) : -1;
+        int real = (tw < 0 && ab < 0) ? value : Math.max(0, Math.max(tw, ab));
+        PacketDistributor.sendToPlayer(player, new TwistSyncPacket(real, twitcher || abyss));
     }
 
     @Override

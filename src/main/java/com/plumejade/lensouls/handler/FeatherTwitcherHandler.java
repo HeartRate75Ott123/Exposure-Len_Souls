@@ -162,10 +162,16 @@ public class FeatherTwitcherHandler {
 
     // ==================== 扭曲值读写 ====================
 
-    /** 原始扭曲值（不封顶：阻死期间可突破上限） */
+    /**
+     * 原始扭曲值（0–100 刻度）。
+     * <p>
+     * <b>与 ④ 折翼沉渊共用同一份存储</b>：④ 内部按 0–200 存，这里统一 ÷2 映射。
+     * 早先两份各自独立 ⇒ 同时佩戴时"合成加的是 ④ 的值、条显示的是 ② 的值"，
+     * 表现为 UI 永远不动、而 ② 的反转条件却永远判不到满值（实测）。
+     */
     public static int rawTwist(Player player) {
         if (player == null) return 0;
-        return Math.max(0, persisted(player).getInt(KEY_TWIST));
+        return Math.max(0, com.plumejade.lensouls.handler.FeatherAbyssHandler.getTwist(player)) / 2;
     }
 
     /** 读取扭曲值（阻死期间不封顶，其余时间 0..100） */
@@ -179,10 +185,9 @@ public class FeatherTwitcherHandler {
     public static void setTwist(ServerPlayer player, int value) {
         boolean defy = DEFY.containsKey(player.getUUID());
         int clamped = defy ? Math.max(0, value) : Math.max(0, Math.min(MAX_TWIST, value));
-        CompoundTag tag = persisted(player);
-        tag.putInt(KEY_TWIST, clamped);
-        writeBack(player, tag);
-        TwistSyncPacket.send(player, Math.min(clamped, MAX_TWIST));
+        // 共用存储：写进 ④ 的那一份（0–200 刻度），这里 ×2 映射；不再单独写 KEY_TWIST。
+        com.plumejade.lensouls.handler.FeatherAbyssHandler.setTwist(player, clamped * 2);
+        TwistSyncPacket.send(player, clamped);
     }
 
     /** 增加扭曲值（含苦楚反转的获取 ×1.2；封顶逻辑见 {@link #setTwist}） */
@@ -452,7 +457,10 @@ public class FeatherTwitcherHandler {
             LivingEntity dead = event.getEntity();
             if (dead == player) return;
             if (!CurseManager.isActive(player, D)) return;
-            if (rawTwist(player) < MAX_TWIST) return;
+
+            // 扭曲值满：本体 ≥100，或**正处于阻死状态**（DEFY 只在 ≥100 时启动，
+            // 而它会在濒死瞬间消耗 100，导致"与 boss 对拼时击杀 boss 的那一下"读到个位数）。
+            if (rawTwist(player) < MAX_TWIST && !DEFY.containsKey(player.getUUID())) return;
             if (player.getArmorValue() != 0) return;
             if (dead.getMaxHealth() < REVERSE_TARGET_MIN_HEALTH) return;
 

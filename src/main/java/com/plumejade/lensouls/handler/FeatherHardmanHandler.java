@@ -174,9 +174,9 @@ public class FeatherHardmanHandler {
             for (Holder<MobEffect> infusion : INFUSIONS) {
                 player.removeEffect(infusion);
             }
-        } else if (CurseManager.rev(player, D, 0)) {
-            applyActivityPenalty(player);
         }
+        // 反转态不再做「事后 chop 掉 2 级 + 重写无限时长」：
+        // −2 级已由 mixin/ElementActivityPenaltyMixin 在 addEffect 之前温和算好（效果不会跳）。
 
         // ── e3 蚀峰：反转后护甲 +5 ──
         if (CurseManager.rev(player, D, 2)) {

@@ -22,9 +22,10 @@
     "PhantomKillCreditMixin",
     "PhantomMoveTargetAccessor",
     "BlessingCrystalMixin",
-    "ServerBossEventMixin"
+    "ServerBossEventMixin",
+    "ElementActivityPenaltyMixin"
   ],
-    "client": [
+  "client": [
     "client.ItemRendererMixin",
     "client.SoulLevelOverlayMixin",
     "client.EntityRenderDispatcherMixin",

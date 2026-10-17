@@ -37,6 +37,18 @@ public class ElementBypassHelper {
         BYPASS_CAP.set(false);
 
         if (source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) return false;
+
+        // ── 我方定身（破韧定身 / 时间定格）期间：原模组的一切被动限伤都应当**无条件**失效 ──
+        // 用户口径：定身时只走原版伤害事件，不再受灾变「伤害桶」/ 传奇怪物「单次上限」约束。
+        // 早期实现把「破定」当成额外放行条件，仍要求「玩家 + 元素活性武器 + 目标有该元素弱点」，
+        // 于是平A / 无活性武器 / 未登记弱点的 BOSS 全部照旧被压 —— 实测 99999999 也打不穿。
+        // 定身是"已付出代价换来"的状态，判定应当提前短路，不参与元素匹配。
+        // StunPauseHelper 是既有双态口径：破刹（韧性清空）或 时间定格，两者都算。
+        if (com.plumejade.lensouls.boss.StunPauseHelper.isStunPaused(target)) {
+            BYPASS_CAP.set(true);
+            return true;
+        }
+
         if (!(source.getEntity() instanceof Player player)) return false;
 
         ItemStack weapon = player.getMainHandItem();
@@ -77,5 +89,10 @@ public class ElementBypassHelper {
     /** @ModifyArg 中调用：检查是否需要绕过 Math.min(cap, amount) */
     public static boolean shouldBypassCap() {
         return BYPASS_CAP.get();
+    }
+
+    /** hurt() 结束后清标志：避免 DamageCap() 在战斗之外的调用（UI/描述）读到残留的 MAX */
+    public static void clearBypass() {
+        BYPASS_CAP.set(false);
     }
 }

@@ -633,9 +633,14 @@ public class FeatherAbyssHandler {
         if (!CurseManager.on(player, DEF, E11_MADNESS)) return;
         LivingEntity target = event.getEntity();
         if (target == player) return;
+        // 实时值：整合包里被魔改过血量的生物，getMaxHealth() 读的是**当下属性值**（含临时修饰符），
+        // 不是实体类型的注册默认值——这就是"6 万血"该判定的口径。
         if (target.getMaxHealth() < E11_TARGET_MAX_HEALTH) return;
         if (player.getAttributeValue(Attributes.MOVEMENT_SPEED) <= E11_SPEED_THRESHOLD) return;
-        if (event.getNewDamage() < target.getHealth()) return;   // 必须是一击致死
+        // 宽容：没造成伤害的攻击（0 伤）不算——既不能记候选，也不能破坏"一击"的判定。
+        if (event.getNewDamage() <= 0.0f) return;
+        // 必须是一击致死：拿「这一次的伤害」对比「目标当下的实时生命」
+        if (event.getNewDamage() < target.getHealth()) return;
         ONESHOT_KILL.put(target.getId(), player.level().getGameTime());
     }
 

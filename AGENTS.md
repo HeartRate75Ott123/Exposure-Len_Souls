@@ -3074,3 +3074,22 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
 - 本版本同时带上上一批**镜魂 DoT 到期提示归位**（§53/§54：删掉照片活性的旧到期提示、DoT 按具体镜魂名显示）。
 - 待实机验证：幻影骑士幻灵期间无 BOSS 血条（其他 BOSS 照旧隐藏）；九头蛇幻灵范围内方块完整、
   火球不炸方块但范围伤害/击退仍在。
+
+### 追加交付（1.6.77 · 未解锁套装的提示改成「未集齐该套装」）
+
+- 反馈：「获取失败提示去掉『的成员』，应该读作未集齐该套装」。
+  改 `gui.lensouls.photos.toast.locked.set`：zh「尚未集齐该套装的成员」→「未集齐该套装」，
+  en「Set members not collected yet」→「Set not fully collected」。代码零改动（键名由
+  `PhotoGallerySettlement.TOAST_LOCKED_SET` 引用）。**注意**别动 `gui.lensouls.photos.locked.set`
+  （套装 tooltip 的「未解锁」标签）。
+- **仓库状态变化（重要）**：并行会话在 13:2x **提交了** `96b5749`（1.6.76），把工作区里我的三轮图鉴改动
+  （套装排序 / 佩戴属性索引 / 纯文本按名称索引）**一并提交**了，所以那些不再是「未提交改动」。
+  本轮之后它的工作区又开始下一批（`ElementBypassHelper`、`FeatherAbyssHandler`、`FeatherHardmanHandler`、
+  两个灾变/传奇 mixin、`lensouls.mixins.json`、新 `ElementActivityPenaltyMixin`）。
+- 交付基线改为 **当前 HEAD + 只补本轮 lang 文案**，构建方式两条硬修正：
+  1. 用 `git archive --format=zip -o x.zip HEAD` 而不是 `checkout-index -a`（后者写**索引**，
+     并行会话一 `git add` 就会把暂存文件带进构建树 —— 本轮一度把 17 个 curse 类打进过 jar）；
+  2. lang 打点脚本的值**必须自带引号**，并在末尾 `json.load()` 硬闸。第一版漏引号生成了
+     `"key": 未集齐该套装,` 这种非法 JSON，已作废重建。
+- 交付：`lensouls-1.6.77.jar`（12,425,430 字节，MD5 `1E174643FBE3E75FA9AB3287690237E5`）。
+  **1.6.46 ~ 1.6.76 作废。**

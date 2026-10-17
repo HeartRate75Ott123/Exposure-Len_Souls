@@ -52,6 +52,7 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerXpEvent;
@@ -620,7 +621,23 @@ public final class ZeroforgeCurse {
 
     // ==================== e5 誓约·封库 ====================
 
-    /** e5 封库：无法打开精妙背包与维度网络（客户端/服务端双双拦下右键） */
+    /**
+     * e5 封库：无法打开精妙背包与维度网络。
+     * <p>
+     * 三道闸，缺一不可：
+     * <ol>
+     *     <li><b>右键物品 / 方块</b>（{@link #onRightClickItem} / {@link #onRightClickBlock}）—— 第一道，
+     *         也是唯一能「不建容器、不闪一下」就拦下的时机；</li>
+     *     <li><b>服务端容器打开</b>（{@link #onContainerOpen}，{@code PlayerContainerEvent.Open}）——
+     *         权威兜底：<b>快捷键</b>（精妙背包开包键位、超越维度 {@code OPEN_GUI_KEY}）根本不过右键，
+     *         但无论走哪条路，服务端最终都要 {@code Player#openMenu}，容器一成立就关掉；</li>
+     *     <li><b>客户端屏幕拦截</b>（{@code client/curse/LibrarySealScreenHandler}）——
+     *         在 {@code ScreenEvent.Opening} 阶段就掐掉，避免「先闪一帧界面再被关」。客户端拿不到服务端附件，
+     *         所以它读的是 {@code CurseSyncPacket} 同步过去的镜像。</li>
+     * </ol>
+     * 三处都以 {@code CurseManager.on(player, D, 4)} 为条件 —— 即「⑦ 装进槽位 ∧ e5 未反转」。
+     * <b>反转（解锁）之后一律放行</b>：不拦、不关、右键不封。
+     */
     @SubscribeEvent
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         try {
@@ -648,6 +665,34 @@ public final class ZeroforgeCurse {
             event.setCanceled(true);
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ⑦ e5 封库（方块）拦截异常", t);
+        }
+    }
+
+    /**
+     * e5 封库（服务端权威兜底）：任何「精妙背包 / 维度网络」容器成立的那一刻就把它关掉。
+     * <p>
+     * 为什么这条必须有：右键拦截只覆盖「右键物品」这一条路 —— 玩家用<b>快捷键</b>开精妙背包、
+     * 用维度网络键位（{@code OpenNetGuiPacket}）开网络存储、或者别的模组代开，都不经过右键，
+     * 服务端也拦不到。而 {@code ServerPlayer#openMenu} 是所有打开路径的唯一收口，容器建好之后
+     * 一定派发 {@code PlayerContainerEvent.Open}（此时 {@code player.containerMenu} 已经是新容器，
+     * 所以 {@code closeContainer()} 关的正是它，同时会发 {@code ClientboundContainerClosePacket} 让客户端一起收屏）。
+     * <p>
+     * 判据用菜单注册名（见 {@link LibrarySealTargets}），不碰第三方类；
+     * {@code CurseManager.on(...)} 为真才动手 —— 反转后完全放开。
+     */
+    @SubscribeEvent
+    public static void onContainerOpen(PlayerContainerEvent.Open event) {
+        try {
+            if (!(event.getEntity() instanceof ServerPlayer player)) return;
+            if (player.level().isClientSide) return;
+            if (!CurseManager.on(player, D, 4)) return;
+            if (!LibrarySealTargets.isSealedMenu(event.getContainer())) return;
+            player.closeContainer();
+            player.displayClientMessage(
+                    net.minecraft.network.chat.Component.translatable(
+                            "message.lensouls.zeroforge.library_sealed"), true);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ⑦ e5 封库（容器兜底）异常", t);
         }
     }
 

@@ -42,4 +42,23 @@ public record CurseDef(String id, int entries, int maskOffset,
     public boolean noReverse(int i) {
         return noReverse.contains(i + 1);
     }
+
+    /** 是否分「诅咒段 + 祝福段」两段（目前只有 ⑦ 羽·零号誓炉：{@code sectionAt = 7}） */
+    public boolean hasSections() {
+        return sectionAt > 0;
+    }
+
+    /**
+     * 诅咒段的条数：分段款 = {@link #sectionAt()}；未分段款 = {@link #entries()}（全部都是诅咒）。
+     * <p>
+     * 显示「反转 x / N」里的 N 一律由这里算，<b>不要</b>在文案或代码里写死 7 / 14。
+     */
+    public int curseEntries() {
+        return hasSections() ? sectionAt : entries;
+    }
+
+    /** 祝福段的条数：分段款 = {@code entries() - sectionAt()}；未分段款 = 0（没有祝福段） */
+    public int blessingEntries() {
+        return hasSections() ? entries - sectionAt : 0;
+    }
 }

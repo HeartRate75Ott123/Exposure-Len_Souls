@@ -1229,6 +1229,100 @@ public class PhotoSpecialEffects {
         return map;
     }
 
+    /**
+     * 照片**佩戴时自动生成的属性词条**纯文本，供图鉴「按 tooltip 搜索」索引
+     * （2026-10 反馈：搜「移速」搜不到带移速属性的照片，只能搜到手写描述里恰好写了的那几句）。
+     * <p>
+     * 数据源就是 {@link #buildAttributeModifiers}——Curios 佩戴时渲染的那份修饰符**同一个入口**，
+     * 所以「索引到的」和「装备后看到的」不会各说一套：普通属性、命中率、元素弱点一个不漏。
+     * <p>
+     * 只出**名称**不出数值（玩家搜的是「有没有这条属性」，不是「+12%」），并补一层
+     * {@link #ATTRIBUTE_ALIASES} 的玩家简写，否则「移速」这种叫法在「移动速度」里根本拼不出来。
+     */
+    public static String attributeSearchText(String entityId) {
+        Multimap<Holder<Attribute>, AttributeModifier> mods = buildAttributeModifiers(entityId);
+        StringBuilder sb = new StringBuilder(64);
+        for (Holder<Attribute> holder : mods.keySet()) {
+            String name = ChatFormatting.stripFormatting(
+                    Component.translatable(holder.value().getDescriptionId()).getString());
+            if (!name.isEmpty()) sb.append(' ').append(name);
+            String alias = aliasOf(holder.value());
+            if (alias != null) sb.append(' ').append(alias);
+        }
+        if (getWeakSlotBonus(entityId) > 0) {
+            // 弱属性照片的额外照片栏位（这行也是自动生成的 tooltip 内容，索引里给几个中文关键词）
+            sb.append(" 栏位 饰品栏位 额外栏位");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 佩戴时属性行的**完整**版本（**含命中率**），供图鉴 tooltip 展示与
+     * {@link #attributeSearchText} 索引共用同一份数据：看得见的 = 搜得到的。
+     * <p>
+     * 与 {@link #describeAttributes(String, String)} 的区别只有两点：① 不跳过命中率
+     * （它对玩家是可搜的真实属性，以前是为了「无特殊效果」判空才排除的）；
+     * ② 不在这里做「已废弃」以外的过滤。{@code skipText} 仍用于**手写描述已经点过的属性**去重——
+     * 命中率不受该去重影响（手写描述从不写它）。
+     */
+    public static List<Component> describeWornAttributes(String entityId, String skipText) {
+        List<Component> lines = new ArrayList<>();
+        List<AttributeEntry> list = tuneMovementSpeed().get(entityId);
+        if (list != null) {
+            for (AttributeEntry ae : list) {
+                boolean hitChance = ae.attribute() == ModAttributes.HIT_CHANCE.value();
+                if (!hitChance && skipText != null
+                        && skipText.contains(Component.translatable(ae.attribute().getDescriptionId()).getString())) {
+                    continue;
+                }
+                lines.add(formatAttribute(ae.attribute(), ae.amount(), ae.operation()));
+            }
+        }
+        var weak = DataPackLoader.getAllWeaknesses(ResourceLocation.parse(entityId));
+        if (weak != null) {
+            for (ElementDamage el : ElementDamage.values()) {
+                if (!weak.containsKey(el)) continue;
+                MutableComponent text = Component.translatable("tooltip.lensouls.weakness." + el.getSerializedName());
+                if (skipText != null && skipText.contains(text.getString())) continue;
+                lines.add(text.withStyle(ChatFormatting.RED));
+            }
+        }
+        return lines;
+    }
+
+    /**
+     * 属性名的**玩家常用简写**，键是 {@code getDescriptionId()} 的最后一段
+     * （{@code generic.movement_speed}/{@code player.block_break_speed} 这类前缀差异一律忽略）。
+     * <p>
+     * 只收「译名里拼不出来」的写法：「护甲值/幸运值/命中率/燃烧时间」这些译名本来就含关键字，
+     * 不必重复；这里放的是玩家嘴上真会说、但译名里没有的词（移速、攻速、血量、挖速…）。
+     */
+    private static final Map<String, String> ATTRIBUTE_ALIASES = Map.ofEntries(
+            Map.entry("movement_speed", "移速 跑速 速度"),
+            Map.entry("attack_speed", "攻速 挥速"),
+            Map.entry("max_health", "血量 血上限 生命上限"),
+            Map.entry("attack_damage", "攻击力 面板 伤害"),
+            Map.entry("armor", "防御"),
+            Map.entry("armor_toughness", "韧性"),
+            Map.entry("attack_knockback", "击飞"),
+            Map.entry("knockback_resistance", "抗击退 击退抗性"),
+            Map.entry("jump_strength", "跳跃高度 跳高"),
+            Map.entry("luck", "幸运"),
+            Map.entry("block_break_speed", "挖掘速度 挖速"),
+            Map.entry("block_interaction_range", "触及距离 触碰距离"),
+            Map.entry("entity_interaction_range", "触及距离 触碰距离"),
+            Map.entry("sneaking_speed", "潜速"),
+            Map.entry("burning_time", "点燃时长"),
+            Map.entry("hit_chance", "命中"),
+            Map.entry("dodge_chance", "闪避")
+    );
+
+    private static String aliasOf(Attribute attribute) {
+        String id = attribute.getDescriptionId();
+        int dot = id.lastIndexOf('.');
+        return ATTRIBUTE_ALIASES.get(dot < 0 ? id : id.substring(dot + 1));
+    }
+
     private static void addWeakModifier(Multimap<Holder<Attribute>, AttributeModifier> map,
                                         DeferredHolder<Attribute, Attribute> attr, boolean present,
                                         String entityId, String element) {

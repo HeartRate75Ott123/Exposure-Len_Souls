@@ -21,7 +21,8 @@
     "PhantomPushGuardMixin",
     "PhantomKillCreditMixin",
     "PhantomMoveTargetAccessor",
-    "BlessingCrystalMixin"
+    "BlessingCrystalMixin",
+    "ServerBossEventMixin"
   ],
     "client": [
     "client.ItemRendererMixin",

@@ -2930,3 +2930,147 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
 - 提示（与照片页同一条通道）：新增 `toast.partial`「照片栏已满，无法放入的照片已发放到物品栏」/
   `toast.already.set`「该套装已全部装备」/ `toast.locked.set`「尚未集齐该套装的成员」；其余复用既有键。
 - 交付：`lensouls-1.6.71.jar`（12,411,663 字节，MD5 `8CC523AEA0A78F650573FC19CC18106F`）。**1.6.46 ~ 1.6.70 作废。**
+
+### 追加交付（1.6.72 · 套装排序：收藏 → 刚集齐 → 未集齐进度）
+
+- 反馈：「新解锁的套装应该排序到前边，然后收藏的优先级最高」。原 `SET_ORDER` 是「收藏 → 装备进度降序
+  → setId 字典序」，集齐的套装虽因进度 1.0 靠前，但彼此之间按 **id 字典序**，与集齐时刻无关。
+- 现 `PhotoGalleryCatalog.SET_ORDER` 四层：`favorite` 降序 → `unlocked` 降序 → **集齐时刻降序** →
+  （未集齐）装备进度降序 → `setId` 收口。收藏永远最上，与是否集齐无关。
+- 「集齐时刻」`unlockTime(setId, members, need)` 全由**已有**数据现算，不加存档字段、不改网络包：
+  普通套装 = 成员里**最晚**的首次窃取时间；**首领套** = 第 `need`(5) 新的首领首拍时间
+  （**刻意不取 max**，否则「早就集齐、之后又多偷几只 BOSS」会被一直顶回最前）；未集齐 = `Long.MIN_VALUE`。
+- 载体复用 `GalleryEntry.firstTime`（照片页 = 首次窃取时间；套装页 = 集齐时刻），
+  `GalleryEntry.set(...)` 多一个 `firstTime` 形参 —— 该 record 的 javadoc 已同步注明。
+- 界面无需改动：`revision` 一变即 `repopulate()`，偷到新生物的瞬间顺序就地刷新。
+- 交付：`lensouls-1.6.72.jar`（12,412,118 字节，MD5 `C1BB6DD598F31B0691F9FB6797D90C23`）。**1.6.46 ~ 1.6.71 作废。**
+
+## 需求批次：镜魂 DoT 到期提示归位（移除照片活性旧提示）
+
+### 53. 现象与根因
+
+- 现象：只戴**照片饰品**（套装元素活性）时，动作栏每约 10 秒弹一次「火焰镜魂 还有 3 秒结束！」；
+  用**首领镜魂**（如焰魔镜魂）时，提示却可能退回元素通用名。
+- 根因：到期提示存在**两份** —— `ElementInfusionEffect.applyEffectTick`（旧系统，按元素活性等级）与
+  `SoulDotEffect.applyEffectTick`（新 xxDot）。前者早已没有任何调用方写来源（`setPlayerData` /
+  `getPlayerCustomName` 零调用 = 死表），只剩「元素名 + 60/40/20 tick 提醒」在误报；后者本身按 descId
+  显示具体镜魂，但 `applyElementEffect` / 两个转换器包**无条件** `setPlayerData`：当低等级镜魂无法覆盖
+  现存 DoT 时仍会把来源冲成 null（先 BOSS 镜魂、后点基础镜魂 → 首领镜魂名丢失）。
+
+### 54. 改动（以代码为准）
+
+- `ElementInfusionEffect`：删除 `playerSlowness` / `playerCustomNames` 静态表与 `setPlayerData` /
+  `getPlayerCustomName` / `hasPlayerSlowness` / `cleanupPlayer` / NBT 读写，以及 60/40/20 到期提示；
+  `shouldApplyEffectTickThisTick` 只留 `duration % 8 == 0`（粒子）。**照片饰品活性不再有任何到期提示**，
+  它是常驻套装活性（约每 10 秒刷新 300tick），本来就不该有倒计时文案。
+- `SoulDotEffect`：来源记录整合为 `UUID → 元素 → SoulSource(descId, slowness)`；新增 `applySoulEffect(...)`
+  作为「施加效果 + 登记来源」的唯一入口（原版 amplifier 更高 → 不覆盖效果也不改来源；基础镜魂不夺走
+  同级/更高等级 BOSS 镜魂的来源）；读取统一走 `activeSource`（**该元素 DoT 不在身上 → 记录作废**，含 NBT
+  残留），避免登出/到期后旧镜魂名继续被当成当前来源；减速标记改为按元素记录并随 DoT 失效；
+  NBT 持久化改为 `lensouls_soul_dot_ids` + `lensouls_soul_dot_slow` 两个键。
+- 调用点：`LensoulItem.applyElementEffect`、`ConverterTriggerPacket`、`ConverterMenuActivatePacket`
+  改走 `applySoulEffect`；`BossPhantomManager.onPlayerLogin` 删除 `ElementInfusionEffect.cleanupPlayer` 调用与 import。
+- 顺带：`LensoulItem` 新增 `isBossSoul()` 访问器（原字段私有）。三条降级路径的「来源 id / 激活文案」
+  统一用它判定 BOSS 镜魂——此前用的是 `damageMultiplier > 1.0f || slowness`，暮色系 1.0 倍率的首领镜魂
+  （九头蛇/幻影骑士/雪怪首领/娜迦）在 `phantom` 路径不可用时会退化成元素通用名。
+- 结果：到期提示只剩一条，名称按**实际在生效的那颗镜魂**显示 —— 首领镜魂「焰魔镜魂（火） 还有 3 秒结束！」，
+  基础镜魂「火焰镜魂 还有 3 秒结束！」。
+- 验证：`.\gradlew.bat compileJava` / `build` 通过（仅既有 unchecked 提示）。本改动与 `1.6.72` 照片图鉴
+  同在工作区、**未单独编号/未复制桌面 jar**（避免与并行的 1.6.72 交付撞号）。
+
+
+### 追加交付（1.6.73 · 按 tooltip 搜索纳入「佩戴属性词条」+ 简写别名）
+
+- 反馈：「按 tooltip 检索时，curios 佩戴时属性词条也要被索引到；有 +移速，搜移速也能匹配到」。
+  原检索文本只有 `PhotographEffectRegistry.descriptionText`（手写描述）+ 套装名，
+  `PhotoSpecialEffects.ATTRIBUTES` 那批佩戴修饰符完全不在索引里。
+- 新 `PhotoSpecialEffects.attributeSearchText(entityId)`：直接遍历 **`buildAttributeModifiers`**
+  （= Curios 佩戴渲染的同一入口），只出属性**名称**；弱属性照片补「栏位」关键词。
+  `PhotoGalleryCatalog.photoTooltipText` 追加这段（**包 try/catch**：每次键入的热路径）。
+- 新 `PhotoSpecialEffects.ATTRIBUTE_ALIASES` + `aliasOf(Attribute)`：按 `getDescriptionId()` **最后一段**
+  建表（`generic.`/`player.` 前缀差异忽略），只收译名里拼不出来的简写：移速/攻速/血量/挖速/触及距离…
+  —— 否则「移速」在「移动速度」里永远 `contains` 不到（这是本条需求的关键点，别只加属性名了事）。
+- 顺带把属性行**显示**进图鉴 tooltip：新 `PhotoSpecialEffects.describeWornAttributes(entityId, skipText)`
+  （与 `describeAttributes` 的唯一区别是**不跳过命中率**）+ lang 键 `gui.lensouls.photos.tooltip.worn`
+  「佩戴时：」。手写描述已点过的属性用 `skipText` 去重，命中率例外。
+- 缓存：`PHOTO_TOOLTIP_TEXT` 仍懒构建，但新增 `PhotoGalleryCatalog.refreshTextCacheIfReloaded()`——
+  用 `DataPackLoader.allWeaknesses()` 的 **map 实例身份**当戳，`/reload` 换实例即整表作废
+  （属性行里含元素弱点，别的数据包与它无关）。
+- **交付注意（本轮踩到）**：工作区可能被**并行会话**同时改（本轮 11:12~11:15 有另一批
+  `effect/ElementInfusionEffect`、`effect/SoulDotEffect`、`item/LensoulItem`、`network/Converter*`、
+  `entity/BossPhantomManager` 的未提交改动）。交付前先 `git status` 看有没有**不属于本轮**的文件，
+  有就**先在仓库外做隔离构建**：`git checkout-index -a --prefix=<临时目录>/` 取 HEAD 源码树 →
+  robocopy 一份工作区（排除 `.git`/`build`/`run`，再补 `libs/` 与 `run/mods`）→ 把非本轮文件换成 HEAD 版本
+  → 在副本里 `gradlew build`。**不要**在主仓库用 stash/checkout 回滚别人的改动（并行会话可能正在写）。
+  另注意：副本目录名**不能以点开头**（Gradle 会把目录名当 rootProject.name 并因此报错）。
+- 交付：`lensouls-1.6.73.jar`（12,414,310 字节，MD5 `ACCC0E7DE0F4D4CF4F85C9D7137FC118`），
+  **隔离构建**：只含 1.6.71/1.6.72 已提交内容 + 本轮改动，不含并行会话那批未提交改动。
+  **1.6.46 ~ 1.6.72 作废。**
+
+### 追加交付（1.6.74 · 纯文本查询按名称索引收口）
+
+- 反馈：「直接输入纯名称时按名称索引，比如键入 jiangshi，而不是必须带名称前缀」。
+- **真根因**：`matchesPhoto` 无前缀分支 `return nameHit || tipHit;`，而没写 `tooltip:` 时
+  `tipQuery` 为空 ⇒ `tipHit` **恒为 true** ⇒ 纯文本**等于不过滤**（整页全列）。套装页
+  `!nameHit && !tipHit` 同一个坑。
+- 现口径（两页一致）：有 `tooltip:` → tooltip 必须命中（也有 `名称:` 就都要）；只有 `名称:` → 名称必须命中；
+  **纯文本 → 先走名称索引**（中/英名 + 实体 id + 拼音），名称没命中才拿**同一段文字**兜底搜 tooltip；
+  空查询全通过。兜底 needle 必须用 `nameQuery`，不能再用那个恒 true 的空 `tipQuery`。
+- 搜索是**边打边筛**（search widget 的 responder 每键 `repopulate()`），所以修好后 `jiangshi` 立刻收窄。
+- **交付方式升级（重要）**：本轮起并行会话开始**实时**改文件（13:17 还在写 `feather/CurseManager.java`），
+  1.6.73 用的「复制工作区 + 回滚 6 个已知文件」已经不够 —— 复制会抓到半写状态（实测 `CurseManager`
+  引用 `LAST_ACTIVE` 却拿不到声明，编译直接失败）。现在改为：`git checkout-index -a --prefix=<临时目录>/`
+  取 **HEAD 全量** → 补 `libs/` + `run/mods` → **只覆盖我这几个文件** → 改 `gradle.properties` 版本 → 构建。
+  这样与并行会话零耦合，且能反过来暴露对方的半成品崩溃（本轮就是这样发现的）。
+  脚本要点：`powershell.exe -File`（本机没有 `pwsh`）、脚本里**不要写中文**（PS 5.1 读无 BOM 的 UTF-8
+  会把多字节字符当引号/括号，直接语法错误）、`$ErrorActionPreference='Stop'` 遇到 gradle 的 stderr 警告
+  会中断 —— 构建结果要单独再跑一次确认 `BUILD SUCCESSFUL`。
+- 交付：`lensouls-1.6.74.jar`（12,415,336 字节，MD5 `9E27A504D962D91B41BD27C626B2DB61`），
+  来源 = HEAD（6c952e1）+ 本轮 6 个文件，**不含并行会话的任何未提交改动**。**1.6.46 ~ 1.6.73 作废。**
+
+## 需求批次（`1.6.75`）：幻影骑士血条 / 九头蛇幻灵不破坏方块
+
+### 55. 幻影骑士（暮色）血条不消失
+
+- 现象：借体幻灵的 BOSS 血条只有**幻影骑士**还显示，其他 BOSS 都已成功隐藏。
+- 根因：血条隐藏只做了 `BossBarCache.clearBossBar`（反射找 `ServerBossEvent` 字段 → `removeAllPlayers()`），
+  但暮色幻影骑士会在 **`setNumber(0)`** 里把 64 格内的玩家重新 `getBossBar().addPlayer(...)`：
+  `updateMyNumber()` 在「附近没有别的骑士」时每 tick 走一次 `setNumber(0)`（`customServerAiStep` 在
+  `totalKnownKnights == MIN_VALUE` 时每 tick 调 `updateMyNumber()`，而该字段永远没被赋值）⇒ 血条被反复加回。
+  它的血条是 `BaseTFBoss.bossEvent`（`ServerTFBossBar extends ServerBossEvent`），而且**覆写了 `addPlayer`**
+  （发自己的加条包、不调父类实现），父类上的任何处理都拦不到它。
+- 修法：
+  - `boss/BossBarCache` 增加「幻灵血条登记表」（`WeakHashMap` 弱引用集合）；`clearBossBar` 改为「登记 + 清空」；
+    新增 `clearIfPlayers`（兜底）与 `unmarkBossBar`（`endPhantom` 解除登记）。
+  - 新 `mixin/ServerBossEventMixin`（`mixins` 数组，required）：`addPlayer` 的 HEAD 直接取消（已登记为幻灵血条时）。
+  - 新 `mixin/compat/ServerTFBossBarMixin`（字符串 target + `remap=false` + `require=0`）：掐暮色覆写的 `addPlayer`。
+  - `BossPhantomManager.tick` 每 10 tick 调一次 `clearIfPlayers`，给第三方自研血条留保险。
+- 注意：`setNumber(0)` 在 `addFreshEntity` **之前**就会加人（`initEntity` → `switchToFormation`），
+  所以「登记 + 清空」必须在 `addFreshEntity` 之后做一次（现流程已如此），之后靠 mixin 从源头拒绝。
+
+### 56. 九头蛇幻灵不再破坏方块
+
+- 现象：九头蛇镜魂召唤的借体九头蛇会把地形挖穿、火球炸方块。
+- 根因（对着暮色源码逐点核过）：`Hydra.destroyBlocksInAABB` 每 tick 按本体/尾/每个头的包围盒
+  `level.destroyBlock`；`HydraMortar.detonate` 命中后 `level.explode(..., ExplosionInteraction.MOB)`。
+  两者都先调 `EventHooks.canEntityGrief`（`HydraMortar` 那处只把结果当 `fire` 标志，方块破坏不看它）。
+- 修法：新 `handler/PhantomGriefHandler`（注册在 `NeoForge.EVENT_BUS`），两条闸：
+  1. `EntityMobGriefingEvent` → 归属幻灵就 `setCanGrief(false)`（`EventHooks.canEntityGrief` 直接读它）；
+  2. `ExplosionEvent.Detonate` → 幻灵爆炸的**方块列表清空**（`getExplosion().getDirectSourceEntity()` 归属判定，
+     实体伤害/击退照常）。
+  归属统一 `AllyFilter`（本体/召唤物/弹幕 owner 链），暮色的 `HydraHead` 等 `PartEntity` 再向上追一层 `getParent()`。
+  `BossPhantomManager.hasActive()` 做常态短路（无幻灵时两次判定都是零开销）。
+- 副作用口径：幻灵期间所有借体 BOSS / 召唤物都不再改地形（含其它 BOSS 的同类 AI），这是「演出不该改世界」的
+  统一口径；真实 BOSS 不受影响（无幻灵标记）。
+
+### 57. 交付（`1.6.76`）
+
+- 版本 `1.6.76`（`gradle.properties` 从 1.6.74 +2）。**用户裁定：直接构建完整工作区**（含并行会话的诅咒/图鉴
+  未提交改动），不再做隔离构建——`.\gradlew.bat build` 通过即说明两边代码合在一起可编译。
+  （先前按并行会话的隔离构建约定出过一版只含本会话文件、不含并行改动的 `1.6.75`；已被 `1.6.76` 取代，
+  桌面上的 1.6.75 已删。）
+- jar 复制到 `C:/Users/volans/Desktop/lensouls-1.6.76.jar`（12,424,456 字节，
+  MD5 `D0D39E3A12EB466800656718F9568061`）。**1.6.46 ~ 1.6.75 作废。**
+- 本版本同时带上上一批**镜魂 DoT 到期提示归位**（§53/§54：删掉照片活性的旧到期提示、DoT 按具体镜魂名显示）。
+- 待实机验证：幻影骑士幻灵期间无 BOSS 血条（其他 BOSS 照旧隐藏）；九头蛇幻灵范围内方块完整、
+  火球不炸方块但范围伤害/击退仍在。

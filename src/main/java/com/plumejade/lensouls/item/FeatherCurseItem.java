@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.item;
 
 import com.plumejade.lensouls.client.CurseClientCache;
+import com.plumejade.lensouls.client.CurseProgress;
 import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseGoals;
 import net.minecraft.network.chat.Component;
@@ -44,14 +45,17 @@ public class FeatherCurseItem extends Item {
         String key = def.key();
         boolean shift = shiftDown();
         // ⑦ 的 sectionAt 之后是**祝福**：它们不是「反转」，而是「解锁」
-        int curseCount = def.sectionAt() > 0 ? def.sectionAt() : def.entries();
+        int curseCount = def.curseEntries();
 
         // ── 头部 ──
         tooltip.add(Component.translatable(key + ".desc"));
         tooltip.add(Component.translatable(key + ".wear"));
-        if (def.sectionAt() > 0) {
+        if (def.hasSections()) {
+            // 双段款（⑦）：两个**独立**计数「反转 x / 7 · 祝福 y / 7」
+            // 参数顺序固定为 (诅咒段已反转数, 诅咒段总数, 祝福段已解锁数, 祝福段总数)
             tooltip.add(Component.translatable(key + ".progress_split",
-                    countReversed(def, 0, curseCount), countReversed(def, curseCount, def.entries())));
+                    CurseProgress.reversedBefore(def), def.curseEntries(),
+                    CurseProgress.reversedFrom(def), def.blessingEntries()));
         } else {
             tooltip.add(Component.translatable(key + ".progress", CurseClientCache.reversedCount(def)));
         }
@@ -131,18 +135,9 @@ public class FeatherCurseItem extends Item {
         return Component.literal(" §8[" + text + "]");
     }
 
-    /** 统计 [from, to) 区间里已反转/已解锁的条数（⑦ 的诅咒段与祝福段分开算） */
-    private int countReversed(CurseDef def, int from, int to) {
-        int n = 0;
-        for (int i = from; i < to; i++) {
-            if (CurseClientCache.isReversed(def, i)) n++;
-        }
-        return n;
-    }
-
     /** ⑦ 第 8 条起是祝福，插一行小标题 */
     private void section(List<Component> tooltip, int index) {
-        if (def.sectionAt() > 0 && index == def.sectionAt()) {
+        if (def.hasSections() && index == def.sectionAt()) {
             tooltip.add(Component.literal("§7【祝福】"));
         }
     }

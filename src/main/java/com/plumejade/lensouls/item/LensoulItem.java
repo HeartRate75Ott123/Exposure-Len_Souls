@@ -5,7 +5,6 @@ import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.component.SoulCooldownData;
 import com.plumejade.lensouls.damage.ElementDamage;
-import com.plumejade.lensouls.effect.ModEffects;
 import com.plumejade.lensouls.effect.SoulDotEffect;
 import com.plumejade.lensouls.entity.BossPhantomManager;
 import com.plumejade.lensouls.entity.BossPhantomType;
@@ -18,7 +17,6 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.core.Holder;
 import net.minecraft.world.effect.MobEffect;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -102,6 +100,11 @@ public class LensoulItem extends Item {
 
     public boolean shouldApplySlowness() {
         return applySlowness;
+    }
+
+    /** 是否 BOSS 专属镜魂（到期提示与激活提示用它区分「具体镜魂名」与「元素通用名」） */
+    public boolean isBossSoul() {
+        return isBossSoul;
     }
 
     /**
@@ -292,16 +295,13 @@ public class LensoulItem extends Item {
         int amplifier = getAmplifier(stack);
         Holder<MobEffect> effectHolder = getEffectHolder();
         int durationTicks = Config.DEFAULT_DURATION.get() * 20;
-        // ambient=false / visible=false / showIcon=true：不跑原版发射器（粒子由 applyEffectTick 自绘），HUD 显示图标
-        player.addEffect(new MobEffectInstance(
-                effectHolder, durationTicks, amplifier, false, false, true
-        ));
-
-        // 记录镜魂数据（BOSS 镜魂存 descId，供描边判定与 DoT ×2；减速标记供 DamageHandler）
+        // 记录镜魂数据（BOSS 镜魂存 descId，供描边判定、DoT ×2 与到期提示；减速标记供 DamageHandler）
         String descId = this.isBossSoul ? stack.getDescriptionId() : null;
-        SoulDotEffect.setPlayerData(player, this.element, this.applySlowness, descId);
+        // 统一入口：低等级激活（原版不会覆盖现有效果）时不冲掉正在生效的高等级 BOSS 镜魂来源
+        SoulDotEffect.applySoulEffect(player, effectHolder, this.element, amplifier, durationTicks,
+                this.applySlowness, descId);
 
-        Component soulDisplay = this.damageMultiplier > 1.0f || this.applySlowness
+        Component soulDisplay = this.isBossSoul
                 ? Component.translatable(stack.getDescriptionId())
                 : Component.translatable("element.lensouls." + element.getSerializedName());
         player.sendSystemMessage(

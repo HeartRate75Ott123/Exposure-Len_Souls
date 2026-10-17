@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.client.feather;
 
 import com.plumejade.lensouls.client.CurseClientCache;
+import com.plumejade.lensouls.client.CurseProgress;
 import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.gui.FeatherSlotMenu;
@@ -173,8 +174,21 @@ public class CurseListScreen extends Screen {
 
         String name = Component.translatable("item.lensouls." + def.id()).getString();
         String motto = Component.translatable("item.lensouls." + def.id() + ".motto").getString();
-        String status = Component.translatable("gui.lensouls.curse.status",
-                CurseClientCache.reversedCount(def), def.entries()).getString();
+        // 双段款（⑦）：两个独立计数「反转 x/7 · 祝福 y/7」；其余 6 款维持「已反转 x / N」
+        String status;
+        int statusColor;
+        if (def.hasSections()) {
+            int reversed = CurseProgress.reversedBefore(def);
+            int blessed = CurseProgress.reversedFrom(def);
+            status = Component.translatable("gui.lensouls.curse.status_split",
+                    reversed, def.curseEntries(), blessed, def.blessingEntries()).getString();
+            statusColor = (reversed + blessed) > 0 ? 0x7BE38A : 0xC7CCD6;
+        } else {
+            int reversed = CurseClientCache.reversedCount(def);
+            status = Component.translatable("gui.lensouls.curse.status",
+                    reversed, def.entries()).getString();
+            statusColor = reversed > 0 ? 0x7BE38A : 0xC7CCD6;
+        }
 
         int textY = y + (ROW_H - 2 - 8) / 2;
         int textX = listX + PAD + ICON + PAD;
@@ -184,7 +198,7 @@ public class CurseListScreen extends Screen {
                 0x8A93A0, false);
         int statusW = this.font.width(status);
         graphics.drawString(this.font, status, listX + LIST_W - PAD - statusW, textY,
-                CurseClientCache.reversedCount(def) > 0 ? 0x7BE38A : 0xC7CCD6, false);
+                statusColor, false);
     }
 
     // ========== 交互 ==========

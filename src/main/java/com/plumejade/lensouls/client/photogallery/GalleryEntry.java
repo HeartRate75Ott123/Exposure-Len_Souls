@@ -16,7 +16,8 @@ import net.minecraft.network.chat.Component;
  * @param collected      套装：已窃取（图鉴已解锁）成员数
  * @param collectedTotal 套装：收集口径的总数（首领套 = 需求张数）
  * @param complete       套装：已装备进度达标（画完成标记）
- * @param firstTime      照片页：首次窃取时间（排序用；迁移补记 = 0）
+ * @param firstTime      照片页：首次窃取时间；套装页：**集齐时刻**（排序用；迁移补记 = 0，
+ *                       套装未集齐 = {@link Long#MIN_VALUE}）
  */
 public record GalleryEntry(
         boolean isSet,
@@ -38,9 +39,9 @@ public record GalleryEntry(
 
     public static GalleryEntry set(String setId, Component name, boolean unlocked, boolean favorite,
                                    int photoHave, int photoNeed, int memberTotal,
-                                   int collected, int collectedTotal, boolean complete) {
+                                   int collected, int collectedTotal, boolean complete, long firstTime) {
         return new GalleryEntry(true, setId, name, unlocked, favorite,
-                photoHave, photoNeed, memberTotal, collected, collectedTotal, complete, 0L);
+                photoHave, photoNeed, memberTotal, collected, collectedTotal, complete, firstTime);
     }
 
     /** 收藏键（服务端附件里用的就是这两个前缀） */

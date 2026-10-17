@@ -17,7 +17,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -131,14 +130,13 @@ public class ConverterMenuActivatePacket implements CustomPacketPayload {
             } else {
                 // 基础镜魂
                 int amplifier = soulItem.getAmplifier(soulStack);
-                var effectHolder = soulItem.getEffectHolder();
-                int durationTicks = Config.DEFAULT_DURATION.get() * 20;
-                player.addEffect(new MobEffectInstance(effectHolder, durationTicks, amplifier, false, false, true));
-                com.plumejade.lensouls.effect.SoulDotEffect.setPlayerData(player, soulItem.getElement(),
-                        soulItem.shouldApplySlowness(),
-                        soulItem.getDamageMultiplier() > 1.0f || soulItem.shouldApplySlowness() ? descId : null);
+                String sourceId = soulItem.isBossSoul() ? descId : null;
+                // 统一入口：低等级激活不冲掉正在生效的高等级 BOSS 镜魂来源（到期提示按此显示具体镜魂）
+                com.plumejade.lensouls.effect.SoulDotEffect.applySoulEffect(player, soulItem.getEffectHolder(),
+                        soulItem.getElement(), amplifier, Config.DEFAULT_DURATION.get() * 20,
+                        soulItem.shouldApplySlowness(), sourceId);
                 String soulId = soulItem.getElement().getSerializedName();
-                Component soulDisplay = soulItem.getDamageMultiplier() > 1.0f || soulItem.shouldApplySlowness()
+                Component soulDisplay = soulItem.isBossSoul()
                         ? Component.translatable(descId)
                         : Component.translatable("element.lensouls." + soulId);
                 player.sendSystemMessage(

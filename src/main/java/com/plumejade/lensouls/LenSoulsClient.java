@@ -68,6 +68,10 @@ public class LenSoulsClient {
         NeoForge.EVENT_BUS.register(ToughnessBarRenderer.class);
         NeoForge.EVENT_BUS.register(ScreenShakeApplier.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.SanBarOverlay.class);
+        // ⑦ e5「誓约·封库」：检测到精妙背包 / 维度网络界面就自动关闭（ScreenEvent + ClientTick）
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.curse.LibrarySealScreenHandler.class);
+        // 断线清空诅咒镜像（含「是否装着」的 activeMask），避免跨存档 / 跨服务器残留
+        NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.CurseClientCache::onClientLogout);
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onPlayerTick);
         // 客户端断线时清理幻灵状态
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onClientLogout);

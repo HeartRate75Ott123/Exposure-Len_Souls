@@ -89,6 +89,8 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(GunKillHandler.class);
         NeoForge.EVENT_BUS.register(BossPhantomManager.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.entity.PhantomDamageHandler.class);
+        // 幻灵不破坏方块（EntityMobGriefingEvent / ExplosionEvent.Detonate）
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.PhantomGriefHandler.class);
 
         // ---- 能力系统 ----
         NeoForge.EVENT_BUS.register(AbilityManager.class);

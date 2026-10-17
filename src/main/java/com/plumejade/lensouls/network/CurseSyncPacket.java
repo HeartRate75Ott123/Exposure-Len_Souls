@@ -22,6 +22,10 @@ import org.jetbrains.annotations.NotNull;
  * {@link CurseClientCache}。
  * <p>
  * 编码只发<b>非 0 的进度项</b>（绝大多数条目长期为 0），一次同步通常几十字节。
+ * <p>
+ * <b>{@code activeMask}（1.5.28 追加）</b>：一位一款诅咒 = 「该款此刻被装进槽位」。
+ * 反转掩码已经占满 64 位，塞不下「是否选中」，所以单独一个 {@code int} 跟着发；
+ * 客户端据此才能做 {@code on} / {@code rev} 的等价判断（⑦ e5 封库的客户端拦截要用）。
  */
 public class CurseSyncPacket implements CustomPacketPayload {
 
@@ -34,10 +38,12 @@ public class CurseSyncPacket implements CustomPacketPayload {
 
     private final long mask;
     private final long[] progress;
+    private final int activeMask;
 
-    public CurseSyncPacket(long mask, long[] progress) {
+    public CurseSyncPacket(long mask, long[] progress, int activeMask) {
         this.mask = mask;
         this.progress = progress;
+        this.activeMask = activeMask;
     }
 
     public long mask() {
@@ -48,8 +54,14 @@ public class CurseSyncPacket implements CustomPacketPayload {
         return progress;
     }
 
+    /** 该玩家当前「选中」了哪几款诅咒（位序同 {@code CurseDefs.ALL}） */
+    public int activeMask() {
+        return activeMask;
+    }
+
     private static void encode(RegistryFriendlyByteBuf buf, CurseSyncPacket packet) {
         buf.writeLong(packet.mask);
+        buf.writeVarInt(packet.activeMask);
         int nonZero = 0;
         for (long value : packet.progress) {
             if (value != 0L) nonZero++;
@@ -64,6 +76,7 @@ public class CurseSyncPacket implements CustomPacketPayload {
 
     private static CurseSyncPacket decode(RegistryFriendlyByteBuf buf) {
         long mask = buf.readLong();
+        int activeMask = buf.readVarInt();
         int nonZero = buf.readVarInt();
         long[] progress = new long[CurseDefs.MASK_BITS];
         for (int k = 0; k < nonZero; k++) {
@@ -71,13 +84,14 @@ public class CurseSyncPacket implements CustomPacketPayload {
             long value = buf.readLong();
             if (index >= 0 && index < progress.length) progress[index] = value;
         }
-        return new CurseSyncPacket(mask, progress);
+        return new CurseSyncPacket(mask, progress, activeMask);
     }
 
     /** 服务端把该玩家的当前状态推给本人 */
     public static void send(ServerPlayer player) {
         CurseStateData data = CurseManager.state(player);
-        PacketDistributor.sendToPlayer(player, new CurseSyncPacket(data.mask(), data.progressCopy()));
+        PacketDistributor.sendToPlayer(player,
+                new CurseSyncPacket(data.mask(), data.progressCopy(), CurseManager.activeMask(player)));
     }
 
     @Override
@@ -87,6 +101,6 @@ public class CurseSyncPacket implements CustomPacketPayload {
     }
 
     public static void handle(CurseSyncPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> CurseClientCache.set(packet.mask, packet.progress));
+        context.enqueueWork(() -> CurseClientCache.set(packet.mask, packet.progress, packet.activeMask));
     }
 }

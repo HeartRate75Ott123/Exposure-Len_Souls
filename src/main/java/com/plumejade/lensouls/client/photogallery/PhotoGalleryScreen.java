@@ -8,6 +8,8 @@ import com.plumejade.lensouls.client.feather.GlassPanel;
 import com.plumejade.lensouls.client.feather.RoundedRect;
 import com.plumejade.lensouls.gui.PhotoGalleryMenu;
 import net.minecraft.ChatFormatting;
+import com.plumejade.lensouls.integration.PhotoSpecialEffects;
+import com.plumejade.lensouls.integration.PhotographEffectRegistry;
 import com.plumejade.lensouls.item.EntityPhotographItem;
 import com.plumejade.lensouls.network.PhotoGalleryActionPacket;
 import com.plumejade.lensouls.network.PhotoGalleryShortcutPacket;
@@ -873,6 +875,15 @@ public class PhotoGalleryScreen extends Screen implements MenuAccess<PhotoGaller
                 // 才谈得上去窃取（2026-10 反馈：原来未解锁只显示一行「尚未窃取」，看不到具体效果）。
                 ItemStack stack = EntityPhotographItem.create(entry.id());
                 List<Component> lines = new ArrayList<>(getTooltipFromItem(this.minecraft, stack));
+                // 佩戴时自动获得的属性（Curios 装备后原生渲染的那几行）。
+                // 图鉴里也列出来：**「按 tooltip 搜索」索引的就是这一份**（2026-10 反馈），搜到了得看得见。
+                List<Component> worn = PhotoSpecialEffects.describeWornAttributes(
+                        entry.id(), PhotographEffectRegistry.descriptionText(entry.id()));
+                if (!worn.isEmpty()) {
+                    lines.add(Component.translatable("gui.lensouls.photos.tooltip.worn")
+                            .withStyle(ChatFormatting.GRAY));
+                    lines.addAll(worn);
+                }
                 if (!entry.unlocked()) {
                     lines.add(Component.translatable("gui.lensouls.photos.locked.entity")
                             .withStyle(ChatFormatting.GRAY));

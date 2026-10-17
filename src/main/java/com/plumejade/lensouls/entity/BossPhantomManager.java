@@ -2,7 +2,6 @@ package com.plumejade.lensouls.entity;
 
 import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
-import com.plumejade.lensouls.effect.ElementInfusionEffect;
 import com.plumejade.lensouls.effect.SoulDotEffect;
 import com.plumejade.lensouls.integration.BossPhotoProjHelper;
 import com.plumejade.lensouls.network.PhantomStartPacket;
@@ -67,6 +66,11 @@ public class BossPhantomManager {
     public ServerPlayer findPlayerByPhantomEntityId(int phantomEntityId) {
         BossPhantomData d = activePhantoms.get(phantomEntityId);
         return d != null ? findPlayer(d.playerId()) : null;
+    }
+
+    /** 当前是否还有活跃幻灵（幻灵「不破坏方块」的判定用它做常态短路，无幻灵时零开销）。 */
+    public boolean hasActive() {
+        return !activePhantoms.isEmpty();
     }
 
     // ========== 启动 ==========
@@ -610,6 +614,7 @@ public class BossPhantomManager {
                     // 跨所有维度查找（可能在另一个维度或区块已卸载时找不到）
                     Entity phantom = findEntityAcrossDimensions(d.phantomEntityId());
                     if (phantom != null) {
+                        com.plumejade.lensouls.boss.BossBarCache.unmarkBossBar(phantom);
                         phantom.discard();
                     }
                     it.remove();
@@ -618,6 +623,10 @@ public class BossPhantomManager {
                 }
                 // 召唤物 + 本体重定向：锁定主人敌人、绝不瞄准玩家（Goety 式）
                 applyPhantomAlly(ie, p);
+                // 兜底：第三方自研血条若绕过了 addPlayer 拦截（理论上不会），每 10 tick 清一次
+                if (elapsed % 10 == 0 && ie != null) {
+                    com.plumejade.lensouls.boss.BossBarCache.clearIfPlayers(ie);
+                }
             } else {
                 // ===== 旧版 BossPhantomEntity 模式：仅在旁观期间锁定观察位，之后玩家自由行动 =====
                 if (elapsed < SPECTATOR_TICKS) {
@@ -769,6 +778,8 @@ public class BossPhantomManager {
             phantom = findEntityAcrossDimensions(d.phantomEntityId());
         }
         if (phantom != null) {
+            // 解除血条登记后再丢弃（丢弃本身也会让弱引用表条目消失，这里让语义完整）
+            com.plumejade.lensouls.boss.BossBarCache.unmarkBossBar(phantom);
             phantom.discard();
         } else {
             // 不在任何已加载维度 → 在未加载区块中 → EntityJoinLevelEvent 兜底
@@ -1021,9 +1032,7 @@ public class BossPhantomManager {
             getInstance().clearPlayer(player.getUUID());
             // 清除上一会话残留的挥击去重记录（跨档 tick 残留会导致 boss 弹幕被卡死）
             BossPhotoProjHelper.clearSwing(player.getUUID());
-            // 清除上一会话残留的元素附魔数据（自定义名称、减速标记）
-            ElementInfusionEffect.cleanupPlayer(player);
-            // 清除上一会话残留的镜魂 DoT 数据（镜魂 descId、减速标记）
+            // 清除上一会话残留的镜魂 DoT 数据（镜魂 descId、减速标记；仍有 DoT 的元素会在下次读取时从 NBT 恢复）
             SoulDotEffect.cleanupPlayer(player);
             // 清除残留的定身效果（幻灵期间 Slowness 255 + Resistance 255）
             removeStunEffects(player);

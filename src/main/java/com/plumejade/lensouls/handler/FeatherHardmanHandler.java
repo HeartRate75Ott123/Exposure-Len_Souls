@@ -138,11 +138,10 @@ public class FeatherHardmanHandler {
             if (!CurseManager.on(player, D, 0)) return;
             MobEffectInstance inst = event.getEffectInstance();
             if (inst == null) return;
-            for (Holder<MobEffect> infusion : INFUSIONS) {
-                if (infusion == inst.getEffect()) {
-                    event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
-                    return;
-                }
+            // 用 ElementActivityMath.indexOf：命令/第三方的 Holder 是 Holder.Reference，
+            // 与我们的 DeferredHolder 引用不同，`==` 会漏判（诅咒态就拦不住命令给的活性）。
+            if (ElementActivityMath.indexOf(inst.getEffect()) >= 0) {
+                event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
             }
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ① e1 活性拦截异常", t);
@@ -162,21 +161,11 @@ public class FeatherHardmanHandler {
     }
 
     private static void tick(ServerPlayer player) {
+        // 活性等级统一由 ElementActivityMath 每 tick 结算（来源 + boost − penalty，①
+        // 诅咒态直接清零）；这里不再自己 remove/add，避免两处抢写。
         boolean worn = hasHardman(player);
 
-        // ── e1 蚀灵 ──
-        if (!CurseManager.rev(player, D, 0)) {
-            // 非反转态（含诅咒态 / 未选中）：把我们写过的等级还原
-            restoreActivity(player);
-        }
-        if (worn && CurseManager.on(player, D, 0)) {
-            // 诅咒：失去元素亲和力、药水活性无效 —— 持续清除四种活性
-            for (Holder<MobEffect> infusion : INFUSIONS) {
-                player.removeEffect(infusion);
-            }
-        }
-        // 反转态不再做「事后 chop 掉 2 级 + 重写无限时长」：
-        // −2 级已由 mixin/ElementActivityPenaltyMixin 在 addEffect 之前温和算好（效果不会跳）。
+        // ── e1 蚀灵：活性等级见 ElementActivityMath ──
 
         // ── e3 蚀峰：反转后护甲 +5 ──
         if (CurseManager.rev(player, D, 2)) {
@@ -199,104 +188,6 @@ public class FeatherHardmanHandler {
     private static void removeArmor(ServerPlayer player) {
         AttributeInstance armor = player.getAttribute(Attributes.ARMOR);
         if (armor != null) armor.removeModifier(ARMOR_MODIFIER_ID);
-    }
-
-    /**
-     * e1 反转：活性效果 -2。逐元素维护「玩家自己的基础等级」与「我们写回去的等级」，
-     * 观测值不是我们的产物时说明玩家自己改了等级（喝药水 / 到期），把它采纳为新的基础等级。
-     */
-    // ==================== e1 反转：活性 -2 的**持久化**账本 ====================
-    // ⚠ 必须是持久化（PlayerPersisted 子键），不能只用内存 Map：
-    //   重进游戏内存 Map 清空 ⇒ 每次重登都会「再扣一次 2 级」（累积扣减，活性被越扣越少、
-    //   看起来就像「反转后活性仍被禁用」），而且 restoreActivity 也因拿不到记录永远还原不了。
-
-    /** 玩家自己的基础等级（未扣减）；下标与 INFUSIONS 对齐 */
-    private static final String KEY_ACT_BASE = "lensouls:hardman_act_base";
-    /** 我们写回去的等级（已扣减） */
-    private static final String KEY_ACT_APPLIED = "lensouls:hardman_act_applied";
-    /** 被我们删掉时的剩余时长（用于原样还原） */
-    private static final String KEY_ACT_SAVED = "lensouls:hardman_act_saved";
-
-    private static int[] loadAct(ServerPlayer player, String key) {
-        int[] a = player.getPersistentData()
-                .getCompound(Player.PERSISTED_NBT_TAG).getIntArray(key);
-        return a.length == INFUSIONS.length ? a : new int[INFUSIONS.length];
-    }
-
-    private static void saveAct(ServerPlayer player, String key, int[] a) {
-        CompoundTag tag = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
-        tag.putIntArray(key, a);
-        player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
-    }
-
-    private static void clearAct(ServerPlayer player) {
-        CompoundTag tag = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
-        if (!tag.contains(KEY_ACT_BASE) && !tag.contains(KEY_ACT_APPLIED) && !tag.contains(KEY_ACT_SAVED)) return;
-        tag.remove(KEY_ACT_BASE);
-        tag.remove(KEY_ACT_APPLIED);
-        tag.remove(KEY_ACT_SAVED);
-        player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
-    }
-
-    private static void applyActivityPenalty(ServerPlayer player) {
-        int[] base = loadAct(player, KEY_ACT_BASE);
-        int[] applied = loadAct(player, KEY_ACT_APPLIED);
-        int[] saved = loadAct(player, KEY_ACT_SAVED);
-
-        for (int i = 0; i < INFUSIONS.length; i++) {
-            MobEffectInstance inst = player.getEffect(INFUSIONS[i]);
-            int observed = inst == null ? 0 : inst.getAmplifier() + 1;
-            if (observed != applied[i]) {
-                base[i] = observed;
-                saved[i] = 0;
-            }
-            int desired = Math.max(0, base[i] - ACTIVITY_PENALTY);
-            if (desired != observed) {
-                if (inst != null) {
-                    saved[i] = inst.getDuration();
-                    player.removeEffect(INFUSIONS[i]);
-                }
-                if (desired > 0 && inst != null) {
-                    player.addEffect(new MobEffectInstance(INFUSIONS[i], inst.getDuration(), desired - 1,
-                            inst.isAmbient(), inst.isVisible(), inst.showIcon()));
-                } else if (desired > 0) {
-                    player.addEffect(new MobEffectInstance(INFUSIONS[i],
-                            MobEffectInstance.INFINITE_DURATION, desired - 1, true, true, true));
-                }
-            }
-            applied[i] = desired;
-        }
-        // 账本落盘：下一 tick / 下次登录都靠它，避免重复扣减
-        saveAct(player, KEY_ACT_BASE, base);
-        saveAct(player, KEY_ACT_APPLIED, applied);
-        saveAct(player, KEY_ACT_SAVED, saved);
-    }
-
-    /** 非反转态：把我们扣减过的活性等级还原成玩家自己的基础等级，并清掉本地状态 */
-    private static void restoreActivity(ServerPlayer player) {
-        CompoundTag persistedTag = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
-        if (!persistedTag.contains(KEY_ACT_BASE)) return;      // 没有账本 ⇒ 不是我们改过，别动
-        int[] base = loadAct(player, KEY_ACT_BASE);
-        int[] applied = loadAct(player, KEY_ACT_APPLIED);
-        int[] saved = loadAct(player, KEY_ACT_SAVED);
-
-        for (int i = 0; i < INFUSIONS.length; i++) {
-            MobEffectInstance inst = player.getEffect(INFUSIONS[i]);
-            int observed = inst == null ? 0 : inst.getAmplifier() + 1;
-            if (observed != applied[i]) continue;         // 不是我们的产物 → 不动它
-            if (observed == base[i]) continue;            // 本来就一致
-            if (inst != null) {
-                player.removeEffect(INFUSIONS[i]);
-                if (base[i] > 0) {
-                    player.addEffect(new MobEffectInstance(INFUSIONS[i], inst.getDuration(), base[i] - 1,
-                            inst.isAmbient(), inst.isVisible(), inst.showIcon()));
-                }
-            } else if (base[i] > 0 && saved != null && saved[i] != 0) {
-                // 是我们把它扣到 0 才删掉的 → 按当初记下的剩余时长还原
-                player.addEffect(new MobEffectInstance(INFUSIONS[i], saved[i], base[i] - 1, true, true, true));
-            }
-        }
-        clearAct(player);
     }
 
     /** e1 反转：每有 1 级正数活性 → 1 点附加伤害（点数加算，§2③） */

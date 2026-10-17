@@ -141,6 +141,8 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherTwitcherHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherHardmanHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FeatherAbyssHandler.class);
+        // ---- 元素活性唯一结算点：每 tick 对齐「来源 + boost − penalty」 ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.ElementActivityTicker.class);
         // ---- 诅咒状态（反转掩码 / 逐条进度）：登录时同步给客户端 ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.feather.CurseManager.class);
         // ---- 脱离 Curios：登录时把旧存档戴在饰品栏上的诅咒迁回背包 ----

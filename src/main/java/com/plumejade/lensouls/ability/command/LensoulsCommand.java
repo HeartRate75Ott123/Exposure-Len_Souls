@@ -16,6 +16,7 @@ import com.plumejade.lensouls.boss.BossToughnessManager;
 import com.plumejade.lensouls.config.CopySoulFilter;
 import com.plumejade.lensouls.item.DimensionalGunItem;
 import com.plumejade.lensouls.item.ModItems;
+import com.plumejade.lensouls.handler.ElementActivityMath;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -80,6 +81,38 @@ public class LensoulsCommand {
         dispatcher.register(Commands.literal("lensouls")
                 // 玩家功能：无门槛
                 .then(Commands.literal("photos").executes(ctx -> openPhotoGallery(ctx)))
+
+        // 测试用：一键开启诅咒反转（/lensouls curse reverse <款|all>）
+        .then(Commands.literal("curse").requires(OP)
+                .then(Commands.literal("reverse")
+                        .then(Commands.argument("feather", StringArgumentType.word())
+                                .suggests((c, b) -> SharedSuggestionProvider.suggest(
+                                        java.util.List.of("all", "hardman", "twitcher", "elementrise",
+                                                "abyss", "timecore", "finalrite", "zeroforge"), b))
+                                .executes(ctx -> {
+                                    var sp = ctx.getSource().getPlayerOrException();
+                                    String which = StringArgumentType.getString(ctx, "feather");
+                                    var defs = java.util.List.of(
+                                            com.plumejade.lensouls.feather.CurseDefs.HARDMAN,
+                                            com.plumejade.lensouls.feather.CurseDefs.TWITCHER,
+                                            com.plumejade.lensouls.feather.CurseDefs.ELEMENTRISE,
+                                            com.plumejade.lensouls.feather.CurseDefs.ABYSS,
+                                            com.plumejade.lensouls.feather.CurseDefs.TIMECORE,
+                                            com.plumejade.lensouls.feather.CurseDefs.FINALRITE,
+                                            com.plumejade.lensouls.feather.CurseDefs.ZEROFORGE);
+                                    int done = 0;
+                                    for (var def : defs) {
+                                        if (!which.equals("all") && !def.id().endsWith(which)) continue;
+                                        for (int i = 0; i < def.entries(); i++) {
+                                            com.plumejade.lensouls.feather.CurseManager.reverse(sp, def, i);
+                                            done++;
+                                        }
+                                    }
+                                    final int n = done;
+                                    ctx.getSource().sendSuccess(
+                                            () -> Component.literal("§a已反转 " + n + " 条诅咒"), true);
+                                    return n;
+                                }))))
                 .then(Commands.literal("skill").requires(OP)
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
@@ -258,6 +291,19 @@ public class LensoulsCommand {
                                 .then(Commands.literal("testfalse")
                                         .executes(ctx -> setPhotoSetDebug(ctx, false)))
                         )
+                )
+                .then(Commands.literal("activity").requires(OP)
+                        .then(Commands.literal("state").executes(LensoulsCommand::activityState))
+                        .then(Commands.literal("selftest").executes(LensoulsCommand::activitySelftest))
+                        .then(Commands.argument("verbose", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .executes(ctx -> {
+                                    boolean on = com.mojang.brigadier.arguments.BoolArgumentType
+                                            .getBool(ctx, "verbose");
+                                    com.plumejade.lensouls.handler.ElementActivityMath.VERBOSE = on;
+                                    ctx.getSource().sendSuccess(() -> Component.literal(
+                                            "§a元素活性诊断日志：" + (on ? "开" : "关")), true);
+                                    return 1;
+                                }))
                 )
                 .then(Commands.literal("dump").requires(OP)
                         .then(Commands.literal("mobs")
@@ -445,6 +491,111 @@ public class LensoulsCommand {
                 ? "§a照片套装面板排版调试已开启（打开背包「照片效果」页查看长文本分页）"
                 : "§7照片套装面板排版调试已关闭"), true);
         return 1;
+    }
+
+    /** /lensouls activity state — 逐元素打印：可见等级 / 源等级 / 源剩余 / 应为等级 / 实例时长 */
+    private static int activityState(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx) {
+        ServerPlayer player = ctx.getSource().getPlayer();
+        if (player == null) {
+            ctx.getSource().sendFailure(Component.literal("§c只有玩家可以执行该调试指令"));
+            return 0;
+        }
+        for (String line : com.plumejade.lensouls.handler.ElementActivityMath.describe(player)) {
+            ctx.getSource().sendSuccess(() -> Component.literal(line), false);
+        }
+        return 1;
+    }
+
+    /**
+     * /lensouls activity selftest — 自己跑一遍施加路径，把结果直接打在聊天框里。
+     * <p>
+     * 目的：不再靠人去核对图标。这里用**注册表 Holder**（`/effect` 命令走的正是这条）去施加，
+     * 覆盖三件事：① 命令路径能不能被钩子看见并记账；② 修整后的等级对不对；
+     * ③ 外部清除后会不会被错误地“复活”。
+     * <p>
+     * ⚠ 会清空执行者的全部药水效果（调试指令，仅 OP）。
+     */
+    private static int activitySelftest(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx) {
+        ServerPlayer player = ctx.getSource().getPlayer();
+        if (player == null) {
+            ctx.getSource().sendFailure(Component.literal("§c只有玩家可以执行该调试指令"));
+            return 0;
+        }
+        var src = ctx.getSource();
+        int boost = ElementActivityMath.boost(player);
+        int pen = ElementActivityMath.penalty(player);
+        boolean block = ElementActivityMath.blocked(player);
+        src.sendSuccess(() -> Component.literal(String.format(
+                "§b[自检] 开始：boost(③)=%d penalty(①)=%d 禁=%s", boost, pen, block)), false);
+
+        // ── 基线：清空后连续两次 push，应无任何活性、源记录应为 0 ──
+        player.removeAllEffects();
+        ElementActivityMath.push(player);
+        ElementActivityMath.push(player);
+        int baseSrc = ElementActivityMath.sourceLevel(player, 0);
+        int baseLvl = effectLevel(player);
+        report(ctx, "清零基线", baseLvl == 0 && baseSrc == 0,
+                String.format("可见=%d 源=%d（应 0/0）", baseLvl, baseSrc));
+
+        // ── A：命令路径（Holder.Reference，正是 /effect give 走的这条） ──
+        var holder = BuiltInRegistries.MOB_EFFECT
+                .getHolder(ElementActivityMath.INFUSIONS[0].unwrapKey().orElseThrow()).orElse(null);
+        if (holder == null) {
+            report(ctx, "A 命令路径", false, "取不到注册表 Holder");
+        } else {
+            player.addEffect(new net.minecraft.world.effect.MobEffectInstance(holder, 300, 3, false, true, true));
+            int afterHook = effectLevel(player);
+            int recSrc = ElementActivityMath.sourceLevel(player, 0);
+            int expect = block ? 0 : Math.max(0, 4 + boost - pen);
+            ElementActivityMath.push(player);
+            int afterPush = effectLevel(player);
+            boolean pass = recSrc == 4 && afterPush == expect
+                    && (expect == 0 || afterHook == expect);
+            report(ctx, "A 命令路径（4 级）", pass,
+                    String.format("记账源=%d（应 4）钩子后=%d push后=%d（应 %d）", recSrc, afterHook, afterPush, expect));
+        }
+
+        // ── B：外部清除（/effect clear、牛奶、死亡、别的模组 remove） ──
+        // 先确保存在一份源，再清掉，连续两次 push 都不该复活
+        if (holder != null) {
+            player.addEffect(new net.minecraft.world.effect.MobEffectInstance(holder, 300, 3, false, true, true));
+            ElementActivityMath.push(player);
+        }
+        player.removeAllEffects();
+        ElementActivityMath.push(player);          // 这一下应判定“外部清除→放弃源”
+        ElementActivityMath.push(player);          // 这一下不该重建源
+        int clearSrc = ElementActivityMath.sourceLevel(player, 0);
+        int clearLvl = effectLevel(player);
+        int expectClear = block ? 0 : Math.max(0, boost - pen);
+        report(ctx, "B 外部清除", clearSrc == 0 && clearLvl == expectClear,
+                String.format("源=%d 可见=%d（应 0 / %d）", clearSrc, clearLvl, expectClear));
+
+        // ── C：第一种模式的样子（ambient 蓝框 + 30 秒） ──
+        if (expectClear > 0) {
+            var inst = player.getEffect(ElementActivityMath.INFUSIONS[0]);
+            boolean pass = inst != null && inst.getAmplifier() + 1 == expectClear
+                    && inst.isAmbient() && inst.getDuration() >= 580 && inst.getDuration() <= 600;
+            report(ctx, "C 自建份外观", pass, inst == null ? "没有实例"
+                    : String.format("等级=%d 蓝框=%s 时长=%d（应 %d/true/600）",
+                    inst.getAmplifier() + 1, inst.isAmbient(), inst.getDuration(), expectClear));
+        } else {
+            report(ctx, "C 自建份外观", true, "跳过（③ 未佩戴，应得等级为 0）");
+        }
+
+        src.sendSuccess(() -> Component.literal("§b[自检] 结束（效果已被清空，重新戴羽毛会自动恢复）"), false);
+        return 1;
+    }
+
+    private static int effectLevel(ServerPlayer player) {
+        var inst = player.getEffect(ElementActivityMath.INFUSIONS[0]);
+        return inst == null ? 0 : inst.getAmplifier() + 1;
+    }
+
+    private static void report(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx,
+                               String name, boolean pass, String detail) {
+        String tag = pass ? "§aPASS" : "§cFAIL";
+        LenSouls.LOGGER.info("[ActTest] {} {} — {}", pass ? "PASS" : "FAIL", name, detail);
+        ctx.getSource().sendSuccess(() -> Component.literal("§b[自检] " + tag + " §f" + name + " §7" + detail), false);
     }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();

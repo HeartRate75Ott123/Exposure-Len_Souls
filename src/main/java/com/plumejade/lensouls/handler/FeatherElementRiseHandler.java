@@ -138,85 +138,58 @@ public class FeatherElementRiseHandler {
         }
 
         CompoundTag tag = persisted(player);
-        int[] base = tag.getIntArray(KEY_BASE);
-        if (base.length != INFUSIONS.length) base = new int[INFUSIONS.length];
         int steps = tag.getInt(KEY_STEPS);
         long lastUp = tag.getLong(KEY_LAST_UP);
         long now = player.level().getGameTime();
 
-        // ── 采纳外部等级 ──
-        // 判据是「观测值 vs **我们上次写进去的总量**」（不是 base + steps）：
-        //   不同 ⇒ 外部（照片 / 药水 / 效果到期）改过等级 ⇒ 以**观测值本身**作为外部基准。
-        // ⚠ 不能写成 observed − steps：外部通常以**更高等级覆盖**我们写的那一份，
-        //   此时观测值里并不含我们的 steps，减掉就等于白扣一级
-        //   （用户实测 bug：照片提供 4 级时，躁动应把它加到 5，而不是停在 4 或退回 1）。
-        int[] lastWritten = tag.getIntArray(KEY_WRITTEN);
-        if (lastWritten.length != INFUSIONS.length) lastWritten = new int[INFUSIONS.length];
-        for (int i = 0; i < INFUSIONS.length; i++) {
-            MobEffectInstance inst = player.getEffect(INFUSIONS[i]);
-            int observed = inst == null ? 0 : inst.getAmplifier() + 1;
-            if (observed != lastWritten[i]) {
-                base[i] = Math.max(0, observed);
-            }
-        }
-
-        // 活性等级统一口径 = **四元素药水活性之和**（与本类 activityLevel / 受伤增伤 / cond 同源）
-        //
-        // 计时口径（用户口径）：**不存「下一次到点的绝对时刻」**，只存「上次升级时刻」，
-        // 每次心跳都用**当下等级**重算间隔再比较 ⇒ 时长天然符合当下状态：
-        // 升/降级后剩余时间立刻按新间隔重算，既不会沿用旧值，也不需要额外做比例折算。
-        // （本方法每 tick 调用一次，心跳粒度比 1 秒更细。）
-        int curLevel = Math.max(1, sumLevel(base, steps));
+        // 计时口径（用户口径）：只存「上次升级时刻」，每次心跳用**当下等级**重算间隔再比较
+        // ⇒ 升/降级后剩余时间立刻按新间隔重算，不沿用旧值，也不需要比例折算。
+        // 间隔用**名义 Σ**：取「身上实际活性之和」与「步数」的较大者，
+        // 否则效果还没上身时 Σ=0 ⇒ 间隔退化成 0 ⇒ 狂涨。
+        int curLevel = Math.max(1, Math.max(ElementActivityMath.currentSum(player), steps));
         if (steps <= 0) {
-            // 初次佩戴：直接给 1 级起步（活性等级 0 会让 (4 × L²) 秒退化成 0）
-            steps = 1;
+            steps = 1;                       // 初次佩戴直接起步 1 级（0 级会让 (4 × L²) 秒退化成 0）
             lastUp = now;
         } else if (lastUp <= 0L || now - lastUp >= intervalTicks(curLevel)) {
             steps++;
             lastUp = now;
         }
 
-        tag.putIntArray(KEY_BASE, base);
         tag.putInt(KEY_STEPS, steps);
         tag.putLong(KEY_LAST_UP, lastUp);
         writeBack(player, tag);
 
-        for (int i = 0; i < INFUSIONS.length; i++) {
-            int level = base[i] + steps;
-            // 记下「我们认定的总量」= 外部 + steps（无论下面是否因一致而跳过写入）
-            lastWritten[i] = Math.max(0, level);
-            if (level <= 0) continue;
-            MobEffectInstance cur = player.getEffect(INFUSIONS[i]);
-            boolean already = cur != null
-                    && cur.getAmplifier() + 1 == level
-                    && cur.getDuration() == MobEffectInstance.INFINITE_DURATION;
-            if (already) continue;
-            player.addEffect(new MobEffectInstance(INFUSIONS[i], MobEffectInstance.INFINITE_DURATION,
-                    level - 1, true, true, true));
+        // 效果写入不在这里做：{@link ElementActivityMath#push} 每 tick 幂等对齐一次
+        // （最终等级 = 来源 + steps − ①惩罚），这里只维护步数。
+    }
+
+    /** 卸下 / 未选中：只清旧口径遗留键（步数保留），活性本身由 push 自然降回来源等级 */
+    private static void clearRamp(ServerPlayer player) {
+        CompoundTag tag = persisted(player);
+        // 注意：KEY_STEPS **不清**——它是「元素觉醒者已经叠出来的修改值」，
+        // 卸下只代表暂时不贡献，重装后应继承它继续叠（用户口径）。
+        if (!tag.contains(KEY_NEXT) && !tag.contains(KEY_BASE)
+                && !tag.contains(KEY_INTERVAL_LEVEL) && !tag.contains(KEY_WRITTEN)) {
+            return;
         }
-        // 写入总量要落盘：下一 tick 就靠它判断「外部有没有改过等级」
-        tag.putIntArray(KEY_WRITTEN, lastWritten);
+        tag.remove(KEY_NEXT);
+        tag.remove(KEY_BASE);
+        tag.remove(KEY_INTERVAL_LEVEL);
+        tag.remove(KEY_WRITTEN);
         writeBack(player, tag);
     }
 
-    /** 摘下 / 未选中：移除我们写的常驻活性（只动无限时长者，保留玩家自己喝的有限时长活性）并清状态 */
-    private static void clearRamp(ServerPlayer player) {
-        for (Holder<MobEffect> infusion : INFUSIONS) {
-            MobEffectInstance inst = player.getEffect(infusion);
-            if (inst != null && inst.getDuration() == MobEffectInstance.INFINITE_DURATION) {
-                player.removeEffect(infusion);
-            }
-        }
-        CompoundTag tag = persisted(player);
-        if (tag.contains(KEY_STEPS) || tag.contains(KEY_NEXT) || tag.contains(KEY_BASE)
-                || tag.contains(KEY_INTERVAL_LEVEL) || tag.contains(KEY_WRITTEN)) {
-            tag.remove(KEY_STEPS);
-            tag.remove(KEY_NEXT);
-            tag.remove(KEY_BASE);
-            tag.remove(KEY_INTERVAL_LEVEL);
-            tag.remove(KEY_WRITTEN);
-            writeBack(player, tag);
-        }
+    /** 供控制器读取步数（③ 只维护 steps，不再自己写效果） */
+    static int stepsOf(ServerPlayer p) {
+        // 只有当前佩戴 ③ 时才把步数贡献给控制器；但**存储不因卸下而清空**。
+        // 这正是"effect clear 后只剩 1 级、重装羽毛要重算"的根因：
+        // 现在卸下只是不贡献，重新装配时继承旧值、按新速率继续往上叠。
+        if (!com.plumejade.lensouls.feather.CurseManager.isActive(p, D)) return 0;
+        return persisted(p).getInt(KEY_STEPS);
+    }
+
+    static {
+        ElementActivityMath.boostProvider = FeatherElementRiseHandler::stepsOf;
     }
 
     /** 上次**升级时刻**（gameTime）。只存这个、不存「下次到点时刻」，
@@ -227,22 +200,10 @@ public class FeatherElementRiseHandler {
     /** 我们上次写进去的**总量**（外部 + steps），用于判断外部等级有没有改过 */
     private static final String KEY_WRITTEN = "lensouls:rise_written";
 
-    /** 当前活性等级（内部口径）= 四种药水活性**之和** = Σ(base + steps) */
-    private static int sumLevel(int[] base, int steps) {
-        int sum = 0;
-        for (int b : base) sum += Math.max(0, b + steps);
-        return sum;
-    }
-
+    /** 升级间隔：4 × 活性等级² 秒 */
     private static long intervalTicks(int level) {
         // 二次方（用户口径）：间隔 = 4 × 活性等级² 秒（曾试过三次方，已按用户要求改回平方）
         return (long) E1_INTERVAL_SECONDS_BASE * level * level * 20L;
-    }
-
-    private static int levelOf(int[] base, int steps) {
-        int max = 0;
-        for (int b : base) max = Math.max(max, b + steps);
-        return max;
     }
 
     /**

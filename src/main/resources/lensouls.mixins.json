@@ -23,7 +23,7 @@
     "PhantomMoveTargetAccessor",
     "BlessingCrystalMixin",
     "ServerBossEventMixin",
-    "ElementActivityPenaltyMixin"
+    "ElementActivityAdjustMixin"
   ],
   "client": [
     "client.ItemRendererMixin",

@@ -47,12 +47,14 @@ public abstract class ElementActivityAdjustMixin {
             // 先记账：不论这一份最终能不能落地，来源本身已经存在
             ElementActivityMath.recordSource(sp, idx, sourceLevel, inst.getDuration());
 
-            // 真的改了等级才记（诊断开关打开时，连"没改"的那次也记，用来确认钩子确实看到了它）
-            if (target != sourceLevel || ElementActivityMath.VERBOSE) {
-                logAdjust(sp, idx, sourceLevel, target, inst.getDuration());
+            // 真的改了等级才记；"无需修整"也记一条（长节流），否则这种情况下日志完全静默、
+            // 让人分不清是"钩子没看见"还是"算出来正好相等"。
+            if (target != sourceLevel) {
+                logAdjust(sp, idx, sourceLevel, target, inst.getDuration(), 100L);
+            } else {
+                logAdjust(sp, idx, sourceLevel, target, inst.getDuration(), 400L);
+                return inst;
             }
-
-            if (target == sourceLevel) return inst;
             if (target <= 0) return inst;                           // 交给 push / Applicable 表现为「不施加」
 
             // 只改等级；时长与外观（含 ambient）继承源 —— 这一份就是「改·源数据」
@@ -66,18 +68,19 @@ public abstract class ElementActivityAdjustMixin {
     /** 同一玩家/元素/取值 5 秒内不重复（诊断开关打开时不节流） */
     private static final java.util.Map<String, Long> LAST_LOG = new java.util.HashMap<>();
 
-    private static void logAdjust(ServerPlayer sp, int idx, int sourceLevel, int target, int duration) {
+    private static void logAdjust(ServerPlayer sp, int idx, int sourceLevel, int target, int duration, long throttle) {
         try {
             long now = sp.level().getGameTime();
             String key = sp.getUUID() + "/" + idx + "/" + sourceLevel + ">" + target;
             Long prev = LAST_LOG.get(key);
-            if (!ElementActivityMath.VERBOSE && prev != null && now - prev < 100L) return;
+            if (!ElementActivityMath.VERBOSE && prev != null && now - prev < throttle) return;
             if (LAST_LOG.size() > 512) LAST_LOG.clear();
             LAST_LOG.put(key, now);
-            LenSouls.LOGGER.info("[ActAdjust] {} {} 来源={} (时长={}) → 可见={} (boost={} pen={} 禁={})",
+            LenSouls.LOGGER.info("[ActAdjust] {} {} 来源={} (时长={}) → {}={} (boost={} pen={} 禁={})",
                     sp.getName().getString(), ElementActivityMath.INFUSIONS[idx].value().getDescriptionId(),
-                    sourceLevel, duration, target, ElementActivityMath.boost(sp),
-                    ElementActivityMath.penalty(sp), ElementActivityMath.blocked(sp));
+                    sourceLevel, duration, target == sourceLevel ? "无需修整" : "可见", target,
+                    ElementActivityMath.boost(sp), ElementActivityMath.penalty(sp),
+                    ElementActivityMath.blocked(sp));
         } catch (Throwable ignored) {
         }
     }

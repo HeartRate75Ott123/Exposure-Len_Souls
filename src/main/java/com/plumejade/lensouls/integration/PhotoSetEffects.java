@@ -387,7 +387,15 @@ public class PhotoSetEffects {
         if (effect == null) return;
         int amp = Math.max(0, lvl - 1);
         var inst = player.getEffect(effect);
-        if (inst == null || inst.getDuration() < 100 || inst.getAmplifier() != amp) {
+        // ⚠ 判据不能看可见等级（会被活性修整成别的数字）⇒ 否则每 tick 重发、时长卡在 300。
+        boolean need;
+        if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+            need = com.plumejade.lensouls.handler.ElementActivityMath.needSource(
+                    sp, com.plumejade.lensouls.handler.ElementActivityMath.indexOf(effect), lvl);
+        } else {
+            need = inst == null || inst.getDuration() < 100 || inst.getAmplifier() != amp;
+        }
+        if (need) {
             player.addEffect(new MobEffectInstance(effect, 300, amp, false, false, true));
         }
     }

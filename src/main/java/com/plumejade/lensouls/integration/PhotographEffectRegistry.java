@@ -509,7 +509,17 @@ public class PhotographEffectRegistry {
                 if (effect != null) {
                     int amp = Math.max(0, level - 1);
                     var inst = player.getEffect(effect);
-                    if (inst == null || inst.getDuration() < 100 || inst.getAmplifier() != amp) {
+                    // ⚠ 判据不能看可见等级：它被元素活性修整过（4 → 2），
+                    // 用 `getAmplifier() != amp` 会让这份来源**每 tick** 都认为没生效 ⇒ 无限重发、
+                    // 时长永远卡在 300（15 秒）。服务端玩家交给活性账本判定，其它情况退回旧判据。
+                    boolean need;
+                    if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                        need = com.plumejade.lensouls.handler.ElementActivityMath.needSource(
+                                sp, com.plumejade.lensouls.handler.ElementActivityMath.indexOf(effect), level);
+                    } else {
+                        need = inst == null || inst.getDuration() < 100 || inst.getAmplifier() != amp;
+                    }
+                    if (need) {
                         player.addEffect(new MobEffectInstance(effect, 300, amp, false, false, true));
                     }
                 }

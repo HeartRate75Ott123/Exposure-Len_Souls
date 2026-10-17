@@ -192,6 +192,29 @@ public final class ElementActivityMath {
         return index >= 0 && index < src.length ? src[index] : 0;
     }
 
+    /**
+     * 外部来源该不该「再施加一次」。
+     * <p>
+     * <b>绝不能拿可见等级当判据</b>：可见等级被我们修整过（4 → 2），来源若写
+     * {@code inst.getAmplifier() != 期望} 就会**每 tick 都认为没生效** ⇒ 无限重发，
+     * 表现就是「时长永远卡在 300（15 秒）、一直往下发任务」。
+     * <p>
+     * 判据改成我们自己的账本：该元素有没有活跃源、源等级是不是同一个、剩余时长还够不够。
+     *
+     * @param level 来源这次打算给的等级（可见等级 ≠ 它）
+     */
+    public static boolean needSource(ServerPlayer p, int index, int level) {
+        if (index < 0) return true;
+        int[] src = loadInts(p, KEY_SRC);
+        long[] end = loadLongs(p, KEY_SRC_END);
+        long now = p.level().getGameTime();
+        boolean task = end[index] != 0 && (end[index] == NEVER || end[index] > now);
+        MobEffectInstance cur = p.getEffect(INFUSIONS[index]);
+        int left = cur == null ? -1 : cur.getDuration();
+        boolean holds = task && src[index] == level && (left < 0 || left >= 100);
+        return !holds;
+    }
+
     // ==================== 每 tick 对齐（幂等） ====================
 
     /** 把身上四种活性对齐到当前应有的状态。每 tick 调一次；状态正确时零写入。 */

@@ -28,6 +28,18 @@ public class ModParticleTypes {
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> FLYING_SPARK =
             PARTICLE_TYPES.register("flying_spark", () -> new SimpleParticleType(false));
 
+    /** 夺魂索命 · 失败：紫色魂火（同样的形态，换一套发射器配色） */
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SOUL_WISP_FAIL =
+            PARTICLE_TYPES.register("soul_wisp_fail", () -> new SimpleParticleType(false));
+
+    /** 夺魂索命：绿色魂火（上升 + 螺旋 + 淡出） */
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SOUL_WISP =
+            PARTICLE_TYPES.register("soul_wisp", () -> new SimpleParticleType(false));
+
+    /** N公司2级员工拍照：银白魂尘（同一套魂火形态，银白配色） */
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SOUL_WISP_WHITE =
+            PARTICLE_TYPES.register("soul_wisp_white", () -> new SimpleParticleType(false));
+
     /** 草飘动粒子（弹道尾迹） */
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> GRASS_BLADE =
             PARTICLE_TYPES.register("grass_blade", () -> new SimpleParticleType(false));

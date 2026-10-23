@@ -153,6 +153,7 @@ public class TimeFreezeManager {
 
     private void broadcast(boolean frozen) {
         PacketDistributor.sendToAllPlayers(new FreezeSyncPacket(frozen,
-                frozen ? frozenEntities.toIntArray() : new int[0]));
+                frozen ? frozenEntities.toIntArray() : new int[0],
+                frozen ? sourcePlayerId : null));
     }
 }

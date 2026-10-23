@@ -230,8 +230,9 @@ public class PhotoSetRegistry {
                 int lvl = AttackerElementLoader.getLevel(id, elem);
                 if (lvl > 0) {
                     String name = elementCn(elem);
-                    event.getToolTip().add(Component.literal("§5集齐任意两张" + name + "活性照片，你造成伤害后有概率触发"
-                            + name + "元素抑制；每增两张该元素照片，抑制效果等级+1").withStyle(ChatFormatting.DARK_PURPLE));
+                    event.getToolTip().add(Component.literal("§5每 2 张" + name + "活性照片提供 " + name
+                            + "元素抑制 1 级（每 +2 张再 +1 级）；造成伤害时每种元素独立 3% 概率施加 5 秒该元素抑制")
+                            .withStyle(ChatFormatting.DARK_PURPLE));
                 }
             }
         } catch (Exception ignored) {}

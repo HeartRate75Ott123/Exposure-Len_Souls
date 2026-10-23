@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.ability.handler;
 
+import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.util.TemporalSnapshot;
 import net.minecraft.server.level.ServerPlayer;
@@ -55,6 +56,44 @@ public class TemporalRecallHandler {
         event.setNewDamage(0);
 
         consumePhoto(player, result);
+        // ⑤ 铁序·无援 反转：时空回溯也属于「保命手段」，触发后同样开 10 秒强化窗口
+        com.plumejade.lensouls.handler.curse.TimecoreCurse.grantNoAidGrace(player);
+        player.displayClientMessage(
+                net.minecraft.network.chat.Component.translatable("ability.lensouls.temporal_recall.triggered")
+                        .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
+        // 视觉前摇 + 延迟传送（真正的 apply 在 beginRecall 里，见下）
+        beginRecall(player, snapshot);
+    }
+
+    /**
+     * 时空回溯的统一执行入口（被动保命 / 主动触发共用）。
+     * <p>
+     * 先给客户端发 {@link com.plumejade.lensouls.ability.network.TemporalRecallFxPacket#PHASE_CHARGE}
+     * 让画面向内拉伸，{@code temporalRecallDelayTicks} 后再真正
+     * {@link TemporalSnapshot#apply} 并补发 ARRIVE（落点回弹 + 涟漪）。
+     * <p>
+     * 延迟为 0 时退化成"传送 + 只有落点特效"。玩家在延迟期间死亡/登出则放弃（不再传送）。
+     */
+    public static void beginRecall(ServerPlayer player, TemporalSnapshot snapshot) {
+        if (snapshot == null) return;
+        int delay = Config.TEMPORAL_RECALL_DELAY_TICKS.get();
+
+        if (delay <= 0) {
+            finishRecall(player, snapshot);
+            return;
+        }
+
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                new com.plumejade.lensouls.ability.network.TemporalRecallFxPacket(
+                        com.plumejade.lensouls.ability.network.TemporalRecallFxPacket.PHASE_CHARGE));
+
+        com.plumejade.lensouls.fx.FxScheduler.schedule(delay, () -> {
+            if (!player.isAlive() || player.hasDisconnected()) return;
+            finishRecall(player, snapshot);
+        });
+    }
+
+    private static void finishRecall(ServerPlayer player, TemporalSnapshot snapshot) {
         snapshot.apply(player);
         // 兜底：回溯后血量必须是正数（照片数据异常/维度丢失时都不能把玩家留在 0 血）
         if (player.getHealth() <= 0.0f) {
@@ -62,11 +101,9 @@ public class TemporalRecallHandler {
             LenSouls.LOGGER.warn("[时空回溯] 回溯后血量为 {}，已回填 1 点（玩家 {}）",
                     player.getHealth(), player.getGameProfile().getName());
         }
-        // ⑤ 铁序·无援 反转：时空回溯也属于「保命手段」，触发后同样开 10 秒强化窗口
-        com.plumejade.lensouls.handler.curse.TimecoreCurse.grantNoAidGrace(player);
-        player.displayClientMessage(
-                net.minecraft.network.chat.Component.translatable("ability.lensouls.temporal_recall.triggered")
-                        .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                new com.plumejade.lensouls.ability.network.TemporalRecallFxPacket(
+                        com.plumejade.lensouls.ability.network.TemporalRecallFxPacket.PHASE_ARRIVE));
         // 回溯后易伤叠加（每5次+1级，持续20s，窗口5min）
         applyRecallVulnerability(player);
     }

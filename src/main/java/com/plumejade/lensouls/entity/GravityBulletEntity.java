@@ -185,10 +185,19 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
         }
     }
 
-    /** 检查引力枪 ActiveBulletId 是否仍指向本子弹 */
+    /**
+     * 检查这次牵引是否仍然有效。
+     * <p>
+     * <b>牵引不要求引力枪一直拿在手上</b>：枪只要还在身上（任意背包槽 / 副手）且
+     * {@code ActiveBulletId} 仍指向这颗子弹就继续；<b>找不到枪也继续</b>
+     * （切物品、把枪收进背包/饰品、丢在地上都不该中断），
+     * 结束方式只有三种：再次右键取消（枪里清 ActiveBulletId 并 discard）、目标死亡、
+     * 拥有者死亡/实体被移除 —— <b>牵引阶段没有超时</b>
+     * （{@code TIMEOUT_TICKS} 只管"发射后还没命中"的飞行段，见 tick 内的未命中分支）。
+     */
     private boolean isActivePull(Player player) {
-        if (gunUuid == null) return false;
-        ServerPlayer sp = (ServerPlayer) player;
+        if (gunUuid == null) return true;
+        if (!(player instanceof ServerPlayer sp)) return true;
         for (ItemStack stack : sp.getInventory().items) {
             if (stack.getItem() instanceof GravityGunItem) {
                 CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
@@ -204,7 +213,9 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
                 return tag.getInt("ActiveBulletId") == getId();
             }
         }
-        return false;
+        // 枪不在快捷栏/背包主格/副手（切物品后枪被收进容器、扔地上、或暂时找不到）：
+        // 不当作"取消"，继续牵引，交给超时/目标死亡/再次右键来收尾。
+        return true;
     }
 
     // ======================== 命中 ========================

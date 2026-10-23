@@ -467,6 +467,28 @@ public class PhotoSpecialEffects {
         attr("fdbosses:malkuth", ModAttributes.DODGE_CHANCE.value(), "malkuth_dodge", 0.23, AttributeModifier.Operation.ADD_VALUE);
         attr("fdbosses:geburah", Attributes.ARMOR_TOUGHNESS.value(), "geburah_tough", 7.0, AttributeModifier.Operation.ADD_VALUE);
         attr("fdbosses:geburah", ModAttributes.DODGE_CHANCE.value(), "geburah_dodge", 0.12, AttributeModifier.Operation.ADD_VALUE);
+        // ---- 文案对账补账 ----
+        // 这 18 张照片的手写文案一直写着「近战/远程攻击 +10~15%」，但属性表里从来没有对应条目
+        // （等于文案凭空承诺）。现按原文案补齐 ATTACK_DAMAGE，统一走 ADD_MULTIPLIED_TOTAL，
+        // tooltip 由 describeAttributes 自动生成，不再需要手写这一行。
+        attr("minecraft:skeleton", Attributes.ATTACK_DAMAGE.value(), "skel_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("minecraft:stray", Attributes.ATTACK_DAMAGE.value(), "stray_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("minecraft:bogged", Attributes.ATTACK_DAMAGE.value(), "bogged_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("minecraft:wither", Attributes.ATTACK_DAMAGE.value(), "wither_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("minecraft:wither_skeleton", Attributes.ATTACK_DAMAGE.value(), "ws_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("minecraft:pillager", Attributes.ATTACK_DAMAGE.value(), "pillager_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("cataclysm:draugr", Attributes.ATTACK_DAMAGE.value(), "draugr_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("cataclysm:elite_draugr", Attributes.ATTACK_DAMAGE.value(), "edraugr_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("cataclysm:royal_draugr", Attributes.ATTACK_DAMAGE.value(), "rdraugr_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("cataclysm:drowned_host", Attributes.ATTACK_DAMAGE.value(), "dhost_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("cataclysm:ignited_revenant", Attributes.ATTACK_DAMAGE.value(), "irev_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("cataclysm:ignited_berserker", Attributes.ATTACK_DAMAGE.value(), "iberk_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("cataclysm:the_watcher", Attributes.ATTACK_DAMAGE.value(), "watcher_atk", 0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("legendary_monsters:flameborn_guard", Attributes.ATTACK_DAMAGE.value(), "fbguard_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("legendary_monsters:flameborn_warrior", Attributes.ATTACK_DAMAGE.value(), "fbwar_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("eternal_starlight:lonestar_skeleton", Attributes.ATTACK_DAMAGE.value(), "lsskel_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("eternal_starlight:twilight_gaze", Attributes.ATTACK_DAMAGE.value(), "tgaze_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        attr("block_factorys_bosses:crossbow_pirate", Attributes.ATTACK_DAMAGE.value(), "cp_atk", 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         // ---- 原版 ----
         attr("minecraft:llama", Attributes.KNOCKBACK_RESISTANCE.value(), "llama_kb", 0.5, AttributeModifier.Operation.ADD_VALUE);
         attr("minecraft:llama", Attributes.MOVEMENT_SPEED.value(), "llama_spd", -0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
@@ -1265,6 +1287,12 @@ public class PhotoSpecialEffects {
      * ② 不在这里做「已废弃」以外的过滤。{@code skipText} 仍用于**手写描述已经点过的属性**去重——
      * 命中率不受该去重影响（手写描述从不写它）。
      */
+    /** 只读出口：该照片挂的属性条目（空列表 = 没有属性加成）。 */
+    public static List<AttributeEntry> attributeEntries(String entityId) {
+        List<AttributeEntry> list = tuneMovementSpeed().get(entityId);
+        return list == null ? List.of() : list;
+    }
+
     public static List<Component> describeWornAttributes(String entityId, String skipText) {
         List<Component> lines = new ArrayList<>();
         List<AttributeEntry> list = tuneMovementSpeed().get(entityId);

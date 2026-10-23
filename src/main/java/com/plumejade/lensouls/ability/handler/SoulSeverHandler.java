@@ -5,10 +5,8 @@ import com.plumejade.lensouls.ability.AbilityType;
 import com.plumejade.lensouls.ability.CameraAbilityStore;
 import com.plumejade.lensouls.enchantment.ModEnchantments;
 import com.plumejade.lensouls.sound.ModSounds;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -60,6 +58,7 @@ public class SoulSeverHandler {
         float floor = target.getMaxHealth() * SEVER_FLOOR_RATIO;
         if (target.getHealth() <= floor) {
             failSound(player, target.getX(), target.getY(), target.getZ());
+            sendFx(player, target, false);
             player.getCooldowns().addCooldown(stack.getItem(), 10);
             return;
         }
@@ -73,12 +72,13 @@ public class SoulSeverHandler {
             // ⑤ 铁序·缚己 的反转条件：护甲 ≥30 时用夺魂索命累计造成 10000 点伤害
             // （夺魂索命直接 setHealth，不走伤害事件，所以必须在这里回报）
             com.plumejade.lensouls.handler.curse.TimecoreCurse.onSoulSever(player, before - target.getHealth());
-            spawnShockwave((ServerLevel) player.level(), target);
+            sendFx(player, target, true);
             player.level().playSound(null, target.getX(), target.getY(), target.getZ(),
                     SoundEvents.TRIDENT_THUNDER, SoundSource.PLAYERS, 1.0f, 1.0f);
             player.getCooldowns().addCooldown(stack.getItem(), 200);
         } else {
             failSound(player, target.getX(), target.getY(), target.getZ());
+            sendFx(player, target, false);
             player.getCooldowns().addCooldown(stack.getItem(), 10);
         }
     }
@@ -88,22 +88,19 @@ public class SoulSeverHandler {
                 ModSounds.TOUGHNESS_FAIL.get(), SoundSource.PLAYERS, 1.0f, 1.0f);
     }
 
-    private static void spawnShockwave(ServerLevel level, LivingEntity target) {
-        Vec3 pos = target.position();
-        for (int ring = 0; ring < 3; ring++) {
-            float radius = 1.5f + ring;
-            for (int i = 0; i < 16; i++) {
-                double angle = 2 * Math.PI * i / 16;
-                level.sendParticles(ParticleTypes.SWEEP_ATTACK,
-                        pos.x + Math.cos(angle) * radius, pos.y + 0.5 + ring * 0.3, pos.z + Math.sin(angle) * radius,
-                        1, 0, 0, 0, 0);
-            }
-        }
-        for (int h = 0; h < 8; h++) {
-            level.sendParticles(ParticleTypes.ENCHANTED_HIT,
-                    pos.x, pos.y + h * 0.4, pos.z, 3, 0.2, 0.1, 0.2, 0.05);
-        }
-        level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, pos.x, pos.y + 1, pos.z, 1, 0, 0, 0, 0);
+    /**
+     * 广播"魂飞魄散"特效（客户端着色器 + 粒子）：
+     * 绿色魂火上升、上升收缩环、魂丝、屏幕绿雾与扩散绿环。
+     * <p>
+     * 刻意不再用原版 {@code SWEEP_ATTACK}/{@code ENCHANTED_HIT}/{@code EXPLOSION_EMITTER}
+     * —— 那是橙色暴击特效，与"夺魂"语义不符且不可控。
+     */
+    private static void sendFx(ServerPlayer player, LivingEntity target, boolean success) {
+        Vec3 pos = target != null ? target.position() : player.position();
+        float height = target != null ? target.getBbHeight() : 1.8f;
+        net.neoforged.neoforge.network.PacketDistributor.sendToAllPlayers(
+                new com.plumejade.lensouls.ability.network.SoulSeverFxPacket(
+                        pos.x, pos.y, pos.z, height, success));
     }
 
     private static boolean isCamera(ItemStack stack) {

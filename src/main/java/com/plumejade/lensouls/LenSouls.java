@@ -100,6 +100,7 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FilterTickHandler.class);
         NeoForge.EVENT_BUS.register(SpatialWarpHandler.class);
         NeoForge.EVENT_BUS.register(TemporalRecallHandler.class);
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.fx.FxScheduler.class);
         NeoForge.EVENT_BUS.register(FreezeCleanupHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.ability.command.LensoulsCommand.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.ability.handler.VitalStrikeHandler.class);

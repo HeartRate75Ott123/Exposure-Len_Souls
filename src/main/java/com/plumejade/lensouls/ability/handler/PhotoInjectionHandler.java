@@ -44,6 +44,16 @@ public class PhotoInjectionHandler {
      */
     private static final Map<String, String> elementEntityCache = new ConcurrentHashMap<>();
 
+    /**
+     * 时空回溯快照（拍摄瞬间的维度/坐标/朝向/生命/饥饿）。
+     * <p>
+     * 必须在这里缓存：出片可能发生在很久之后（拍立得在手上、暗房冲洗），
+     * 出片那一刻的位置不是"拍照位置"。与空间扭曲用帧内坐标同源，这里额外需要
+     * 生命/饥饿这些帧里没有的玩家状态，所以直接抓一份完整快照。
+     */
+    private static final Map<String, com.plumejade.lensouls.ability.util.TemporalSnapshot> temporalSnapshotCache =
+            new ConcurrentHashMap<>();
+
     public static Boolean pollBoss(String exposureId) {
         return exposureId != null ? bossFlagCache.remove(exposureId) : null;
     }
@@ -61,6 +71,11 @@ public class PhotoInjectionHandler {
     }
 
     /** 按帧标识符取能力并删除 */
+    /** 取出拍摄瞬间缓存的时空回溯快照（取走即删）。 */
+    public static com.plumejade.lensouls.ability.util.TemporalSnapshot pollTemporalSnapshot(String exposureId) {
+        return exposureId != null ? temporalSnapshotCache.remove(exposureId) : null;
+    }
+
     public static AbilityType pollAbility(String exposureId) {
         return exposureId != null ? pendingAbilities.remove(exposureId) : null;
     }
@@ -137,6 +152,12 @@ public class PhotoInjectionHandler {
             // 按帧 ID 存储能力，后续切换能力不影响已拍帧
             LenSouls.LOGGER.debug("[PhotoInject] onFrameAdded: exposureId={} ability={}", exposureId, ability);
             pendingAbilities.put(exposureId, ability);
+
+            // 时空回溯：快照要记的是"按下快门那一刻"，不是出片那一刻
+            if (ability == AbilityType.TEMPORAL_RECALL) {
+                temporalSnapshotCache.put(exposureId,
+                        com.plumejade.lensouls.ability.util.TemporalSnapshot.capture(player));
+            }
 
             // 见微知著：把画面中的生物自动解锁进图鉴（只读生物，花草等环境豁免；零额外射线）
             if (ability == AbilityType.WILD_GLIMPSE) {

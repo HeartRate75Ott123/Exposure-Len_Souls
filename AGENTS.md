@@ -20,7 +20,7 @@ NeoForge 1.21.1 模组（镜魂），基于 Exposure 相机模组的扩展。详
   `"/c/Program Files/Git/cmd/git.exe" push origin main` 即可（系统 GCM 已有 GitHub 凭据，实测秒过）。
   本地提交仍可用自带 git，只有联网那步换系统 git。
 - 版本号在 `gradle.properties` 的 `mod_version`，构建前先递增
-- 常用交付：构建后复制 JAR 到桌面（`C:/Users/volans/Desktop/`）；提交/推送需用户明确要求
+- 常用交付：**只跑到构建通过就算完成**，**不要**把 JAR 复制到桌面/其它位置（用户自己跑测试、自己取产物）；提交/推送需用户明确要求
 - 语言文件（`assets/lensouls/lang/*.json`）只**追加**键，追加后跑 `python -c "import json; json.load(...)"` 验证；曾发现 en_us 遗留重复键（`command.lensouls.toughness.*`）已清理
 
 ## 工作区路径地图（全面整理后，2026-08 扫描确认）
@@ -3173,3 +3173,146 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
   pwsh 仅留给 Windows 原生场景（见文件顶部「构建与运行」）。
 - 待实机验证：`/lensouls curse days` 与 Xaero HUD 天数一致、普通方块不再加产、无时运工具的矿产量按原版时运 II、
   e23+e11 打高血 BOSS 不再崩、丢手只掉一份、假死后 2 秒内自动回血且日志给出诊断。
+
+## 2026-10 需求批次（`1.7.70` → `1.7.72`）：N公司2级员工的特效重做
+
+### 63. 需求与落点
+
+| 需求 | 实现 |
+|------|------|
+| 拍照命中玩家 → 屏幕「银白 + 闪白 + 取景框 + 横向失焦」 | `client/fx/PhotoShotScreenFx` + `screen_fx.fsh` 新增 `FxBlurH/FxViewfinder/FxViewfinderOpen`（SDF 线绘：四角臂 + 细画幅边框 + **单个**中央圆环 + 圆内十字 + 环外刻度），只发给被拍到的玩家 |
+| 员工位置爆出「夺魂索命那种带辉光的圆形小粒子」 | 新粒子 `ModParticleTypes.SOUL_WISP_WHITE`（复用 `soul_wisp.png` + `PARTICLE_SHEET_TRANSLUCENT`），`Level2StaffFx.cameraBurst` 撒 28+14 颗 |
+| 远程投掷的粒子 → 着色器：十字环外扩 + 深紫粗轨迹 | 删掉服务端每 tick 6 颗 `ParticleTypes.SMOKE`；改为释放瞬间一条 `Level2StaffSpikeFxPacket`（起点/方向/射程），客户端 `Level2StaffFx.spike`：三环（水平 + 两个互垂竖直环，正视 = 圆 + 十字，**环带半宽 0.050**）先收缩聚焦再外扩消散，随后半宽 0.085 的深紫主轨 + 两条螺旋缠绕丝 + 头部光环环 |
+| ~~近战银白刀光~~ | **用户要求放弃**：`Level2StaffSlashFxPacket` / `SlashBurst` / `broadcastSlash` 全部已删除，不要再加回来 |
+
+### 64. 必记的坑（本次逐条踩过/推演过）
+
+- **取景框只留一个圈**：第一版画了外圈 + 内圈（`ringR*0.74` 细环），实机截图反馈"同心双环"太花 →
+  内圈已删，只留一个圆环 + 圆内十字 + 环外四个刻度。
+- **蓄力光环要够厚**：`WorldFx.ring` 的 `halfWidth` 从 0.020 提到 0.050（整条 0.1 格），
+  否则 1~2 格尺度下只剩一条细光边、看不出"蓄力"。
+  配套把蓄力段从 0.10s 拉到 0.14s（`FOCUS`）、环寿命 0.50s（`RING_LIFE`），加粗后能看清"聚焦→推出"。
+- **`FxGrow` 会裁切整批几何的 UV.x**：环的 UV.x 是绕圈角度，所以「长出式轨迹」与「头部光环环」
+  必须分两批 draw（同一批里 grow < 1 会把环啃掉一截）。
+- **顶点 alpha 与 `FxAlpha` 不能同时乘 fade**（会变成平方衰减，尾巴突然消失）：整体淡出只走 `FxAlpha`，
+  顶点 alpha 只表达"刃口亮/拖尾暗"的剖面。
+- 服务端不再为特效每 tick 发包：「拍照生效」「远程释放」各一条，客户端自己按时间推进。
+- 客户端特效必须在 `AFTER_LEVEL`（`WorldFxPass` 统一驱动）；断线清理由 `LenSoulsClient` 的
+  `LoggingOut` 监听一起清 `Level2StaffFx`。
+- **快门对齐音效重音**：拍照的结算点不在动画末尾（2.0s），而在**音效起 1.5s** ——
+  `Level2StaffBossAnimations.CAMERA_SHOOT_SHUTTER_SEC = 1.50f` + `cameraFlashTick/cameraFlashed`，
+  `ST_CAMERA` 分支里先判 `cameraFlashTick` 再判 `cameraEndTick`（两者都落盘进 NBT）。
+  1.5s 是量出来的：`camera_shoot.ogg` 全长 2.168s，1.30~1.44s 近静音（−45→−91 dB）、
+  1.45s 起音、1.50~1.55s 最响（−19 dB）。换素材重测：
+  `ffmpeg -hide_banner -ss T -t 0.08 -i camera_shoot.ogg -af volumedetect -f null -`
+  （注意 `-v error` 会把 volumedetect 的输出一起吞掉）。
+- `camera_shoot` 的视觉与 debuff 同刻触发（同一 tick 内 `applyCameraDebuff`）；
+  魂尘广播 48 格、取景框只给 32 格 debuff 圈内的玩家（同一条包用 boolean 区分）。
+
+## 2026-10 需求批次（`1.7.73` → `1.7.80`）：削韧手感反馈 + 相机取景器的两个顶层叠加层
+
+### 65. 削韧命中：屏幕抖动 + 镜面炸碎（只给出手的人）
+
+| 位置 | 职责 |
+|------|------|
+| `boss/ToughnessFeedbackPacket` | 新 S2C：`(entityId, stun)`。**只发给造成这次韧性伤害的玩家**（`hit(entity, player)` 的 `player`），无归属者才退回广播 |
+| `boss/BossToughnessManager.hit` | `actuallyHit` 时发：`isBroken`（这一下把韧性打空）= `stun` |
+| `client/fx/ToughnessImpactScreenFx` | **两档刻意分开**：普通削韧 = 只有屏幕抖动（CameraShake 抖相机，1.0°/0.26s）；打出定身那一次 = 抖动 2.6°/0.55s + **"冲击"全屏表现**（爆闪 + 径向拉爆 + 径向速度线 + 冲击环 + 冷蓝暗角，0.85s） |
+| `screen_fx.fsh` | 新增 `FxShake`(vec2) / `FxShakeZoom` / `FxShardBurst` / `FxShardScale`；`shatterUV` 支持"炸碎"口径 |
+
+### 65.0 屏幕后处理必须在**第一人称手部之后**画（`1.7.78`/`1.7.79` 修正）
+
+- 现象：削韧的镜面炸碎"没叠在最上层"——世界碎了，但手里的那只会动的东西还是完整的。
+- 根因：`GameRenderer.renderLevel` 的顺序是 `LevelRenderer.renderLevel`（世界，末尾发 `AFTER_LEVEL`）
+  → `RenderSystem.clear(DEPTH)` → `renderItemInHand`（手 / 手持物）。`ScreenFxManager` 原先挂在
+  `AFTER_LEVEL`，所以整屏后处理只盖住了世界层。
+- 现在拆成两半：`onCaptureProjector`（`AFTER_LEVEL`，只更新世界→屏幕投影器，因为只有那里拿得到
+  event 的矩阵）＋ `renderFrame()`（由 `GameRendererFrameEndMixin` 在 `GameRenderer.renderLevel`
+  的 RETURN 调用，即"世界 + 手部都画完、HUD 之前"）。
+- **必须带两个闸**（踩过的坑）：
+  ① `BackgroundScreenshotCaptureTask.isCapturing()` —— Exposure 拍照抓帧会**额外**调一次
+  `GameRenderer.renderLevel`（绑的是抓帧 FBO），不拦会把镜面画到屏幕上、甚至画进照片里；
+  ② `System.nanoTime()` 5ms 去重 —— 同一帧被多次调用时不能把镜面叠着炸两遍。
+- HUD 仍然在它上面（这是刻意的：网页/游戏的后处理惯例是"先处理 3D 层，再画 HUD"）。
+  真要连 HUD 一起碎，只能把 `render()` 挪到帧末（和 `ViewfinderOverlay` 同一个 `GuiGraphics.flush()` 注入点）。
+
+### 65.1 屏幕抖动必须抖相机，不要在后处理里偏移采样（`1.7.77` 修正）
+
+- 第一版是 `screen_fx` 里 `uv = vUV + FxShake`：偏移只有 0.008 UV、还按 `(1-t/T)^2` 衰减，
+  除了头两帧（约 15px）之外每帧只有 2~5px —— 实机反馈"完全看不出来"。
+  结论：**这种幅度下屏幕空间偏移不构成"shake"**，别再往这个方向调数值。
+- 现改为 `client/fx/CameraShake`：监听 NeoForge `ViewportEvent.ComputeCameraAngles`，
+  每帧给 pitch/yaw/roll 各加一点二次衰减的多频振荡（普通 1.0°/0.7°/0.45°、0.26s；
+  定身 2.6°/1.8°/1.2°、0.55s）。世界跟着转、HUD 不动，这才是"撞一下"的观感。
+  参考：Epic Fight 1.21 也是拿这个事件换成它自己的 `BuildCameraTransform`（`Camera.setup` 的 HEAD 注入）。
+- `FxShake` / `FxShakeZoom` 已从 `screen_fx.fsh`、`screen_fx.json`、`ScreenFxManager.State` 里**全部删除**，
+  不要重新加回来（会和相机抖动打架）。
+- 诊断开关：`ScreenFxManager` 首次真正跑后处理时打一行
+  `[ScreenFx] 后处理 pass 已生效（shard=.. flash=.. viewfinder=..）`，
+  配合 `[Toughness] 屏幕反馈触发 stun=..` 可区分「包没到」「effect 没进状态」「pass 没跑」三种情况。
+
+- **镜面碎裂已整体移除（`1.7.80`）**：做过一版"借回溯镜面 + 炸碎口径"的定身表现，实机观感不好
+  （碎片乱飞，像画面故障而不是力道）⇒ 用户要求换掉。`FxShardBurst` / `FxShardScale` 两个 uniform
+  与 `shatterUV` 里的"径向炸开"分支**已全部删除**，`shatterUV` 回到只有时空回溯一种口径（4.5 格硬编码），
+  **不要重新加回来**。
+- 定身那一下现在换成只由现有通道组合的"硬冲击"（见 `ToughnessImpactScreenFx` 的类注释）：
+  爆闪 0.62（0~0.10s）→ 径向拉爆 `warp` 0.95（缓收 0.98s）→ 色散 1.15 + 径向速度线 1.35（0.42s 收完）
+  → 冲击环 `ripple` 0.85（0.55s）→ 冷蓝暗角 `tint` 0.34（缓收）。全通道 u=1 归零，与普通画面衔接。
+- 抖动只偏移**画面采样**（`uv = vUV + FxShake`），HUD 不跟着抖；`shatterUV` 必须传 `uv` 而不是 `vUV`，
+  否则"抖屏 + 炸碎"同时发生时抖动会被吃掉（踩过）。
+- 同一次拍照可能同时削到多只 BOSS：客户端 `ToughnessImpactScreenFx` 用 0.20s 合并窗口去重，
+  定身级会把普通级**升级**（`promote()`），不会叠成两三层抖动。
+
+### 66. 相机取景器之上的两个叠加层（`client/hud/ViewfinderOverlay`）
+
+- **不能挂 `RenderGuiEvent`**：`RenderGuiEvent` 由 `GuiLayerManager` 在 `Gui.render` **内部**派发，
+  而 Exposure 在 `Gui.render` 的 HEAD 画取景器、且默认 `hide_hud_while_in_viewfinder = true` 时会
+  **cancel 掉整个 `Gui.render`** ⇒ 取景器一开，HUD / 动作栏 / `RenderGuiEvent` 全部消失。
+- 正确注入点：`GameRenderer.render` 里唯一那次 `GuiGraphics.flush()`（HUD/屏幕/toast 全画完之后）
+  `shift = AFTER`。此时 GUI 正交矩阵还没弹出（`RoundedRect` 依赖它），画的东西必然最上层。
+  已用 `javap` 核对：该 flush 调用在 `render(DeltaTracker, boolean)` 内**只有一处**。
+- **冷却禁止符**：<b>只在取景器界面里</b>（`CameraClient.viewfinder().isLookingThrough()`）且手持相机
+  （`instanceof CameraItem`，拍立得 `InstantCameraItem` 是其子类）处于
+  `player.getCooldowns().isOnCooldown(item)` 时显示，位置在**取景框底部控制条上方那条空带**
+  （屏幕高度 `CENTER_Y_RATIO = 0.815`），小图标（圆环半径 9 GUI px）。
+  配色沿用羽毛界面（`RoundedRect` + 警示红 `0xFF5A50`）。原版快门冷却默认只有 **2 tick**
+  （`CameraItem.BASE_COOLDOWN`）⇒ 必须有 0.35s **保底展示** + 0.22s 淡出，否则只闪一帧。
+- **取景器提示**：`mixin/client/ActionBarHintMixin` 挂在 `ClientPacketListener.setActionBarText` 的 TAIL，
+  只在「有屏幕打开」或「取景器藏 HUD」时接管，其余仍交给原版动作栏（避免同一句出现两份）。
+  渲染直接复用羽毛界面的 `FeatherToast`（淡入 0.25s / 停留 2s / 淡出 0.5s），所以文字与底板一起渐隐。
+- `LenSoulsClient` 的 `LoggingOut` 清理里补了 `ToughnessImpactScreenFx.reset()` 与 `FeatherToast.clear()`。
+
+### 67. 定身冲击加 RGB 脉冲（`1.7.81`）
+
+- 新通道 `FxRgb`（`screen_fx.fsh` + `screen_fx.json` + `ScreenFxManager.State.rgb`），只由
+  `ToughnessImpactScreenFx` 写；结构是「径向脉冲波 + 色相跑马灯 + 三通道错拍呼吸」，
+  `rim = smoothstep(0.18, 1.02, r)` 让中心几乎不动（不糊准星）、越靠边越强。
+- **着色器里必须放在 `FxTint` 暗角之后**：暗角是 `mix(col, 冷蓝, …)`，放在它前面会被压成灰蓝，
+  边缘跳色全被吃掉（第一版就踩了）。为此定身暗角 alpha 从 0.34 降到 0.30。
+- Java 侧 `beat(t, 7.5)`（`(1-phase)²`，急起慢落）同时驱动：色散振幅（0.40~1.30 起伏）、
+  `s.rgb` 强度（0~0.95）、以及 `s.prism = 0.45 * hit * fast`（冲击环带一半彩虹色，避免"外圈跳色、环还是死银"）。
+  `s.rgb` 包络在 `u ∈ [0.34, 0.72]` 收回（≈0.6s），与冲击环一起收尾。
+- 时空回溯完全不经过这条通道（它只写 shard/prism 那一套），不受影响。
+
+### 68. 定身/RGB 之后的两个回归（`1.7.82`）：后处理频闪 + 夺魂索命环心错位
+
+- **频闪 = 帧去重写成了墙钟猜测（严重，影响所有屏幕后处理）**。`1.7.80` 把后处理挪到
+  `GameRenderer.renderLevel` RETURN 时，为了"同一帧只画一次"加了
+  `if (now - lastFrameNanos < 5_000_000L) return;`。问题是**帧间隔本来就常常小于 5 ms**
+  （>200 FPS 时 4~5ms；掉帧抖动时会来回跨过这条线）⇒ **真帧被当成"同帧"整帧跳过**，
+  实机表现就是"特效几帧消失、几帧出现"的频闪（用户录屏慢放确认）。
+  现在改成精确帧标志：`GameRenderer.render` HEAD（已有 `GameRendererFrameEndMixin.lensouls$beginFrame`）
+  调 `ScreenFxManager.beginFrame()` 清 `drawnThisFrame`，`renderFrame()` 里 `if (drawnThisFrame) return;`。
+  **规则：同一帧去重只能靠帧标志 / 渲染目标身份，绝不能用 `System.nanoTime()` 猜。**
+  抓帧那条路仍由 `BackgroundScreenshotCaptureTask.isCapturing()` 单独挡（在标志之前判）。
+- **夺魂索命的屏幕绿环"错位"**：`SoulSeverFxPacket` 里的坐标是 `entity.position()` = **脚底**，
+  而 `WorldFxBursts.SoulSeverBurst` 的魂丝/魂柱/上升环全在胸口往上（`feet + height*0.42 … 1.5*height`）
+  ⇒ 屏幕环投影在脚底，挂在目标下方 1~3 格，看起来"环飘在别处"。
+  现在 `SoulSeverScreenFx` 收 `height`，环心取 `pos + (0, height*0.5, 0)`（身体中心）。
+  **世界特效与屏幕特效用同一个锚点（身体中心）**，不要再拿 `position()` 直接投。
+- 顺手改的两处：涟漪那句 `pow` 改成乘法（GLSL `pow(x,y)` 在 x<0 时未定义，环内侧恒为负）、
+  夺魂索命圆环 `FxFlicker` 0.3→0.1（沿圆周高频噪声落在大面积细带上，像频闪）。
+  `1.7.83` 一度按"与频闪无关"回退 → **`1.7.84` 按用户确认重新保留**：它们不是频闪真因，
+  但各自都是独立正确的加固，可以和帧去重修复共存。
+  教训：**"几帧有 / 几帧没有"这类整帧开关的问题先怀疑帧级闸门**（本例就是 `nanoTime` 去重），
+  颜色/平滑参数治不了它；但也别把无关改动混进同一版交付，否则定位会被带偏。

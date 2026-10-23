@@ -43,6 +43,16 @@ public final class Level2StaffBossAnimations {
     public static final float CAMERA_SHOOT_LENGTH_SEC = 2.0f;
 
     /**
+     * 快门时刻（秒，从音效开始算）—— 屏幕闪白 / 取景框 / 银白魂尘与 debuff 都在这一拍结算。
+     * <p>
+     * 1.5s 是对着 {@code camera_shoot.ogg} 实测出来的重音位置：该 ogg 全长 2.168s，
+     * 1.30~1.44s 是一段近静音的间隙（−45 → −91 dB），1.45s 起音、1.50~1.55s 最响（−19 dB）。
+     * 换素材后请重新测一遍再用：
+     * {@code ffmpeg -hide_banner -ss T -t 0.08 -i camera_shoot.ogg -af volumedetect -f null -}。
+     */
+    public static final float CAMERA_SHOOT_SHUTTER_SEC = 1.50f;
+
+    /**
      * 随机取一个近战变体，并排除 {@code exclude}（上一次播过的动作名），
      * 保证相邻两次动作不会重复。所有变体都被排除时（理论上只有 1 个变体才会发生）退回普通随机。
      */

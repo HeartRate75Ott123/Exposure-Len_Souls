@@ -131,6 +131,14 @@ public class BossToughnessManager {
                     PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessParticlePacket(entity.getId(), false));
                 }
                 PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessHitSoundPacket(entity.getId(), false));
+                // 屏幕反馈（抖动 + 镜面炸碎）只给「造成这次韧性伤害的人」——旁观者不该跟着抖屏。
+                // 没有归属者（内部/无主调用）时退回广播，至少"削到了"这件事还看得见。
+                ToughnessFeedbackPacket feedback = new ToughnessFeedbackPacket(entity.getId(), isBroken);
+                if (player != null) {
+                    PacketDistributor.sendToPlayer(player, feedback);
+                } else {
+                    PacketDistributor.sendToPlayersTrackingEntity(entity, feedback);
+                }
             } else if (wasInvincible) {
                 PacketDistributor.sendToPlayersTrackingEntity(entity, new ToughnessHitSoundPacket(entity.getId(), true));
             }

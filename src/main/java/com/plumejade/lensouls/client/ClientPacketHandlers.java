@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.client;
 
 import com.plumejade.lensouls.boss.FreezeRejectParticlePacket;
+import com.plumejade.lensouls.boss.ToughnessFeedbackPacket;
 import com.plumejade.lensouls.boss.ToughnessHitSoundPacket;
 import com.plumejade.lensouls.boss.ToughnessParticlePacket;
 import com.plumejade.lensouls.client.phantom.SwarmPhantomClient;
@@ -39,6 +40,14 @@ public class ClientPacketHandlers {
         Level level = Minecraft.getInstance().level;
         if (level == null) return;
         SwarmPhantomClient.put(packet.getEntityId(), packet.getRemainingTicks(), level.getGameTime());
+    }
+
+    /**
+     * 削韧命中的屏幕反馈（只发给出手的玩家）：屏幕抖动 + 镜面炸碎。
+     * 走到这里时玩家一定在客户端上，不需要再判 entity——实体可能已因这一下进入定身。
+     */
+    public static void handleToughnessFeedback(ToughnessFeedbackPacket packet) {
+        com.plumejade.lensouls.client.fx.ToughnessImpactScreenFx.trigger(packet.isStun());
     }
 
     public static void handleToughnessHitSound(ToughnessHitSoundPacket packet) {

@@ -62,11 +62,27 @@ public class LenSoulsClient {
         modEventBus.addListener(LenSoulsClient::registerItemDecorations);
 
         // 客户端游戏事件（RenderLevelStageEvent）
-        NeoForge.EVENT_BUS.register(SpatialWarpOutlineRenderer.class);
         NeoForge.EVENT_BUS.register(FrozenOutlineManager.class);
-        NeoForge.EVENT_BUS.register(GravityTetherRenderer.class);
         NeoForge.EVENT_BUS.register(ToughnessBarRenderer.class);
         NeoForge.EVENT_BUS.register(ScreenShakeApplier.class);
+        // 时间定格 · 冻结天穹（纯客户端天空替换：AFTER_LEVEL 深度掩码全屏 pass，Iris 兼容）
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.ability.client.sky.TimeFreezeSky.class);
+        // 屏幕后处理特效（时空回溯 / 夺魂索命）
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.fx.ScreenFxManager.class);
+        // 世界空间特效统一入口（AFTER_LEVEL：Iris 光影下自定义着色器也能正常显示）
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.fx.WorldFxPass.class);
+        // 屏幕抖动（削韧反馈）：抖相机角度，走 ViewportEvent.ComputeCameraAngles
+        NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.fx.CameraShake::onComputeCameraAngles);
+        // 断线清理客户端特效缓存
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) -> {
+            com.plumejade.lensouls.client.fx.ScreenFxManager.clear();
+            com.plumejade.lensouls.client.fx.WorldFxBursts.clear();
+            com.plumejade.lensouls.client.fx.Level2StaffFx.clear();
+            com.plumejade.lensouls.client.fx.ToughnessImpactScreenFx.reset();
+            com.plumejade.lensouls.client.feather.FeatherToast.clear();
+            com.plumejade.lensouls.client.fx.WorldFxPass.reset();
+            com.plumejade.lensouls.client.fx.TemporalRecallScreenFx.reset();
+        });
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.SanBarOverlay.class);
         // ⑦ e5「誓约·封库」：检测到精妙背包 / 维度网络界面就自动关闭（ScreenEvent + ClientTick）
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.curse.LibrarySealScreenHandler.class);
@@ -268,19 +284,51 @@ public class LenSoulsClient {
             LenSouls.LOGGER.error("[Glint] 实体状态光效着色器加载失败", e);
         }
 
-        // 时间定格黑洞星空 — 天空球（POSITION_COLOR）
+        // 时间定格 · 冻结天穹（全屏四边形，POSITION；z=远平面 + LEQUAL 深度掩码只覆盖天空）
         try {
             event.registerShader(
                     new ShaderInstance(provider,
-                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "black_hole_ring"),
-                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR),
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "timefreeze_sky"),
+                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION),
                     instance -> {
-                        com.plumejade.lensouls.ability.client.GrayOutManager.blackHoleShader = instance;
+                        com.plumejade.lensouls.ability.client.sky.TimeFreezeSky.shader = instance;
+                        LenSouls.LOGGER.info("[TimeFreezeSky] 冻结天穹着色器已加载");
                     }
             );
         } catch (java.io.IOException e) {
-            LenSouls.LOGGER.error("[GrayOut] 黑洞星空着色器加载失败", e);
+            LenSouls.LOGGER.error("[TimeFreezeSky] 冻结天穹着色器加载失败", e);
         }
+
+        // 世界空间发光带（金色电流 / 磁力线 / 魂丝共用一张 fsh，per-draw 设 uniform）
+        try {
+            event.registerShader(
+                    new ShaderInstance(provider,
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "fx_ribbon"),
+                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX_COLOR),
+                    instance -> {
+                        com.plumejade.lensouls.client.fx.WorldFx.shader = instance;
+                        LenSouls.LOGGER.info("[WorldFx] fx_ribbon 着色器已加载");
+                    }
+            );
+        } catch (java.io.IOException e) {
+            LenSouls.LOGGER.error("[WorldFx] fx_ribbon 着色器加载失败", e);
+        }
+
+        // 屏幕后处理（时空回溯拉伸 / 夺魂索命绿雾 / 破防白闪共用一张）
+        try {
+            event.registerShader(
+                    new ShaderInstance(provider,
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "screen_fx"),
+                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION),
+                    instance -> {
+                        com.plumejade.lensouls.client.fx.ScreenFxManager.shader = instance;
+                        LenSouls.LOGGER.info("[ScreenFx] 屏幕特效着色器已加载");
+                    }
+            );
+        } catch (java.io.IOException e) {
+            LenSouls.LOGGER.error("[ScreenFx] 屏幕特效着色器加载失败", e);
+        }
+
     }
 
     /** 注册粒子提供器 */
@@ -295,6 +343,15 @@ public class LenSoulsClient {
                 com.plumejade.lensouls.client.particle.FlyingSparkParticle.PurpleProvider::new);
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.GRASS_BLADE.get(),
                 com.plumejade.lensouls.client.particle.GrassBladeParticle.Provider::new);
+
+        // 夺魂索命：绿色魂火（成功）/ 紫色魂火（失败）
+        event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.SOUL_WISP.get(),
+                com.plumejade.lensouls.client.particle.SoulWispParticle.Provider::new);
+        event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.SOUL_WISP_FAIL.get(),
+                com.plumejade.lensouls.client.particle.SoulWispParticle.FailProvider::new);
+        // N公司2级员工拍照：银白魂尘
+        event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.SOUL_WISP_WHITE.get(),
+                com.plumejade.lensouls.client.particle.SoulWispParticle.WhiteProvider::new);
 
         // 韧性粒子
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.TOUGHNESS_HIT.get(),

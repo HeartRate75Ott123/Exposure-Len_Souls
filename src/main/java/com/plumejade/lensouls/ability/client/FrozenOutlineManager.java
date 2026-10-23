@@ -76,10 +76,8 @@ public class FrozenOutlineManager {
             maskClearedInFrame = false;
 CaptureState.clearFrameCaptures();
             CaptureState.setMainPassActive(true);
-            GrayOutManager.frameStart();
         } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
             CaptureState.setMainPassActive(false);
-            GrayOutManager.markActive();
             if (goldOutlineShader != null && maskTarget != null
                     && (ClientFreezeCache.isTestMode() || ClientFreezeCache.hasAnyFrozen())) {
                 needsComposite = true;

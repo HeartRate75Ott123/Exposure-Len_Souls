@@ -46,7 +46,8 @@
     "client.MinecraftSwingMixin",
     "client.BossHealthOverlayMixin",
     "client.PhantomRemnantScaleMixin",
-    "client.AnnihilationExplosionClockMixin"
+    "client.AnnihilationExplosionClockMixin",
+    "client.ActionBarHintMixin"
   ],
   "injectors": {
     "defaultRequire": 1

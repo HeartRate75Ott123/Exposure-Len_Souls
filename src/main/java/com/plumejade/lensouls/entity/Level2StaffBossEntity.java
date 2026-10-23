@@ -4,7 +4,6 @@ import com.plumejade.lensouls.animation.Level2StaffBossAnimations;
 import com.plumejade.lensouls.animation.Level2StaffBossAnimations.MeleeAnim;
 import com.plumejade.lensouls.animation.Level2StaffBossAnimations.SpikeAnim;
 import com.plumejade.lensouls.sound.ModSounds;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.damagesource.DamageSource;
@@ -35,9 +34,13 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * <p>
  * 每累计造成 5 次近战伤害 → 远离玩家；距离 6~9 格时连续释放两次 spike
  * （spike_hit 在 0.75s、spike_hit2 在 0.9s 释放一次远程 + 音效），两次后重新贴近。
- * 远程为一道自身体中心向玩家的黑烟粒子射线，命中玩家造成 10 点魔法伤害。
+ * 远程为一道自身体中心向玩家的魔法射线（服务端只做判定，视觉是客户端着色器轨迹：
+ * 起手银白「十字环」+ 深紫魔法轨迹），命中玩家造成 14 点魔法伤害。
  * <p>
  * 玩家距离 ≥9 格时尝试 camera_shoot（动画起即播音效，响度/音高浮动），放完再次贴近。
+ * 拍照的"快门"结算不在动画末尾，而在<b>音效起 1.5s</b>（与 {@code camera_shoot.ogg} 里的重音对齐，
+ * 见 {@link Level2StaffBossAnimations#CAMERA_SHOOT_SHUTTER_SEC}）：这一刻同时给 debuff，并由客户端弹出
+ * 「快门闪白 + 取景框 + 横向失焦」、在员工身上爆出银白发光魂尘（附近可见）。
  * <p>
  * 动画仅一条控制器：移动播 walk，攻击经 triggerAnim 播放整段（播完自动回待机/行走）。
  */
@@ -130,6 +133,10 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
 
     // ---- camera 进行中 ----
     private int cameraEndTick;
+    /** 快门时刻（音效起 1.5s，与音效重音对齐）：闪白 + 取景框 + 魂尘 + debuff 都在这一 tick 结算 */
+    private int cameraFlashTick;
+    /** 快门是否已结算（防止跨 tick 重复施加） */
+    private boolean cameraFlashed;
 
     // ---- 远程射线进行中 ----
     private int rayTicksLeft;
@@ -211,6 +218,8 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         tag.putInt(KEY_PREFIX + "spike_shots", spikeShotsDone);
         tag.putString(KEY_PREFIX + "spike_anim", spikeAnimName == null ? "" : spikeAnimName);
         tag.putInt(KEY_PREFIX + "camera_end", cameraEndTick);
+        tag.putInt(KEY_PREFIX + "camera_flash", cameraFlashTick);
+        tag.putBoolean(KEY_PREFIX + "camera_flashed", cameraFlashed);
         tag.putInt(KEY_PREFIX + "ray_ticks", rayTicksLeft);
         tag.putDouble(KEY_PREFIX + "ray_head_x", rayHeadX);
         tag.putDouble(KEY_PREFIX + "ray_head_y", rayHeadY);
@@ -245,6 +254,8 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         spikeShotsDone = tag.getInt(KEY_PREFIX + "spike_shots");
         spikeAnimName = emptyToNull(tag.getString(KEY_PREFIX + "spike_anim"));
         cameraEndTick = tag.getInt(KEY_PREFIX + "camera_end");
+        cameraFlashTick = tag.getInt(KEY_PREFIX + "camera_flash");
+        cameraFlashed = tag.getBoolean(KEY_PREFIX + "camera_flashed");
         rayTicksLeft = tag.getInt(KEY_PREFIX + "ray_ticks");
         rayHeadX = tag.getDouble(KEY_PREFIX + "ray_head_x");
         rayHeadY = tag.getDouble(KEY_PREFIX + "ray_head_y");
@@ -330,9 +341,7 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
 
     /** 平滑转向玩家（身体 + 头部同步）；动作状态（hit/spike/camera）要求实时面朝，转向快 */
     private void faceTarget(LivingEntity target) {
-        double dx = target.getX() - this.getX();
-        double dz = target.getZ() - this.getZ();
-        float yaw = (float) (net.minecraft.util.Mth.atan2(dz, dx) * (180F / Math.PI)) - 90F;
+        float yaw = yawTo(target);
 
         // 高转向速度（90°/tick）：动作期间几乎即时对准玩家
         float yBody = this.rotateTowards(this.yBodyRot, yaw, 90.0F);
@@ -346,6 +355,13 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         if (this.getNavigation().getPath() != null && !this.getNavigation().getPath().isDone()) {
             this.getNavigation().stop();
         }
+    }
+
+    /** 面朝目标的 yaw（MC 角度）；近战刀光要用同一个朝向，所以抽出来共用 */
+    private float yawTo(LivingEntity target) {
+        double dx = target.getX() - this.getX();
+        double dz = target.getZ() - this.getZ();
+        return (float) (net.minecraft.util.Mth.atan2(dz, dx) * (180F / Math.PI)) - 90F;
     }
 
     /** 角度插值逼近（每 tick 最多转 speed 度） */
@@ -516,9 +532,15 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                 }
             }
             case ST_CAMERA -> {
-                // 动画放完 → 施加 debuff 并必然接近玩家（不再进入 spike）
-                if (this.tickCount >= cameraEndTick) {
+                // 快门那一刻（音效起 1.5s，与音效里的重音对齐）：闪白/取景框/魂尘 + debuff 一起结算。
+                // 注意这比动画结束（2.0s）早 0.5s —— 视觉必须踩在重音上，debuff 也就跟着一起给，
+                // 免得"屏幕闪了但实际拍到的范围是 0.5s 后才算的"这种两头不对齐。
+                if (!cameraFlashed && this.tickCount >= cameraFlashTick) {
+                    cameraFlashed = true;
                     applyCameraDebuff();
+                }
+                // 动画放完 → 必然接近玩家（不再进入 spike）
+                if (this.tickCount >= cameraEndTick) {
                     cameraCooldown = 200; // 冷却 10s：期间专心拉近，不触发 camera/中距 spike
                     meleeHits = 0;
                     setActionInactive();
@@ -586,12 +608,18 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.fightState = ST_CAMERA;
         this.cameraEndTick = this.tickCount
                 + Math.round(Level2StaffBossAnimations.CAMERA_SHOOT_LENGTH_SEC * 20f);
+        // 快门时刻：音效起 1.5s —— 正好落在 camera_shoot.ogg 里那段重音的起拍上
+        // （实测该 ogg 长 2.168s，1.30~1.44s 是静音间隙，1.45s 起音、1.50~1.55s 最响）。
+        this.cameraFlashTick = this.tickCount
+                + Math.round(Level2StaffBossAnimations.CAMERA_SHOOT_SHUTTER_SEC * 20f);
+        this.cameraFlashed = false;
         triggerAction(Level2StaffBossAnimations.CAMERA_SHOOT);
         this.lastActionAnimName = Level2StaffBossAnimations.CAMERA_SHOOT;
         playBossSound(ModSounds.LEVEL2_STAFF_CAMERA_SHOOT.get());
     }
 
-    /** camera_shoot：以自身为中心 32 格内所有玩家获得迟缓/挖掘疲劳/虚弱 255 级，持续 15s */
+    /** camera_shoot：以自身为中心 32 格内所有玩家获得迟缓/挖掘疲劳/虚弱 255 级，持续 15s；
+     *  同时广播"员工爆银白魂尘 + 被拍到的人屏幕取景框闪白"（视觉与 debuff 同刻）。 */
     private void applyCameraDebuff() {
         if (level().isClientSide) return;
         int duration = 15 * 20; // 15 秒
@@ -600,13 +628,17 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
                 net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN,
                 net.minecraft.world.effect.MobEffects.DIG_SLOWDOWN,
                 net.minecraft.world.effect.MobEffects.WEAKNESS);
+        java.util.Set<java.util.UUID> hit = new java.util.HashSet<>();
         for (net.minecraft.server.level.ServerPlayer p :
                 level().getEntitiesOfClass(net.minecraft.server.level.ServerPlayer.class,
                         this.getBoundingBox().inflate(32.0D))) {
             for (var e : effects) {
                 p.addEffect(new net.minecraft.world.effect.MobEffectInstance(e, duration, amp, false, true, true));
             }
+            hit.add(p.getUUID());
         }
+        // 视觉：员工身上爆银白魂尘（附近都看得到）；被拍到的玩家屏幕里弹出取景框后处理
+        broadcastCameraFx(hit);
     }
 
     private void resetToIdle() {
@@ -618,13 +650,14 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.rayTicksLeft = 0;
         this.lastSpikeHit = false;
         this.rayResult = -1;
+        this.cameraFlashed = false;
         setActionInactive();
         this.getNavigation().stop();
     }
 
-    // ========== 远程射线（黑烟粒子，命中 10 点魔法伤害） ==========
+    // ========== 远程射线（视觉是客户端着色器轨迹，命中 14 点魔法伤害） ==========
 
-    /** 从自身中心向目标释放一道黑烟粒子射线；命中结果异步由 {@link #tickRay} 写入 {@code lastSpikeHit} */
+    /** 从自身中心向目标释放一道魔法射线；命中结果异步由 {@link #tickRay} 写入 {@code lastSpikeHit} */
     private void fireSmokeRay(Player target) {
         Vec3 origin = this.getEyePosition();
         Vec3 toTarget = target.getEyePosition().subtract(origin);
@@ -639,9 +672,12 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         this.rayDirZ = dir.z;
         this.rayTicksLeft = Math.max(1, (int) Math.ceil(range / RAY_SPEED));
         this.rayResult = -1;   // 飞行中
+
+        // 视觉交给客户端着色器：员工身上爆银白「十字环」，随后一道深紫魔法轨迹飞向目标
+        broadcastSpike(origin, dir, range);
     }
 
-    /** 每 tick 推进射线，撒黑烟粒子，命中玩家造成 10 点魔法伤害 */
+    /** 每 tick 推进射线（纯服务端判定），命中玩家造成魔法伤害 */
     private void tickRay(Player target) {
         if (rayTicksLeft <= 0) return;
         rayTicksLeft--;
@@ -650,13 +686,6 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
         rayHeadX += rayDirX * RAY_SPEED;
         rayHeadY += rayDirY * RAY_SPEED;
         rayHeadZ += rayDirZ * RAY_SPEED;
-
-        // 撒黑烟粒子（客户端广播）
-        if (level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-            serverLevel.sendParticles(ParticleTypes.SMOKE,
-                    rayHeadX, rayHeadY, rayHeadZ,
-                    6, 0.12D, 0.12D, 0.12D, 0.02D);
-        }
 
         // 命中判定：头部接近目标碰撞箱
         if (target.isAlive()) {
@@ -674,6 +703,37 @@ public class Level2StaffBossEntity extends Monster implements GeoEntity {
             // 飞行结束（无论命中与否）记录结果
             lastSpikeHit = rayResult == 1;
             rayHeadX = rayHeadY = rayHeadZ = 0;
+        }
+    }
+
+    // ========== 客户端特效广播（拍照闪 / 远程轨迹） ==========
+    // 特效全部是"服务端发一条包、客户端用着色器自己算"的形式：
+    // 服务端不产生任何粒子（旧的 6 颗/tick 黑烟已删除），也不会因为特效而每 tick 发包。
+    // 近战刀光已按需求放弃（曾实现过银白新月弧，不要重新加回来）。
+
+    /** 远程轨迹：起点 / 方向 / 射程 —— 客户端按与服务端相同的速度（0.7 格/tick）复现 */
+    private void broadcastSpike(Vec3 origin, Vec3 dir, double range) {
+        if (!(level() instanceof net.minecraft.server.level.ServerLevel sl)) return;
+        var packet = new com.plumejade.lensouls.network.Level2StaffSpikeFxPacket(
+                origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, (float) range);
+        for (net.minecraft.server.level.ServerPlayer p : sl.getEntitiesOfClass(
+                net.minecraft.server.level.ServerPlayer.class, this.getBoundingBox().inflate(64.0D))) {
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, packet);
+        }
+    }
+
+    /**
+     * 拍照闪：员工位置爆银白魂尘（48 格内都看得到）；
+     * {@code hit} 里的玩家（32 格 debuff 圈内 = 真正"被拍到"的人）额外获得屏幕取景框。
+     */
+    private void broadcastCameraFx(java.util.Set<java.util.UUID> hit) {
+        if (!(level() instanceof net.minecraft.server.level.ServerLevel sl)) return;
+        float height = this.getBbHeight();
+        for (net.minecraft.server.level.ServerPlayer p : sl.getEntitiesOfClass(
+                net.minecraft.server.level.ServerPlayer.class, this.getBoundingBox().inflate(48.0D))) {
+            var packet = new com.plumejade.lensouls.network.Level2StaffCameraFxPacket(
+                    this.getX(), this.getY(), this.getZ(), height, hit.contains(p.getUUID()));
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, packet);
         }
     }
 

@@ -129,9 +129,9 @@ public class PhotographEffectRegistry {
         add("minecraft:zombie", "", "");
         add("minecraft:husk", "§a免疫 饥饿 效果", "");
         add("minecraft:drowned", "§a赋予 水下呼吸 效果；§a水下攻击 +10%", "");
-        add("minecraft:skeleton", "§a远程攻击 +10%", "§a挥击/远程命中时 15% 概率朝视线方向射出 3 支弓箭", "§a弓箭：每支造成 等同攻击面板 的伤害");
-        add("minecraft:stray", "§a免疫 冰冻 伤害；§a远程攻击 +10%", "");
-        add("minecraft:bogged", "§a免疫 中毒 效果；§a远程攻击 +10%", "");
+        add("minecraft:skeleton", "§a挥击/远程命中时 15% 概率朝视线方向射出 3 支弓箭", "§a弓箭：每支造成 等同攻击面板 的伤害");
+        add("minecraft:stray","§a免疫 冰冻 伤害", "");
+        add("minecraft:bogged","§a免疫 中毒 效果", "");
         add("minecraft:creeper", "§a免疫 爆炸 伤害；§a受到所有来源伤害 -10%", "");
         add("minecraft:enderman", "§a末影人不主动攻击；§a免疫 末影珍珠 伤害", "§c你受到的 魔法 伤害 +12%");
         add("minecraft:endermite", "§a你受到的魔法伤害 -12%；§a免疫 末影珍珠 伤害", "");
@@ -144,19 +144,19 @@ public class PhotographEffectRegistry {
         add("minecraft:cave_spider", "§a免疫 中毒 效果", "§c你受到的近战伤害 +5%");
         add("minecraft:spider", "", "§c你受到的近战伤害 +5%");
         add("minecraft:silverfish", "", "");
-        add("minecraft:warden", "§a免疫 黑暗 效果；§a近战攻击 +15%", "");
-        add("minecraft:wither", "§a免疫 凋零 效果；§a远程攻击 +10%", "§c你受到的治疗量 -20%");
-        add("minecraft:wither_skeleton", "§a免疫 凋零 效果；§a近战攻击 +10%", "");
+        add("minecraft:warden","§a免疫 黑暗 效果", "");
+        add("minecraft:wither","§a免疫 凋零 效果", "§c你受到的治疗量 -20%");
+        add("minecraft:wither_skeleton","§a免疫 凋零 效果", "");
         add("minecraft:skeleton_horse", "", "");
         add("minecraft:zombie_horse", "", "");
         add("minecraft:slime", "§a免疫 摔落 伤害", "");
         add("minecraft:zombified_piglin", "§a赋予 火焰免疫 效果", "§c你受到的魔法伤害 +10%");
         add("minecraft:piglin", "§a赋予 火焰免疫 效果", "§c你受到的魔法伤害 +10%");
-        add("minecraft:piglin_brute", "§a近战攻击 +15%", "");
-        add("minecraft:hoglin", "§a近战攻击 +15%", "§c你受到的魔法伤害 +12%");
-        add("minecraft:zoglin", "§a近战攻击 +10%", "§c你受到的魔法伤害 +12%");
-        add("minecraft:strider", "§a赋予 火焰免疫 效果；§a免疫 熔岩 伤害；§a移动 +5%", "");
-        add("minecraft:ravager", "§a近战攻击 +15%", "");
+        add("minecraft:piglin_brute");
+        add("minecraft:hoglin", "§c你受到的魔法伤害 +12%");
+        add("minecraft:zoglin", "§c你受到的魔法伤害 +12%");
+        add("minecraft:strider","§a赋予 火焰免疫 效果；§a免疫 熔岩 伤害", "");
+        add("minecraft:ravager");
         add("minecraft:vindicator", "§a佩戴时额外获得 1 个照片饰品栏位", "");
         add("minecraft:evoker", "§a魔法攻击 +15%；§a你受到的魔法伤害 -12%", "§c近战伤害 -12%", "§a挥击/远程命中时 15% 概率在视线前方钻出 一排尖牙", "§a尖牙：对范围内目标造成 魔法伤害（原版固定值）");
         // 末影龙：赐福水晶（"免疫摔落"不是新加的 —— PhotoSpecialEffects 里早有
@@ -176,8 +176,8 @@ public class PhotographEffectRegistry {
                 "§a佩戴时免疫 黑暗 效果，并自带 夜视",
                 "§a佩戴时 幻翼/幻术师 进入 6 格会现形 3 秒",
                 "§c佩戴时 你的攻击有 12% 概率落空");
-        add("minecraft:pillager", "§a远程攻击 +10%", "");
-        add("minecraft:vex", "§a移动 +15%", "");
+        add("minecraft:pillager");
+        add("minecraft:vex");
         add("minecraft:shulker", "", "");
         add("minecraft:guardian", "§a赋予 水下呼吸 效果", "");
         add("minecraft:elder_guardian", "§a赋予 海豚恩惠3 效果；§a游泳 +30%", "");
@@ -189,13 +189,13 @@ public class PhotographEffectRegistry {
         add("minecraft:sheep", "§a免疫 细雪 减速效果", "");
         add("minecraft:chicken", "§a免疫 摔落 伤害", "");
         add("minecraft:rabbit", "", "");
-        add("minecraft:wolf", "§a近战攻击 +10%；§a移动 +5%", "");
-        add("minecraft:fox", "§a移动 +10%", "§c受到所有来源伤害 +5%");
+        add("minecraft:wolf");
+        add("minecraft:fox", "§c受到所有来源伤害 +5%");
         add("minecraft:cat", "§a周围 8 格内的 爬行者/幻翼 不会靠近", "");
-        add("minecraft:ocelot", "§a移动 +10%", "");
+        add("minecraft:ocelot");
         add("minecraft:parrot", "§a跳跃提升 + 免疫 摔落 伤害", "");
         add("minecraft:bat", "§a创造飞行§c（飞行时造成的伤害 -90%）", "");
-        add("minecraft:bee", "§a移动 +10%", "");
+        add("minecraft:bee");
         add("minecraft:allay", "§a 8 格内的掉落物自动吸向玩家", "");
         add("minecraft:armadillo", "", "");
         add("minecraft:turtle", "§a赋予 水下呼吸 效果", "");
@@ -205,10 +205,10 @@ public class PhotographEffectRegistry {
         add("minecraft:squid", "§a赋予 水下呼吸 效果；§a游泳 +10%", "");
         add("minecraft:glow_squid", "§a赋予 水下呼吸 效果；§a游泳 +10%", "");
         add("minecraft:goat", "", "");
-        add("minecraft:horse", "§a移动 +10%", "");
-        add("minecraft:donkey", "§a移动 +10%", "");
-        add("minecraft:mule", "§a移动 +10%", "");
-        add("minecraft:polar_bear", "§a近战攻击 +10%", "");
+        add("minecraft:horse");
+        add("minecraft:donkey");
+        add("minecraft:mule");
+        add("minecraft:polar_bear");
         add("minecraft:panda", "", "");
         add("minecraft:snow_golem", "§a免疫 冰冻 伤害", "§c你受到的 火 伤害 +12%");
         add("minecraft:iron_golem", "§a免疫 箭矢/弹射物 伤害", "");
@@ -220,35 +220,35 @@ public class PhotographEffectRegistry {
         add("minecraft:tropical_fish", "§a赋予 水下呼吸 效果；§a游泳 +10%", "");
         add("minecraft:tadpole", "§a游泳 +15%", "");
         add("minecraft:frog", "", "");
-        add("minecraft:camel", "§a移动 +5%", "");
+        add("minecraft:camel");
         add("minecraft:sniffer", "", "");
         add("minecraft:villager", "§a交易价格优惠 +10%", "");
-        add("minecraft:wandering_trader", "§a移动 +10%", "");
+        add("minecraft:wandering_trader");
 
         // ── 暮色森林（重点） ──
         add("twilightforest:hydra", "§a赋予 火焰免疫 效果；§a你受到的远程伤害 -12%", "§c你受到的 冰冻 伤害 +12%");
-        add("twilightforest:alpha_yeti", "§a免疫 冰冻 伤害；§a近战攻击 +10%", "");
+        add("twilightforest:alpha_yeti","§a免疫 冰冻 伤害", "");
         add("twilightforest:naga", "§a荆棘（受近战攻击反伤）", "");
         add("twilightforest:snow_queen", "§a创造飞行§c（飞行时造成的伤害 -90%）", "§c你受到的 火 伤害 +12%");
         add("twilightforest:ur_ghast", "§a创造飞行§c（飞行时造成的伤害 -90%）", "");
         add("twilightforest:lich", "§a魔法攻击 +12%；§a你受到的魔法伤害 -12%", "§c近战伤害 -12%");
-        add("twilightforest:minotaur", "§a近战攻击 +15%", "");
-        add("twilightforest:troll", "§a近战攻击 +15%", "");
-        add("twilightforest:wraith", "§a移动 +10%；§a潜行速度 +20%", "");
-        add("twilightforest:yeti", "§a免疫 冰冻 伤害；§a近战攻击 +10%", "");
+        add("twilightforest:minotaur");
+        add("twilightforest:troll");
+        add("twilightforest:wraith","§a潜行速度 +20%", "");
+        add("twilightforest:yeti","§a免疫 冰冻 伤害", "");
         add("twilightforest:knight_phantom", "§a你受到的凋零伤害 -25%", "");
         add("twilightforest:armored_giant", "", "");
         add("twilightforest:death_tome", "§a魔法攻击 +10%", "");
-        add("twilightforest:minoshroom", "§a近战攻击 +15%", "");
+        add("twilightforest:minoshroom");
         add("twilightforest:helmet_crab", "", "");
         add("twilightforest:quest_ram", "", "");
         add("twilightforest:squirrel", "", "");
         add("twilightforest:hedge_spider", "", "§c你受到的近战伤害 +5%");
         add("twilightforest:swarm_spider", "", "§c你受到的近战伤害 +5%");
         add("twilightforest:king_spider", "", "§c你受到的近战伤害 +5%");
-        add("twilightforest:hostile_wolf", "§a近战攻击 +10%", "");
-        add("twilightforest:winter_wolf", "§a近战攻击 +10%", "");
-        add("twilightforest:mist_wolf", "§a近战攻击 +10%", "");
+        add("twilightforest:hostile_wolf");
+        add("twilightforest:winter_wolf");
+        add("twilightforest:mist_wolf");
         add("twilightforest:fire_beetle", "§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
         add("twilightforest:ice_crystal", "§a免疫 冰冻 伤害", "");
         add("twilightforest:stable_ice_core", "§a免疫 冰冻 伤害", "");
@@ -256,29 +256,29 @@ public class PhotographEffectRegistry {
         add("twilightforest:snow_guardian", "§a免疫 冰冻 伤害", "");
         add("twilightforest:maze_slime", "§a免疫 摔落 伤害", "");
         add("twilightforest:pinch_beetle", "", "");
-        add("twilightforest:redcap", "§a近战攻击 +10%", "");
-        add("twilightforest:redcap_sapper", "§a近战攻击 +10%", "");
-        add("twilightforest:lower_goblin_knight", "§a近战攻击 +10%", "");
-        add("twilightforest:upper_goblin_knight", "§a近战攻击 +10%", "");
-        add("twilightforest:blockchain_goblin", "§a近战攻击 +10%", "");
+        add("twilightforest:redcap");
+        add("twilightforest:redcap_sapper");
+        add("twilightforest:lower_goblin_knight");
+        add("twilightforest:upper_goblin_knight");
+        add("twilightforest:blockchain_goblin");
         add("twilightforest:carminite_ghastguard", "§a免疫 爆炸 伤害；§a免疫 弹射物 伤害", "");
         add("twilightforest:carminite_ghastling", "§a免疫 摔落 伤害", "");
         add("twilightforest:carminite_broodling", "§a免疫 摔落 伤害", "");
         add("twilightforest:carminite_golem", "§a免疫 爆炸 伤害；§a免疫 弹射物 伤害", "");
-        add("twilightforest:kobold", "§a移动 +10%", "");
+        add("twilightforest:kobold");
         add("twilightforest:slime_beetle", "", "");
         add("twilightforest:skeleton_druid", "§a魔法攻击 +10%", "");
         add("twilightforest:bighorn_sheep", "§a免疫 细雪 减速", "");
-        add("twilightforest:boar", "§a近战攻击 +5%", "");
-        add("twilightforest:deer", "§a移动 +10%", "");
+        add("twilightforest:boar");
+        add("twilightforest:deer");
         add("twilightforest:dwarf_rabbit", "", "");
         add("twilightforest:giant_miner", "", "");
         add("twilightforest:lich_minion", "§a魔法攻击 +5%", "");
         add("twilightforest:loyal_zombie", "", "");
-        add("twilightforest:mosquito_swarm", "§a移动 +10%", "");
+        add("twilightforest:mosquito_swarm");
         add("twilightforest:penguin", "§a游泳 +15%", "");
-        add("twilightforest:raven", "§a移动 +10%", "");
-        add("twilightforest:rising_zombie", "§a近战攻击 +5%", "");
+        add("twilightforest:raven");
+        add("twilightforest:rising_zombie");
         add("twilightforest:tiny_bird", "§a免疫 摔落 伤害", "");
         add("twilightforest:towerwood_borer", "", "");
 
@@ -287,30 +287,30 @@ public class PhotographEffectRegistry {
         add("cataclysm:coral_golem", "", "");
         add("cataclysm:deepling", "§a赋予 水下呼吸 效果", "");
         add("cataclysm:deepling_angler", "§a游泳 +15%", "");
-        add("cataclysm:deepling_brute", "§a近战攻击 +10%", "");
+        add("cataclysm:deepling_brute");
         add("cataclysm:deepling_priest", "§a你受到的魔法伤害 -12%", "§c近战伤害 -5%");
         add("cataclysm:deepling_warlock", "§a魔法攻击 +10%", "");
-        add("cataclysm:draugr", "§a免疫 凋零 效果；§a近战攻击 +10%", "");
-        add("cataclysm:elite_draugr", "§a免疫 凋零 效果；§a近战攻击 +10%", "");
-        add("cataclysm:royal_draugr", "§a免疫 凋零 效果；§a近战攻击 +10%", "");
-        add("cataclysm:drowned_host", "§a近战攻击 +10%", "");
+        add("cataclysm:draugr","§a免疫 凋零 效果", "");
+        add("cataclysm:elite_draugr","§a免疫 凋零 效果", "");
+        add("cataclysm:royal_draugr","§a免疫 凋零 效果", "");
+        add("cataclysm:drowned_host");
         add("cataclysm:ender_golem", "§a免疫 弹射物 伤害", "");
         add("cataclysm:endermaptera", "§a你受到的魔法伤害 -12%", "");
         add("cataclysm:hippocamtus", "§a游泳 +20%", "");
-        add("cataclysm:ignited_revenant", "§a赋予 火焰免疫 效果；§a近战攻击 +10%", "§c你受到的 冰冻 伤害 +12%");
-        add("cataclysm:ignited_berserker", "§a赋予 火焰免疫 效果；§a近战攻击 +10%", "§c你受到的 冰冻 伤害 +12%");
-        add("cataclysm:koboleton", "§a近战攻击 +10%", "");
-        add("cataclysm:kobolediator", "§a近战攻击 +10%", "");
+        add("cataclysm:ignited_revenant","§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
+        add("cataclysm:ignited_berserker","§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
+        add("cataclysm:koboleton");
+        add("cataclysm:kobolediator");
         add("cataclysm:lionfish", "§a赋予 水下呼吸 效果；§a游泳 +20%", "§c你受到的近战伤害 +5%");
-        add("cataclysm:the_watcher", "§a远程攻击 +15%", "§c近战伤害 -12%");
-        add("cataclysm:the_prowler", "§a移动 +10%；§a你受到的远程伤害 -12%", "");
+        add("cataclysm:the_watcher", "§c近战伤害 -12%");
+        add("cataclysm:the_prowler","§a你受到的远程伤害 -12%", "");
         add("cataclysm:urchinkin", "", "§c你受到的近战伤害 +5%");
         add("cataclysm:symbiocto", "§a赋予 水下呼吸 效果", "");
         add("cataclysm:wadjet", "§a魔法攻击 +10%；§a你受到的魔法伤害 -12%", "");
-        add("cataclysm:clawdian", "§a近战攻击 +10%", "");
-        add("cataclysm:cindaria", "§a近战攻击 +10%", "");
-        add("cataclysm:coralssus", "§a近战攻击 +10%", "");
-        add("cataclysm:aptrgangr", "§a近战攻击 +10%", "");
+        add("cataclysm:clawdian");
+        add("cataclysm:cindaria");
+        add("cataclysm:coralssus");
+        add("cataclysm:aptrgangr");
         add("cataclysm:modern_remnant", "", "");
         add("cataclysm:netherite_ministrosity", "", "");
         add("cataclysm:the_baby_leviathan", "§a赋予 水下呼吸 效果；§a游泳 +20%", "");
@@ -321,36 +321,36 @@ public class PhotographEffectRegistry {
         add("legendary_monsters:endersent", "§a你受到的魔法伤害 -12%", "§c近战伤害 -5%");
         add("legendary_monsters:the_obliterator", "§a你受到的所有来源伤害 -10%", "§a挥击/远程命中时 15% 概率向视线方向发射 湮灭激光", "§a湮灭激光：30 格贯穿射线，持续 1.5 秒；每段判定造成 等同攻击面板 + 目标最大生命 2% 的伤害");
         add("legendary_monsters:frostbitten_golem", "§a免疫 冰冻 伤害", "§c你受到的 火 伤害 +12%");
-        add("legendary_monsters:withered_abomination", "§a免疫 凋零 效果；§a近战攻击 +10%", "§c你受到的治疗量 -10%");
+        add("legendary_monsters:withered_abomination","§a免疫 凋零 效果", "§c你受到的治疗量 -10%");
         add("legendary_monsters:skeletosaurus", "§a免疫 箭矢/弹射物 伤害", "");
-        add("legendary_monsters:dune_sentinel", "§a移动 +10%", "");
+        add("legendary_monsters:dune_sentinel");
         add("legendary_monsters:shulker_mimic", "§a免疫 弹射物 伤害（反弹弹射物）", "");
         add("legendary_monsters:ancient_guardian", "§a你受到的魔法伤害 -12%", "");
         add("legendary_monsters:annihilation_pursuer", "§a你受到的近战伤害 -12%", "");
         add("legendary_monsters:flame_drifter", "§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
-        add("legendary_monsters:flameborn_guard", "§a赋予 火焰免疫 效果；§a近战攻击 +10%", "§c你受到的 冰冻 伤害 +12%");
-        add("legendary_monsters:flameborn_warrior", "§a赋予 火焰免疫 效果；§a近战攻击 +10%", "§c你受到的 冰冻 伤害 +12%");
-        add("legendary_monsters:ambusher", "§a移动 +10%", "");
-        add("legendary_monsters:beheaded_knight", "§a近战攻击 +10%", "");
+        add("legendary_monsters:flameborn_guard","§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
+        add("legendary_monsters:flameborn_warrior","§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
+        add("legendary_monsters:ambusher");
+        add("legendary_monsters:beheaded_knight");
         add("legendary_monsters:chorusling", "§a免疫 末影珍珠 伤害", "§c你受到的魔法伤害 +12%");
         add("legendary_monsters:knights_armor", "", "");
         add("legendary_monsters:mossy_golem", "", "");
-        add("legendary_monsters:resurrected_knight", "§a近战攻击 +10%；§a免疫 凋零 效果", "");
-        add("legendary_monsters:skeloraptor", "§a移动 +10%", "");
+        add("legendary_monsters:resurrected_knight","§a免疫 凋零 效果", "");
+        add("legendary_monsters:skeloraptor");
         add("legendary_monsters:spiky_bug", "", "§c你受到的近战伤害 +5%");
-        add("legendary_monsters:fractured", "§a近战攻击 +10%；§a你受到的魔法伤害 -12%", "");
-        add("legendary_monsters:fractured_apostle", "§a近战攻击 +10%；§a你受到的魔法伤害 -12%", "");
-        add("legendary_monsters:guard", "§a近战攻击 +10%", "");
-        add("legendary_monsters:haunted_guard", "§a近战攻击 +10%", "");
-        add("legendary_monsters:haunted_knight", "§a近战攻击 +10%", "");
-        add("legendary_monsters:hovering_hurricane", "§a移动 +10%", "");
-        add("legendary_monsters:stratling", "§a近战攻击 +10%", "");
-        add("legendary_monsters:wandering_eye", "§a远程攻击 +10%", "");
+        add("legendary_monsters:fractured","§a你受到的魔法伤害 -12%", "");
+        add("legendary_monsters:fractured_apostle","§a你受到的魔法伤害 -12%", "");
+        add("legendary_monsters:guard");
+        add("legendary_monsters:haunted_guard");
+        add("legendary_monsters:haunted_knight");
+        add("legendary_monsters:hovering_hurricane");
+        add("legendary_monsters:stratling");
+        add("legendary_monsters:wandering_eye");
         add("legendary_monsters:warped_fungussus", "§a赋予 再生1 效果", "");
         add("legendary_monsters:bomber", "§a免疫 爆炸 伤害", "");
 
         // ── 永恒星光（重点） ──
-        add("eternal_starlight:lunar_monstrosity", "§a你受到的魔法伤害 -12%；§a近战攻击 +10%", "");
+        add("eternal_starlight:lunar_monstrosity","§a你受到的魔法伤害 -12%", "");
         add("eternal_starlight:the_gatekeeper", "§a你受到的所有来源伤害 -12%；§a魔法攻击 +10%", "");
         add("eternal_starlight:starlight_golem", "", "");
         add("eternal_starlight:aethersent_golem", "", "");
@@ -358,17 +358,17 @@ public class PhotographEffectRegistry {
         add("eternal_starlight:ent", "§a赋予 再生1 效果", "");
         add("eternal_starlight:freeze", "§a免疫 冰冻 伤害", "");
         add("eternal_starlight:permafrost", "§a免疫 冰冻 伤害", "");
-        add("eternal_starlight:stranghoul", "§a近战攻击 +10%", "");
-        add("eternal_starlight:lonestar_skeleton", "§a远程攻击 +10%", "");
+        add("eternal_starlight:stranghoul");
+        add("eternal_starlight:lonestar_skeleton");
         add("eternal_starlight:nightfall_spider", "", "§c你受到的近战伤害 +5%");
-        add("eternal_starlight:seeker", "§a移动 +10%", "");
-        add("eternal_starlight:tangled", "§a近战攻击 +10%", "");
-        add("eternal_starlight:tangled_skull", "§a近战攻击 +10%", "");
-        add("eternal_starlight:thirst_walker", "§a近战攻击 +10%", "");
-        add("eternal_starlight:ratlin", "§a移动 +10%", "");
-        add("eternal_starlight:zombified_ratlin", "§a移动 +10%", "");
-        add("eternal_starlight:gleech", "§a移动 +10%", "");
-        add("eternal_starlight:aurora_deer", "§a移动 +10%", "");
+        add("eternal_starlight:seeker");
+        add("eternal_starlight:tangled");
+        add("eternal_starlight:tangled_skull");
+        add("eternal_starlight:thirst_walker");
+        add("eternal_starlight:ratlin");
+        add("eternal_starlight:zombified_ratlin");
+        add("eternal_starlight:gleech");
+        add("eternal_starlight:aurora_deer");
         add("eternal_starlight:creteor", "§a你受到的魔法伤害 -12%", "");
         add("eternal_starlight:tiny_creteor", "§a你受到的魔法伤害 -12%", "");
         add("eternal_starlight:crystallized_moth", "§a免疫 摔落 伤害", "");
@@ -376,42 +376,42 @@ public class PhotographEffectRegistry {
         add("eternal_starlight:luminofish", "§a赋予 水下呼吸 效果；§a游泳 +15%", "");
         add("eternal_starlight:rookfish", "§a赋予 水下呼吸 效果；§a游泳 +15%", "");
         add("eternal_starlight:shadow_snail", "", "");
-        add("eternal_starlight:shimmer_lacewing", "§a移动 +10%", "");
+        add("eternal_starlight:shimmer_lacewing");
         add("eternal_starlight:starfire_bird", "§a免疫 摔落 伤害", "");
-        add("eternal_starlight:twilight_gaze", "§a远程攻击 +10%", "");
-        add("eternal_starlight:yeti", "§a免疫 冰冻 伤害；§a近战攻击 +10%", "");
+        add("eternal_starlight:twilight_gaze");
+        add("eternal_starlight:yeti","§a免疫 冰冻 伤害", "");
 
         // ── 首领崛起（重点） ──
         add("block_factorys_bosses:yeti", "§a免疫 冰冻 伤害；§a赋予 力量1 效果", "");
         add("block_factorys_bosses:underworld_knight", "§a赋予 火焰免疫 效果；§a免疫 凋零 效果", "");
-        add("block_factorys_bosses:kraken", "§a赋予 水下呼吸 效果；§a游泳 +30%；§a近战攻击 +10%", "");
-        add("block_factorys_bosses:infernal_dragon", "§a赋予 火焰免疫 效果；§a免疫 弹射物 伤害；§a近战攻击 +10%", "§c你受到的 冰冻 伤害 +12%");
+        add("block_factorys_bosses:kraken","§a赋予 水下呼吸 效果；§a游泳 +30%", "");
+        add("block_factorys_bosses:infernal_dragon","§a赋予 火焰免疫 效果；§a免疫 弹射物 伤害", "§c你受到的 冰冻 伤害 +12%");
         add("block_factorys_bosses:sandworm", "", "");
-        add("block_factorys_bosses:soul_knight_wither_skeleton", "§a免疫 凋零 效果；§a近战攻击 +10%", "");
-        add("block_factorys_bosses:soul_skeleton", "§a免疫 凋零 效果；§a近战攻击 +10%", "");
-        add("block_factorys_bosses:crossbow_pirate", "§a远程攻击 +10%", "");
-        add("block_factorys_bosses:dragon_guard_sword", "§a近战攻击 +10%", "");
-        add("block_factorys_bosses:flaming_skeleton_guard_fireball", "§a赋予 火焰免疫 效果；§a近战攻击 +10%", "§c你受到的 冰冻 伤害 +12%");
-        add("block_factorys_bosses:flaming_skeleton_guard_sword", "§a赋予 火焰免疫 效果；§a近战攻击 +10%", "§c你受到的 冰冻 伤害 +12%");
-        add("block_factorys_bosses:kraken_tentacle", "§a近战攻击 +5%", "");
+        add("block_factorys_bosses:soul_knight_wither_skeleton","§a免疫 凋零 效果", "");
+        add("block_factorys_bosses:soul_skeleton","§a免疫 凋零 效果", "");
+        add("block_factorys_bosses:crossbow_pirate");
+        add("block_factorys_bosses:dragon_guard_sword");
+        add("block_factorys_bosses:flaming_skeleton_guard_fireball","§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
+        add("block_factorys_bosses:flaming_skeleton_guard_sword","§a赋予 火焰免疫 效果", "§c你受到的 冰冻 伤害 +12%");
+        add("block_factorys_bosses:kraken_tentacle");
         add("block_factorys_bosses:pile_of_bones", "", "");
-        add("block_factorys_bosses:pirate_captain", "§a近战攻击 +10%；§a远程攻击 +5%", "");
-        add("block_factorys_bosses:pirate_rook", "§a近战攻击 +10%", "");
+        add("block_factorys_bosses:pirate_captain");
+        add("block_factorys_bosses:pirate_rook");
 
         // ── lensouls 自身 ──
-        add("lensouls:twitcher", "§a移动 +10%", "");
+        add("lensouls:twitcher");
 
         // ── 逆卡巴拉：觉醒（archaion）──
-        add("archaion:brave", "§7逆卡巴拉：觉醒——勇魂守卫。", "");
-        add("archaion:deepslate_sentinel", "§7逆卡巴拉：觉醒——深板岩哨卫。", "");
-        add("archaion:grimoray", "§7逆卡巴拉：觉醒——秘法游魂。", "");
-        add("archaion:haunter", "§7逆卡巴拉：觉醒——逐影猎手。", "");
+        add("archaion:brave");
+        add("archaion:deepslate_sentinel");
+        add("archaion:grimoray");
+        add("archaion:haunter");
         add("archaion:last_of_deepslate",
                 "§a挥击/远程命中时 12% 概率发射 回声之星",
                 "§a回声之星：沿视线飞向被打中的敌人，命中处 3 格范围爆炸，造成 等同攻击面板 的伤害",
                 "");
-        add("archaion:slated", "§7逆卡巴拉：觉醒——石板行者。", "");
-        add("archaion:wight", "§7逆卡巴拉：觉醒——守墓幽灵。", "");
+        add("archaion:slated");
+        add("archaion:wight");
         // ── 逆卡巴拉：觉醒 fdbosses ──
         add("fdbosses:chesed",
                 "§a挥击/远程命中时 12% 概率在被打中的敌人位置竖起 动能力场",
@@ -653,11 +653,15 @@ public class PhotographEffectRegistry {
      */
     public static int meaningfulLineCount(String entityId) {
         List<String> lines = DESCRIPTIONS.get(entityId);
-        if (lines == null) return 0;
         int count = 0;
-        for (String line : lines) {
-            if (line != null && !line.isEmpty()) count++;
+        if (lines != null) {
+            for (String line : lines) {
+                if (line != null && !line.isEmpty()) count++;
+            }
         }
+        // 手写描述只保留「独特实现」，属性行由 PhotoSpecialEffects 自动生成并渲染 ⇒
+        // 属性块按 1 行计入功能强度，否则删文案会静默改变命中率分档。
+        if (count == 0 && !PhotoSpecialEffects.attributeEntries(entityId).isEmpty()) count = 1;
         return count;
     }
 

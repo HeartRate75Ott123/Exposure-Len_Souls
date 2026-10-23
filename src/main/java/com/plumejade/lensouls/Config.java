@@ -36,6 +36,14 @@ public class Config {
             .comment("Photo damage bonus multiplier (e.g. 1.2 = +120% damage)")
             .defineInRange("photoBonus", 1.2, 0.0, 10.0);
 
+    /**
+     * 时空回溯的前摇（tick）：0 = 直接传送（只有落点特效）；
+     * 默认 9（0.45s）——与客户端 CHARGE（0.42s）对齐，白闪正好盖住传送那一帧。
+     */
+    public static final ModConfigSpec.IntValue TEMPORAL_RECALL_DELAY_TICKS = BUILDER
+            .comment("Delay (ticks) before the actual temporal-recall teleport, so the client can play the warp wind-up. 0 = teleport instantly.")
+            .defineInRange("temporalRecallDelayTicks", 9, 0, 40);
+
     public static final ModConfigSpec.DoubleValue CAMERA_MAX_CAPTURE_DISTANCE = BUILDER
             .comment("Max distance (blocks) at which the camera and camera abilities can register entities.",
                     "Mobs beyond this are never captured, even if inside the viewfinder frustum. 0 = unlimited.")

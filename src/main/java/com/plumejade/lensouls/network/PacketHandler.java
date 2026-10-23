@@ -8,6 +8,7 @@ import com.plumejade.lensouls.ability.network.FreezeSyncPacket;
 import com.plumejade.lensouls.ability.network.SpatialWarpActivatePacket;
 import com.plumejade.lensouls.ability.network.TemporalRecallTriggerPacket;
 import com.plumejade.lensouls.boss.FreezeRejectParticlePacket;
+import com.plumejade.lensouls.boss.ToughnessFeedbackPacket;
 import com.plumejade.lensouls.boss.ToughnessHitSoundPacket;
 import com.plumejade.lensouls.boss.ToughnessParticlePacket;
 import com.plumejade.lensouls.boss.ToughnessSyncPacket;
@@ -202,6 +203,32 @@ public class PacketHandler {
                 CameraAbilitySyncPacket::handle
         );
 
+        // ---- 时空回溯视觉（前摇 / 落点）S2C ----
+        registrar.playToClient(
+                com.plumejade.lensouls.ability.network.TemporalRecallFxPacket.TYPE,
+                com.plumejade.lensouls.ability.network.TemporalRecallFxPacket.STREAM_CODEC,
+                com.plumejade.lensouls.ability.network.TemporalRecallFxPacket::handle
+        );
+
+        // ---- 夺魂索命视觉（魂飞魄散）S2C ----
+        registrar.playToClient(
+                com.plumejade.lensouls.ability.network.SoulSeverFxPacket.TYPE,
+                com.plumejade.lensouls.ability.network.SoulSeverFxPacket.STREAM_CODEC,
+                com.plumejade.lensouls.ability.network.SoulSeverFxPacket::handle
+        );
+
+        // ---- N公司2级员工：拍照闪 / 远程轨迹 S2C ----
+        registrar.playToClient(
+                Level2StaffCameraFxPacket.TYPE,
+                Level2StaffCameraFxPacket.STREAM_CODEC,
+                Level2StaffCameraFxPacket::handle
+        );
+        registrar.playToClient(
+                Level2StaffSpikeFxPacket.TYPE,
+                Level2StaffSpikeFxPacket.STREAM_CODEC,
+                Level2StaffSpikeFxPacket::handle
+        );
+
         // ---- 冻结状态同步 S2C ----
         registrar.playToClient(
                 FreezeSyncPacket.TYPE,
@@ -228,6 +255,13 @@ public class PacketHandler {
                 ToughnessParticlePacket.TYPE,
                 ToughnessParticlePacket.STREAM_CODEC,
                 ToughnessParticlePacket::handle
+        );
+
+        // ---- 削韧命中的屏幕反馈（抖动 + 镜面炸碎，只发给出手的玩家）S2C ----
+        registrar.playToClient(
+                ToughnessFeedbackPacket.TYPE,
+                ToughnessFeedbackPacket.STREAM_CODEC,
+                ToughnessFeedbackPacket::handle
         );
 
         // ---- 时间定格拒绝粒子 S2C ----

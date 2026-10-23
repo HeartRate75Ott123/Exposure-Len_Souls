@@ -1,0 +1,19 @@
+{
+    "vertex": "lensouls:timefreeze_sky",
+    "fragment": "lensouls:timefreeze_sky",
+    "samplers": [],
+    "attributes": [ "Position" ],
+    "uniforms": [
+        { "name": "SkyTime", "type": "float", "count": 1, "values": [ 0.0 ] },
+        { "name": "SkyIntensity", "type": "float", "count": 1, "values": [ 0.0 ] },
+        { "name": "SkyScreenSize", "type": "float", "count": 2, "values": [ 1920.0, 1080.0 ] },
+        { "name": "SkyTanHalfFov", "type": "float", "count": 1, "values": [ 0.7 ] },
+        { "name": "SkyAspect", "type": "float", "count": 1, "values": [ 1.7777778 ] },
+        { "name": "SkyDayBrightness", "type": "float", "count": 1, "values": [ 1.0 ] },
+        { "name": "SkyFogColor", "type": "float", "count": 3, "values": [ 0.55, 0.65, 0.80 ] },
+        { "name": "SkyCamForward", "type": "float", "count": 3, "values": [ 0.0, 0.0, 1.0 ] },
+        { "name": "SkyCamUp", "type": "float", "count": 3, "values": [ 0.0, 1.0, 0.0 ] },
+        { "name": "SkyCamRight", "type": "float", "count": 3, "values": [ 1.0, 0.0, 0.0 ] },
+        { "name": "SkyClockDir", "type": "float", "count": 3, "values": [ 0.0, 0.36, 0.93 ] }
+    ]
+}

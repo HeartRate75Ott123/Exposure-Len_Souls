@@ -42,6 +42,31 @@ public final class AbilityBehavior {
     }
 
     /**
+     * 从帧自带的数据重建一份回溯快照（兜底路径）。
+     * <p>
+     * 帧里有 POSITION / YAW / PITCH / DIMENSION ——本来就是我们想要的"拍摄瞬间"；只有生命/饥饿
+     * 帧里没有，退化用玩家当前值（只影响回溯后的血量/饱食度，不影响落点）。
+     */
+    private static TemporalSnapshot snapshotFromFrame(Frame frame, ServerPlayer player) {
+        var extra = frame.extraData();
+        Vec3 pos = extra.get(Frame.POSITION).orElse(null);
+        if (pos == null) {
+            return player != null ? TemporalSnapshot.capture(player) : null;
+        }
+        var dim = extra.get(Frame.DIMENSION).orElse(
+                player != null ? player.level().dimension().location() : null);
+        if (dim == null) {
+            return player != null ? TemporalSnapshot.capture(player) : null;
+        }
+        float yaw = extra.get(Frame.YAW).orElse(player != null ? player.getYRot() : 0.0f);
+        float pitch = extra.get(Frame.PITCH).orElse(player != null ? player.getXRot() : 0.0f);
+        float health = player != null ? player.getHealth() : 20.0f;
+        int food = player != null ? player.getFoodData().getFoodLevel() : 20;
+        float saturation = player != null ? player.getFoodData().getSaturationLevel() : 5.0f;
+        return new TemporalSnapshot(dim, pos, yaw, pitch, health, food, saturation);
+    }
+
+    /**
      * 该能力是否要求帧内有生物，否则退化为普通照片（不标 {@code lensouls:injected}）。
      */
     public static boolean requiresEntitiesInFrame(AbilityType ability) {
@@ -72,9 +97,15 @@ public final class AbilityBehavior {
                 }
             }
             case TEMPORAL_RECALL -> {
-                // 拍照即固化回溯快照（仅服务端玩家可用）
-                if (player != null) {
-                    tag.put("lensouls:snapshot", TemporalSnapshot.capture(player).toTag());
+                // 回溯点 = 按下快门那一刻。优先用 PhotoInjectionHandler 在拍照瞬间抓的完整快照
+                // （含生命/饥饿）；缺失时用帧内自带的坐标/朝向/维度兜底，实在没有才用当前状态。
+                TemporalSnapshot snapshot = com.plumejade.lensouls.ability.handler.PhotoInjectionHandler
+                        .pollTemporalSnapshot(frame.identifier() != null ? frame.identifier().toString() : null);
+                if (snapshot == null) {
+                    snapshot = snapshotFromFrame(frame, player);
+                }
+                if (snapshot != null) {
+                    tag.put("lensouls:snapshot", snapshot.toTag());
                 }
             }
             case WEAKNESS_LENS -> {

@@ -1,10 +1,9 @@
 package com.plumejade.lensouls.mixin.client;
 
 import com.plumejade.lensouls.ability.client.ClientFreezeCache;
-import com.plumejade.lensouls.ability.client.GrayOutManager;
+import com.plumejade.lensouls.ability.client.sky.TimeFreezeSky;
 import com.plumejade.lensouls.boss.StunPauseHelper;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
@@ -17,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 破韧渲染修复 + 时停场景视觉。
+ * 破韧渲染修复 + 时停云端遮挡。
  * <p>
  * 破韧渲染修复：渲染层复刻原版全局 freeze 语义。
  * <p>
@@ -31,13 +30,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * MazeSlime.oSquish、BirdRenderer flap、Adherent bounce 等），
  * 无需逐字段堵插值。
  * <p>
- * 时停场景视觉：
- * <ul>
- *   <li>{@code renderSky} HEAD：时停期间画黑洞星空球并取消原版天空盒
- *       （星空在 renderSky 阶段绘制：主目标深度此时为 clear 值，星空先铺满，
- *       地形随后渲染覆盖——天然只覆盖天空区域，不盖地形/实体）；</li>
- *   <li>{@code renderClouds} HEAD：时停期间跳过云。</li>
- * </ul>
+ * 时停天空不再在这里画：{@link TimeFreezeSky} 改成 {@code RenderLevelStageEvent}
+ * 的深度掩码全屏 pass（AFTER_LEVEL），这样原版 / Sodium / Iris 光影下都能正常显示。
+ * 这里只保留"跳过云层"——云会写深度，会挡住我们画在天空区域的时计。
  */
 @OnlyIn(Dist.CLIENT)
 @Mixin(LevelRenderer.class)
@@ -58,31 +53,18 @@ public abstract class LevelRendererMixin {
     }
 
     /**
-     * 时停：黑洞星空替代原版天空盒（星空铺满后由地形覆盖，只显示天空区域）。
+     * 时停：跳过云（云层会写深度，把自定义天穹切成一块一块）。
      * <p>
-     * 注入点选在 {@code FogRenderer.levelFogColor()} 调用之后（原版天空绘制前）。
+     * 只有"能看到冻结天穹的那个客户端"才需要跳过——其他玩家只是世界被定住，
+     * 天空照旧，云不该凭空消失。
      */
-    @Inject(method = "renderSky(Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;FLnet/minecraft/client/Camera;ZLjava/lang/Runnable;)V",
-            at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/FogRenderer;levelFogColor()V",
-                    shift = At.Shift.AFTER),
-            cancellable = true, require = 1)
-    private void lensouls$blackHoleSky(Matrix4f projectionMatrix, Matrix4f modelViewMatrix,
-                                       float partialTicks, Camera camera, boolean bl,
-                                       Runnable runnable, CallbackInfo ci) {
-        if (!ClientFreezeCache.isTimeFrozen()) return;
-        GrayOutManager.renderBlackHoleSky(modelViewMatrix);
-        ci.cancel();
-    }
-
-    /** 时停：跳过云（黑洞天空完全替代）。 */
     @Inject(method = "renderClouds(Lcom/mojang/blaze3d/vertex/PoseStack;Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;FDDD)V",
             at = @At("HEAD"), cancellable = true, require = 1)
     private void lensouls$skipClouds(PoseStack poseStack, Matrix4f matrix,
                                      Matrix4f projection, float partialTick,
                                      double camX, double camY, double camZ,
                                      CallbackInfo ci) {
-        if (ClientFreezeCache.isTimeFrozen()) {
+        if (TimeFreezeSky.isSkyActive()) {
             ci.cancel();
         }
     }

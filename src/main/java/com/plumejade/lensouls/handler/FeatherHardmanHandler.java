@@ -44,7 +44,7 @@ import java.util.UUID;
  *             反转 = 相机解禁；韧性伤害 -2（点数加算）；被拍摄的敌对生物受到「韧性伤害 × 当前近战伤害」的伤害
  * e3 蚀峰(2)：诅咒 = 造成伤害 -35%、受到伤害 +35%；额外造成「当前伤害 × 空余照片饰品栏位 × 5%」的附加伤害（真伤）
  *             反转 = 〔保留〕-35% / +35% 照旧；护甲 +5；系数改为 6%（真伤）
- * 反转条件（整款共用）：空余照片饰品栏位 ≥5 时击杀 4 只不同 BOSS（bosslist）
+ * 反转条件（整款共用）：击杀 4 只不同 BOSS（bosslist）
  * </pre>
  *
  * <b>叠加口径</b>（设计文档 §2）：受伤侧一律乘算；e3 的附加伤害与「每级活性 +1 点」属点数类、直接加算，
@@ -258,7 +258,7 @@ public class FeatherHardmanHandler {
         }
     }
 
-    // ==================== 反转条件：击杀 4 只不同 BOSS（空余栏位 ≥5） ====================
+    // ==================== 反转条件：击杀 4 只不同 BOSS ====================
 
     @SubscribeEvent
     public static void onKill(LivingDeathEvent event) {
@@ -267,7 +267,7 @@ public class FeatherHardmanHandler {
             LivingEntity dead = event.getEntity();
             if (dead == player) return;
             if (!CurseManager.isActive(player, D)) return;
-            if (freePhotoSlots(player) < REQUIRED_FREE_PHOTO_SLOTS) return;
+            // 注：旧版的「空余照片饰品栏位 ≥5」前置条件已按要求取消——只保留「4 只不同 BOSS」。
 
             // BOSS 判定：首领清单（bosslist）
             if (!BossEntityLoader.isBoss(dead)) return;

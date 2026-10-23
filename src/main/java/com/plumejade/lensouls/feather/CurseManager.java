@@ -59,6 +59,12 @@ public final class CurseManager {
         CurseSyncPacket.send(player);
     }
 
+    /** 取消反转并同步（**仅调试指令使用**：正式流程里反转是永久的） */
+    public static void unreverse(ServerPlayer player, CurseDef def, int entry) {
+        state(player).setReversed(def.maskOffset() + entry, false);
+        CurseSyncPacket.send(player);
+    }
+
     public static long progress(Player player, CurseDef def, int entry) {
         return state(player).progress(def.maskOffset() + entry);
     }

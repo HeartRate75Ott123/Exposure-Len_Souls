@@ -337,11 +337,24 @@ public class FeatherTwitcherHandler {
             ((EntityInvulnerableTimeAccessor) (Object) player).lensouls$setInvulnerableTime(0);
             applyingDefyDeath = true;
             try {
-                player.hurt(player.damageSources().magic(), DEFY_DEATH_DAMAGE);
+                // 用 genericKill（带 BYPASSES_INVULNERABILITY）：「阻死到点必死」不能被无敌帧、
+                // 创造模式无敌、石之心 25% 上限之类的减伤挡掉 —— 否则会留下一个「阻死结束却没死」的人，
+                // 而 DEFY_ENDING 还挂着，下一次普通死亡会凭空触发扭曲者生成 + 强制掉落。
+                player.hurt(player.damageSources().genericKill(), DEFY_DEATH_DAMAGE);
             } finally {
                 applyingDefyDeath = false;
             }
+            if (player.getHealth() > 0.0f) {
+                DEFY_ENDING.remove(player.getUUID());
+                LenSouls.LOGGER.info("[Curse] ② 阻死到时后未致死（血量={}），已撤销满值死亡标记",
+                        player.getHealth());
+            }
         }
+    }
+
+    /** 该玩家是否正处于阻死窗口（诊断用：假死日志里会带上这个字段） */
+    public static boolean isDefying(Player player) {
+        return player != null && DEFY.containsKey(player.getUUID());
     }
 
     // ==================== 死亡 ====================

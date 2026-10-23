@@ -100,7 +100,8 @@ import java.util.UUID;
  * <pre>
  * e1  虚无的承诺(0)  无反转
  * e2  神秘雪球(1)    反转条件=累计受到 100 次敌对雪球伤害 → 伤害 1 点、数量 3 个
- * e3  安魂曲(2)      条件=天数&lt;5 且生命上限&gt;20 → 每天最大生命 +1、受伤 −13%/天
+ * e3  安魂曲(2)      条件=天数&lt;5（**该玩家自己的已过天数**，见 {@link WorldDays}）且生命上限&gt;20
+ *                    → 每天最大生命 +1、受伤 −13%/天
  * e4  愚钝(3)        条件=单次**实际到手** 2000 点经验（本条减半/翻倍后的最终值） → 经验 ×2
  * e5  自闭(4)        条件=16 格内 10 tick 窗口内加入 50 只生物且非旁观、存活 → 护甲每层 +5%
  * e6  厄运(5)        条件=累计挖掘 200 个方块 → 不再生蠹虫、每分钟改给 2 个正面效果
@@ -108,7 +109,7 @@ import java.util.UUID;
  * e8  挫败(7)        条件=挫败层数 ≥3 时击杀 1 只 BOSS → 每层 ×1.06
  * e9  食之无味(8)    条件=累计食用 50 种不同食物 → 进食回血 ×2
  * e10 失忆(9)        条件=空手击杀湮灭构造体 → 复制之魂解禁
- * e11 疯狂(10)       条件=移速**属性值** &gt;4 时一击杀死最大生命 ≥6 万的生物 → 每点受伤 −0.2%
+ * e11 疯狂(10)       条件=移速属性值 &gt;2 时一击杀死 ≥6 万血生物 → 每点受伤 −0.2%
  * e12 恶意(11)       条件=承受一次 ≥50 点元素附加伤害并存活 → 受到的元素附加伤害 −12%
  * </pre>
  * 生命周期防护：登录同步/清残留、登出恢复创造并清内存层、死亡清层+扭曲归零，
@@ -191,8 +192,13 @@ public class FeatherAbyssHandler {
     private static final long E2_HIT_GOAL = 100L;
     /** e3：生命上限突破 20 */
     private static final float E3_MAX_HEALTH_GOAL = 20.0f;
-    /** e3：游戏天数 ≥ 该值后过期，无法再反转 */
-    private static final int E3_DAY_LIMIT = 5;
+    /**
+     * e3：**该玩家自己的**已过天数 ≥ 该值后过期，无法再反转。
+     * <p>
+     * 0 起的「已过天数」：加入当天 = 0，之后每过一次午夜 +1 ⇒ 判定「&lt; 5」等于
+     * 「从你加入这个世界的第 1 天算起，还有 5 次换日的机会」。
+     */
+    private static final int E3_DAY_LIMIT = WorldDays.ABYSS_REVERSE_WINDOW_DAYS;
     /** e4：一次性获取 2000 点经验 */
     private static final int E4_XP_GOAL = 2000;
     /** e5：16 格内一次性（{@link #E5_BATCH_WINDOW} tick 窗口内）加入 50 只生物 */
@@ -211,8 +217,8 @@ public class FeatherAbyssHandler {
     private static final String E10_OBLITERATOR = "legendary_monsters:the_obliterator";
     /** e11：目标最大生命 ≥6 万 */
     private static final float E11_TARGET_MAX_HEALTH = 60000.0f;
-    /** e11：「移速大于 4」阈值（按 {@code Attributes.MOVEMENT_SPEED} 的**属性值**判定，不是速度 deltaMovement） */
-    private static final double E11_SPEED_THRESHOLD = 4.0;
+    /** e11：移速**属性值** &gt; 2（直接比属性值，与旧判定同一口径） */
+    private static final double E11_SPEED_THRESHOLD = 2.0;
     /** e12：一次元素附加伤害 ≥50 点 */
     private static final float E12_ELEMENT_BONUS_GOAL = 50.0f;
 
@@ -255,8 +261,26 @@ public class FeatherAbyssHandler {
     private static final Map<UUID, List<Integer>> PENDING_REVERSE = new HashMap<>();
     /** 待结算的最早时刻（gameTime）：晚 2 tick 结算，使「存活」成立 */
     private static final Map<UUID, Long> PENDING_AT = new HashMap<>();
-    /** e11：一击必杀候选（目标实体 id → 致命一击的 gameTime） */
-    private static final Map<Integer, Long> ONESHOT_KILL = new HashMap<>();
+    /**
+     * e11：一击必杀的候选快照。
+     * <p>
+     * {@code healthBefore} 在 Pre 阶段取（这一击之前的实时生命）；Post 阶段拿**实际造成**的伤害
+     * 与之比较，并当场判定这一击是否把目标打死。
+     */
+    private record OneShot(long tick, float healthBefore) {}
+
+    /** e11：一击必杀候选（目标实体 id → 快照） */
+    private static final Map<Integer, OneShot> ONESHOT_KILL = new HashMap<>();
+
+    /**
+     * e11：Post 阶段已判定「这一击达标」、等**死亡事件确认**。
+     * <p>
+     * 为什么不在 Post 直接 tick：Post 早于 `die()`，目标可能被不死图腾 / 自定义保命救回，
+     * 那时 `health ≤ 0` 却并没有真死。死亡事件只有真死才触发（图腾救回不会走到），所以在这里落地。
+     */
+    private record E11Confirm(long tick, UUID player) {}
+
+    private static final Map<Integer, E11Confirm> E11_CONFIRM = new HashMap<>();
     /** e5：加入批次（UUID → {批次起点 gameTime, 计数}） */
     private static final Map<UUID, long[]> JOIN_BATCH = new HashMap<>();
     /** e12：本次受伤我们施加的倍率（玩家实体 id → 倍率），供 LOWEST 阶段还原元素附加伤害 */
@@ -324,6 +348,9 @@ public class FeatherAbyssHandler {
      * 门控（条目索引见类 javadoc）。
      */
     private static void tick(ServerPlayer player) {
+        // 世界天数起点：第一次观测到该玩家就把「当天」记成他的第 1 天，之后只读 ——
+        // 每位玩家各自独立（见 WorldDays）。放在最前面，确保任何人进服当天就被记上。
+        WorldDays.ensureOrigin(player);
         boolean has = hasAbyss(player);
         // e1 虚无的承诺（无反转）：每 tick 响应手持终末立方体
         updateAutoCreative(player, has && CurseManager.on(player, DEF, E1_COMMITMENT));
@@ -340,7 +367,7 @@ public class FeatherAbyssHandler {
         if (has) {
             refreshStackModifiers(player);
             advanceTimers(player);
-            // e3 条件：游戏天数 <5 时生命上限突破 20（过期无法反转）
+            // e3 条件：**自己的**天数 <5 时生命上限突破 20（过期无法反转）
             checkRequiemCondition(player);
         } else {
             removeStackModifiers(player);
@@ -348,7 +375,7 @@ public class FeatherAbyssHandler {
         }
     }
 
-    /** e3 条件：游戏天数小于 5 天时，生命上限突破 20；过期（≥5 天）无法反转 */
+    /** e3 条件：**自己**的已过天数小于 5 天时，生命上限突破 20；过期（≥5 天）无法反转 */
     private static void checkRequiemCondition(ServerPlayer player) {
         if (!CurseManager.on(player, DEF, E3_REQUIEM)) return;
         if (getSaveDays(player) >= E3_DAY_LIMIT) return;
@@ -390,14 +417,18 @@ public class FeatherAbyssHandler {
 
     // ========== 安魂曲：maxHealth ∓1/天（下限1）+ 受到的伤害每天 +13%（反转 −13%） ==========
 
-    /** 安魂曲天数：镜像 InControl——主世界昼夜转换计数（SavedData 持久化，睡一觉 +1） */
+    /**
+     * 安魂曲天数：**该玩家自己的已过天数**（0 起）。
+     * <p>
+     * 口径见 {@link WorldDays}：日界与绝对天数对齐 Xaero 地图（午夜换日、{@code (dayTime+6000)/24000+1}），
+     * 但每个玩家以「首次被观测到的绝对天」为起点独立计时 —— 世界跑了多少天不影响刚加入的人，
+     * 反转窗口（{@link #E3_DAY_LIMIT}）与扣血都按玩家自己的天数算。
+     */
     private static int getSaveDays(ServerPlayer player) {
-        MinecraftServer server = player.getServer();
-        if (server == null) return 0;
-        return FeatherAbyssDayData.getData(server).getDaycounter();
+        return WorldDays.elapsedDays(player);
     }
 
-    /** 每 tick 推进安魂曲天数计数（主世界昼夜转换，睡一觉/过一夜 +1）+ 推进祸之可能性收束队列 */
+    /** 每 tick 推进祸之可能性收束队列（天数不再需要 tick 推进：直接由世界时钟算出） */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         try {
@@ -405,7 +436,6 @@ public class FeatherAbyssHandler {
             if (server == null) return;
             ServerLevel overworld = server.getLevel(Level.OVERWORLD);
             if (overworld == null) return;
-            FeatherAbyssDayData.getData(server).tick(overworld);
             processSummonScheduler();
             pruneOneShotCandidates(overworld.getGameTime());
         } catch (Throwable t) {
@@ -445,7 +475,8 @@ public class FeatherAbyssHandler {
         if (Math.abs(want) < 0.001) {
             if (mod != null) {
                 max.removeModifier(REQUIEM_MODIFIER);
-                LOGGER.info("[AbyssRequiem] removed days={} reversed={}", days, reversed);
+                LOGGER.info("[AbyssRequiem] removed days={} mapDay={} reversed={}",
+                        days, WorldDays.absoluteDay(player.getServer()), reversed);
             }
             return;
         }
@@ -456,8 +487,8 @@ public class FeatherAbyssHandler {
             if (player.getHealth() > player.getMaxHealth()) {
                 player.setHealth(player.getMaxHealth());
             }
-            LOGGER.info("[AbyssRequiem] apply days={} natural={} amount={} reversed={}",
-                    days, natural, want, reversed);
+            LOGGER.info("[AbyssRequiem] apply days={} mapDay={} natural={} amount={} reversed={}",
+                    days, WorldDays.absoluteDay(player.getServer()), natural, want, reversed);
         }
     }
 
@@ -626,8 +657,10 @@ public class FeatherAbyssHandler {
     }
 
     /**
-     * e11 条件预判：{@code Attributes.MOVEMENT_SPEED} 的**属性值** &gt; 4 时，对最大生命 ≥6 万的生物打出
-     * **致死一击**即记候选，真正的反转在 {@link #onMobKilled}（必须确实死亡）里落地。
+     * e11 条件预判（Pre）：移速属性值 &gt;2、目标 ≥6 万血、这一击有伤害 ⇒ 记下「打之前剩多少血」。
+     * <p>
+     * 判定全部在 {@link #onDamagePostE11}（Post）里做：那里能拿到**实际造成**的伤害，
+     * 也能当场知道这一击有没有把目标打死——**这一击没打死就作废**，机会不留给后面的补刀。
      */
     private static void checkOneShotKill(ServerPlayer player, LivingDamageEvent.Pre event) {
         if (!CurseManager.on(player, DEF, E11_MADNESS)) return;
@@ -639,9 +672,36 @@ public class FeatherAbyssHandler {
         if (player.getAttributeValue(Attributes.MOVEMENT_SPEED) <= E11_SPEED_THRESHOLD) return;
         // 宽容：没造成伤害的攻击（0 伤）不算——既不能记候选，也不能破坏"一击"的判定。
         if (event.getNewDamage() <= 0.0f) return;
-        // 必须是一击致死：拿「这一次的伤害」对比「目标当下的实时生命」
-        if (event.getNewDamage() < target.getHealth()) return;
-        ONESHOT_KILL.put(target.getId(), player.level().getGameTime());
+        ONESHOT_KILL.put(target.getId(), new OneShot(player.level().getGameTime(), target.getHealth()));
+    }
+
+    /**
+     * e11（Post）：拿**实际造成**的伤害判「一击」，并且当场结算。
+     * <ul>
+     *   <li>这一击没打死目标 ⇒ 候选直接作废（这一次没成功就失去机会）；</li>
+     *   <li>实际伤害 ≥ 这一击之前的实时生命 ⇒ 达成条件，立刻 {@code tick}。</li>
+     * </ul>
+     * 在这里落地而不在死亡事件里，是因为死亡事件可能先于本事件触发（读不到实际伤害）。
+     */
+    @SubscribeEvent
+    public static void onDamagePostE11(LivingDamageEvent.Post event) {
+        try {
+            LivingEntity target = event.getEntity();
+            OneShot prev = ONESHOT_KILL.remove(target.getId());     // 无论成败都消费掉
+            if (prev == null) return;
+            if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
+            if (!hasAbyss(player) || !CurseManager.on(player, DEF, E11_MADNESS)) return;
+            // 没打死 ⇒ 这次机会作废
+            if (target.getHealth() > 0.0f && !target.isDeadOrDying()) return;
+            if (target.getMaxHealth() < E11_TARGET_MAX_HEALTH) return;
+            if (player.getAttributeValue(Attributes.MOVEMENT_SPEED) <= E11_SPEED_THRESHOLD) return;
+            if (event.getNewDamage() < prev.healthBefore()) return;
+            // 达标：登记待确认（真死才在死亡事件里 tick，避免被图腾保命骗过）
+            E11_CONFIRM.put(target.getId(),
+                    new E11Confirm(player.level().getGameTime(), player.getUUID()));
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ④ e11 伤害后结算异常", t);
+        }
     }
 
     /**
@@ -1240,7 +1300,7 @@ public class FeatherAbyssHandler {
      *   <li>疯狂：击杀怪物 3% 概率降 1 点扭曲值（诅咒态与反转态都保留）；</li>
      *   <li>e7 条件：累计击杀**由祸之可能性召唤**的怪物 100 只；</li>
      *   <li>e8 条件：挫败层数 ≥3 时击杀 1 只 BOSS；</li>
-     *   <li>e11 条件：移速 &gt; 4 时一击杀死最大生命 ≥6 万的生物。</li>
+     *   <li>e11 条件：移速属性值 &gt;2 时，把 ≥6 万血的**满血**生物一击杀死。</li>
      * </ul>
      */
     @SubscribeEvent
@@ -1252,12 +1312,22 @@ public class FeatherAbyssHandler {
             ServerPlayer player = killerOf(event);
             if (player == null || !hasAbyss(player)) {
                 ONESHOT_KILL.remove(dead.getId());
+                E11_CONFIRM.remove(dead.getId());
                 return;
             }
             // 疯狂：击杀怪物 3% 概率 −1 扭曲值
             if (dead instanceof Monster && player.getRandom().nextFloat() < 0.03f) {
                 addTwist(player, -1);
             }
+            // e11 条件：Post 已判定「移速 >2 时一击致死」，这里确认目标**真的死了**（图腾救回不会到这）
+            E11Confirm confirm = E11_CONFIRM.remove(dead.getId());
+            if (confirm != null
+                    && CurseManager.on(player, DEF, E11_MADNESS)
+                    && player.getUUID().equals(confirm.player())
+                    && player.level().getGameTime() - confirm.tick() <= 5L) {
+                CurseManager.tick(player, DEF, E11_MADNESS, 1L, 1L);
+            }
+
             // e7 条件：累计击杀由祸之可能性召唤的怪物 100 只（归属校验）
             if (dead.getPersistentData().getBoolean(KEY_SUMMON_TAG)
                     && dead.getPersistentData().hasUUID(KEY_SUMMON_OWNER)
@@ -1278,12 +1348,6 @@ public class FeatherAbyssHandler {
                 if (deadId != null && E10_OBLITERATOR.equals(deadId.toString())) {
                     CurseManager.reach(player, DEF, E10_AMNESIA);
                 }
-            }
-            // e11 条件：移速 > 4 时一击杀死最大生命 ≥6 万的生物（候选由 checkOneShotKill 登记）
-            Long oneShot = ONESHOT_KILL.remove(dead.getId());
-            if (oneShot != null && CurseManager.on(player, DEF, E11_MADNESS)
-                    && player.level().getGameTime() - oneShot <= 5L) {
-                CurseManager.reach(player, DEF, E11_MADNESS);
             }
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ④ 击杀结算异常", t);
@@ -1311,10 +1375,11 @@ public class FeatherAbyssHandler {
         applyRequiem(newPlayer, CurseManager.rev(newPlayer, DEF, E3_REQUIEM));
     }
 
-    /** 登录：疯狂值同步 + 清残留内存层（安魂曲由 onPlayerTick 按佩戴状态维护） */
+    /** 登录：疯狂值同步 + 清残留内存层 + 记世界天数起点（安魂曲由 onPlayerTick 按佩戴状态维护） */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        WorldDays.ensureOrigin(player);
         clearStackState(player.getUUID());
         clearTransient(player.getUUID());
         if (hasAbyss(player)) {
@@ -1350,7 +1415,8 @@ public class FeatherAbyssHandler {
      */
     private static void pruneOneShotCandidates(long now) {
         if (ONESHOT_KILL.isEmpty()) return;
-        ONESHOT_KILL.values().removeIf(t -> now - t > 60L);
+        ONESHOT_KILL.values().removeIf(t -> now - t.tick() > 60L);
+        E11_CONFIRM.values().removeIf(c -> now - c.tick() > 5L);
     }
 
     // ---- e5 / e12「且存活」待结算 ----

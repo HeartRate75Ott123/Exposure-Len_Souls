@@ -46,22 +46,29 @@ public class TemporalRecallHandler {
         PhotoFindResult result = findTemporalPhoto(player);
         if (result.isEmpty()) return;
 
-        // 先抵消伤害（无论 snapshot 读取是否成功都不致死）
+        // 先读出快照；**读不到就当作没这张照片**，绝不能先把伤害清零再说 ——
+        // 旧实现是「先 setNewDamage(0) 再读」，读失败时等于白送一次保命（伤害没了、照片也没消耗）。
+        TemporalSnapshot snapshot = readSnapshot(result);
+        if (snapshot == null) return;
+
+        // 抵消这次致命伤
         event.setNewDamage(0);
 
-        // 从实际持有 snapshot 数据的照片读取快照
-        TemporalSnapshot snapshot = readSnapshot(result);
-        if (snapshot != null) {
-            consumePhoto(player, result);
-            snapshot.apply(player);
-            // ⑤ 铁序·无援 反转：时空回溯也属于「保命手段」，触发后同样开 10 秒强化窗口
-            com.plumejade.lensouls.handler.curse.TimecoreCurse.grantNoAidGrace(player);
-            player.displayClientMessage(
-                    net.minecraft.network.chat.Component.translatable("ability.lensouls.temporal_recall.triggered")
-                            .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
-            // 回溯后易伤叠加（每5次+1级，持续20s，窗口5min）
-            applyRecallVulnerability(player);
+        consumePhoto(player, result);
+        snapshot.apply(player);
+        // 兜底：回溯后血量必须是正数（照片数据异常/维度丢失时都不能把玩家留在 0 血）
+        if (player.getHealth() <= 0.0f) {
+            player.setHealth(1.0f);
+            LenSouls.LOGGER.warn("[时空回溯] 回溯后血量为 {}，已回填 1 点（玩家 {}）",
+                    player.getHealth(), player.getGameProfile().getName());
         }
+        // ⑤ 铁序·无援 反转：时空回溯也属于「保命手段」，触发后同样开 10 秒强化窗口
+        com.plumejade.lensouls.handler.curse.TimecoreCurse.grantNoAidGrace(player);
+        player.displayClientMessage(
+                net.minecraft.network.chat.Component.translatable("ability.lensouls.temporal_recall.triggered")
+                        .copy().withStyle(net.minecraft.ChatFormatting.GREEN), true);
+        // 回溯后易伤叠加（每5次+1级，持续20s，窗口5min）
+        applyRecallVulnerability(player);
     }
 
     /** 时空回溯易伤：每5次回溯叠1层，持续20s，窗口5min */

@@ -64,6 +64,24 @@ public final class TimecoreCurse {
     private static final Map<UUID, Double> SLOW_WALK = new HashMap<>();
     /** e13 余悸：大击窗口到期 tick */
     private static final Map<UUID, Long> FEAR_UNTIL = new HashMap<>();
+    /** e23 平势：本 tick 已经反击过（多段/范围伤害同一 tick 只反击一次） */
+    private static final Map<UUID, Long> LAST_FIELD_TICK = new HashMap<>();
+
+    /**
+     * 「我们自己造成的伤害」重入深度（线程内）。
+     * <p>
+     * 本类有三处在**伤害结算内部**再造成伤害：e23 平势 诅咒态（它被你打就反击你）、
+     * e11 锈甲 反转态（反弹 25% 给攻击者）、e23 反转态（20% 反制）。
+     * 这些伤害会重新派发 {@code LivingIncomingDamageEvent} / {@code LivingDamageEvent.Pre}，
+     * 于是形成闭环：{@code 玩家打 BOSS → levelFieldCounter 让玩家受伤 → onReflect 反弹给 BOSS
+     * → BOSS 受伤（来源是玩家）→ onDealDamage → levelFieldCounter → …}，
+     * 实机表现就是 {@code java.lang.StackOverflowError: Exception in server tick loop}
+     * （错误报告里 63 层 {@code onDealDamage/levelFieldCounter/onReflect} 循环即此）。
+     * <p>
+     * 标记为「自家伤害」后，本类的三个伤害回调直接返回 —— 我们自己安排的那一份伤害
+     * 只按字面数值结算，不再被自己的倍率、反弹、反制加工一次。
+     */
+    private static final ThreadLocal<int[]> SELF_DAMAGE_DEPTH = ThreadLocal.withInitial(() -> new int[1]);
 
     private TimecoreCurse() {
     }
@@ -341,33 +359,19 @@ public final class TimecoreCurse {
             }
         }
 
-        // e4 徒劳 反转：不再吞掉落，且**时运 +2**（按原版公式模拟，等同于工具上带时运 II）
-        if (CurseManager.rev(player, D, 3) && !event.getDrops().isEmpty()) {
-            int extra = fortuneExtra(player, 2);
-            var src = event.getDrops().get(0);
-            for (int i = 0; i < extra; i++) {
-                event.getDrops().add(new net.minecraft.world.entity.item.ItemEntity(
-                        player.level(), src.getX(), src.getY(), src.getZ(), src.getItem().copy()));
-            }
-        }
-    }
-
-    /** 原版「时运」掉落公式：额外数量 = rand(0..level+1) - 1，下限 0 */
-    private static int fortuneExtra(ServerPlayer player, int level) {
-        return Math.max(0, player.getRandom().nextInt(level + 2) - 1);
-    }
-
-    /** 原版「抢夺」掉落公式：额外数量 = rand(0..level) */
-    private static int lootingExtra(ServerPlayer player, int level) {
-        return player.getRandom().nextInt(level + 1);
+        // e4 徒劳 反转：不再吞掉落，且**时运 +2**。
+        // 实现不在这里：见 CurseLootBonus / BlockFortuneDropMixin ——
+        // 旧版「复制一件已有掉落物」等于对所有方块无条件加产量（石头也掉 2 个），
+        // 现在改成「掉落上下文里的工具多 2 级时运」，由原版战利品表自己决定谁该多掉。
     }
 
     /**
-     * e15 厄运：时运 -2 / 抢夺 -2（诅咒态）→ 时运 +2 / 抢夺 +2（反转态）。
+     * e15 厄运：时运 −2 / 抢夺 −2（诅咒态）→ 时运 +2 / 抢夺 +2（反转态）。
      * <p>
-     * 原版「时运/抢夺」是附魔等级，没有对应属性可加，这里用**掉落物数量**近似：
-     * 诅咒态约一半概率少掉一件，反转态追加最多 2 件。BOSS 掉魂 +50% 在
-     * {@code CopySoulDropHandler} 侧（未接，见交付说明）。
+     * <b>反转态的 +2 不在这里</b>：见 {@link CurseLootBonus}（按真正的附魔等级回话，
+     * 只对原版写了抢夺的生物掉落生效）。这里只剩诅咒态的 −2 —— 原版没有「负等级附魔」，
+     * 只能用「按概率删掉 0~2 件掉落（至少留 1 件）」近似，对玩家是纯惩罚，近似无害。
+     * BOSS 掉魂 +50% 在 {@code CopySoulDropHandler} 侧（未接，见交付说明）。
      */
     @SubscribeEvent
     public static void onDrops(net.neoforged.neoforge.event.entity.living.LivingDropsEvent event) {
@@ -385,19 +389,6 @@ public final class TimecoreCurse {
                 it.remove();
                 cut--;
             }
-            return;
-        }
-        if (CurseManager.rev(player, D, 14)) {
-            // e15 厄运 反转：**抢夺 +2**（按原版公式模拟，等同于武器上带抢夺 II）
-            java.util.List<net.minecraft.world.entity.item.ItemEntity> copies = new java.util.ArrayList<>();
-            int extra = lootingExtra(player, 2);
-            int n = 0;
-            for (var src : drops) {
-                if (n++ >= extra) break;
-                copies.add(new net.minecraft.world.entity.item.ItemEntity(
-                        player.level(), src.getX(), src.getY(), src.getZ(), src.getItem().copy()));
-            }
-            drops.addAll(copies);
         }
     }
 
@@ -410,6 +401,7 @@ public final class TimecoreCurse {
 
     @SubscribeEvent
     public static void onIncoming(LivingIncomingDamageEvent event) {
+        if (inSelfDamage()) return;   // 我们安排的那份伤害：不再被自己的倍率/反弹加工（见 SELF_DAMAGE_DEPTH）
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         float d = event.getAmount();
         if (d <= 0.0f) return;
@@ -485,7 +477,7 @@ public final class TimecoreCurse {
                 && counter.getMaxHealth() >= player.getMaxHealth() * 1.5f
                 && player.getRandom().nextFloat() < 0.20f) {
             counter.invulnerableTime = 0;                 // 清无敌帧（Entity 上的公开字段）
-            counter.hurt(player.damageSources().playerAttack(player), Math.max(1.0f, d * 0.5f));
+            hurtGuarded(counter, player.damageSources().playerAttack(player), Math.max(1.0f, d * 0.5f));
         }
 
         // ⑤ 大成：受到伤害 -25%（乘算；受伤侧一律乘算 §2）
@@ -500,6 +492,7 @@ public final class TimecoreCurse {
 
     @SubscribeEvent
     public static void onDealDamage(LivingDamageEvent.Pre event) {
+        if (inSelfDamage()) return;   // 自己的反弹/反伤：按字面数值结算，不再叠一遍己方倍率
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         LivingEntity target = event.getEntity();
         if (target == player) return;
@@ -533,15 +526,11 @@ public final class TimecoreCurse {
             }
         }
 
-        // e16 释刃：造成伤害时 2% 概率把主手武器丢出去
-        if (CurseManager.on(player, D, 15) && player.getRandom().nextFloat() < 0.02f) {
-            ItemStack main = player.getMainHandItem();
-            if (!main.isEmpty()) {
-                ItemStack drop = main.copy();
-                player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, ItemStack.EMPTY);
-                player.drop(drop, true);
-                CurseManager.tick(player, D, 15, 1L, 200L);
-            }
+        // e16 释刃：造成伤害时 2% 概率把主手武器丢出去（统一走 CurseHandDrop：
+        // 先清槽、回读校验、只生成一份掉落物，且 1 秒内最多一次）
+        if (CurseManager.on(player, D, 15) && player.getRandom().nextFloat() < 0.02f
+                && CurseHandDrop.dropHeld(player, net.minecraft.world.InteractionHand.MAIN_HAND, true, "timecore-e16")) {
+            CurseManager.tick(player, D, 15, 1L, 200L);
         }
 
         // e20 垂翅：飞行/腾空时造成伤害 -50%（乘算）
@@ -642,11 +631,12 @@ public final class TimecoreCurse {
     /** e11 锈甲 反转：受近战伤害时反弹 25% 给攻击者 */
     @SubscribeEvent
     public static void onReflect(LivingIncomingDamageEvent event) {
+        if (inSelfDamage()) return;   // 我们自己的自伤/反伤，不再反弹（否则 onReflect ⇄ onDealDamage 无限递归）
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (!CurseManager.rev(player, D, 10)) return;
         if (!(event.getSource().getDirectEntity() instanceof LivingEntity attacker)) return;
         if (event.getSource().getDirectEntity() instanceof Projectile) return;
-        attacker.hurt(player.damageSources().thorns(player), event.getAmount() * 0.25f);
+        hurtGuarded(attacker, player.damageSources().thorns(player), event.getAmount() * 0.25f);
     }
 
     // ==================== e21 无援 ====================
@@ -701,11 +691,46 @@ public final class TimecoreCurse {
         }
     }
 
-    /** e23 平势：目标最大生命比你高一倍时，它被你打就反击你（诅咒态） */
+    /**
+     * e23 平势：目标最大生命比你高一倍时，它被你打就反击你（诅咒态）。
+     * <p>
+     * 同 tick 只反击一次：范围/多段伤害（横扫、弹幕、连续命中）会在同一刻派发多次
+     * {@code LivingDamageEvent.Pre}，逐次反击等于把「挨一下」放大成十几下。
+     * 造成伤害走 {@link #hurtGuarded}，绝不允许这条链再被 {@link #onDealDamage} 处理回来。
+     */
     public static void levelFieldCounter(ServerPlayer player, LivingEntity target) {
+        if (inSelfDamage()) return;
         if (!CurseManager.on(player, D, 22)) return;
         if (target.getMaxHealth() < player.getMaxHealth() * 2.0f) return;
-        player.hurt(player.damageSources().mobAttack(target), 2.0f);
+        long now = player.level().getGameTime();
+        Long last = LAST_FIELD_TICK.put(player.getUUID(), now);
+        if (last != null && last.longValue() == now) return;
+        hurtGuarded(player, player.damageSources().mobAttack(target), 2.0f);
+    }
+
+    /** 自己在伤害结算内部再造成的伤害：打上重入标记，期间本类的伤害回调全部跳过 */
+    private static boolean inSelfDamage() {
+        return SELF_DAMAGE_DEPTH.get()[0] > 0;
+    }
+
+    /**
+     * 我们主动造成的一次伤害（自伤 / 反弹 / 反制）。
+     * <p>
+     * 嵌套调用直接放弃：外层已经在结算我们自己安排的伤害了，再套一层只会回到递归里。
+     * 数值按字面结算，不再被诅咒的倍率加工 —— 这也是「反击 2 点」「反弹 25%」的字面语义。
+     */
+    private static void hurtGuarded(LivingEntity target, net.minecraft.world.damagesource.DamageSource source,
+                                    float amount) {
+        if (target == null || amount <= 0.0f) return;
+        if (target.level().isClientSide) return;
+        int[] depth = SELF_DAMAGE_DEPTH.get();
+        if (depth[0] > 0) return;
+        depth[0]++;
+        try {
+            target.hurt(source, amount);
+        } finally {
+            depth[0]--;
+        }
     }
 
     /**
@@ -901,6 +926,8 @@ public final class TimecoreCurse {
         LAST_POS.remove(id);
         SLOW_WALK.remove(id);
         FEAR_UNTIL.remove(id);
+        LAST_FIELD_TICK.remove(id);
+        CurseHandDrop.clear(id);
         // e4「待吞掉落」按**方块坐标**记账（见 SWALLOW_POS），且每服务器 tick 清空一次，
         // 与玩家 UUID 无关，这里不再需要清理。
     }

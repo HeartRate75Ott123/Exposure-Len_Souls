@@ -17,13 +17,16 @@
     "PlayerSwingMixin",
     "EntitiesInFrameMixin",
     "EntityInvulnerableTimeAccessor",
+    "LivingEntityDeadAccessor",
     "FoodDataMixin",
     "PhantomPushGuardMixin",
     "PhantomKillCreditMixin",
     "PhantomMoveTargetAccessor",
     "BlessingCrystalMixin",
     "ServerBossEventMixin",
-    "ElementActivityAdjustMixin"
+    "ElementActivityAdjustMixin",
+    "BlockFortuneDropMixin",
+    "EnchantmentHelperLootingMixin"
   ],
   "client": [
     "client.ItemRendererMixin",

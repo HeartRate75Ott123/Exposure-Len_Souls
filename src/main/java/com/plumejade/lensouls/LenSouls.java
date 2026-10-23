@@ -171,6 +171,8 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.SlowIronPlateHandler.class);
         // ---- 复制之魂封印的全容器扫描（精妙背包内容物 + 超越维度终端） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.CopySoulSealHandler.class);
+        // ---- 假死兜底：0 血未死（死亡被取消却没回血 / 直接 setHealth(0)）的当刻止损与周期修复 ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.FalseDeathGuard.class);
         // ---- 弱点透镜照片：双持右键装机 / 耐久 100 / tooltip ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.WeaknessLensHandler.class);
         // ---- 照片图鉴：登录迁移 + 登录同步（解锁记录的写入点见 PhotoInjector 回调） ----

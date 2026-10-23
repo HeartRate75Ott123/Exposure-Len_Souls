@@ -38,6 +38,9 @@ public class HeartOfStoneHandler {
     public static void onDamaged(LivingDamageEvent.Pre event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (!isWorn(player)) return;
+        // 「必死级」伤害（带 BYPASSES_INVULNERABILITY，例如 ② 阻死结束的 999 真伤）不封顶：
+        // 否则高上限玩家会被石之心把 999 砍成 25% 上限，阻死结束却杀不死，留下一个本该死了的人。
+        if (event.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) return;
 
         float damage = event.getNewDamage() * DAMAGE_TAKEN_MULTIPLIER;
         float cap = (float) (player.getMaxHealth() * MAX_HIT_FRACTION);

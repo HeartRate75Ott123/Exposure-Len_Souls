@@ -98,7 +98,7 @@ public final class FinalriteCurse {
             "minecraft:warden", 0,                                // e1 竭泉 · 监守者
             "legendary_monsters:posessed_paladin", 1,              // e2 血偿 · 堕落圣骑
             "cataclysm:ignis", 2,                                  // e3 蚀力 · 炎魔 Ignis
-            "legendary_monsters:overgrown_colossus", 3,             // e4 枯井 · 蔓生巨像
+            "block_factorys_bosses:infernal_dragon", 3,           // e4 枯井 · 炼狱飞龙
             "cataclysm:scylla", 4,                                  // e5 篡命 · 斯库拉 Scylla
             "cataclysm:ender_guardian", 5,                          // e6 献祭 · 末影守卫
             "cataclysm:the_harbinger", 6                            // e7 穿甲 · 先驱者

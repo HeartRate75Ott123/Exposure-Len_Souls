@@ -782,7 +782,9 @@ public final class ZeroforgeCurse {
      * <ul>
      *   <li>只在「没开别的容器」且「光标为空」时交换 —— 否则物品停在 {@code containerMenu} 光标或容器槽里会被吞 / 复制；</li>
      *   <li>旁观者、创造模式、死亡瞬间、切维度不触发 —— 这几种状态下切换手持会丢物品；</li>
-     *   <li>丢出用 {@code player.drop(stack, false)} 丢在<b>脚下</b>，不往外抛（3% 丢出若抛远，在岩浆/虚空边就是直接销毁）；</li>
+     *   <li>丢出统一走 {@code CurseHandDrop.dropHeld}（先清槽 → 回读校验 → 只生成一份掉落物），
+     *       丢在<b>脚下</b>不往外抛（3% 丢出若抛远，在岩浆/虚空边就是直接销毁）；
+     *       掉不出来（1 秒节流 / 清空失败）就退化成正常换手，绝不「凭空多一份」；</li>
      *   <li>交换后 {@code broadcastChanges()} + 音效 + 动作栏提示 —— 不给反馈会被当成客户端显示错乱上报；</li>
      *   <li>只换 {@code Inventory} 槽位（主手 0 / 副手 40），不碰渲染层。</li>
      * </ul>
@@ -864,22 +866,21 @@ public final class ZeroforgeCurse {
         ItemStack offStack = inv.getItem(off);
         if (mainStack.isEmpty() && offStack.isEmpty()) return;
 
+        boolean dropped = false;
         if (mayDrop && player.getRandom().nextFloat() < HAND_DROP_CHANCE) {
-            // 丢在脚下（false = 不往外抛），保证岩浆 / 虚空边不会直接销毁
-            if (!mainStack.isEmpty()) {
-                inv.setItem(main, ItemStack.EMPTY);
-                player.drop(mainStack, false);
-                player.displayClientMessage(
-                        net.minecraft.network.chat.Component.translatable(
-                                "message.lensouls.zeroforge.hand_drop"), true);
-            } else {
-                inv.setItem(off, ItemStack.EMPTY);
-                player.drop(offStack, false);
+            // 丢在脚下（false = 不往外抛），保证岩浆 / 虚空边不会直接销毁。
+            // 统一走 CurseHandDrop：先清槽 → 回读校验 → 只生成这一份掉落物
+            // （旧写法「先丢复制品再清槽」在清空失效时会在手里留一份、地上多一份）
+            dropped = mainStack.isEmpty()
+                    ? CurseHandDrop.dropHeld(player, net.minecraft.world.InteractionHand.OFF_HAND, false, "zeroforge-e7")
+                    : CurseHandDrop.dropHeld(player, net.minecraft.world.InteractionHand.MAIN_HAND, false, "zeroforge-e7");
+            if (dropped) {
                 player.displayClientMessage(
                         net.minecraft.network.chat.Component.translatable(
                                 "message.lensouls.zeroforge.hand_drop"), true);
             }
-        } else {
+        }
+        if (!dropped) {
             inv.setItem(main, offStack);
             inv.setItem(off, mainStack);
         }
@@ -1352,12 +1353,12 @@ public final class ZeroforgeCurse {
             }
 
             // e4 断供 条件：击杀远古遗魂
-            // e5 封库 条件：击杀炼狱飞龙
+            // e5 封库 条件：击杀娜迦（twilightforest:naga）
             String killed = typeId(event.getEntity());
             if ("cataclysm:ancient_remnant".equals(killed)) {
                 CurseManager.tick(player, D, 3, 1L, 1L);
             }
-            if ("block_factorys_bosses:infernal_dragon".equals(killed)) {
+            if ("twilightforest:naga".equals(killed)) {
                 CurseManager.tick(player, D, 4, 1L, 1L);
             }
 

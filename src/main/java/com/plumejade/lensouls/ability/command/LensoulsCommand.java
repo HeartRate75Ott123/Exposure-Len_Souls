@@ -82,37 +82,33 @@ public class LensoulsCommand {
                 // 玩家功能：无门槛
                 .then(Commands.literal("photos").executes(ctx -> openPhotoGallery(ctx)))
 
-        // 测试用：一键开启诅咒反转（/lensouls curse reverse <款|all>）
+        // 测试用：开启/关闭诅咒反转（/lensouls curse reverse <款|all> [true|false]）
+        // 省略布尔参数 = true（照旧）；false = 清掉反转位并把该款各条进度归零，方便反复测同一条件。
         .then(Commands.literal("curse").requires(OP)
                 .then(Commands.literal("reverse")
                         .then(Commands.argument("feather", StringArgumentType.word())
                                 .suggests((c, b) -> SharedSuggestionProvider.suggest(
                                         java.util.List.of("all", "hardman", "twitcher", "elementrise",
                                                 "abyss", "timecore", "finalrite", "zeroforge"), b))
-                                .executes(ctx -> {
-                                    var sp = ctx.getSource().getPlayerOrException();
-                                    String which = StringArgumentType.getString(ctx, "feather");
-                                    var defs = java.util.List.of(
-                                            com.plumejade.lensouls.feather.CurseDefs.HARDMAN,
-                                            com.plumejade.lensouls.feather.CurseDefs.TWITCHER,
-                                            com.plumejade.lensouls.feather.CurseDefs.ELEMENTRISE,
-                                            com.plumejade.lensouls.feather.CurseDefs.ABYSS,
-                                            com.plumejade.lensouls.feather.CurseDefs.TIMECORE,
-                                            com.plumejade.lensouls.feather.CurseDefs.FINALRITE,
-                                            com.plumejade.lensouls.feather.CurseDefs.ZEROFORGE);
-                                    int done = 0;
-                                    for (var def : defs) {
-                                        if (!which.equals("all") && !def.id().endsWith(which)) continue;
-                                        for (int i = 0; i < def.entries(); i++) {
-                                            com.plumejade.lensouls.feather.CurseManager.reverse(sp, def, i);
-                                            done++;
-                                        }
-                                    }
-                                    final int n = done;
-                                    ctx.getSource().sendSuccess(
-                                            () -> Component.literal("§a已反转 " + n + " 条诅咒"), true);
-                                    return n;
-                                }))))
+                                .executes(ctx -> setCurseReversed(ctx, true))
+                                .then(Commands.argument("on", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                        .executes(ctx -> setCurseReversed(ctx,
+                                                com.mojang.brigadier.arguments.BoolArgumentType.getBool(ctx, "on")))))))
+                // 天数自检：地图口径的绝对天 / 该玩家自己的天（折翼 e3 的窗口按后者算）
+                .then(Commands.literal("days").requires(OP)
+                        .executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            long mapDay = com.plumejade.lensouls.handler.WorldDays.absoluteDay(player.getServer());
+                            int elapsed = com.plumejade.lensouls.handler.WorldDays.elapsedDays(player);
+                            int window = com.plumejade.lensouls.handler.WorldDays.ABYSS_REVERSE_WINDOW_DAYS;
+                            String state = elapsed >= window
+                                    ? "§c已过期（无法反转）"
+                                    : "§a窗口内（剩余 " + (window - elapsed) + " 天）";
+                            ctx.getSource().sendSuccess(() -> Component.literal(
+                                    "§e地图第 " + mapDay + " 天 §7| §a你自己第 " + (elapsed + 1)
+                                            + " 天§7（已过 " + elapsed + " 天）§7| §b安魂曲反转窗口：" + state), false);
+                            return 1;
+                        }))
                 .then(Commands.literal("skill").requires(OP)
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
@@ -493,7 +489,53 @@ public class LensoulsCommand {
         return 1;
     }
 
-    /** /lensouls activity state — 逐元素打印：可见等级 / 源等级 / 源剩余 / 应为等级 / 实例时长 */
+    /**
+     * `/lensouls curse reverse <款|all> [true|false]` 的实现。
+     * <p>
+     * true  = 直接把该款所有条目标记为已反转（测试用）；
+     * false = 清掉反转位并**把各条进度归零**（否则目标已达成，下一次任何相关事件都会立刻再反转，
+     *         反复测同一条件时很烦）。
+     */
+    private static int setCurseReversed(CommandContext<CommandSourceStack> ctx, boolean on) {
+        ServerPlayer sp;
+        try {
+            sp = ctx.getSource().getPlayerOrException();
+        } catch (Exception e) {
+            ctx.getSource().sendFailure(Component.literal("§c只有玩家可以执行该调试指令"));
+            return 0;
+        }
+        String which = StringArgumentType.getString(ctx, "feather");
+        var defs = java.util.List.of(
+                com.plumejade.lensouls.feather.CurseDefs.HARDMAN,
+                com.plumejade.lensouls.feather.CurseDefs.TWITCHER,
+                com.plumejade.lensouls.feather.CurseDefs.ELEMENTRISE,
+                com.plumejade.lensouls.feather.CurseDefs.ABYSS,
+                com.plumejade.lensouls.feather.CurseDefs.TIMECORE,
+                com.plumejade.lensouls.feather.CurseDefs.FINALRITE,
+                com.plumejade.lensouls.feather.CurseDefs.ZEROFORGE);
+        int done = 0;
+        for (var def : defs) {
+            if (!which.equals("all") && !def.id().endsWith(which)) continue;
+            for (int i = 0; i < def.entries(); i++) {
+                if (on) {
+                    com.plumejade.lensouls.feather.CurseManager.reverse(sp, def, i);
+                } else {
+                    com.plumejade.lensouls.feather.CurseManager.unreverse(sp, def, i);
+                    com.plumejade.lensouls.feather.CurseManager.setProgress(sp, def, i, 0L);
+                }
+                done++;
+            }
+        }
+        final int n = done;
+        ctx.getSource().sendSuccess(() -> Component.literal(on
+                ? "§a已反转 " + n + " 条诅咒"
+                : "§7已取消反转并归零进度：" + n + " 条"), true);
+        return n;
+    }
+
+    /**
+     * /lensouls activity state — 逐元素打印：可见等级 / 源等级 / 源剩余 / 应为等级 / 实例时长
+     */
     private static int activityState(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx) {
         ServerPlayer player = ctx.getSource().getPlayer();
         if (player == null) {

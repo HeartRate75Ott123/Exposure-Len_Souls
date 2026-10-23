@@ -89,8 +89,13 @@ public class TemporalSnapshot {
         // 传送
         player.teleportTo(targetLevel, pos.x, pos.y, pos.z, yaw, pitch);
 
-        // 恢复状态
-        player.setHealth(health);
+        // 恢复状态（**血量必须夹到 [1, 上限]**）：
+        // 照片里的 health 是拍照时的血量，但旧版本/其它来源的照片可能没有这个键，
+        // 读出来就是 0 —— 直接 setHealth(0) 会让玩家变成「0 血未死」（原版 hurt 见
+        // isDeadOrDying() 直接 return，之后任何伤害都打不进去，只能 /heal 救），
+        // 而调用方（致命伤回溯）已经把那一击的伤害清零了，于是必然卡死。
+        float safeHealth = Math.max(1.0f, Math.min(health, player.getMaxHealth()));
+        player.setHealth(safeHealth);
         player.getFoodData().setFoodLevel(foodLevel);
         player.getFoodData().setSaturation(saturation);
 

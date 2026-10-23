@@ -9,7 +9,11 @@ NeoForge 1.21.1 模组（镜魂），基于 Exposure 相机模组的扩展。详
 ./gradlew runClient      # 启动客户端
 ```
 
-- git bash 下用 `./gradlew`（不要用 `gradlew.bat`）
+- **执行环境（2026-10 更新）**：`ops_bash`（git bash / MINGW64）现已可用，是**首选**执行器 ——
+  `cd lensouls-template-1.21.1 && ./gradlew build` 实测通过（`BUILD SUCCESSFUL`，配置缓存可复用）。
+  `pwsh` 仍可用，但仅在需要 Windows 原生能力（注册表、服务、`-LiteralPath` 通配符场景）时才用；
+  **不要**在两套 shell 之间混用语法（bash 里写 `$env:X` 必错）。
+- 旧的「pwsh 下用 `.\gradlew.bat build`」记录只是历史环境说明，不是禁用 bash 的规则。
 - 版本号在 `gradle.properties` 的 `mod_version`，构建前先递增
 - 常用交付：构建后复制 JAR 到桌面（`C:/Users/volans/Desktop/`）；提交/推送需用户明确要求
 - 语言文件（`assets/lensouls/lang/*.json`）只**追加**键，追加后跑 `python -c "import json; json.load(...)"` 验证；曾发现 en_us 遗留重复键（`command.lensouls.toughness.*`）已清理
@@ -3093,3 +3097,74 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
      `"key": 未集齐该套装,` 这种非法 JSON，已作废重建。
 - 交付：`lensouls-1.6.77.jar`（12,425,430 字节，MD5 `1E174643FBE3E75FA9AB3287690237E5`）。
   **1.6.46 ~ 1.6.76 作废。**
+
+## 2026-10 需求批次（`1.7.48` → `1.7.49`）
+
+> 1.7.38 ~ 1.7.47 的改动（诅咒文案/工具提示、BOSS 目标替换、e11 疯狂口径等）与本节一起提交，
+> 明细见 `git show` / `git log`；下面只记**本批次两次构建**的关键口径与坑。
+
+### 58. 天数重构（`1.7.48`）：对齐 Xaero 口径 + 每人独立
+
+- **Xaero 的算法**（反编译 `xaero/hud/minimap/info/BuiltInInfoDisplays` 的 `lambda$static$14`，`gui.xaero_day` 那行）：
+  `t = 6000 + level.getDayTime(); day = t / 24000 + 1; hh = (t % 24000) / 1000;`
+  ⇒ **午夜换日**（不是原版「夜→昼」），且这个「天」是**绝对量**（客户端读 world dayTime，全服同号）。
+- 新 `handler/WorldDays`：`absoluteDay` = 上面的绝对天（与地图同号，只用于日志/指令）；
+  `elapsedDays` = 绝对天 − 该玩家「首次被观测到的绝对天」（存 `lensouls:world_day_start`，
+  登录当刻 + 每 tick 由 `FeatherAbyssHandler.tick` 兜底写入）⇒ **每个玩家各自独立**。
+- 折翼 e3 的反转窗口（`WorldDays.ABYSS_REVERSE_WINDOW_DAYS = 5`）与安魂曲扣血全改用 `elapsedDays`；
+  **删除 `handler/FeatherAbyssDayData`**（主世界夜→昼跳变计数、全服共用一份 SavedData，既不与地图同口径也不可能按人独立）。
+- 自检指令 `/lensouls curse days`：`地图第 N 天 | 你自己第 M 天（已过 K 天）| 窗口…`。
+- 项目里其余「天」只有 `PhotoSetEffects` 的白昼/黑夜判定（`getDayTime()%24000` vs 12542/23458）——
+  那是**天空亮度时刻**，不是天数，口径不同，未动。
+
+### 59. 时运 / 抢夺改回「真附魔等级」（`1.7.48`）
+
+- 旧实现把 `BlockDropsEvent`/`LivingDropsEvent` 里**已经算好的掉落物复制一份** ⇒ 对所有方块无条件加产（石头也掉 2 个）。
+- 现在按原版的两个真实读取点回话（`javap` 确认）：
+  - 时运：`ApplyBonusCount` 读 `LootContextParams.TOOL` ⇒ `mixin/BlockFortuneDropMixin` 在
+    `Block.dropResources` 调 `Block.getDrops` 处把工具换成**带时运 II 的副本**（真物品不动，空手不处理）。
+  - 抢夺：`EnchantedCountIncreaseFunction` 读 `EnchantmentHelper.getEnchantmentLevel(LOOTING, ATTACKING_ENTITY)`
+    ⇒ `mixin/EnchantmentHelperLootingMixin` 在该方法 RETURN 处对 `minecraft:looting` 回答 `+2`。
+    全量扫描确认该方法只有 3 个引用（`EnchantedCountIncreaseFunction`、`LootItemRandomChanceWithEnchantedBonusCondition`、自身），都是抢夺口径。
+- **坑**：`EnchantmentHelper.updateEnchantments(stack, ...)` 在**堆上没有任何附魔组件**时直接 `return EMPTY`
+  什么都不写（反编译确认）—— 用它给无附魔工具临时加时运会静默失效。`CurseLootBonus` 改为显式
+  `getComponentType(stack)` + `ItemEnchantments.Mutable` 读写。
+- 诅咒态（−2）仍是「按概率删 0~2 件」的近似（原版没有负等级附魔）。
+
+### 60. 诅咒自伤递归崩溃 + 丢手刷物品（`1.7.48`）
+
+- 崩溃报告里 63 层循环：`onDealDamage → levelFieldCounter（玩家受伤）→ onReflect（反弹给 BOSS）→ onDealDamage …`
+  （`StackOverflowError: Exception in server tick loop`，触发条件是 e23 平势 诅咒态 + e11 锈甲 反转态）。
+  修法：`SELF_DAMAGE_DEPTH`（ThreadLocal 深度）+ `hurtGuarded(...)` 包住全部自伤/反弹/反制，
+  期间 `onIncoming`/`onDealDamage`/`onReflect` 直接返回；e23 同 tick 只反击一次。
+- 丢手（⑤ e16 2% 丢主手、⑦ e7 3% 丢手）统一到 `handler/curse/CurseHandDrop`：
+  **先清槽 → 回读校验确实空了 → 才生成这一份掉落物 → `broadcastChanges`**，同玩家 1 秒内最多一次
+  （抽概率入口在多段伤害里会被同 tick 反复调用）。日志 `[Curse] <来源> 丢出手中物品 …`。
+
+### 61. 假死（0 血未死）根治与兜底（`1.7.49`）
+
+- **机制（`javap` 确认）**：`LivingEntity.hurt` 头部 `if (isDeadOrDying()) return false;`，
+  而 `isDeadOrDying() = isRemoved() || dead || getHealth() <= 0` ⇒ 一旦「血量 ≤ 0 且 `dead == false`」，
+  之后任何伤害（`/kill`、真伤、岩浆）都进不来，只能 `setHealth`（`/heal`）救。
+- 产生路径只有两条：① 某处 `LivingDeathEvent.setCanceled(true)` 却没回血；② 直接 `setHealth(≤0)`。
+- **我们确认的一条**：`TemporalRecallHandler` 旧代码先 `event.setNewDamage(0)` 再读快照，
+  且 `TemporalSnapshot.apply` 直接 `player.setHealth(health)`（health 来自照片 NBT）——
+  旧照片没有 `health` 键时读出 0 ⇒ `setHealth(0)` + 致命伤已被清零 = 标准假死。
+  现改为**先读快照、读不到当没照片**（不消耗/不清零），`apply` 里血量夹到 `[1, 上限]`，回溯后再兜一次。
+- 新增 `handler/FalseDeathGuard`：`LivingDeathEvent`（LOWEST）当刻回填 1 点 + WARN；
+  每 20 tick / 登录兜底修「0 血且 `dead == false`」；WARN 带玩家/血量/上限/dead/模式/扭曲/诅咒掩码/阻死/最后伤害类型。
+  区分「正常死亡中」必须读 `LivingEntity.dead`（`isDeadOrDying()` 把两者混在一起）⇒ 新 `mixin/LivingEntityDeadAccessor`。
+- ② 扭曲之人审计：**诅咒态不取消死亡**（只在满值死亡时生成扭曲者 + 写强制掉落标记），
+  两个取消分支（阻死 ① / 反转 ②）都先 `setHealth(1)`，所以 ② 本身不产生 0 血。
+  但顺带修掉两个真缺陷：阻死到点的必死一击改用 `genericKill`（`BYPASSES_INVULNERABILITY`），
+  没死成时撤销 `DEFY_ENDING`（否则下一次普通死亡会凭空刷扭曲者）；石之心不再对必死级伤害封顶。
+
+### 62. 交付
+
+- `1.7.48`：`lensouls-1.7.48.jar`（12,454,816 字节，MD5 `7291192E5783386069550E4AEB543AC6`）。
+- `1.7.49`（最终，含 1.7.48 全部内容）：`lensouls-1.7.49.jar`（12,459,812 字节，MD5 `6A0A589C2345BA337FA65EC0694C082E`）。
+  **`1.7.48` 作废，用 `1.7.49`。**
+- 构建环境：`ops_bash`（git bash）已成为首选执行器，`cd lensouls-template-1.21.1 && ./gradlew build` 实测通过；
+  pwsh 仅留给 Windows 原生场景（见文件顶部「构建与运行」）。
+- 待实机验证：`/lensouls curse days` 与 Xaero HUD 天数一致、普通方块不再加产、无时运工具的矿产量按原版时运 II、
+  e23+e11 打高血 BOSS 不再崩、丢手只掉一份、假死后 2 秒内自动回血且日志给出诊断。

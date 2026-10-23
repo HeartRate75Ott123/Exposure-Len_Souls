@@ -61,11 +61,15 @@ public class FeatherCurseItem extends Item {
         }
         tooltip.add(Component.translatable(key + ".shift_hint"));
 
-        // ①②③ 的整款共用条件：按住 Shift 时在条目之前显示一次
+        // ①②③ 的整款共用条件：按住 Shift 时在条目之前显示**一次**，计数类条件把进度接在后面
         if (shift && def.sharedCond()) {
-            tooltip.add(Component.literal("§7")
+            Component line = Component.literal("§7")
                     .append(Component.translatable("gui.lensouls.curse.shared_cond"))
-                    .append(Component.translatable(key + ".cond_shared")));
+                    .append(Component.translatable(key + ".cond_shared"));
+            // 目标 >1 说明这是计数条件（荒厄：x 只 / x 只），把进度补在条件后面；
+            // ②③ 的条件是状态判定（目标恒为 1），不显示进度。
+            if (CurseGoals.goal(def, 0) > 1L) line = line.copy().append(progressSuffix(def, 0));
+            tooltip.add(line);
         }
 
         // ── 逐条：常显「当前实际生效的效果」；按住 Shift 时**紧跟其后**补条件与结果 ──
@@ -104,6 +108,17 @@ public class FeatherCurseItem extends Item {
                     ? "gui.lensouls.curse.cond_blessing" : "gui.lensouls.curse.cond_curse").getString();
             String afterLabel = Component.translatable(blessing
                     ? "gui.lensouls.curse.after_blessing" : "gui.lensouls.curse.after_curse").getString();
+
+            // 整款共用条件：上方已经写过一次（带进度），条目里**不再重复**，只留结果
+            if (def.sharedCond()) {
+                if (on) {
+                    tooltip.add(Component.literal("§8    └ §a" + stateLabel));
+                } else {
+                    tooltip.add(Component.literal("§8    └ §7" + afterLabel + "：")
+                            .append(Component.translatable(def.entryKey(i) + ".after")));
+                }
+                continue;
+            }
 
             if (on) {
                 tooltip.add(Component.literal("§8    └ §a" + stateLabel + " §8· " + condLabel + "：").append(cond));

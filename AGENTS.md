@@ -14,6 +14,11 @@ NeoForge 1.21.1 模组（镜魂），基于 Exposure 相机模组的扩展。详
   `pwsh` 仍可用，但仅在需要 Windows 原生能力（注册表、服务、`-LiteralPath` 通配符场景）时才用；
   **不要**在两套 shell 之间混用语法（bash 里写 `$env:X` 必错）。
 - 旧的「pwsh 下用 `.\gradlew.bat build`」记录只是历史环境说明，不是禁用 bash 的规则。
+- **网络操作（push/fetch）必须用系统 git**：DSH 自带 bash 里的 `git` 会走它自己的
+  `ucrt64/bin/git-credential-manager.exe`，该实例没配凭据助手，会弹
+  `CredentialHelperSelector`（`<no helper>` / `wincred` / `manager`）把命令卡死。改用
+  `"/c/Program Files/Git/cmd/git.exe" push origin main` 即可（系统 GCM 已有 GitHub 凭据，实测秒过）。
+  本地提交仍可用自带 git，只有联网那步换系统 git。
 - 版本号在 `gradle.properties` 的 `mod_version`，构建前先递增
 - 常用交付：构建后复制 JAR 到桌面（`C:/Users/volans/Desktop/`）；提交/推送需用户明确要求
 - 语言文件（`assets/lensouls/lang/*.json`）只**追加**键，追加后跑 `python -c "import json; json.load(...)"` 验证；曾发现 en_us 遗留重复键（`command.lensouls.toughness.*`）已清理

@@ -233,7 +233,6 @@ public final class ZeroforgeCurse {
     /** e7：下次强制换手 tick */
     private static final Map<UUID, Long> NEXT_SWAP = new ConcurrentHashMap<>();
     /** e7 反转：力量 X 冷却到期 tick */
-    private static final Map<UUID, Long> STRENGTH_UNTIL = new ConcurrentHashMap<>();
     /** e7：上一 tick 所在维度（切维度不触发换手） */
     private static final Map<UUID, ResourceLocation> LAST_DIMENSION = new ConcurrentHashMap<>();
     /** e10：本模组点亮的发光实体（逐玩家） */
@@ -877,26 +876,66 @@ public final class ZeroforgeCurse {
             NEXT_SWAP.remove(player.getUUID());
         }
 
-        // 反转态：玩家自己交换主副手时给力量 X（每 7 秒最多一次）
-        if (CurseManager.rev(player, D, 6)) {
-            Integer prevMain = LAST_MAIN_HASH.put(player.getUUID(), player.getMainHandItem().hashCode());
-            if (prevMain != null && prevMain != player.getMainHandItem().hashCode()) {
-                rollStrength(player, now);
-            }
-        } else {
-            LAST_MAIN_HASH.remove(player.getUUID());
+        // 反转态的「手动换手」不再靠每 tick 比对主手指纹 —— 那种轮询会把**切物品栏**、
+        // 吃东西（数量变化）、耐久变化都误判成换手，又会漏掉「主副手换成同款物品」。
+        // 现在改用 NeoForge 的 LivingSwapItemsEvent.Hands（服务端 SWAP_ITEM_WITH_OFFHAND
+        // 分支里派发，只对应手动 F 键），见 onSwapHands。
+    }
+
+    /**
+     * e7 易手 反转：**手动交换主副手**时 5% 概率获得力量 X（10 秒）。
+     * <p>
+     * 用 {@code LivingSwapItemsEvent.Hands} 而不是轮询主手指纹：该事件在服务端
+     * {@code ServerGamePacketListenerImpl.handlePlayerAction} 的 {@code SWAP_ITEM_WITH_OFFHAND}
+     * 分支里由 {@code CommonHooks.onLivingSwapHandItems} 派发（字节码逐点核对），
+     * **只有手动换手会触发**，切物品栏 / 换选中槽 / 吃东西都不会。
+     */
+    @SubscribeEvent
+    public static void onSwapHands(net.neoforged.neoforge.event.entity.living.LivingSwapItemsEvent.Hands event) {
+        try {
+            if (!(event.getEntity() instanceof ServerPlayer player)) return;
+            if (player.level().isClientSide) return;
+            if (!active(player)) return;
+            if (!CurseManager.rev(player, D, 6)) return;
+            rollStrength(player, player.level().getGameTime());
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ⑦ e7 换手奖励结算异常", t);
         }
     }
 
-    /** e7：上一 tick 主手物品指纹（用来发现「玩家自己换手了」） */
-    private static final Map<UUID, Integer> LAST_MAIN_HASH = new ConcurrentHashMap<>();
+    /** e7 反转：力量 X 冷却的持久化子键（跨死亡 / 掉线保留） */
+    private static final String STRENGTH_UNTIL_KEY = "zf7StrengthUntil";
 
-    /** e7 反转：5% 概率获得力量 X（10 秒），触发后冷却 7 秒 */
+    /**
+     * 读 7 秒冷却到期刻。
+     * <p>
+     * <b>防脏数据</b>：存档被回滚 / 换维度导致游戏刻跳变时，残留的「未来时刻」会让奖励永久失效。
+     * 冷却最长只可能是 {@code 7 秒 + 余量}，超出这个范围的到期刻一律视为脏数据并清除。
+     */
+    private static long strengthUntil(ServerPlayer player) {
+        long until = persisted(player).getLong(STRENGTH_UNTIL_KEY);
+        if (until <= 0L) return 0L;
+        long now = player.level().getGameTime();
+        if (until > now + STRENGTH_COOLDOWN_TICKS + 200L) {
+            markStrengthCooldown(player, 0L);
+            LenSouls.LOGGER.warn("[Curse] ⑦ e7 力量 X 冷却值异常（{}，当前 {}），已重置", until, now);
+            return 0L;
+        }
+        return until;
+    }
+
+    private static void markStrengthCooldown(ServerPlayer player, long until) {
+        CompoundTag tag = persisted(player);
+        tag.putLong(STRENGTH_UNTIL_KEY, until);
+        writeBack(player, tag);
+    }
+
+    /** e7 反转：5% 概率获得力量 X（10 秒），触发后冷却 7 秒（写入 PlayerPersisted，跨死亡/掉线保留） */
     private static void rollStrength(ServerPlayer player, long now) {
-        Long until = STRENGTH_UNTIL.get(player.getUUID());
-        if (until != null && now < until) return;
+        long until = strengthUntil(player);
+        if (now < until) return;
         if (player.getRandom().nextFloat() >= STRENGTH_CHANCE) return;
-        STRENGTH_UNTIL.put(player.getUUID(), now + STRENGTH_COOLDOWN_TICKS);
+        markStrengthCooldown(player, now + STRENGTH_COOLDOWN_TICKS);
         player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, STRENGTH_DURATION_TICKS, 9,
                 true, false, false));
         player.displayClientMessage(
@@ -937,8 +976,6 @@ public final class ZeroforgeCurse {
         }
         inv.setChanged();
         player.containerMenu.broadcastChanges();
-        // 记下换手后的主手指纹：否则下一 tick 的「自己换手」检测会把这次强制换手再算一次
-        LAST_MAIN_HASH.put(player.getUUID(), player.getMainHandItem().hashCode());
 
         // 反馈：声音 + 动作栏提示（不给反馈会被当成客户端显示错乱上报）
         player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
@@ -946,11 +983,9 @@ public final class ZeroforgeCurse {
         player.displayClientMessage(
                 net.minecraft.network.chat.Component.translatable(
                         "message.lensouls.zeroforge.hand_swap"), true);
-
-        // 反转态：强制换手同样算一次换手
-        if (CurseManager.rev(player, D, 6)) {
-            rollStrength(player, player.level().getGameTime());
-        }
+        // 注意：这里**不**结算力量 X。强制换手只发生在诅咒态（{@code on}），而力量 X 是反转态的奖励
+        // （{@code rev} = 选中 ∧ 已反转），两者互斥 —— 写成 `if (rev) rollStrength(...)` 是死代码，
+        // 因为反转后 {@link #tickHandSwap} 根本不会走到这里（{@code NEXT_SWAP} 被清空、不再强制换手）。
     }
 
     // ==================== e8 零号·神愤（条件） ====================
@@ -1461,9 +1496,7 @@ public final class ZeroforgeCurse {
         NO_SOUL_TICKS.remove(id);
         SELF_HURT_UNTIL.remove(id);
         NEXT_SWAP.remove(id);
-        STRENGTH_UNTIL.remove(id);
         LAST_DIMENSION.remove(id);
-        LAST_MAIN_HASH.remove(id);
     }
 
     // ==================== 对外查询 ====================

@@ -52,6 +52,41 @@ public final class WorldFxBursts {
     //  入口
     // =====================================================================
 
+    /**
+     * 滤镜成功施加：被施加者身上「对焦收束」。
+     * <p>
+     * 只记实体 id + 颜色，位置每帧现取（见 {@link FilterAppliedBurst}）——被施加者走动、被击退、
+     * 甚至被打飞时，特效都会平滑跟过去，而不是钉在发包那一瞬间的坐标。
+     */
+    public static void filterApplied(ClientLevel level, net.minecraft.world.entity.Entity target,
+                                     float r, float g, float b) {
+        BURSTS.add(new FilterAppliedBurst(target, r, g, b));
+
+        // 胸口一圈效果色的魂尘：环是"框"，粒子是"尘"，两者一起把"覆上一层"的观感做实。
+        // 半径与数量都按体型放大——巨兽身上 0.32 格的小圈等于看不见。
+        float scale = bodyScaleOf(target.getBbWidth(), target.getBbHeight());
+        double h = target.getBbHeight();
+        double cx = target.getX();
+        double cy = target.getY() + h * 0.55;
+        double cz = target.getZ();
+        int wisps = Math.min(30, Math.round(10 * scale));
+        for (int i = 0; i < wisps; i++) {
+            double ang = Math.PI * 2.0 * i / wisps;
+            double rad = (0.32 + level.random.nextDouble() * 0.10) * scale;
+            level.addParticle(ModParticleTypes.SOUL_WISP_WHITE.get(),
+                    cx + Math.cos(ang) * rad,
+                    cy + (level.random.nextDouble() - 0.5) * 0.18 * scale,
+                    cz + Math.sin(ang) * rad,
+                    0.0, 0.012 + level.random.nextDouble() * 0.02, 0.0);
+        }
+    }
+
+    /** 体型缩放：包围盒对角 / 普通类人生物对角（与 {@link FilterAppliedBurst} 同一口径） */
+    private static float bodyScaleOf(float width, float height) {
+        float span = (float) Math.sqrt(width * width + height * height);
+        return Math.max(0.55F, Math.min(3.40F, span / 1.90F));
+    }
+
     /** 夺魂索命：目标身上「魂飞魄散」。 */
     public static void soulSever(ClientLevel level, Vec3 feet, float height, boolean success) {
         BURSTS.add(new SoulSeverBurst(feet, height, success));
@@ -227,6 +262,223 @@ public final class WorldFxBursts {
                 }, null, wide, r, g, (int) (b * 0.85F), (int) (255 * p.alpha));
                 WorldFx.flush(pillar);
             }
+        }
+    }
+
+    /**
+     * 滤镜施加的「对焦收束」：三个元素合成一次"被套上一层滤镜"的观感。
+     * <ol>
+     *   <li><b>咬合环</b>（银白偏效果色）：半径 {@code 1.30 → 0.42} × 目标体型，0.30s 内 ease-out 收拢；</li>
+     *   <li><b>上色环</b>（效果色）：半径 {@code 0.36 → 1.62} × 目标体型，0.60s 内向外荡开并淡出；</li>
+     *   <li><b>刻度线</b>（效果色）：咬合环上绕 8 根短线，随咬合一起收、一起淡（取景器/镜头的刻度语汇）。</li>
+     * </ol>
+     * 环都取<b>相机朝向</b>的平面（right / up 由"目标→镜头"方向现算），因此从任何角度看都是正圆，
+     * 永远像"套在这个目标身上的一圈"，不会因为侧看塌成一条线。
+     *
+     * <h3>体型缩放（为什么不能写死 1.3 格）</h3>
+     * 半径原先按<b>绝对格数</b>写死，套在僵尸身上刚好，套在下界合金巨兽那种 4×6 的体型上
+     * 就只是胸口一小圈，"上了滤镜"完全看不出来。现在用目标的包围盒对角
+     * {@code sqrt(w² + h²)} 对普通类人生物（0.6×1.8 ≈ 1.90）取比值，作为整体缩放：
+     * <ul>
+     *   <li>普通生物 ≈ 1.0（观感与之前一致）；小型生物夹到 0.55；</li>
+     *   <li>巨兽 ≈ 2.5~3.4（夹上限），环线宽度、刻度长度、粒子散热半径一起放大；</li>
+     *   <li>体型缩放 ≥ 1.5 时，在 {@code 0.30h / 0.55h / 0.80h} 三层各来一圈
+     *       —— 高个子只圈中间会像"腰带"，三层才是"整只被套住"。</li>
+     * </ul>
+     *
+     * <h3>平滑移动</h3>
+     * 不存死坐标，每帧向实体胸口做指数趋近（帧率无关的 {@code 1 - e^{-16·dt}}，约 60ms 追上）；
+     * 位置、身高、体型三者都做同样的平滑（阶段变化突然变大的 boss 不会让环"啪"地跳一下）。
+     * 实体卸载或死亡后保持最后位置把动画播完，既不瞬移也不凭空消失。
+     * 目标是自己时不能用胸口（相机就长在胸口，环会糊满屏幕）——改成镜头正前方 1.15 格、半径减半。
+     */
+    private static final class FilterAppliedBurst implements Burst {
+        /** 普通类人生物的包围盒对角，作为体型缩放的分母 */
+        private static final float HUMANOID_SPAN = 1.90F;
+        /** 跟随时长常数：越大跟得越紧（16 ≈ 60ms 追上） */
+        private static final float FOLLOW_K = 16.0F;
+        private static final float BASE_DURATION = 0.70F;
+
+        private final int entityId;
+        private final float cr;
+        private final float cg;
+        private final float cb;
+        private final boolean self;
+
+        /** 平滑跟踪得到的胸口位置（世界坐标） */
+        private Vec3 pos;
+        private float height;
+        /** 平滑跟踪得到的包围盒对角（体型缩放用） */
+        private float span;
+        private float t;
+
+        FilterAppliedBurst(net.minecraft.world.entity.Entity target, float r, float g, float b) {
+            this.entityId = target.getId();
+            this.cr = r;
+            this.cg = g;
+            this.cb = b;
+            Minecraft mc = Minecraft.getInstance();
+            this.self = mc.player != null && mc.player.getId() == entityId;
+            double h = target.getBbHeight();
+            this.height = (float) h;
+            this.span = (float) Math.sqrt(target.getBbWidth() * target.getBbWidth() + h * h);
+            if (!self) {
+                this.pos = new Vec3(target.getX(), target.getY() + h * 0.55, target.getZ());
+            }
+        }
+
+        /** 体型缩放：普通生物 ≈ 1.0，巨兽夹到 3.4（再大就不是"一圈"而是天花板了） */
+        private float bodyScale() {
+            return Math.max(0.55F, Math.min(3.40F, span / HUMANOID_SPAN));
+        }
+
+        /** 体型越大，动画给得越长（0.70 ~ 0.94s），否则巨兽上的环还没读完就没了 */
+        private float duration() {
+            return BASE_DURATION + 0.12F * Math.min(2.0F, Math.max(0.0F, bodyScale() - 1.0F));
+        }
+
+        @Override
+        public boolean update(float dt) {
+            t += dt;
+            float life = duration();
+            if (self) return t < life;
+
+            Minecraft mc = Minecraft.getInstance();
+            ClientLevel level = mc.level;
+            if (level == null || pos == null) return t < life;
+
+            net.minecraft.world.entity.Entity e = level.getEntity(entityId);
+            // 实体没了（死亡/卸载/超出追踪距离）：保持最后位置，让这一下正常播完
+            if (e == null || !e.isAlive()) return t < life;
+
+            double h = e.getBbHeight();
+            double wantX = e.getX();
+            double wantY = e.getY() + h * 0.55;
+            double wantZ = e.getZ();
+            float wantSpan = (float) Math.sqrt(e.getBbWidth() * e.getBbWidth() + h * h);
+            if (dt <= 0.0F) {
+                pos = new Vec3(wantX, wantY, wantZ);
+                height = (float) h;
+                span = wantSpan;
+            } else {
+                // 位置 / 身高 / 体型用同一条平滑曲线：boss 换阶段突然变高变大时，环不会"啪"地跳
+                float a = 1.0F - (float) Math.exp(-FOLLOW_K * dt);
+                pos = new Vec3(
+                        pos.x + (wantX - pos.x) * a,
+                        pos.y + (wantY - pos.y) * a,
+                        pos.z + (wantZ - pos.z) * a);
+                height += ((float) h - height) * a;
+                span += (wantSpan - span) * a;
+            }
+            return t < life;
+        }
+
+        @Override
+        public void render(Matrix4f pose, Vec3 camera, float time) {
+            float life = duration();
+            float u = Math.min(1.0F, t / life);
+            if (u >= 1.0F) return;
+
+            float scale = bodyScale();
+            Vector3f center;
+            float radiusScale;
+            if (self) {
+                Minecraft mc = Minecraft.getInstance();
+                Vec3 look = mc.player != null ? mc.player.getLookAngle() : new Vec3(0.0, 0.0, 1.0);
+                center = new Vector3f((float) (look.x * 1.15), (float) (look.y * 1.15 - 0.18),
+                        (float) (look.z * 1.15));
+                radiusScale = 0.5F;
+            } else {
+                if (pos == null) return;
+                center = new Vector3f((float) (pos.x - camera.x),
+                        (float) (pos.y - camera.y),
+                        (float) (pos.z - camera.z));
+                radiusScale = scale;
+            }
+
+            // 相机朝向的两个轴：环永远正对镜头（侧看也不会塌成一条线）
+            Vector3f view = new Vector3f(-center.x, -center.y, -center.z);
+            if (view.lengthSquared() < 1.0E-6F) return;
+            view.normalize();
+            Vector3f right = new Vector3f(0F, 1F, 0F).cross(view);
+            if (right.lengthSquared() < 1.0E-5F) right.set(1F, 0F, 0F);
+            right.normalize();
+            Vector3f up = new Vector3f(view).cross(right).normalize();
+
+            // ① 咬合：1.30 → 0.42（× 体型），ease-out
+            float squeeze = Math.min(1.0F, t / (0.30F * Math.max(1.0F, scale * 0.72F)));
+            float squeezeEase = 1.0F - (1.0F - squeeze) * (1.0F - squeeze);
+            float squeezeR = (1.30F - 0.88F * squeezeEase) * radiusScale;
+            int squeezeA = Math.round(235.0F * smoothstep(0.0F, 0.05F, t)
+                    * (1.0F - smoothstep(0.24F, 0.62F, t)));
+
+            // ② 上色：0.36 → 1.62，向外荡开
+            float spread = Math.min(1.0F, t / 0.60F);
+            float spreadEase = 1.0F - (1.0F - spread) * (1.0F - spread);
+            float spreadR = (0.36F + 1.26F * spreadEase) * radiusScale;
+            int spreadA = Math.round(220.0F * smoothstep(0.0F, 0.04F, t)
+                    * (1.0F - spread) * (1.0F - spread));
+
+            // 线宽与刻度长度也跟体型走：4 格宽的环配 0.02 的细线会细到看不见。
+            // 基准值比第一版加粗约 60%（用户实机反馈"线条可以适当粗一些"）
+            float lineK = 0.75F + 0.45F * scale;
+            float squeezeW = 0.032F * lineK;
+            float spreadW = 0.048F * lineK;
+            float tickIn = 0.045F * lineK;
+            float tickLen = 0.110F * lineK;
+
+            WorldFx.Params p = WorldFx.params();
+            p.time = time;
+            p.pulseSpeed = 1.5F;
+            p.pulseSharp = 0.12F;   // 比魂丝柔和：这是镜头刻度，不该像电
+            p.edgeSoft = 1.5F;
+            p.coreBoost = 0.9F;
+            p.flicker = 0.12F;
+            p.grow = 1.0F;
+            p.taper = 0.0F;
+            p.alpha = 1.0F;
+
+            BufferBuilder buffer = WorldFx.begin(p);
+
+            // 只有<b>一圈</b>咬合环。曾经为大体型做过"0.30h / 0.55h / 0.80h 三层"，
+            // 实机看是"一个实体身上出现了两层法印、一上一下"（焰魔那种体型特别明显）——
+            // 加量不等于加强，观感反而像叠了两个特效。大体型继续只靠 radiusScale 放大。
+            if (squeezeA > 3) {
+                WorldFx.ring(buffer, pose, center, right, up, squeezeR, squeezeW,
+                        tint(150, 0.42F, cr), tint(160, 0.42F, cg), tint(178, 0.42F, cb),
+                        squeezeA, 64);
+            }
+            if (spreadA > 3) {
+                WorldFx.ring(buffer, pose, center, right, up, spreadR, spreadW,
+                        tint(55, 0.85F, cr), tint(58, 0.85F, cg), tint(62, 0.85F, cb),
+                        spreadA, 64);
+            }
+
+            int tickA = Math.round(squeezeA * 0.75F);
+            if (tickA > 3) {
+                int ticks = scale >= 2.0F ? 12 : 8;
+                for (int i = 0; i < ticks; i++) {
+                    double ang = Math.PI * 2.0 * i / ticks + Math.PI / ticks;
+                    float dirX = (float) Math.cos(ang);
+                    float dirY = (float) Math.sin(ang);
+                    Vector3f inner = new Vector3f(center)
+                            .add(new Vector3f(right).mul(dirX * (squeezeR + tickIn)))
+                            .add(new Vector3f(up).mul(dirY * (squeezeR + tickIn)));
+                    Vector3f outer = new Vector3f(center)
+                            .add(new Vector3f(right).mul(dirX * (squeezeR + tickIn + tickLen)))
+                            .add(new Vector3f(up).mul(dirY * (squeezeR + tickIn + tickLen)));
+                    WorldFx.polyline(buffer, pose, new Vector3f[]{inner, outer}, null,
+                            0.022F * lineK,
+                            tint(90, 0.75F, cr), tint(92, 0.75F, cg), tint(96, 0.75F, cb), tickA);
+                }
+            }
+
+            WorldFx.flush(buffer);
+        }
+
+        /** 底色 + 效果色（gain 越大越"上色"）；暗色效果也留得住可见度 */
+        private static int tint(int base, float gain, float c) {
+            return Math.max(0, Math.min(255, Math.round(base + gain * 255.0F * c)));
         }
     }
 

@@ -50,6 +50,36 @@ public class ClientPacketHandlers {
         com.plumejade.lensouls.client.fx.ToughnessImpactScreenFx.trigger(packet.isStun());
     }
 
+    /**
+     * 滤镜成功施加：在被施加者身上播「对焦收束」。
+     * <p>
+     * 只靠 entityId 找实体——位置由 {@code WorldFxBursts} 每帧现取（平滑跟随），
+     * 所以这里丢包/实体暂时不在视野里都不影响已开播的那一份。
+     */
+    public static void handleFilterAppliedFx(com.plumejade.lensouls.network.FilterAppliedFxPacket packet) {
+        Minecraft mc = Minecraft.getInstance();
+        Level level = mc.level;
+        if (!(level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel)) return;
+        Entity target = clientLevel.getEntity(packet.getEntityId());
+        if (target == null) return;
+        com.plumejade.lensouls.client.fx.WorldFxBursts.filterApplied(
+                clientLevel, target, packet.getR(), packet.getG(), packet.getB());
+    }
+
+    /**
+     * 最上层提示弹窗（等级不足 / 封器未反转 / 胶卷用光……）。
+     * <p>
+     * 走 {@code FeatherToast}：由 {@code GameRenderer.render} 里 {@code GuiGraphics.flush()} 之后绘制，
+     * 压在所有 HUD 与取景器之上；同时清掉原版动作栏那份（这些提示以前走过动作栏，会重复）。
+     */
+    public static void handleHudHint(com.plumejade.lensouls.network.HudHintPacket packet) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        com.plumejade.lensouls.LenSouls.LOGGER.info("[HudHint] 最上层提示: {}", packet.text().getString());
+        com.plumejade.lensouls.client.feather.FeatherToast.show(packet.text());
+        if (mc.gui != null) mc.gui.setOverlayMessage(net.minecraft.network.chat.Component.empty(), false);
+    }
+
     public static void handleToughnessHitSound(ToughnessHitSoundPacket packet) {
         Minecraft mc = Minecraft.getInstance();
         Level level = mc.level;

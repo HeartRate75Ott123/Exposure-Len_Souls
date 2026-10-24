@@ -17,8 +17,7 @@ import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
  * 判定严格收窄到「本模组标记过的照片弹幕（{@code lensouls:photo_proj}）」：
  * <ul>
  *   <li>命中发射者本人 → 免伤（本次修复的问题）；</li>
- *   <li>命中任意玩家 → 免伤（与弹幕框架注释里既有的「不伤自身/队友」口径一致，
- *       队友挡在弹道上也属于误伤而非设计意图）；</li>
+ *   <li>命中<b>任意玩家</b> → 免伤（全局口径，与组队无关）；</li>
  *   <li>命中任意<b>友方单位</b> → 免伤。口径 = 统一大过滤 {@link AllyFilter#isFriendly}
  *       （类别：玩家 + 任意驯服宠物（狼/猫/鹦鹉/马…）+ 自家召唤物（幻灵/幻翼）+ 任意第三方辅助作战单位，
  *       <b>不区分归属</b>；外加同乘），视角 = 弹幕发射者——
@@ -40,7 +39,8 @@ public class PhotoProjSafetyHandler {
             return;
         }
         // 统一大过滤：类别（玩家/任意驯服宠物/自家召唤物/任意辅助单位）+ 同乘，
-        // 视角 = 弹幕发射者（被反弹后 getEntity 可能已是别人，故用 ownerOf 解析投影物 owner）
+        // 视角 = 弹幕发射者（被反弹后 getEntity 可能已是别人，故用 ownerOf 解析投影物 owner）。
+        // 玩家**一律**免伤（不分组队），见 AllyFilter#isFriendly 的类注释。
         if (AllyFilter.isFriendly(PhotoProjMarker.ownerOf(event.getSource()), victim)) {
             if (PhotoProjMarker.isBarrageDamage(event.getSource())) {
                 event.setCanceled(true);

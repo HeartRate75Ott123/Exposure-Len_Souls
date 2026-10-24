@@ -3373,3 +3373,216 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
   注：`./gradlew runServer` 目前起不来，与本次改动无关——`libs/` 里新加的 l2* 依赖在 dev 环境
   找不到 `com.tterrag.registrate.AbstractRegistrate`（嵌套 jarJar 在 dev 不加载），
   `L2Tabs/L2Core/L2Library/L2MenuStacker` 构造失败。
+
+### 71. 虚影核心归还：扩栏饰品必须先装（`1.7.95`）
+
+**现象**：死亡后捡回虚影残像，明明记忆了原饰品槽位，一部分饰品却回到背包（背包满时更糟）。
+**根因**：Curios 的「加饰品栏位」是**异步**的。
+- 栏位加成来自 `SlotAttribute`（`CuriosRegistry.CURIO_ATTRIBUTE_MODIFIERS` 组件里
+  `curios:<slot>` 命名空间的条目）。穿戴时由 **`CuriosEventHandler` 在玩家刻里**对比
+  `previousStacks` 发现变化 → `addTransientSlotModifiers(...)` → `flagUpdate()` →
+  之后某个 `update()` 才 `resize()` → `grow()`。
+- 而 `DynamicStackHandler.setStackInSlot` **只写物品**，不结算任何修饰符
+  （`setEquippedCurio` 也只是转调它）。所以旧版单轮归还时：装上一件「+1 戒指栏」后，
+  后一件戒指面对的仍是旧槽位数 ⇒ `idx < stacks.getSlots()`/`isItemValid` 不通过 ⇒
+  退回背包。多件扩栏饰品、或扩栏饰品记忆槽位越界时同理。
+
+**修法**（`PhantomRemnantData.restore` 分轮 + `applySlotExpansionNow`）：
+1. **扩栏饰品优先**（`expandsCurioSlots`：`CuriosApi.getAttributeModifiers` 里有
+   `SlotAttribute` 且 `amount > 0`），每装一件立刻 `applySlotExpansionNow`：
+   `ICuriosItemHandler.addTransientSlotModifiers(...)` + `ICurioStacksHandler.update()`
+   —— 与正常流程**同口径、同 id**（`CuriosApi.getSlotId(ctx)` 只由标识符决定，
+   所以与随后正常流程的写入**幂等**，不会把栏位加两遍）。
+2. 再装其余饰品（原槽 → 同组空位 → 跨容器兜底），然后原版槽位；
+3. **重试轮**兜底（扩栏在第 2 轮才装上的情形）；
+4. 最后才塞背包，背包也满才掉在原地。
+
+**坑（改这段前必读）**：
+- **`placed[]` 不能用 `stack.isEmpty()` 当判据**：`Inventory.setItem(idx, stack)` 放进去的就是
+  这个 stack 实例（不是拷进再清空），用 `isEmpty()` 判断会判成「没放进去」，随后兜底轮
+  `inv.add(stack)` 再放一次 ⇒ **物品复制**。判据只看 `placeXxx` 的返回值。
+- `curio:<identifier>:<index>` 的 identifier **从最后一个冒号倒着切**（`lensouls:photograph`
+  这种带命名空间的标识符，正着切会解析成 `lensouls`）。
+- 扩栏结算用的 `SlotContext` 必须用**真实落点**（`CurioPlacement`），不能用记忆槽位：
+  `CurioAttributeModifierEvent`/组件条目按 `context.identifier()` 过滤，标识符不一致会算出
+  另一个 modifier id ⇒ 与正常流程各加一次 ⇒ 栏位翻倍。
+- `slotModifiersOf` 整体 try/catch：第三方 `ICurio#getAttributeModifiers` 抛异常时按
+  「不加栏位」继续，不能把整次归还带崩。
+- `ICurioStacksHandler.update()` 在 `clearCacheTick == tickCount`（刚关掉饰品界面那一类时序）
+  会早退且**保留** update 标志 —— 这时本刻长不出新槽位，饰品会走重试轮/背包；属可接受的边界。
+
+## 2026-10 需求批次（`1.8.1`）：瞄准类能力的友方过滤
+
+### 72. 夺魂索命 / 要害打击会锁上自己的召唤物
+
+- **现象（1.5.52 测试日志 + 录像复盘）**：`18:01` 前后与末影守卫开打，玩家身上有 **69 只
+  `Juuuuuuu0's Vex`**（第三方召唤模组，非 gytrinket 构造体）；夺魂索命放出了**成功**特效
+  （1.5.52 只有成功分支才放冲击波粒子 + 雷霆音效，失败只有音效），落在一个小体积浮空单位上，
+  用户认成"无人机"。
+- **根因**：`SoulSeverHandler.findTarget` / `VitalStrikeHandler.findAllBossesInSight` 只跳过
+  **玩家自己**，`AimTargetUtil.isAimedAt` 只挡过 **gytrinket 构造体**（1.4.98 的
+  `PhotoTargetFilter`）。驯服宠物、自家召唤物（幻灵/幻翼）、归属玩家的实体、同乘、
+  第三方召唤物全都在目标池里。
+- **口径（最终定案，`1.8.7`）**：
+  | 分类 | 弹幕免伤（`isFriendly`） | 瞄准（`isFriendlyForAim`） |
+  |---|---|---|
+  | 玩家（任意，含自己/队友/路人） | **免伤** | **排除**（全局；这两个能力对玩家没用） |
+  | 驯服宠物 / 自家召唤物 / gytrinket 构造体 | 免伤 | 排除 |
+  | 归属玩家的实体（`OwnableEntity` / `TraceableEntity`，雪傀儡等） | 免伤 | 排除 |
+  | 同乘（骑/被骑） | 免伤 | 排除 |
+  | 认不出归属的第三方召唤物（如原版 Vex） | — | **可锁**（宁可让它可锁） |
+
+### 落点（只动三处，全部集中在分类层）
+
+- `AllyFilter` 新增两个分类/过滤：
+  - `isPlayerOwned(Entity)`：**走原版 API 双通道**——`OwnableEntity.getOwner()`（返回 `LivingEntity`）
+    或 `TraceableEntity.getOwner()`（返回 `Entity`）解析出玩家即算。两条接口覆盖面不同，
+    `1.8.6` 才把 `TraceableEntity` 补上（第三方把 owner 存成实体引用时只有它能读）。
+  - `isFriendlyForAim(viewer, target)`：瞄准语义的大过滤 = **玩家一律排除** + `isFriendlyUnit` + 同乘。
+    与 `isFriendly` 相反（那条把玩家算友方）。
+  - `isFriendlyUnit` 里补进 `isPlayerOwned`（`OwnableEntity` 这类此前两个分类都漏）。
+- `AimTargetUtil.isAimedAt` 顶部改为一句 `AllyFilter.isFriendlyForAim(player, entity)`，
+  删掉原来单独判 `isAssistConstruct` 的那行（已被覆盖）。
+
+### 必须知道的坑
+
+- **原版 `Vex.setOwner` 的参数是 `Mob`**（`javap` 核实），玩家**不可能**是 Vex 的 owner ⇒
+  `isPlayerOwned` 对这类完全失效。日志里的 `Juuuuuuu0's Vex` 正是这种情况，
+  结论是**接受**（见 §73「名字认亲已删除」）。
+- `isPlayerOwned` 并进 `isFriendlyUnit` 是**有意的连带影响**：玩家自建的雪傀儡/归属实体
+  现在也免疫自家照片弹幕、不会被定格、不会被弹幕选敌、子弹会穿过去。
+  **不影响普通伤害**——玩家用剑/弓打自己的宠物照旧掉血（`PhotoProjSafetyHandler`
+  只在 `PhotoProjMarker.isBarrageDamage` 成立时才免伤）。
+
+### 交付
+
+- 版本 `1.8.1`（**最终版号见 §73：`1.8.7`**）；`./gradlew build` 通过（只剩既有的 unchecked/JEI 弃用提示）。
+  产物 `build/libs/lensouls-1.8.1.jar`；**未复制到桌面、未提交**（等用户指示）。
+- **未实机验证**。复测清单：① 对自家雪傀儡 / 驯服狼右键夺魂索命 → 应完全跳过它们，
+  锁定其后的 BOSS；② 对任意玩家右键 → 不会锁（§73 定案）；
+  ③ 对方 BOSS 的召唤物（如唤魔者 Vex）仍可正常锁定；④ 要害打击照常削韧 BOSS。
+
+## 2026-10 需求批次（`1.8.4`）：友伤/瞄准改成全局口径（FTB Teams 撤回）
+
+### 73. 玩家一律免伤、瞄准一律排除玩家（团队兼容不接了）
+
+- **口径（用户最终定案，覆盖此前"按团队"那版）**：
+  - **照片弹幕**：命中**任意玩家**一律免伤（不分组队，与 1.5.52 起的行为一致）；
+  - **夺魂索命 / 要害打击**：**全局排除玩家**——这两个能力对玩家没意义（前者 50% 血线 + 30% 成功率，
+    后者只认 BOSS），锁到人身上纯属浪费冷却；
+  - **第三方召唤物**：只按原版 API 认（`OwnableEntity` / `TraceableEntity` / `TamableAnimal`），
+    **认不出归属的一律当可锁**。
+- **撤回 FTB Teams**（`1.8.2` 那版作废）：`util/TeamCompat`、`AllyFilter#isSameTeam`、
+  `AllyFilter#isBarrageFriendly` 全部删除，`PhotoProjSafetyHandler` 回到 `isFriendly`。
+  用户结论：「FTB teams 看起来没有兼容必要了」——两条链路都不按团队区分，团队就没有落点。
+  留档：`TeamManager.arePlayersInSameTeam(UUID, UUID)` 是可用接口（`FTBTeamsAPI.api().getManager()`），
+  以后真要接，按接口类反射取 Method 即可。
+- **"按自定义名认亲"已删除（`1.8.7`）**：曾经做过三层（自己名字 → 任意在线玩家 → 任意玩家名字前缀），
+  用户最终结论：**「误判风险高过判对的收益，名字识别就是个错误」**。
+  理由与本轮教训：
+  - 它要修的只是「偶尔被自家 Vex 吃掉一次冷却」；而误判是**永久且静默**的——某个怪就是锁不上，
+    事后极难查出是这条判定干的（弹幕/定格/枪械都还正常，只有这两招不对它生效）；
+  - 三个版本一路改（`1.8.1` 只认自己 → `1.8.4` 在线表 → `1.8.5` 纯结构）都在给同一条启发式打补丁，
+    说明它本身不该存在；
+  - 现在的口径：**认不出归属的人/怪，宁可让它可锁**。
+- **已知边界**：原版 Vex 这类「`setOwner` 只收 `Mob`、名字是唯一线索」的召唤物**认不出归属**，
+  可以被夺魂索命/要害打击选中——代价是一次冷却，接受。
+- **滤镜零影响（用户口径）**：`FilterPhotoHandler` 只走
+  `PhotoTargets.otherPlayers / others / othersNonPlayer`，完全不经过 `AllyFilter`。
+- **交付**：版本 `1.8.7`（`1.8.1` ~ `1.8.6` 作废）；`./gradlew build` 通过；
+  产物 `build/libs/lensouls-1.8.7.jar`；**未复制到桌面、未提交、未实机验证**。
+  复测：① 对雪傀儡/驯服狼右键夺魂索命 → 应跳过并锁到其后的 BOSS；
+  ② 对任意玩家右键 → 不会锁；③ 任意玩家被照片弹幕命中 → 不掉血；④ 16 滤镜行为不变。
+
+### 74. 排查记录：10-19 15:32 客户端崩溃 ≠ 卡死（资源包里的 `.DS_Store`）
+
+- 文件：`Downloads/新建文件夹 (6)/crash-2026-10-19_15.32.42-client.txt`，**JVM uptime 21.5 s**
+  ⇒ 是**资源重载期**的启动崩溃，不是在世界里的卡死，与本轮卡死无关。
+- 链条：某资源包内混入 macOS 元数据 → `ResourceLocation(".DS_Store:sounds.json")` →
+  Moonlight 的 `ResourceLocationSanityCheck.validateNamespace` 抛
+  `Invalid ResourceLocation namespace` → `Minecraft.clearResourcePacksOnError` →
+  `rollbackResourcePacks` → `reloadResourcePacks` → aaa_particles `beginReload` →
+  `Failed to initialize EffekseerManager` → `Rendering overlay` 崩溃。
+- 处理：从资源包（或客户端 `resourcepacks/`）里删掉 `.DS_Store` 即可；与 lensouls 无关。
+  时间对上的是 10-19-3 那局启动 15 s 后就崩、15:33:30 重启（10-19-4 开头）。
+
+
+
+
+### 69. 滤镜施加成功 → 世界特效「对焦收束」（`1.8.8`）
+
+- 触发点两条，**都在"确实施加成功"之后**：
+  ① 特殊滤镜（16 个 `FilterEffect`）：`handler/FilterAppliedFxHandler` 监听
+     `MobEffectEvent.Added`，**只认 `instanceof FilterEffect`** —— 玩家喝药水/别的模组上 buff 不该算滤镜；
+  ② 药水滤镜（药水玻璃板）：在 `FilterPhotoHandler.applyPotionFilter` 自己的施加循环里
+     `FilterAppliedFx.broadcast(...)`，颜色取第一条药水效果。**不能**让 `MobEffectEvent` 代劳，
+     否则"喝药水"也会触发滤镜特效。
+  ③ 万象加持（`FILTER_ART`）走的是原版 buff，不是 `FilterEffect`，事件不会替我们触发 → 两处调用点手动补发。
+- 网络：`FilterAppliedFxPacket`（S2C: entityId + rgb），
+  `PacketDistributor.sendToPlayersTrackingEntityAndSelf`（世界事件，旁观者与自拍本人都要看见）。
+  **只传 entityId 不传坐标**——位置由客户端每帧现取。
+- 客户端 `WorldFxBursts.FilterAppliedBurst` 三件套：咬合环（1.30→0.42，0.30s）/ 上色环颜色
+  （0.36→1.62，0.60s）/ 环上 8 根刻度线（取景器语汇）。
+  环用**相机朝向平面**（right/up 由"目标→镜头"现算），从任何角度看都是正圆，不会侧看塌成线。
+- **平滑移动**：每帧向实体胸口指数趋近 `1 - e^{-16·dt}`（≈60ms 追上，帧率无关）。
+  实体卸载/死亡后保持最后位置播完，不瞬移不消失。
+  目标是自己时相机就在胸口，环会糊满屏幕 → 改画在镜头正前方 1.15 格、半径减半。
+- 踩点：`-Pmod_version=1.8.8` 可在不改 `gradle.properties` 的情况下换版本号（多会话同时改同一份
+  工作树时有用，别覆盖别人已发布的 jar）。
+
+#### 69.1 体型缩放（`1.8.9`，实机反馈"巨兽身上很不明显"）
+
+- 环半径原来按**绝对格数**写死（1.30 → 0.42），套僵尸刚好，套下界合金巨兽那种 4×6 的体型
+  就只剩胸口一小圈。现按目标包围盒对角 `sqrt(w² + h²)` 对普通类人生物（0.6×1.8 ≈ 1.90）取比值：
+  普通生物 ≈ 1.0（观感不变）、小型夹 0.55、巨兽夹到 3.4。
+- 一起放大的还有：**线宽** `0.020 × (0.75 + 0.45·scale)`、**刻度长度**、**魂尘半径与数量**、
+  以及动画时长（0.70 → 0.94s，巨兽上读得完）。
+- `scale ≥ 1.5` 时在 `0.30h / 0.55h / 0.80h` **三层各一圈**（中间层满强度、上下各 62%）——
+  高个子只圈胸口会像"腰带"，三层才是"整只被套住"；`scale ≥ 2.0` 时刻度从 8 根加到 12 根。
+- 位置 / 身高 / 体型三者共用同一条平滑曲线（`1 - e^{-16·dt}`），boss 换阶段突然变高变大时环不会跳。
+- 教训：**任何"套在实体身上"的世界特效，尺寸都必须跟实体包围盒走**，别用固定格数。
+
+#### 69.2 取消多层环 + 加粗 + 等级不足提示上浮（`1.8.10` / `1.8.11`）
+
+- **多层环是错的**：`1.8.9` 为大体型在 `0.30h / 0.55h / 0.80h` 叠了三圈咬合环，实机看是
+  "一个实体身上冒出两层法印、一上一下"（焰魔那种体型最明显）——**加量 ≠ 加强**。
+  `1.8.11` 回到**单圈**，大体型只靠 `radiusScale` 放大；以后要"更明显"优先调半径/线宽/亮度，
+  不要靠叠加同形态的圈。
+- 线宽基准整体加粗约 60%：咬合 0.020→0.032、上色 0.030→0.048、刻度 0.014→0.022，
+  刻度内外距 0.030/0.085 → 0.045/0.110（仍然乘 `0.75 + 0.45·scale`）。
+- `message.lensouls.lens_tier_insufficient`（"等级不足，无法造成韧性伤害"）加入
+  `ViewfinderOverlay.ALWAYS_TOAST_KEYS`：**按翻译键判定**，无论是否在取景器都走最上层
+  `FeatherToast`，并 `gui.setOverlayMessage(empty)` 清掉原版动作栏那份。
+  原因：它由 `FrameAddedEvent` 触发，服务端回包时取景器常常已关，原来会掉回底部动作栏、
+  被取景框与闪白压住。同键的 `VitalStrikeHandler`（要害打击）提示一并覆盖。
+
+### 70. 提示弹窗层（`1.8.12`）：不再依赖动作栏 + 多条叠加 + 胶卷用光
+
+- **`captureActionBar` 那条路不可靠**：它要拦 `ClientPacketListener.setActionBarText`，
+  再判 `mc.screen` / 取景器是否藏 HUD 才接管。实测"等级不足"提示仍被压在底部
+  （取景器开着时动作栏根本不画，关了又在最底行），`hardman.inject_fail` 同样没顶上。
+  现在换成**专用 S2C 通道** `network/HudHintPacket`（携带 `Component`，
+  `ComponentSerialization.STREAM_CODEC`）→ 客户端 `ClientPacketHandlers.handleHudHint`
+  → `FeatherToast.show` + `gui.setOverlayMessage(empty)` 清掉动作栏那份。
+  已改的三个点：`ToughnessPhotoHandler.failSound`、`VitalStrikeHandler`、`PhotoInjectionHandler`（封器）。
+  **以后凡是"拍照那一刻必须看到"的提示，都走 `HudHintPacket.send(player, comp)`，不要再塞动作栏。**
+  自检指令：`/lensouls gui toast`（不依赖任何拍照条件，只验证弹窗层画不画；客户端会打
+  `[HudHint] 最上层提示: …`）。
+- **`FeatherToast` 改成小队列表**：新提示到来时旧的进入 180ms 快速淡出（不是硬切），
+  渲染按「旧→新」并给每条 `poseStack.translate(0,0,z)` 递进 z（`Z_STEP=2`），
+  位置相同也靠 z 压住，不会互相插穿/闪烁；同文本仍在播时只重置计时，最多 3 条。
+- **胶卷用光提示**：`mixin/compat/CameraNoFilmHintMixin` 挂 `CameraItem.release` HEAD
+  （快门释放的唯一入口）。只判胶片那一项 `Attachment.FILM.map(stack, FilmRollItem::canAddFrame)`，
+  冷却/定时器/快门开着都不算"胶卷用光"，不抢别的原因；`LocalPlayer` 守卫（release 双端都会走）+ 800ms 去抖。
+  文案：`message.lensouls.no_film`（没装胶卷）/ `message.lensouls.film_used_up`（拍完了）。
+
+#### 70.1 旧弹窗"复活"（`1.8.13`）
+
+- 现象：一条提示**自然淡完**之后，下次来一条新提示，旧文字会重新亮起来、压在新提示下面"强行过渡"一下。
+- 原因：`entered` 列表只在 `render()` 里裁剪，而当所有条目都淡完时 `isVisible()` 为 false →
+  《取景器叠加层》直接 return → `render()` 不被调用 → **死条目一直留在列表里**。
+  下一次 `show()` 把"所有 `retiredAt < 0`"的条目都标记退场，其中就包括这些早该扔掉的死条目：
+  `alphaOf` 对刚退场的条目返回 1.0，于是它们被**复活**了。
+- 修法：加 `isDead()` / `prune()`（自然播完或退场播完即死），`show()` 先 `prune` 再只让
+  `alphaOf > 0.01` 的旧条目退场；`isVisible()` 与 `render()` 也都先 `prune`。
+  **原则：任何"淡出"都只能作用在还看得见的条目上，不能靠时间戳自己判断"它还活着"。**

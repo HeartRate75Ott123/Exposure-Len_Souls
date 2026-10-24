@@ -20,6 +20,8 @@
     "LivingEntityDeadAccessor",
     "RegenerationHealMarkMixin",
     "FoodDataMixin",
+    "TotemAnnulledMixin",
+    "ZeroHealthSetHealthDiagMixin",
     "PhantomPushGuardMixin",
     "PhantomKillCreditMixin",
     "PhantomMoveTargetAccessor",

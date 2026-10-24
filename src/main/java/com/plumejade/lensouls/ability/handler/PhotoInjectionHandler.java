@@ -122,8 +122,8 @@ public class PhotoInjectionHandler {
             if (com.plumejade.lensouls.feather.CurseManager.on(player,
                     com.plumejade.lensouls.feather.CurseDefs.HARDMAN, 1)) {
                 PhotoLog.info("cache-hardman", () -> "未缓存：① e2 封器未反转（exposureId=" + exposureId + "）");
-                player.displayClientMessage(
-                        net.minecraft.network.chat.Component.translatable("message.lensouls.hardman.inject_fail"), true);
+                com.plumejade.lensouls.network.HudHintPacket.send(player,
+                        net.minecraft.network.chat.Component.translatable("message.lensouls.hardman.inject_fail"));
                 return;
             }
 

@@ -38,6 +38,7 @@
     "PosessedPaladinStunHurtMixin",
     "AnnihilationPursuerStunMixin",
     "FieldGuideExposureMixin",
+    "InventoryTotemCurseMixin",
     "PaladinSoulPillarFractureMixin",
     "ScyllaWaveKnockbackMixin",
     "GytrinketProjectileBurstMixin",
@@ -77,6 +78,7 @@
   "client": [
     "BetterCombatRangeMixin",
     "GytrinketCameraChargeMixin",
+    "CameraNoFilmHintMixin",
     "AnnihilationBeamCrossRenderMixin",
     "DeathLaserCrossRenderMixin",
     "AnnihilationExplosionRoundMixin"

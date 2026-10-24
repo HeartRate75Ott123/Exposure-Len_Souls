@@ -62,7 +62,7 @@ public final class FalseDeathGuard {
                 STUCK_STREAK.remove(player.getUUID());
                 return;
             }
-            if (player.getHealth() > 0.0f) return;   // 取消者已经正确回血，无事
+            if (Float.isFinite(player.getHealth()) && player.getHealth() > 0.0f) return;   // 取消者已经正确回血，无事
 
             player.setHealth(1.0f);
             logRepair(player, "死亡事件被取消但血量仍为 0", event.getSource());
@@ -94,8 +94,20 @@ public final class FalseDeathGuard {
         }
     }
 
+    /** 血量是否「坏掉」：NaN / ±Infinity 会让 {@code getHealth() <= 0} 恒 false ⇒ 永不判死 */
+    private static boolean isBrokenHealth(ServerPlayer player) {
+        float h = player.getHealth();
+        return !Float.isFinite(h);
+    }
+
     private static void check(ServerPlayer player, boolean immediate) {
         UUID id = player.getUUID();
+        if (isBrokenHealth(player)) {
+            player.setHealth(Math.max(1.0f, Math.min(player.getMaxHealth(), 1.0f)));
+            logRepair(player, "血量非有限值（NaN/Infinity）", player.getLastDamageSource());
+            STUCK_STREAK.remove(id);
+            return;
+        }
         if (player.isRemoved() || player.getHealth() > 0.0f) {
             STUCK_STREAK.remove(id);
             return;

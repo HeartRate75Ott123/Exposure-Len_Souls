@@ -153,6 +153,9 @@ public class FilterPhotoHandler {
                 // 自拍：仅对自己生效
                 if (effect == ModEffects.FILTER_ART) {
                     applyRandomBuffs(player);
+                    // 万象加持不再逐个原版 buff 播特效（那些不是 FilterEffect，事件不会替我们触发），
+                    // 按滤镜本身补一次即可
+                    FilterAppliedFx.broadcast(player, effect.value().getColor());
                 } else {
                     player.addEffect(new MobEffectInstance(effect, SPECIAL_FILTER_DURATION));
                 }
@@ -168,6 +171,7 @@ public class FilterPhotoHandler {
                     if (ent instanceof ServerPlayer sp) {
                         if (effect == ModEffects.FILTER_ART) {
                             applyRandomBuffs(sp);
+                            FilterAppliedFx.broadcast(sp, effect.value().getColor());
                         } else {
                             sp.addEffect(new MobEffectInstance(effect, SPECIAL_FILTER_DURATION));
                         }
@@ -204,10 +208,13 @@ public class FilterPhotoHandler {
             instances.add(new MobEffectInstance(effect, e.duration(), e.amplifier()));
         }
         if (instances.isEmpty()) return;
+        // 特效颜色取第一条药水效果（同一次玻璃板里的效果共享一套观感，不逐条刷环）
+        int fxColor = instances.get(0).getEffect().value().getColor();
 
         if (selfie) {
             // 自拍：目标为自己，必命中，记冷却
             instances.forEach(player::addEffect);
+            FilterAppliedFx.broadcast(player, fxColor);
             scheduleCooldown(hand, 60);
             lastGlassShot.put(player.getUUID(), now);
         } else {
@@ -220,6 +227,7 @@ public class FilterPhotoHandler {
             lastGlassShot.put(player.getUUID(), now);
             for (LivingEntity ent : targets) {
                 instances.forEach(ent::addEffect);
+                FilterAppliedFx.broadcast(ent, fxColor);
             }
         }
     }

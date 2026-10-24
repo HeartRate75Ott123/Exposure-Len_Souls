@@ -298,6 +298,15 @@ public class LensoulsCommand {
                                 .then(Commands.literal("testfalse")
                                         .executes(ctx -> setPhotoSetDebug(ctx, false)))
                         )
+                        // 最上层提示弹窗自检：不需要任何拍照/取景器条件，用来确认"弹窗层到底画不画"
+                        .then(Commands.literal("toast")
+                                .executes(ctx -> {
+                                    com.plumejade.lensouls.network.HudHintPacket.send(ctx.getSource().getPlayerOrException(),
+                                            Component.literal("§a弹窗自检：如果你看到这一行，说明最上层弹窗是通的"));
+                                    ctx.getSource().sendSuccess(() -> Component.literal("§7已发送弹窗自检"), false);
+                                    return 1;
+                                })
+                        )
                 )
                 .then(Commands.literal("activity").requires(OP)
                         .then(Commands.literal("state").executes(LensoulsCommand::activityState))

@@ -229,6 +229,20 @@ public class PacketHandler {
                 Level2StaffSpikeFxPacket::handle
         );
 
+        // ---- 最上层 HUD 提示弹窗 S2C ----
+        registrar.playToClient(
+                HudHintPacket.TYPE,
+                HudHintPacket.STREAM_CODEC,
+                HudHintPacket::handle
+        );
+
+        // ---- 滤镜施加成功的世界特效（对焦收束）S2C ----
+        registrar.playToClient(
+                FilterAppliedFxPacket.TYPE,
+                FilterAppliedFxPacket.STREAM_CODEC,
+                FilterAppliedFxPacket::handle
+        );
+
         // ---- 冻结状态同步 S2C ----
         registrar.playToClient(
                 FreezeSyncPacket.TYPE,

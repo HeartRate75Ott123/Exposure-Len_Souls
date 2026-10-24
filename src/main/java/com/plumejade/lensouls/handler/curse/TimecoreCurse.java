@@ -50,6 +50,9 @@ public final class TimecoreCurse {
 
     private static final CurseDef D = CurseDefs.TIMECORE;
 
+    /** 单次受击的**有限**上限：超过它的（/kill、必死级）不需要倍率，直接按这个值走，避免 ×倍率后溢出成 Infinity */
+    private static final float MAX_SAFE_DAMAGE = 1.0e6f;
+
     private static final ResourceLocation ARMOR_MOD = ResourceLocation.parse("lensouls:curse_rust_armor");
     private static final ResourceLocation WEIGHT_MOD = ResourceLocation.parse("lensouls:curse_weight");
 
@@ -448,7 +451,22 @@ public final class TimecoreCurse {
         if (inSelfDamage()) return;   // 我们安排的那份伤害：不再被自己的倍率/反弹加工（见 SELF_DAMAGE_DEPTH）
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         float d = event.getAmount();
-        if (d <= 0.0f) return;
+        // /kill 的 genericKill 是 Float.MAX_VALUE（3.4028235E38）：只要本处理器再乘一个倍率
+        // （e5 盈伤 ×1.5、e13 余悸 ×1.2…）就会变成 **Infinity**，后续任何一处
+        // `Infinity − Infinity` / `Infinity × 0` 都会把伤害写成 **NaN**，而 NaN 血量的
+        // `getHealth() <= 0` 恒为 false ⇒ 原版永不判死、`hurt` 也被 isDeadOrDying 挡掉 ——
+        // 实机表现正是「/kill 与普通攻击都杀不死 + 血量条 NaN 导致屏幕抖动/卡死」。
+        // 所以入口先夹到有限值，再进任何倍率。
+        if (!Float.isFinite(d) || d <= 0.0f) return;
+        d = Math.min(d, MAX_SAFE_DAMAGE);
+
+        // 累计承伤类条件（e5 满血 / e10 无正面效果 / e11 低护甲）排查用：
+        // 一眼看出「是不是压根没进诅咒态、血量算不算满血、d 是多少」。
+        AttackDiag.log("⑤受击 血={}/{} d={} e5诅咒={} e5反转={} e10诅咒={} e11诅咒={} 护甲={}",
+                player.getHealth(), player.getMaxHealth(), d,
+                CurseManager.on(player, D, 4), CurseManager.rev(player, D, 4),
+                CurseManager.on(player, D, 9), CurseManager.on(player, D, 10),
+                player.getArmorValue());
 
         // e5 盈伤：生命 >50% 时受到伤害 +50%（乘算）/ 反转 -25%（加算）
         if (player.getHealth() > player.getMaxHealth() * 0.5f) {
@@ -498,7 +516,7 @@ public final class TimecoreCurse {
 
         // e10 夺佑 条件：无任何正面效果时累计承受 5000 点伤害并存活（累计跨死亡/掉线保留）
         if (CurseManager.on(player, D, 9) && hasNoBeneficialEffect(player)) {
-            CurseManager.tick(player, D, 9, (long) Math.ceil(d), 5000L);
+            CurseManager.tick(player, D, 9, countableDamage(player, d, event.getSource()), 5000L);
         }
 
         // e11 锈甲 条件：护甲值 ≤5 时累计承受 2000 点物理伤害
@@ -506,12 +524,14 @@ public final class TimecoreCurse {
                 && player.getArmorValue() <= 5
                 && event.getSource().is(net.minecraft.tags.DamageTypeTags.IS_PROJECTILE) == false
                 && event.getSource().getDirectEntity() instanceof LivingEntity) {
-            CurseManager.tick(player, D, 10, (long) Math.ceil(d), 2000L);
+            CurseManager.tick(player, D, 10, countableDamage(player, d, event.getSource()), 2000L);
         }
 
         // e5 盈伤 条件：在满血状态下累计承受 3000 点伤害并存活（死亡即重置计数）
         if (CurseManager.on(player, D, 4) && player.getHealth() >= player.getMaxHealth()) {
-            CurseManager.tick(player, D, 4, (long) Math.ceil(d), 3000L);
+            long delta = countableDamage(player, d, event.getSource());
+            long now2 = CurseManager.tick(player, D, 4, delta, 3000L);
+            AttackDiag.log("⑤e5 满血承伤 +{} → 累计 {}", delta, now2);
         }
 
         // e23 平势 反转：目标最大生命高于你 50% 时，你受伤有 20% 概率**反制**（并清掉对方无敌帧）
@@ -684,6 +704,59 @@ public final class TimecoreCurse {
     }
 
     // ==================== e21 无援 ====================
+
+    /**
+     * 「累计承伤」类条件的**有效承伤**。
+     * <p>
+     * 直接把 {@code event.getAmount()} 累加会出两种事故：
+     * <ul>
+     *   <li>{@code /kill} 打的是 {@code genericKill} + {@code Float.MAX_VALUE}（3.4e38）——
+     *       一次就把 3000/5000 的进度瞬间打满（实测：{@code /kill} 直接弹「盈伤 反转达成」），
+     *       而且把进度写成天文数字留在存档里；</li>
+     *   <li>虚空/必死级伤害同样属 {@code BYPASSES_INVULNERABILITY}，不该算「承受的伤害」。</li>
+     * </ul>
+     * 因此：必死级来源一律不计；单次再大也按「10 倍最大生命」封顶。
+     */
+    private static long countableDamage(ServerPlayer player, float d, net.minecraft.world.damagesource.DamageSource src) {
+        if (!Float.isFinite(d) || d <= 0.0f) return 0L;
+        if (src != null && src.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) return 0L;
+        long cap = Math.max(1L, (long) Math.ceil(player.getMaxHealth() * 10.0f));
+        return Math.min((long) Math.ceil(d), cap);
+    }
+
+    /**
+     * ⑤ e21 无援（诅咒态）是否**封掉一切不死图腾**。
+     * <p>
+     * 供两条「原版事件拦不到」的路径使用：
+     * <ul>
+     *   <li>{@code mixin/TotemAnnulledMixin} —— 原版 {@code LivingEntity.checkTotemDeathProtection}
+     *       入口直接返回 false（连物品都不会被 {@code shrink}）；</li>
+     *   <li>{@code mixin/compat/InventoryTotemCurseMixin} —— 「更好的图腾 / inventorytotem」在
+     *       {@code LivingDeathEvent} 里从**背包**取图腾自行复活，完全不经过 {@code LivingUseTotemEvent}。</li>
+     * </ul>
+     */
+    public static boolean blocksTotem(net.minecraft.server.level.ServerPlayer player) {
+        return CurseManager.on(player, D, 20);
+    }
+
+    /** 图腾拦截取证日志的节流表（UUID → 下次允许打印刻） */
+    private static final java.util.Map<java.util.UUID, Long> TOTEM_LOG_AT =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * 图腾被拦下时打一条 INFO（每玩家 30 秒最多一次）。
+     * <p>
+     * 用途：确认 mixin 真的命中了 —— 原版路径打印 {@code vanilla}，
+     * 《更好的图腾》背包路径打印 {@code inventorytotem}。没有这条日志就说明那条路径没被拦到。
+     */
+    public static void logTotemBlock(ServerPlayer player, String path) {
+        long now = player.level().getGameTime();
+        Long until = TOTEM_LOG_AT.get(player.getUUID());
+        if (until != null && now < until) return;
+        TOTEM_LOG_AT.put(player.getUUID(), now + 600L);
+        LenSouls.LOGGER.info("[Curse] ⑤ e21 图腾已拦下（路径={}，玩家={}）",
+                path, player.getGameProfile().getName());
+    }
 
     /** e21 无援：不死图腾失效（诅咒态）；反转后照常触发并给 10 秒强化 */
     @SubscribeEvent

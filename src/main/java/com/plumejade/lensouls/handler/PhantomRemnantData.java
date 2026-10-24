@@ -1,19 +1,28 @@
 package com.plumejade.lensouls.handler;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.item.ModItems;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemContainerContents;
 import top.theillusivec4.curios.api.CuriosApi;
+import top.theillusivec4.curios.api.SlotAttribute;
+import top.theillusivec4.curios.api.SlotContext;
+import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,6 +41,9 @@ import java.util.UUID;
  *   <li><b>槽位精确归位</b>：EL 只用 {@code inventory.add()} 随便塞；这里优先放回<b>原槽位</b>
  *       （含 Curios 槽位），原槽位被占用才退回背包，再放不下才掉在原地 —— 对应
  *       「自动回归当时的物品栏，饰品等的状态」。</li>
+ *   <li><b>扩栏饰品优先装备</b>（1.7.95 修复）：见 {@link #restore} 的分轮归还说明 ——
+ *       先装「会加饰品栏位」的饰品并把栏位加成当场结算，再装其余饰品，
+ *       避免按记忆栏位放时因为槽位数还没长出来而被拦回背包。</li>
  *   <li><b>经验全部收走</b>（EL 只存一部分）。</li>
  * </ul>
  */
@@ -165,6 +177,22 @@ public final class PhantomRemnantData {
 
     /**
      * 把容器内容按原槽位归还给玩家。
+     * <p>
+     * <b>归还分轮（顺序就是这次修复的核心，别随手改回单轮）：</b>
+     * <ol>
+     *   <li><b>先装「会加饰品栏位」的饰品</b>（Curios 的 {@link SlotAttribute} 加成 &gt; 0，
+     *       例如「+1 戒指栏」的戒指）。这类饰品的栏位加成是
+     *       <b>「写进槽位 → 下一个玩家刻由 CuriosEventHandler 结算」</b>的：
+     *       {@code DynamicStackHandler.setStackInSlot} 只写物品，{@code addTransientSlotModifiers} +
+     *       {@code update()}（→ {@code resize()} → {@code grow()}）要等到下一刻才发生。
+     *       所以单轮归还时，后一件戒指面对的仍是旧槽位数 ⇒ 越界/校验失败 ⇒ 退回背包，
+     *       正是「按记忆栏位放，却因为槽位不够被拦回背包」的成因。</li>
+     *   <li>装完一件扩栏饰品就 <b>当场结算一次</b>（{@link #applySlotExpansionNow}），让下一件饰品
+     *       立刻看到长出来的新槽位；连续多件扩栏饰品也能逐个叠加。</li>
+     *   <li>再装<b>其余饰品</b>（原槽 → 同组空位 → 跨容器兜底），然后放<b>原版槽位</b>的物品。</li>
+     *   <li><b>重试轮</b>：前几轮没落位的饰品再试一次（万一某件扩栏饰品是在第 3 轮才装上的）。</li>
+     *   <li>最后才塞背包，背包也塞不下才掉在原地 —— 绝不会因为顺序问题丢东西。</li>
+     * </ol>
      *
      * @return 是否确实归还了一次（false = 这是个空容器/已被领取过）
      */
@@ -195,24 +223,93 @@ public final class PhantomRemnantData {
         // ── 2) 按原槽位归还物品；逐件兜底，单件失败不影响其余 ──
         Inventory inv = player.getInventory();
         int failed = 0;
+        int expanders = 0;
+        boolean[] placed = new boolean[items.size()];
+
+        // 2.1 扩栏饰品优先（每装上一件就立刻把栏位加成结算掉）
         for (int i = 0; i < items.size(); i++) {
+            String slot = slotOf(slots, i);
             ItemStack stack = items.get(i);
-            String slot = i < slots.size() ? slots.get(i) : "";
+            if (stack.isEmpty() || !isCurioSlot(slot) || !expandsCurioSlots(player, slot, stack)) continue;
             try {
-                if (!place(player, inv, slot, stack) && !stack.isEmpty()) {
-                    // 背包与槽位都放不下 → 掉在原地（Inventory.add 可能已塞入一部分）
-                    ItemEntity drop = new ItemEntity(player.level(),
-                            player.getX(), player.getY() + 0.5, player.getZ(), stack);
-                    player.level().addFreshEntity(drop);
+                CurioPlacement at = placeInCurio(player, slot, stack);
+                if (at != null) {
+                    placed[i] = true;
+                    applySlotExpansionNow(player, at, stack);
+                    expanders++;
                 }
             } catch (Exception e) {
                 failed++;
-                LenSouls.LOGGER.warn("[PhantomRemnant] 第 {} 件物品归位失败，掉在原地", i, e);
-                if (!stack.isEmpty()) {
-                    ItemEntity drop = new ItemEntity(player.level(),
-                            player.getX(), player.getY() + 0.5, player.getZ(), stack);
-                    player.level().addFreshEntity(drop);
+                LenSouls.LOGGER.warn("[PhantomRemnant] 扩栏饰品「{}」提前装备失败，稍后重试",
+                        stack.getHoverName().getString(), e);
+            }
+        }
+
+        // 2.2 其余饰品（此时扩栏带来的新槽位已经存在）
+        for (int i = 0; i < items.size(); i++) {
+            String slot = slotOf(slots, i);
+            ItemStack stack = items.get(i);
+            if (stack.isEmpty() || placed[i] || !isCurioSlot(slot)) continue;
+            try {
+                // 万一某件扩栏饰品只在这一轮才装上，同样立刻结算，给重试轮铺路
+                boolean expander = expandsCurioSlots(player, slot, stack);
+                CurioPlacement at = placeInCurio(player, slot, stack);
+                if (at != null) {
+                    placed[i] = true;
+                    if (expander) applySlotExpansionNow(player, at, stack);
                 }
+            } catch (Exception e) {
+                failed++;
+                LenSouls.LOGGER.warn("[PhantomRemnant] 第 {} 件饰品归位失败，稍后重试", i, e);
+            }
+        }
+
+        // 2.3 原版槽位（背包 / 盔甲 / 副手）—— 优先原槽位，其次背包空位
+        for (int i = 0; i < items.size(); i++) {
+            String slot = slotOf(slots, i);
+            ItemStack stack = items.get(i);
+            if (stack.isEmpty() || placed[i] || isCurioSlot(slot)) continue;
+            try {
+                // 注意：原槽位放回时放进去的是 stack 本身，不能再用 stack.isEmpty() 当判据
+                placed[i] = placeInInventory(inv, slot, stack);
+            } catch (Exception e) {
+                failed++;
+                LenSouls.LOGGER.warn("[PhantomRemnant] 第 {} 件物品归位失败，最后兜底", i, e);
+            }
+        }
+
+        // 2.4 重试轮：仍没落位的饰品再试一次（扩栏在 2.2 才生效的情形）
+        for (int i = 0; i < items.size(); i++) {
+            String slot = slotOf(slots, i);
+            ItemStack stack = items.get(i);
+            if (stack.isEmpty() || placed[i] || !isCurioSlot(slot)) continue;
+            try {
+                boolean expander = expandsCurioSlots(player, slot, stack);
+                CurioPlacement at = placeInCurio(player, slot, stack);
+                if (at != null) {
+                    placed[i] = true;
+                    if (expander) applySlotExpansionNow(player, at, stack);
+                }
+            } catch (Exception e) {
+                failed++;
+            }
+        }
+
+        // 2.5 最后兜底：塞背包，背包也塞不下才掉在原地
+        for (int i = 0; i < items.size(); i++) {
+            ItemStack stack = items.get(i);
+            if (stack.isEmpty() || placed[i]) continue;
+            try {
+                // Inventory.add 会就地减少堆数量；返回 false 表示还有剩余
+                if (inv.add(stack) || stack.isEmpty()) continue;
+            } catch (Exception e) {
+                failed++;
+                LenSouls.LOGGER.warn("[PhantomRemnant] 第 {} 件物品未能放入背包", i, e);
+            }
+            if (!stack.isEmpty()) {
+                ItemEntity drop = new ItemEntity(player.level(),
+                        player.getX(), player.getY() + 0.5, player.getZ(), stack);
+                player.level().addFreshEntity(drop);
             }
         }
 
@@ -226,8 +323,8 @@ public final class PhantomRemnantData {
         remnant.set(DataComponents.CUSTOM_DATA, CustomData.of(cleared));
         remnant.remove(DataComponents.CONTAINER);
 
-        LenSouls.LOGGER.info("[PhantomRemnant] 归还 {} 件物品（失败 {}）/ {} 点经验（缓存等级 {}+{}%）",
-                items.size(), failed, xp, level, progress);
+        LenSouls.LOGGER.info("[PhantomRemnant] 归还 {} 件物品（扩栏优先 {} 件 / 失败 {}）/ {} 点经验（缓存等级 {}+{}%）",
+                items.size(), expanders, failed, xp, level, progress);
         return true;
     }
 
@@ -264,76 +361,175 @@ public final class PhantomRemnantData {
         return 7 + level * 2;
     }
 
+    // ==================== 归还：槽位解析 / 落位 / 扩栏 ====================
+
+    /** 槽位表取下标（表长不匹配时按空串处理） */
+    private static String slotOf(List<String> slots, int i) {
+        return i >= 0 && i < slots.size() ? slots.get(i) : "";
+    }
+
+    private static boolean isCurioSlot(String slot) {
+        return slot != null && slot.startsWith("curio:");
+    }
+
+    private static boolean isInventorySlot(String slot) {
+        return slot != null && slot.startsWith("inv:");
+    }
+
     /**
-     * 优先放回原槽位；原槽位被新拾取的东西占用时，退回该容器内的空位，最后才交给调用方掉在原地。
+     * {@code curio:<identifier>:<index>} → identifier。
      * <p>
-     * <b>饰品兼容性加固（修复「照片回来进背包而非 photograph 槽位」）：</b>
-     * <ul>
-     *   <li><b>标识符解析从最后一个冒号倒着取</b>。旧实现 {@code split(":")} 取
-     *       {@code parts[1]} 当槽位 id，遇到带命名空间的标识符
-     *       （如 {@code lensouls:photograph}，{@code CuriosIntegration} 自己就兼容这种）
-     *       会解析成 {@code lensouls} → {@code getCurios().get()} 返回 null →
-     *       整段饰品归还失败，物品漏进背包；</li>
-     *   <li>每一步放回前都过 {@code stacks.isItemValid()}（Curios 内部会走
-     *       {@code CuriosApi.isStackValid} + 注册谓词），不再无脑塞——
-     *       避免把照片塞进戒指之类的错误槽位；</li>
-     *   <li>同组空位失败后，追加<b>跨容器</b>兜底：任何其它 Curios 槽位，
-     *       只要校验通过就收下（照片会自动找到另一个模组提供的照片槽）。</li>
-     * </ul>
+     * 标识符可能自带冒号（如 {@code lensouls:photograph}），所以<b>从最后一个冒号倒着切</b>：
+     * 旧实现 {@code split(":")} 取 {@code parts[1]}，遇到带命名空间的标识符会解析成
+     * {@code lensouls} → {@code getCurios().get()} 返回 null → 整段饰品归还失败、物品漏进背包。
      */
-    private static boolean place(ServerPlayer player, Inventory inv, String slot, ItemStack stack) {
-        if (slot != null && slot.startsWith("inv:")) {
+    private static String curioIdentifier(String slot) {
+        int last = slot.lastIndexOf(':');
+        if (last <= "curio:".length()) return null;
+        return slot.substring("curio:".length(), last);
+    }
+
+    private static int curioIndex(String slot) {
+        int last = slot.lastIndexOf(':');
+        if (last < 0) return -1;
+        return parseInt(slot.substring(last + 1));
+    }
+
+    /** 落位结果：落在哪个槽位的哪一格（扩栏结算要用真实槽位当 SlotContext） */
+    private record CurioPlacement(String identifier, int index) {
+    }
+
+    /**
+     * 优先放回原槽位；原槽位被新拾取的东西占用时，退回该容器内的空位，
+     * 再不行就<b>跨容器</b>兜底（照片可落到另一个模组提供的 photograph 槽）。
+     * <p>
+     * 每一步放回前都过 {@code stacks.isItemValid()}（Curios 内部会走
+     * {@code CuriosApi.isStackValid} + 注册谓词 + {@code CurioCanEquipEvent}），不再无脑塞
+     * —— 避免把照片塞进戒指之类的错误槽位。
+     *
+     * @return 实际落点；null = 没有任何 Curios 槽位收下（调用方再决定进背包还是重试）
+     */
+    private static CurioPlacement placeInCurio(ServerPlayer player, String slot, ItemStack stack) {
+        if (!isCurioSlot(slot)) return null;
+        String identifier = curioIdentifier(slot);
+        int idx = curioIndex(slot);
+        if (identifier == null || idx < 0) return null;
+
+        var curios = CuriosApi.getCuriosInventory(player);
+        if (curios.isEmpty()) return null;
+        var inventory = curios.get();
+
+        // 1) 原槽位（空 + 校验通过）→ 2) 同组内的空位
+        var handler = inventory.getCurios().get(identifier);
+        if (handler != null) {
+            var stacks = handler.getStacks();
+            if (idx < stacks.getSlots() && stacks.getStackInSlot(idx).isEmpty()
+                    && stacks.isItemValid(idx, stack)) {
+                stacks.setStackInSlot(idx, stack);
+                return new CurioPlacement(identifier, idx);
+            }
+            for (int i = 0; i < stacks.getSlots(); i++) {
+                if (stacks.getStackInSlot(i).isEmpty() && stacks.isItemValid(i, stack)) {
+                    stacks.setStackInSlot(i, stack);
+                    return new CurioPlacement(identifier, i);
+                }
+            }
+        }
+        // 3) 跨容器兜底：任何其它 Curios 槽位，校验通过即收
+        for (var entry : inventory.getCurios().entrySet()) {
+            if (entry.getKey().equals(identifier)) continue;
+            var otherStacks = entry.getValue().getStacks();
+            for (int i = 0; i < otherStacks.getSlots(); i++) {
+                if (otherStacks.getStackInSlot(i).isEmpty() && otherStacks.isItemValid(i, stack)) {
+                    otherStacks.setStackInSlot(i, stack);
+                    return new CurioPlacement(entry.getKey(), i);
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 原版槽位（背包 / 盔甲 / 副手）：原槽位空着就放回原处，否则交给 {@link Inventory#add} */
+    private static boolean placeInInventory(Inventory inv, String slot, ItemStack stack) {
+        if (isInventorySlot(slot)) {
             int idx = parseInt(slot.substring(4));
             if (idx >= 0 && idx < inv.getContainerSize() && inv.getItem(idx).isEmpty()) {
                 inv.setItem(idx, stack);
                 return true;
             }
-        } else if (slot != null && slot.startsWith("curio:")) {
-            // 标识符可能自带冒号（lensouls:photograph），所以从最后一个冒号切分：
-            // "curio:<identifier>:<index>" —— identifier 允许包含冒号，index 一定在末尾
-            int last = slot.lastIndexOf(':');
-            if (last > "curio:".length()) {
-                int idx = parseInt(slot.substring(last + 1));
-                String identifier = slot.substring("curio:".length(), last);
-                if (idx >= 0) {
-                    var curios = CuriosApi.getCuriosInventory(player);
-                    if (curios.isPresent()) {
-                        // 1) 原槽位（空 + 校验通过）
-                        var handler = curios.get().getCurios().get(identifier);
-                        if (handler != null) {
-                            var stacks = handler.getStacks();
-                            if (idx < stacks.getSlots() && stacks.getStackInSlot(idx).isEmpty()
-                                    && stacks.isItemValid(idx, stack)) {
-                                stacks.setStackInSlot(idx, stack);
-                                return true;
-                            }
-                            // 2) 同组内的空位（校验通过才放，不无脑塞）
-                            for (int i = 0; i < stacks.getSlots(); i++) {
-                                if (stacks.getStackInSlot(i).isEmpty() && stacks.isItemValid(i, stack)) {
-                                    stacks.setStackInSlot(i, stack);
-                                    return true;
-                                }
-                            }
-                        }
-                        // 3) 跨容器兜底：任何其它 Curios 槽位，校验通过即收
-                        //    （照片可落到另一个模组提供的 photograph 槽；
-                        //     普通饰品也能被其它兼容槽位接住）
-                        for (var entry : curios.get().getCurios().entrySet()) {
-                            if (entry.getKey().equals(identifier)) continue;
-                            var otherStacks = entry.getValue().getStacks();
-                            for (int i = 0; i < otherStacks.getSlots(); i++) {
-                                if (otherStacks.getStackInSlot(i).isEmpty()
-                                        && otherStacks.isItemValid(i, stack)) {
-                                    otherStacks.setStackInSlot(i, stack);
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
         return inv.add(stack);
+    }
+
+    /**
+     * 取一件饰品在指定槽位上下文里提供的<b>栏位加成</b>（Curios 的 {@link SlotAttribute}）。
+     * <p>
+     * 与 {@code CuriosEventHandler} / {@code CurioStacksHandler.activateSlot} 同口径：
+     * 走 {@link CuriosApi#getAttributeModifiers}，所以「物品自带属性组件」与
+     * 「{@code ICurio#getAttributeModifiers} 动态返回」两种写法都能识别。
+     *
+     * @return identifier → 栏位修饰符；空表 = 这件饰品不加栏位
+     */
+    private static Multimap<String, AttributeModifier> slotModifiersOf(ServerPlayer player,
+                                                                      String identifier, int index,
+                                                                      ItemStack stack) {
+        Multimap<String, AttributeModifier> slots = HashMultimap.create();
+        if (stack.isEmpty()) return slots;
+        try {
+            SlotContext ctx = new SlotContext(identifier == null ? "" : identifier,
+                    player, Math.max(0, index), false, false);
+            ResourceLocation slotId = CuriosApi.getSlotId(ctx);
+            Multimap<Holder<Attribute>, AttributeModifier> map =
+                    CuriosApi.getAttributeModifiers(ctx, slotId, stack);
+            for (var entry : map.entries()) {
+                if (entry.getKey().value() instanceof SlotAttribute wrapper) {
+                    slots.put(wrapper.getIdentifier(), entry.getValue());
+                }
+            }
+        } catch (Exception e) {
+            // 恶性的 ICurio#getAttributeModifiers 实现不能把整次归还带崩：当作「不加栏位」继续
+            LenSouls.LOGGER.warn("[PhantomRemnant] 读取「{}」的栏位加成失败（按不加栏位处理）",
+                    stack.getHoverName().getString(), e);
+            slots.clear();
+        }
+        return slots;
+    }
+
+    /** 这件饰品是否会「加饰品栏位」（任一栏位修饰符为正） */
+    private static boolean expandsCurioSlots(ServerPlayer player, String slot, ItemStack stack) {
+        if (stack.isEmpty() || !isCurioSlot(slot)) return false;
+        Multimap<String, AttributeModifier> slots =
+                slotModifiersOf(player, curioIdentifier(slot), curioIndex(slot), stack);
+        for (AttributeModifier modifier : slots.values()) {
+            if (modifier.amount() > 0.0D) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 把刚装上的饰品所提供的栏位加成<b>当场结算</b>（不等下一个玩家刻）。
+     * <p>
+     * 正常流程是 {@code CuriosEventHandler} 在玩家刻里对比 {@code previousStacks} 发现变化 →
+     * {@code addTransientSlotModifiers} → {@code flagUpdate()} → 之后某个 {@code update()} 里
+     * {@code resize()} → {@code grow()}。这里直接做同样两步：
+     * <ol>
+     *   <li>{@code handler.addTransientSlotModifiers(...)}：按 {@code AttributeModifier.id()} 存放，
+     *       同 id 重复写入只是覆盖 ⇒ 与随后正常流程的写入<b>幂等</b>，不会把栏位加两遍；</li>
+     *   <li>{@code ICurioStacksHandler#update()}：立刻按新修饰符重算槽位并 {@code grow()}
+     *       （{@code update()} 由 {@code flagUpdate()} 置位，仅在真正有变化时生效）。</li>
+     * </ol>
+     * 不加这一步的话，同一次归还循环里「后一件戒指」看到的仍是旧槽位数，会被拦回背包。
+     */
+    private static void applySlotExpansionNow(ServerPlayer player, CurioPlacement at, ItemStack stack) {
+        Multimap<String, AttributeModifier> slots =
+                slotModifiersOf(player, at.identifier(), at.index(), stack);
+        if (slots.isEmpty()) return;
+        CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
+            handler.addTransientSlotModifiers(slots);
+            for (String id : slots.keySet()) {
+                handler.getStacksHandler(id).ifPresent(ICurioStacksHandler::update);
+            }
+        });
     }
 
     private static int parseInt(String s) {

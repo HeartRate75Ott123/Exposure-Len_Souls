@@ -15,6 +15,11 @@ import net.neoforged.neoforge.entity.PartEntity;
  * <p>
  * 判定包含<b>遮挡</b>（{@link CameraVisibility#hasClearSight}）：曾经这里只有锥角 + 射程，
  * 导致要害打击/断魂可以直接锁定墙后与地下的 BOSS。现在遇方块即止。
+ * <p>
+ * 目标筛选（{@link AllyFilter#isFriendlyForAim}）：非玩家的友方单位——驯服宠物、自家召唤物
+ * （幻灵/幻翼）、第三方辅助构造体（gytrinket 无人机/蜂群/僚机）、归属玩家的实体（{@code OwnableEntity}）、
+ * 同乘、以及名字里写着归属的第三方召唤物——一律不算瞄准目标；<b>玩家一律排除</b>
+ * （夺魂索命/要害打击对玩家没有意义，全局口径、与组队无关）。
  */
 public final class AimTargetUtil {
 
@@ -30,9 +35,12 @@ public final class AimTargetUtil {
      * @param halfAngleDeg  锥半角（度），如 30 表示总锥角 60°
      */
     public static boolean isAimedAt(Player player, LivingEntity entity, double range, double halfAngleDeg) {
-        // 第三方辅助作战单位（gytrinket 无人机/蜂群/僚机）不算瞄准目标（分类定义见 AllyFilter）：
+        // 非玩家的友方单位不算瞄准目标（分类定义全在 AllyFilter）：
+        // 第三方辅助构造体（gytrinket 无人机/蜂群/僚机）、驯服宠物、自家召唤物（幻灵/幻翼）、
+        // 归属玩家的 OwnableEntity、同乘，以及名字里写着归属的第三方召唤物（Vex 这类，owner 只能是 Mob）。
         // 返回 false 后调用方会继续看下一个生物，不会出现「准星扫过无人机就锁定它」。
-        if (AllyFilter.isAssistConstruct(entity)) return false;
+        // 玩家一律排除（夺魂索命/要害打击对玩家没有意义），全局口径、与组队无关。
+        if (AllyFilter.isFriendlyForAim(player, entity)) return false;
 
         Level level = player.level();
         Vec3 eye = player.getEyePosition();

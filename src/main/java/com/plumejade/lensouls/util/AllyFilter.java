@@ -1,7 +1,9 @@
 package com.plumejade.lensouls.util;
 
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.TraceableEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.neoforged.fml.ModList;
@@ -23,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p><b>怎么用（两层，别再混）</b>：
  * <ol>
  *   <li><b>分类</b>（{@code isPlayer / isTamedPet / isPhantom / isSwarmPhantom / isOwnSummon /
- *       isAssistConstruct}）——只回答"属不属于这一类"，定义全在本类；</li>
+ *       isAssistConstruct / isPlayerOwned}）——只回答"属不属于这一类"，定义全在本类；</li>
  *   <li><b>大过滤</b> {@link #isFriendly}（类别 + 同乘）与它的补集 {@link #isEnemyOf}（可打目标）；
  *       <b>所有"友方/敌我"判定一律走这两个</b>，不要在调用点手写组合。
  *       {@link #isFriendlyUnit} 是其中的"类别层"（一元、无视角），供上面两者内部使用，
@@ -33,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p><b>友方口径（2026-10 统一，取代先前的"免伤/定格/选敌/枪械"四档）</b>：
  * <pre>
  * isFriendlyUnit = 玩家 ‖ 任意驯服宠物 ‖ 自家召唤物（幻灵 + 幻翼）‖ 任意第三方辅助作战单位
+ *                  ‖ 归属任意玩家的实体（OwnableEntity；Vex 的 owner 只能是 Mob，走名字兜底）
  * isFriendly(viewer, target) = isFriendlyUnit(target) ‖ 同乘(viewer, target)   ← 大过滤
  * </pre>
  * 消费方与各自的视角：
@@ -42,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <tr><td>时间定格目标（{@code PhotoTargets.freezable}）</td><td>{@code isFriendly}</td><td>拍摄者</td></tr>
  *   <tr><td>弹幕选敌（{@code BossPhotoProjHelper.findNearestNonPlayer}）</td><td>{@code isEnemyOf}</td><td>玩家自己</td></tr>
  *   <tr><td>次元枪子弹（{@code GunBulletEntity.canHitEntity}）</td><td>{@code isFriendly}</td><td>子弹 owner</td></tr>
+ *   <tr><td>瞄准类能力（夺魂索命 / 要害打击，{@code AimTargetUtil}）</td><td>{@code isFriendlyForAim}</td><td>施法者</td></tr>
  * </table>
  * <b>刻意不区分归属</b>：自己/队友/路人的宠物与构造体一律算友方（代价：PvP 下敌方构造体也打不到，
  * 属用户明确接受的取舍）。
@@ -52,6 +56,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * （弹幕免伤那条链路本来就没有可靠视角）；② 粒度是"队伍"而非"单位类别"，一句 {@code /team join}
  * 就能整体改变"谁算友方"；③ 它<b>可被任何模组覆写</b>、没组队时恒 false ⇒ 判定权外移、行为不可复现。
  * 真需要按队伍保护，就在那一处单独写一行并把视角写清楚。
+ *
+ * <p><b>不接任何"团队/结盟"系统</b>（FTB Teams 也接过一次，已按用户口径撤回）：玩家在
+ * {@link #isFriendly} 里**一律算友方**（照片弹幕打谁都不掉血），在 {@link #isFriendlyForAim}
+ * 里**一律排除**（夺魂索命/要害打击对玩家没用）。两条口径都是全局的，与组队状态无关。
  *
  * <p><b>服务端注意</b>：{@code getPersistentData()}（幻灵/幻翼标记）<b>不会同步到客户端</b>，
  * 所以这些标记判定只能在服务端用；客户端要知道"这实体是不是自家幻灵"走
@@ -142,6 +150,31 @@ public final class AllyFilter {
     }
 
     /**
+     * 归属玩家的实体——<b>走原版 API，不看名字</b>：{@link OwnableEntity#getOwner()} 或
+     * {@link TraceableEntity#getOwner()} 解析出玩家就算。
+     * <p>
+     * 两条接口都试，是因为它们各覆盖一批实体：
+     * <ul>
+     *   <li>{@link OwnableEntity}：`getOwnerUUID()` + 默认 `getOwner()`，覆盖雪傀儡、第三方模组的构造体/召唤物；</li>
+     *   <li>{@link TraceableEntity}：`getOwner()` 直接返回 {@code Entity}，覆盖"owner 存实体引用"的写法
+     *       （原版 Vex 也实现它，但返回的是 {@code Mob}，所以玩家归属仍不可表达）。</li>
+     * </ul>
+     * 为什么要单列一条：它们既不是 {@link #isTamedPet 驯服宠物}（不走 {@code TamableAnimal}），
+     * 也不带本模组的幻灵/幻翼标记，所以前两个分类都漏掉。
+     * <p>
+     * <b>owner 必须是玩家</b>：原版唤魔者召的 Vex 同样实现这两个接口（owner = 唤魔者），
+     * 那是敌对单位，绝不能放过。
+     * <p>
+     * <b>API 覆盖不到的</b>：原版 {@code Vex.setOwner} 的参数类型是 {@code Mob}，
+     * 玩家根本不可能是 Vex 的 owner（javap 核实）⇒ 这类召唤物认不出归属，按可锁处理。
+     * （不再加"按自定义名认人"的兜底：见 {@link #isFriendlyForAim} 的说明。）
+     */
+    public static boolean isPlayerOwned(Entity e) {
+        if (e instanceof OwnableEntity own && own.getOwner() instanceof Player) return true;
+        return e instanceof TraceableEntity trace && trace.getOwner() instanceof Player;
+    }
+
+    /**
      * 同乘关系（骑或被骑）——归入大过滤：不长眼地打/锁/牵引"自己正骑着的东西"永远是误伤。
      * <p>视角为空时恒 false（安全降级）。
      */
@@ -152,7 +185,8 @@ public final class AllyFilter {
     // ==================== 大过滤（所有友方/敌我判定都走这两个） ====================
 
     /**
-     * <b>类别层</b>：玩家 ‖ 任意驯服宠物 ‖ 自家召唤物（幻灵 + 幻翼）‖ 任意第三方辅助作战单位。
+     * <b>类别层</b>：玩家 ‖ 任意驯服宠物 ‖ 自家召唤物（幻灵 + 幻翼）‖ 任意第三方辅助作战单位
+     * ‖ 归属任意玩家的实体（{@code OwnableEntity}：第三方把 owner 设成玩家的召唤物、雪傀儡等）。
      * <p>
      * 一元判定、不需要视角，所以四种消费方<b>共用同一份类别定义</b>；
      * 「新增一种自家单位或辅助单位」只需在分类里加一条，四个功能自动同步。
@@ -163,7 +197,7 @@ public final class AllyFilter {
      * 需要"视角"的调用请用 {@link #isFriendly}（它在本层之上再加同乘）。
      */
     public static boolean isFriendlyUnit(Entity e) {
-        return isPlayer(e) || isTamedPet(e) || isOwnSummon(e) || isAssistConstruct(e);
+        return isPlayer(e) || isTamedPet(e) || isOwnSummon(e) || isAssistConstruct(e) || isPlayerOwned(e);
     }
 
     /**
@@ -173,9 +207,29 @@ public final class AllyFilter {
      * 次元枪子弹用子弹 owner。可为 {@code null}（= 只看类别，同乘那档自动失效）。
      * <p>
      * <b>结盟（计分板同队）刻意不在内</b>，理由见类注释（判定权外移 / 行为不可复现）。
+     * <b>玩家一律算友方</b>（不分组队）：照片弹幕命中任何玩家都免伤，这是 1.5.52 起就有的口径。
      */
     public static boolean isFriendly(Entity viewer, Entity target) {
         if (target == null) return false;
+        return isFriendlyUnit(target) || isVehicleRelated(viewer, target);
+    }
+
+    /**
+     * <b>瞄准语义的友方</b>：这个目标该不该被"瞄着打"的能力跳过
+     * （{@code AimTargetUtil}：夺魂索命 / 要害打击）。
+     * <p>
+     * 与 {@link #isFriendly} 只差一处，且是<b>全局</b>口径：<b>玩家一律跳过</b>——这两个能力对玩家
+     * 没有意义（夺魂索命有 50% 血线 + 30% 成功率，要害打击只认 BOSS），锁到人身上纯属浪费冷却。
+     * 其余类别与 {@link #isFriendly} 一致：宠物 / 自家召唤物 / 辅助构造体 / 归属玩家的实体 /
+     * 同乘，一律跳过。
+     * <p>
+     * <b>刻意不按自定义名认人</b>：曾经加过一层"名字里有 {@code "<X>'s "} 就当作别人的召唤物"，
+     * 已按用户口径删除——那种启发式的误判是**永久且静默**的（某个怪就是锁不上，还查不出原因），
+     * 而它要修的只是"偶尔被自家 Vex 吃掉一次冷却"。**误判风险高过判对的收益。**
+     * 认不出来的人和怪，宁可让它可锁。
+     */
+    public static boolean isFriendlyForAim(Entity viewer, Entity target) {
+        if (target == null || isPlayer(target)) return true;
         return isFriendlyUnit(target) || isVehicleRelated(viewer, target);
     }
 

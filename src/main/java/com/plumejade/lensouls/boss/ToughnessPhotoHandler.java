@@ -88,10 +88,10 @@ public class ToughnessPhotoHandler {
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntity(entity,
                 new ToughnessHitSoundPacket(entity.getId(), true));
         if (holder instanceof net.minecraft.server.level.ServerPlayer player) {
-            player.displayClientMessage(
+            // 走最上层弹窗通道：动作栏那条会被取景框压住、取景器开着时甚至完全不画
+            com.plumejade.lensouls.network.HudHintPacket.send(player,
                     net.minecraft.network.chat.Component.translatable("message.lensouls.lens_tier_insufficient",
-                            BossTierLoader.getTier(entity)),
-                    true);
+                            BossTierLoader.getTier(entity)));
         }
     }
 }

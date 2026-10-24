@@ -31,6 +31,21 @@ public final class CurseHandDrop {
     /** 上次真正丢出的游戏刻 */
     private static final Map<UUID, Long> LAST_DROP = new ConcurrentHashMap<>();
 
+    /** 正在执行丢手（重入保护：伤害事件是嵌在 Player#attack / hurt 里跑的） */
+    private static final java.util.Set<UUID> DROPPING =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** 「丢出手中物品」INFO 的节流表（UUID → 下次允许打印刻）：正常丢手 1 秒最多一次，长期刷会淹日志 */
+    private static final Map<UUID, Long> LOG_AT = new ConcurrentHashMap<>();
+    /** 正常丢手的 INFO 间隔（tick）：60 秒一条 */
+    private static final long LOG_INTERVAL_TICKS = 1200L;
+
+    /** 本 tick 丢出的物品（tick 末审计：若槽位被塞回同一件，就是一次复制，必须清掉） */
+    private static final Map<UUID, PendingDrop> PENDING = new ConcurrentHashMap<>();
+
+    private record PendingDrop(int slot, ItemStack dropped, String reason) {
+    }
+
     private CurseHandDrop() {
     }
 
@@ -43,40 +58,83 @@ public final class CurseHandDrop {
      */
     public static boolean dropHeld(ServerPlayer player, InteractionHand hand, boolean around, String reason) {
         if (player == null || hand == null) return false;
-        long now = player.level().getGameTime();
-        Long last = LAST_DROP.get(player.getUUID());
-        if (last != null && now - last.longValue() < MIN_INTERVAL_TICKS) return false;
+        // 重入保护：伤害事件是嵌在 Player#attack → hurt → actuallyHurt 里跑的，
+        // 同一次攻击的多段伤害（横扫/多段弹幕）会在同 tick 反复进来。
+        if (!DROPPING.add(player.getUUID())) return false;
+        try {
+            long now = player.level().getGameTime();
+            Long last = LAST_DROP.get(player.getUUID());
+            if (last != null && now - last.longValue() < MIN_INTERVAL_TICKS) return false;
 
-        Inventory inv = player.getInventory();
-        int slot = hand == InteractionHand.MAIN_HAND ? inv.selected : Inventory.SLOT_OFFHAND;
-        ItemStack held = inv.getItem(slot);
-        if (held.isEmpty()) return false;
+            Inventory inv = player.getInventory();
+            int slot = hand == InteractionHand.MAIN_HAND ? inv.selected : Inventory.SLOT_OFFHAND;
+            ItemStack held = inv.getItem(slot);
+            if (held.isEmpty()) return false;
 
-        // 1) 先清空槽位 —— 只有清空成功才允许生成掉落物，顺序反了就是「凭空多一份」
-        ItemStack copy = held.copy();
-        inv.setItem(slot, ItemStack.EMPTY);
-        inv.setChanged();
+            // 1) 先清空槽位 —— 只有清空成功才允许生成掉落物，顺序反了就是「凭空多一份」
+            ItemStack copy = held.copy();
+            inv.setItem(slot, ItemStack.EMPTY);
+            inv.setChanged();
 
-        // 2) 回读校验：清空没生效（槽位内容被别的处理器换掉 / 索引对不上）就放弃，
-        //    绝不在「手里还留着」的情况下再丢一份出去
-        if (!inv.getItem(slot).isEmpty()) {
-            LenSouls.LOGGER.warn("[Curse] {} 丢手放弃：槽位清空失败 slot={}", reason, slot);
-            return false;
+            // 2) 回读校验：清空没生效（槽位内容被别的处理器换掉 / 索引对不上）就放弃，
+            //    绝不在「手里还留着」的情况下再丢一份出去
+            if (!inv.getItem(slot).isEmpty()) {
+                LenSouls.LOGGER.warn("[Curse] {} 丢手放弃：槽位清空失败 slot={}", reason, slot);
+                return false;
+            }
+
+            // 3) 只生成这一个掉落物（原版 Player#drop：脚下 + 40 tick 拾取延迟）
+            player.drop(copy, around);
+            player.containerMenu.broadcastChanges();
+
+            LAST_DROP.put(player.getUUID(), now);
+            // 正常丢手是节流日志（每玩家 60 秒一条）：这条只是「机制在跑」的心跳，
+            // 丢手本身已由 MIN_INTERVAL_TICKS 限制到 1 秒最多一次，但长期刷仍会淹日志。
+            Long logAt = LOG_AT.get(player.getUUID());
+            if (logAt == null || now >= logAt) {
+                LOG_AT.put(player.getUUID(), now + LOG_INTERVAL_TICKS);
+                LenSouls.LOGGER.info("[Curse] {} 丢出手中物品 {} x{} slot={}（同类日志 60 秒一条）",
+                        reason, copy.getItem().toString(), copy.getCount(), slot);
+            }
+
+            // 4) tick 末审计：这一件到底是「真的离开手」，还是「被谁又塞回同一件」。
+            //    攻速快时实测出现「复制主手武器」= 掉落物与手上各一份 —— 一旦发现槽位在同 tick 内
+            //    被写回**完全相同**的堆，就把手上那份清掉（地面那份才是权威）并 WARN 记录。
+            PENDING.put(player.getUUID(), new PendingDrop(slot, copy.copy(), reason));
+            player.server.execute(() -> auditDrop(player));
+            return true;
+        } finally {
+            DROPPING.remove(player.getUUID());
         }
+    }
 
-        // 3) 只生成这一个掉落物（原版 Player#drop：脚下 + 40 tick 拾取延迟）
-        player.drop(copy, around);
-        player.containerMenu.broadcastChanges();
-
-        LAST_DROP.put(player.getUUID(), now);
-        LenSouls.LOGGER.info("[Curse] {} 丢出手中物品 {} x{} slot={}",
-                reason, copy.getItem().toString(), copy.getCount(), slot);
-        return true;
+    /** tick 末审计：槽位被塞回同一件 = 复制，清掉手上那份并记日志 */
+    private static void auditDrop(ServerPlayer player) {
+        PendingDrop pending = PENDING.remove(player.getUUID());
+        if (pending == null || player.isRemoved()) return;
+        Inventory inv = player.getInventory();
+        ItemStack now = inv.getItem(pending.slot());
+        if (now.isEmpty()) return;   // 正常：东西确实离开了手
+        if (ItemStack.isSameItemSameComponents(now, pending.dropped())
+                && now.getCount() >= pending.dropped().getCount()) {
+            inv.setItem(pending.slot(), ItemStack.EMPTY);
+            inv.setChanged();
+            player.containerMenu.broadcastChanges();
+            LenSouls.LOGGER.warn("[Curse] {} 丢手后同 tick 被塞回同一件，已清除手上那份防复制：{} x{} slot={}",
+                    pending.reason(), now.getItem(), now.getCount(), pending.slot());
+        } else {
+            LenSouls.LOGGER.warn("[Curse] {} 丢手后槽位被写入其它物品（未处理）：{} x{} slot={}",
+                    pending.reason(), now.getItem(), now.getCount(), pending.slot());
+        }
     }
 
     /** 退出世界 / 死亡时清计时（与其它瞬时计时同口径） */
     public static void clear(UUID id) {
-        if (id != null) LAST_DROP.remove(id);
+        if (id == null) return;
+        LAST_DROP.remove(id);
+        LOG_AT.remove(id);
+        PENDING.remove(id);
+        DROPPING.remove(id);
     }
 
     /** 仅供调试：忘掉节流 */

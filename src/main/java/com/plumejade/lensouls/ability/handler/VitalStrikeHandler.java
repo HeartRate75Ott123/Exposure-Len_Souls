@@ -74,9 +74,9 @@ public class VitalStrikeHandler {
                 int lensTier = getLensTier(stack);
                 if (lensTier < bossTier) {
                     if (!tierFailedShown) {
-                        player.displayClientMessage(
-                                net.minecraft.network.chat.Component.translatable("message.lensouls.lens_tier_insufficient", bossTier),
-                                true);
+                        com.plumejade.lensouls.network.HudHintPacket.send(player,
+                                net.minecraft.network.chat.Component.translatable(
+                                        "message.lensouls.lens_tier_insufficient", bossTier));
                         tierFailedShown = true;
                     }
                     continue;

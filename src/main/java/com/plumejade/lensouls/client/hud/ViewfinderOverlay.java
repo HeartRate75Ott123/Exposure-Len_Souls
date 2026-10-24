@@ -77,14 +77,35 @@ public final class ViewfinderOverlay {
      * 接管一条动作栏消息：只在「原版根本画不出来」的时候才接管 ——
      * 有屏幕打开（HUD 不渲染），或者正在看取景器且 Exposure 会隐藏 HUD。
      * 其它情况仍交给原版动作栏，避免同一句话出现两份。
+     * <p>
+     * 例外：{@link #ALWAYS_TOAST_KEYS} 里这几条<b>永远</b>走最上层弹窗 ——
+     * "无法造成韧性伤害（等级不足）"是拍照那一刻的关键反馈，但它由 {@code FrameAddedEvent} 触发，
+     * 服务端回包时取景器往往已经关了（或客户端根本没开），于是它会掉回原版动作栏那条线上，
+     * 被取景框/闪白压住看不见。这类消息固定接管，并把原版那一份清空避免重复。
      */
     public static void captureActionBar(Component text) {
         if (text == null || text.getString().isEmpty()) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
-        if (mc.screen != null || hudHiddenByViewfinder()) {
+
+        boolean always = isAlwaysToast(text);
+        if (always || mc.screen != null || hudHiddenByViewfinder()) {
             FeatherToast.show(text);
+            // 已经用最上层弹窗画过了 → 清掉原版动作栏那份；取景器藏 HUD 时本来就没有，不用管
+            if (always && !hudHiddenByViewfinder()) {
+                mc.gui.setOverlayMessage(Component.empty(), false);
+            }
         }
+    }
+
+    /** 必须走最上层弹窗的动作栏消息（按翻译键判定，不比对已翻译文本） */
+    private static final java.util.Set<String> ALWAYS_TOAST_KEYS = java.util.Set.of(
+            "message.lensouls.lens_tier_insufficient"
+    );
+
+    private static boolean isAlwaysToast(Component text) {
+        return text.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t
+                && ALWAYS_TOAST_KEYS.contains(t.getKey());
     }
 
     /** Exposure：正在通过取景器看 + 配置里隐藏 HUD ⇒ 原版动作栏/事件全都不会出现 */

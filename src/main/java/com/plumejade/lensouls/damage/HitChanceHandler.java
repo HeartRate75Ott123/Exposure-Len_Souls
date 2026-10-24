@@ -29,6 +29,23 @@ import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
  */
 public class HitChanceHandler {
 
+    /**
+     * 最终命中率的**下限**。
+     * <p>
+     * 照片的命中率词条是「每张一条 {@code ADD_MULTIPLIED_BASE}」——弹幕类 −24%、幻象类 −12%、
+     * 弱弹幕 −6%，多条叠加后属性会被压到 0（{@code RangedAttribute} 的 min 就是 0）。
+     * 一旦压到 0，本处理器会取消**每一次**攻击：玩家「完全打不出伤害」，而这条惩罚的原意
+     * 只是「命中率下降」。更隐蔽的是，它发生在 {@code LOWEST} 且注册早于诅咒处理器，
+     * 被取消的事件不会再派发给后面的监听器 —— ⑦ e3 锈契因此**看不到**这些丢失，
+     * 表现为「15% 丢失根本不触发、进度不涨」。
+     * <p>
+     * 所以这里给一个下限：照片叠再多，也至少保留 25% 命中率（想调整只改这一个常量）。
+     */
+    public static final double MIN_EFFECTIVE_CHANCE = 0.25;
+
+    /** 命中率被压到下限时的 WARN 节流（UUID → 下次允许打印的游戏刻） */
+    private static final java.util.Map<java.util.UUID, Long> WARN_AT = new java.util.concurrent.ConcurrentHashMap<>();
+
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onIncomingDamage(LivingIncomingDamageEvent event) {
         ServerPlayer attacker = resolvePlayerAttacker(event.getSource().getEntity(), event.getSource().getDirectEntity());
@@ -39,12 +56,32 @@ public class HitChanceHandler {
         AttributeInstance instance = attacker.getAttribute(ModAttributes.HIT_CHANCE);
         if (instance == null) return;
 
-        double chance = instance.getValue();
-        if (chance >= 1.0) return;
+        double raw = instance.getValue();
+        if (raw >= 1.0) return;
 
-        if (chance <= 0.0 || attacker.getRandom().nextDouble() >= chance) {
+        double chance = Math.max(MIN_EFFECTIVE_CHANCE, Math.min(1.0, raw));
+        if (raw < MIN_EFFECTIVE_CHANCE) {
+            // 只在被压穿下限时按 30 秒节流记一次，方便定位「谁把命中率堆成负的」
+            long now = attacker.level().getGameTime();
+            Long until = WARN_AT.get(attacker.getUUID());
+            if (until == null || now >= until) {
+                WARN_AT.put(attacker.getUUID(), now + 600L);
+                com.plumejade.lensouls.LenSouls.LOGGER.warn(
+                        "[HitChance] 命中率属性={} 已低于下限 {}，按 {} 结算（玩家={}；多为弹幕/幻象类照片叠满所致）",
+                        String.format("%.3f", raw), MIN_EFFECTIVE_CHANCE, MIN_EFFECTIVE_CHANCE,
+                        attacker.getGameProfile().getName());
+            }
+        }
+
+        boolean miss = attacker.getRandom().nextDouble() >= chance;
+        if (miss) {
             event.setCanceled(true);
         }
+        com.plumejade.lensouls.handler.curse.AttackDiag.log(
+                "命中率 raw={} 取用={} 掷骰={} → {} 目标={}",
+                String.format("%.3f", raw), String.format("%.3f", chance),
+                miss ? "未命中" : "命中", miss ? "取消伤害" : "放行",
+                event.getEntity().getType());
     }
 
     /**

@@ -88,6 +88,20 @@ public class LenSoulsClient {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.curse.LibrarySealScreenHandler.class);
         // 断线清空诅咒镜像（含「是否装着」的 activeMask），避免跨存档 / 跨服务器残留
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.CurseClientCache::onClientLogout);
+        // 诅咒的「端无关」查询：让 BreakSpeed 这类**两端都要算**的钩子在客户端也走同一口径
+        // （客户端读 CurseSyncPacket 推下来的镜像，服务端读权威附件）
+        com.plumejade.lensouls.handler.curse.TimecoreCurse.setClientQuery(
+                new com.plumejade.lensouls.feather.CurseSideQuery() {
+                    @Override
+                    public boolean on(com.plumejade.lensouls.feather.CurseDef def, int entry) {
+                        return com.plumejade.lensouls.client.CurseClientCache.on(def, entry);
+                    }
+
+                    @Override
+                    public boolean rev(com.plumejade.lensouls.feather.CurseDef def, int entry) {
+                        return com.plumejade.lensouls.client.CurseClientCache.rev(def, entry);
+                    }
+                });
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onPlayerTick);
         // 客户端断线时清理幻灵状态
         NeoForge.EVENT_BUS.addListener(com.plumejade.lensouls.client.phantom.ClientPhantomHandler::onClientLogout);

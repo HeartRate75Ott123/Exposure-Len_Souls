@@ -35,7 +35,8 @@ public class FoodDataMixin {
             float mult = 1.0f;
 
             if (FeatherAbyssHandler.hasAbyss(player)) {
-                // ④ e9：诅咒态直接拦截（不回血）；只有该条**已反转**时才放行并 ×2
+                // ④ e9：诅咒态直接拦截（不回血）；只有该条**已反转**时才放行并 ×2。
+                // 独立生效：⑤ e8 是否反转不改变本条 —— 想恢复自然回血必须反转 ④ e9 本身。
                 if (!CurseManager.rev(player, CurseDefs.ABYSS, 8)) {
                     return;
                 }

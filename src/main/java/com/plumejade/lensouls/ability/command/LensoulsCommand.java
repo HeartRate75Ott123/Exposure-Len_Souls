@@ -94,6 +94,17 @@ public class LensoulsCommand {
                                 .then(Commands.argument("on", com.mojang.brigadier.arguments.BoolArgumentType.bool())
                                         .executes(ctx -> setCurseReversed(ctx,
                                                 com.mojang.brigadier.arguments.BoolArgumentType.getBool(ctx, "on")))))))
+                // 攻击链路诊断（命中率 / ⑦ e3 锈契掷骰 / 造成伤害收口，各打一行 [Atk]）
+                .then(Commands.literal("debug")
+                        .then(Commands.argument("on", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .executes(ctx -> {
+                                    boolean on = com.mojang.brigadier.arguments.BoolArgumentType.getBool(ctx, "on");
+                                    com.plumejade.lensouls.handler.curse.AttackDiag.setEnabled(on);
+                                    ctx.getSource().sendSuccess(() -> Component.literal(
+                                            on ? "§a[Atk] 攻击诊断已开启（每次攻击打一行日志）"
+                                                    : "§7[Atk] 攻击诊断已关闭"), false);
+                                    return 1;
+                                })))
                 // 天数自检：地图口径的绝对天 / 该玩家自己的天（折翼 e3 的窗口按后者算）
                 .then(Commands.literal("days").requires(OP)
                         .executes(ctx -> {

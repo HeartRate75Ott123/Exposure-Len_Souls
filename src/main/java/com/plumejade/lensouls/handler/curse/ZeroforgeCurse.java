@@ -378,8 +378,11 @@ public final class ZeroforgeCurse {
 
         // 无魂时的持续性 debuff：诅咒态才给；反转后（rev）完全摘掉
         if (CurseManager.on(player, D, 0) && !hasSoul) {
-            player.addEffect(new MobEffectInstance(MobEffects.HUNGER, 60, 5, true, false, false));
-            player.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 60, 3, true, false, false));
+            // CurseEffects.keep：只在快过期时续期，避免每 tick 各发一个效果包（两个效果 = 每 tick 2 包）。
+            // 虚弱从 IV 降到 III：原版每级 −4 点攻击伤害，IV 是 −16 ⇒ 绝大多数武器（铁剑 6、下界合金剑 8）
+            // 直接被压到 0 伤害，表现为「空挥一样完全打不出伤害」；III（−12）保留「肌无力」手感但仍打得动。
+            CurseEffects.keep(player, MobEffects.HUNGER, 80, 5);
+            CurseEffects.keep(player, MobEffects.WEAKNESS, 80, 2);
         }
     }
 
@@ -459,22 +462,67 @@ public final class ZeroforgeCurse {
      * 是 {@code LOWEST}，同优先级下「后注册者后跑」，这里必然在它之后，
      * 因此「已被命中率取消」的那一刀也会走到这里（才能计入丢失次数）。
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onMissRoll(LivingIncomingDamageEvent event) {
+    /**
+     * e3 锈契 · **近战**：这一刀 15% 概率丢失。
+     * <p>
+     * <b>为什么在 {@code AttackEntityEvent} 而不是伤害事件</b>：本条的「丢失」就是**让攻击不成立**
+     * （空挥）。如果等伤害事件到了再取消，一来那已经是「打完再反悔」，二来**计数只能依赖伤害事件**——
+     * 一旦这一刀被更强的来源提前掐掉（命中率、胸针魔法化、距离/前置拦截…），伤害事件根本不会派发，
+     * 进度就永远不涨。所以在攻击入口这一处掷骰、取消、**同时 +1 进度**：
+     * 一次攻击 = 一次掷骰 = 一次计数，不依赖任何后续事件。
+     * <p>
+     * 取消后仍消耗攻击冷却（与「这一刀真的丢了」一致）。
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onAttackTarget(net.neoforged.neoforge.event.entity.player.AttackEntityEvent event) {
+        try {
+            if (!(event.getEntity() instanceof ServerPlayer player)) return;
+            if (event.getTarget() == player) return;
+            if (!active(player)) return;
+            if (!CurseManager.on(player, D, 2)) return;
+
+            float roll = player.getRandom().nextFloat();
+            AttackDiag.log("锈契·近战掷骰 roll={} < {} ? {}（目标={}）",
+                    String.format("%.3f", roll), MISS_CHANCE, roll < MISS_CHANCE,
+                    event.getTarget().getType());
+            if (roll >= MISS_CHANCE) return;
+
+            event.setCanceled(true);          // 空挥：这一刀完全不成立
+            player.resetAttackStrengthTicker(); // 冷却照常消耗（丢失要有代价）
+            CurseManager.tick(player, D, 2, 1L, MISS_GOAL);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ⑦ e3 锈契（近战）结算异常", t);
+        }
+    }
+
+    /**
+     * e3 锈契 · **远程**（弓箭/枪弹/召唤物代打）：同一条 15% 丢失。
+     * <p>
+     * 这条路上没有 {@code AttackEntityEvent}，所以仍在伤害事件里掷骰；但**掷骰与计数写在同一个分支里**
+     * （取消的那一刻就 +1），不依赖任何「事件是否被别处取消」的判断 —— 这正是上一版
+     * `receiveCanceled` 方案的错误：把计数挂在「事件已经被取消」这种不可控状态上。
+     * 近战已在 {@link #onAttackTarget} 结算，这里用「直接实体是玩家」把它排除，避免一刀掷两次。
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onRangedMissRoll(LivingIncomingDamageEvent event) {
         try {
             if (event.getEntity().level().isClientSide) return;
             if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
             if (event.getEntity() == player) return;
             if (!active(player)) return;
+            if (!CurseManager.on(player, D, 2)) return;
+            if (event.getSource().getDirectEntity() instanceof ServerPlayer) return;  // 近战另算
 
-            if (CurseManager.on(player, D, 2)) {
-                if (event.isCanceled() || player.getRandom().nextFloat() < MISS_CHANCE) {
-                    if (!event.isCanceled()) event.setCanceled(true);
-                    CurseManager.tick(player, D, 2, 1L, MISS_GOAL);
-                }
-            }
+            float roll = player.getRandom().nextFloat();
+            AttackDiag.log("锈契·远程掷骰 roll={} < {} ? {}（目标={}）",
+                    String.format("%.3f", roll), MISS_CHANCE, roll < MISS_CHANCE,
+                    event.getEntity().getType());
+            if (roll >= MISS_CHANCE) return;
+
+            event.setCanceled(true);
+            CurseManager.tick(player, D, 2, 1L, MISS_GOAL);
         } catch (Throwable t) {
-            LenSouls.LOGGER.error("[Curse] ⑦ e3 锈契掷骰异常", t);
+            LenSouls.LOGGER.error("[Curse] ⑦ e3 锈契（远程）结算异常", t);
         }
     }
 
@@ -570,6 +618,9 @@ public final class ZeroforgeCurse {
                 d *= (1.0f + additive);
             }
 
+            AttackDiag.log("造成伤害收口 目标={} 原={} 最终={} 断供={} 饱食={} 加算={}",
+                    target.getType(), event.getNewDamage(), d,
+                    CurseManager.on(player, D, 3), player.getFoodData().getFoodLevel(), additive);
             event.setNewDamage(d);
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ⑦ 造成伤害结算异常", t);

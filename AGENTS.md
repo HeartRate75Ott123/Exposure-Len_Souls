@@ -3316,3 +3316,60 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
   但各自都是独立正确的加固，可以和帧去重修复共存。
   教训：**"几帧有 / 几帧没有"这类整帧开关的问题先怀疑帧级闸门**（本例就是 `nanoTime` 去重），
   颜色/平滑参数治不了它；但也别把无关改动混进同一版交付，否则定位会被带偏。
+
+## 2026-10 需求批次（`1.7.94`）：石之心封顶失效 + 四只 BOSS 定身伤害/隐身异常
+
+### 69. 石之心「单次不超过 25%」在很多情况下不生效（会被秒杀）
+
+- **根因：派发顺序**。`HeartOfStoneHandler` 原来挂在默认优先级 `NORMAL`，而「受到伤害倍率」这一类
+  处理器全部注册在它**之后**（同优先级按注册顺序派发）：
+  - `FeatherTwitcherHandler.onDamaged`（② e1 外伤 +100% / e2 苦楚 每点扭曲 +1%）
+  - `FeatherAbyssHandler.damageTaken`（④ e3 安魂曲 +13%/天 / e11 疯狂 每点扭曲 +0.2%）
+  - `FeatherHardmanHandler.onDamaged`（③ e3 保留项）
+  - `FinalriteCurse.onArmorPierce`（⑥ e7 穿甲：把 50% 的护甲削减量**加回**）
+  它们乘/加完的伤害完全绕过了封顶。实测最狠的一档：② e1 外伤 ×2 叠 e2 苦楚（扭曲 100 再 ×2）= ×4
+  ⇒ `25% ×4 = 100%`，满血被一击秒杀 —— 正是「理论至少承伤 4 次却还是被秒杀」的来源。
+- **修法**：`LivingDamageEvent.Pre` 改 `EventPriority.LOWEST`（`×1.17` 与 `min(cap)` 一起收口）。
+  `LOWEST` 里排在它之后的只有 `FeatherAbyssHandler.onDamagedLast`（⑥ e12 恶意反转态，只做**减法**），
+  封顶不会被它突破。**不要改回 `NORMAL`**：这条封顶必须排在所有「受到伤害」乘区之后。
+- **另加 `LivingDamageEvent.Post`（LOWEST）兜底**：实际结算值仍 > 25% 时按
+  `当前血量 + (实际 − 上限)` 补回。口径推导：Post 时 `getHealth()` 已是 `受击前 − 实际值`（可为负），
+  补齐后正好等于 `受击前 − 上限`，不多给也不少给；夹到 `[0, 最大生命]`。
+  只对非 `BYPASSES_INVULNERABILITY` 生效 ⇒ 不影响 ② 阻死到点的 `genericKill`（必死级伤害照旧不封顶、不兜底）。
+
+### 70. 四只 BOSS 定身时「卡无敌帧 / 空挥 / 实体消失」
+
+统一症状：破刹或时间定格把它们停在特定动画帧之后，攻击**不结算伤害、连受击红闪都没有**
+（说明 `hurt` 在方法开头就 `return false` 了，不是减伤也不是无敌帧）。逐只 `javap -p -c` 核实
+（灾变 3.32 / 传奇怪物 2.1.20）：
+
+| BOSS | 闸门（反编译原文） | 修法（新增 mixin） |
+|------|------------------|------|
+| 咒翼灵骸 `cataclysm:maledictus` | `hurt` 首行 `if (attackState ∈ {31,32,33} && !source.is(BYPASSES_INVULNERABILITY)) return false` | `MaledictusStunHurtMixin`：定身期间把该 Tag 读数强制 `true` |
+| 末影守卫 `cataclysm:ender_guardian` | `hurt` 首行 `if (getAnimation() == GUARDIAN_MASS_DESTRUCTION && !bypass) return false` | `EnderGuardianStunHurtMixin`：同上 |
+| 堕落圣骑 `legendary_monsters:posessed_paladin` | `hurt` 首行 `if (attackState == 15) return false`（**无 bypass 口子**）+ `if (isSleep() && !bypass) return false` | `PosessedPaladinStunHurtMixin`：`hurt` 内把 `getAttackState()` 读成 0 + bypass 读数强制 `true` |
+| 湮灭猎影 `legendary_monsters:annihilation_pursuer` | `hurt` 里 `isDuringTeleportation() && !bypass` 与 `isSleep()` 两道；客户端 `tick` 里 `isDuringTeleportation()` 就 `setInvisible(true)` | `AnnihilationPursuerStunMixin`：定身期间整段取消它自己重写的 `tick`，进入时把「传送/潜伏」状态归零 + `setInvisible(false)` |
+
+- 圣骑的 15 是**二阶段「甲壳崩裂」过渡态**：`tick()` 里「`state == 0` 且 `Crackiness ≥ MEDIUM` 且未进二阶段」
+  就会写 15，而过渡收尾写在 `aiStep`（定身暂停 `LivingEntity.tick` 时一并停住）⇒ 过渡永远走不完。
+  **改状态没用**（`tick()` 本身没被暂停，下一 tick 又写回 15），只能在 `hurt` 的读取处动手；
+  状态机一个字节都不改，定身结束后过渡照常推进。沉睡态（state 1/2）是出生保护，定身期间一并放开。
+- 猎影的「实体消失」是**客户端逐刻按状态算隐身**：`tick()` 里
+  `if (isClientSide && isDuringTeleportation()) setInvisible(true)`，而 `isDuringTeleportation()`
+  读的是 `attackState + attackTicks` 的窗口。它自己**重写了 `tick()`**，通用 `BossStunTickMixin`
+  只取消基类 `LivingEntity.tick` 的方法体 ⇒ 定身期间它自己的攻击序列照跑（会真的传送走）、
+  动画时钟冻结在传送窗口 ⇒ 每一客户端 tick 都把 `invisible` 置回 `true`。
+  因此对它用 `IgnisStunMixin` / `BlockFactorysBossStunMixin` 同款「整段取消重写的 tick」，
+  并在取消前 `setAttackState(0)`（`onSyncedDataUpdated` 会 `stopAllAnimationStates()` 并回 idle，
+  顺带解掉传送期伤害免疫、把模型从「缩放到 0 的传送帧」拉回正常姿态）+ `setInvisible(false)` 兜底。
+  死亡放行，保证 `tickDeath` 正常执行。
+- 重定向只作用于各自 `hurt` 方法体内那一条 invoke：灾变 `IABoss_monster.hurt` / `LLibrary_Boss_Monster.hurt`
+  的 `DamageCap` / 距离限制 / 伤害桶，以及传奇怪物 `IAnimatedMiniBoss.hurt` 的封顶与伤害适应减伤，
+  仍按真实伤害来源判定，不受影响。
+- 四个 mixin 登记在 `lensouls.compat.mixins.json`（`required:false`，模组缺席整条跳过）。
+  验证方式：`./gradlew build` 通过（这四条只做了静态核对：目标类方法描述符逐条 `javap` 对过，
+  `@Redirect` 处理器签名按 Mixin 规则带上「调用接收者」参数）。**实机必须逐一复测**：
+  破刹后连击是否出伤害/红闪、猎影是否还消失。
+  注：`./gradlew runServer` 目前起不来，与本次改动无关——`libs/` 里新加的 l2* 依赖在 dev 环境
+  找不到 `com.tterrag.registrate.AbstractRegistrate`（嵌套 jarJar 在 dev 不加载），
+  `L2Tabs/L2Core/L2Library/L2MenuStacker` 构造失败。

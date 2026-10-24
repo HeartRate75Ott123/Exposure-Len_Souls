@@ -18,6 +18,7 @@
     "EntitiesInFrameMixin",
     "EntityInvulnerableTimeAccessor",
     "LivingEntityDeadAccessor",
+    "RegenerationHealMarkMixin",
     "FoodDataMixin",
     "PhantomPushGuardMixin",
     "PhantomKillCreditMixin",

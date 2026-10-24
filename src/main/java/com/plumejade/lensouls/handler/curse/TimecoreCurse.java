@@ -4,6 +4,7 @@ import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
+import com.plumejade.lensouls.feather.CurseSideQuery;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -106,9 +107,9 @@ public final class TimecoreCurse {
             player.removeEffect(MobEffects.DAMAGE_RESISTANCE);
         }
 
-        // e9 断粮：永久饥饿 3
+        // e9 断粮：永久饥饿 3（CurseEffects.keep：只在快过期时续期，避免每 tick 发效果包）
         if (CurseManager.on(player, D, 8)) {
-            player.addEffect(new MobEffectInstance(MobEffects.HUNGER, 40, 2, true, false, false));
+            CurseEffects.keep(player, MobEffects.HUNGER, 60, 2);
         }
 
         // e2/e9：进食检测（饱食度上升 = 刚吃过东西）
@@ -242,16 +243,22 @@ public final class TimecoreCurse {
         float amount = event.getAmount();
         if (amount <= 0.0f) return;
 
+        // ⑤ e8 反转的文案承诺「再生类效果正常生效」⇒ **生命恢复效果带来的治疗**不被 ⑤ 自己的
+        // 恢复量拦截削减（e1 绝疗 −80% / e2 饥禁禁疗 / e8 自身都不动它）。
+        // 作用域仅限 ⑤：⑥ 竭泉/血偿、④ 食之无味各自照旧按自己的诅咒态生效。
+        boolean regenExempt = CurseManager.rev(player, D, 7) && HealSource.isRegenerationHeal();
+
         // e1 绝疗：受到治疗 -80%
-        if (CurseManager.on(player, D, 0)) {
+        if (!regenExempt && CurseManager.on(player, D, 0)) {
             event.setAmount(amount * 0.2f);
         }
-        // e2 饥禁：饱食度 <5 时禁疗
-        if (CurseManager.on(player, D, 1) && player.getFoodData().getFoodLevel() < 5) {
+        // e2 饥禁：饱食度 <5 时禁疗（再生带来的治疗按 e8 反转承诺放行）
+        if (!regenExempt && CurseManager.on(player, D, 1)
+                && player.getFoodData().getFoodLevel() < 5) {
             event.setAmount(0.0f);
             return;
         }
-        // e8 止息：生命自然恢复与再生类效果无效
+        // e8 止息：生命自然恢复与再生类效果无效（已反转则本条本就不生效）
         if (CurseManager.on(player, D, 7)) {
             event.setAmount(0.0f);
             return;
@@ -289,16 +296,45 @@ public final class TimecoreCurse {
 
     // ==================== 挖掘 ====================
 
+    /**
+     * e3 迟凿：挖掘速度 −50%（诅咒态）/ +50%（反转态）。
+     * <p>
+     * <b>必须两端同口径</b>：{@code PlayerEvent.BreakSpeed} 由 {@code Player.getDigSpeed} 触发，
+     * 客户端（{@code LocalPlayer}）与服务端（{@code ServerPlayer}）各算一次；而 1.21.1 的
+     * {@code ServerPlayerGameMode} 会用自己的 {@code getDestroyProgress} 累积挖掘进度
+     * （{@code incrementDestroyProgress} / {@code hasDelayedDestroy}）。只改服务端 ⇒
+     * 客户端按原速挖、服务端按半速算，两边的进度/回执对不上 ——
+     * 实机症状就是「挖完方块不消失，延迟 0.x 秒才消失并掉出掉落物」。
+     * 客户端没有羽毛槽附件，改用 {@code CurseClientCache} 镜像（见 {@link CurseSideQuery}）。
+     */
     @SubscribeEvent
     public static void onBreakSpeed(PlayerEvent.BreakSpeed event) {
         Player player = event.getEntity();
-        if (!(player instanceof ServerPlayer sp)) return;
-        // e3 迟凿：挖掘速度 -50% / 反转 +50%
-        if (CurseManager.on(sp, D, 2)) {
+        if (sideOn(player, 2)) {
             event.setNewSpeed(event.getNewSpeed() * 0.5f);
-        } else if (CurseManager.rev(sp, D, 2)) {
+        } else if (sideRev(player, 2)) {
             event.setNewSpeed(event.getNewSpeed() * 1.5f);
         }
+    }
+
+    /** 客户端镜像查询（由 {@code LenSoulsClient} 注入；专用服为 null） */
+    private static CurseSideQuery CLIENT_QUERY;
+
+    /** 仅供客户端初始化调用 */
+    public static void setClientQuery(CurseSideQuery query) {
+        CLIENT_QUERY = query;
+    }
+
+    /** 当前端上「该条诅咒态是否生效」：服务端读权威附件，客户端读同步镜像 */
+    private static boolean sideOn(Player player, int entry) {
+        if (player instanceof ServerPlayer sp) return CurseManager.on(sp, D, entry);
+        return CLIENT_QUERY != null && CLIENT_QUERY.on(D, entry);
+    }
+
+    /** 当前端上「该条反转态是否生效」：服务端读权威附件，客户端读同步镜像 */
+    private static boolean sideRev(Player player, int entry) {
+        if (player instanceof ServerPlayer sp) return CurseManager.rev(sp, D, entry);
+        return CLIENT_QUERY != null && CLIENT_QUERY.rev(D, entry);
     }
 
     @SubscribeEvent
@@ -345,8 +381,16 @@ public final class TimecoreCurse {
     public static void onBlockDrops(net.neoforged.neoforge.event.level.BlockDropsEvent event) {
         if (!(event.getBreaker() instanceof ServerPlayer player)) return;
         if (SWALLOW_POS.remove(event.getPos())) {
-            event.getDrops().clear();
-            return;
+            // **消费时必须回读当前状态**：记账写在 BreakEvent、消费写在掉落时，两者之间可能已经反转
+            // （或换了佩戴者）。反转后不再吞，只把记录作废 —— 旧版这里不看状态，
+            // 于是出现「徒劳已反转却还在吞掉落」。
+            if (CurseManager.on(player, D, 3)) {
+                event.getDrops().clear();
+                return;
+            }
+            if (LenSouls.LOGGER.isDebugEnabled()) {
+                LenSouls.LOGGER.debug("[Curse] ⑤ e4 吞掉落记录作废（消费时该条已反转）pos={}", event.getPos());
+            }
         }
         // e15 厄运 诅咒态：时运 −2 ⇒ 平均少掉 0~2 件（至少保留 1 件）
         if (CurseManager.on(player, D, 14) && event.getDrops().size() > 1) {

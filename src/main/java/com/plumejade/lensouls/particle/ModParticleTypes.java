@@ -40,6 +40,10 @@ public class ModParticleTypes {
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SOUL_WISP_WHITE =
             PARTICLE_TYPES.register("soul_wisp_white", () -> new SimpleParticleType(false));
 
+    /** 红色魂尘（要害打击命中时从受击者身上爆出） */
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SOUL_WISP_RED =
+            PARTICLE_TYPES.register("soul_wisp_red", () -> new SimpleParticleType(false));
+
     /** 草飘动粒子（弹道尾迹） */
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> GRASS_BLADE =
             PARTICLE_TYPES.register("grass_blade", () -> new SimpleParticleType(false));

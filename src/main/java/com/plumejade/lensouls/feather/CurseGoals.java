@@ -98,12 +98,12 @@ public final class CurseGoals {
         put(CurseDefs.TIMECORE, 1, 12000L, TIME);    // e2 饥禁   :114 每 tick +1 → 12000 tick = 10 分钟
         put(CurseDefs.TIMECORE, 2, 1000L, BLOCKS);   // e3 迟凿   :293 挖 1000 个方块
         put(CurseDefs.TIMECORE, 3, 150L, TIMES);     // e4 徒劳   :302 被吞掉落 150 次
-        put(CurseDefs.TIMECORE, 4, 3000L, POINTS);   // e5 盈伤   :478 满血累计承受 3000 点
+        put(CurseDefs.TIMECORE, 4, 3000L, POINTS);   // e5 盈伤   :539 每次满血挨打都累加（同一条命可反复满血累加，死亡清零）
         put(CurseDefs.TIMECORE, 5, 1L, TIMES);       // e6 坠渊   :436 单次摔落 ≥15 点并存活 → 1 次
         put(CurseDefs.TIMECORE, 6, 10000L, POINTS);  // e7 钝锋   :512 累计造成 10000 点
         put(CurseDefs.TIMECORE, 7, 6000L, TIME);     // e8 止息   :127 每 tick +1 → 6000 tick = 5 分钟
         put(CurseDefs.TIMECORE, 8, 200L, KILLS);     // e9 断粮   :623 饥饿 V 下击杀 200 只
-        put(CurseDefs.TIMECORE, 9, 5000L, POINTS);   // e10 夺佑  :465 无正面效果时承受 5000 点
+        put(CurseDefs.TIMECORE, 9, 5000L, POINTS);   // e10 夺佑  :524 移速属性值 <0.05 时承受 5000 点（死亡不清零）
         put(CurseDefs.TIMECORE, 10, 2000L, POINTS);  // e11 锈甲  :473 护甲 ≤5 时承受 2000 点物理
         put(CurseDefs.TIMECORE, 11, 10000L, POINTS); // e12 缚己  :721 夺魂索命累计 10000 点
         put(CurseDefs.TIMECORE, 12, 30L, TIMES);     // e13 余悸  :445 累计 30 次大击

@@ -292,31 +292,36 @@ public final class WorldFxBursts {
      * 实体卸载或死亡后保持最后位置把动画播完，既不瞬移也不凭空消失。
      * 目标是自己时不能用胸口（相机就长在胸口，环会糊满屏幕）——改成镜头正前方 1.15 格、半径减半。
      */
-    private static final class FilterAppliedBurst implements Burst {
+    /**
+     * "贴在某个实体身上"的特效基类：负责三件所有这类特效都要的事——
+     * <ol>
+     *   <li><b>体型缩放</b>：包围盒对角 {@code sqrt(w² + h²)} 对普通类人生物（0.6×1.8 ≈ 1.90）取比值，
+     *       普通生物 ≈ 1.0、小型夹 0.55、巨兽夹到 3.4；环半径/线宽/刻度长度都乘它；</li>
+     *   <li><b>平滑跟随</b>：只存 entityId，位置/身高/体型每帧向实体做指数趋近
+     *       （帧率无关 {@code 1 - e^{-16·dt}}，约 60ms 追上）；实体卸载或死亡后保持最后位置播完；</li>
+     *   <li><b>绘制坐标</b>：给出相机朝向平面上的一对轴（{@link #facingAxes}），
+     *       这样环从任何角度看都是正圆，不会侧看塌成一条线；自身目标改用镜头正前方。</li>
+     * </ol>
+     */
+    private abstract static class BodyFollowBurst implements Burst {
         /** 普通类人生物的包围盒对角，作为体型缩放的分母 */
-        private static final float HUMANOID_SPAN = 1.90F;
+        protected static final float HUMANOID_SPAN = 1.90F;
         /** 跟随时长常数：越大跟得越紧（16 ≈ 60ms 追上） */
-        private static final float FOLLOW_K = 16.0F;
-        private static final float BASE_DURATION = 0.70F;
+        protected static final float FOLLOW_K = 16.0F;
+        protected static final float BASE_DURATION = 0.70F;
 
-        private final int entityId;
-        private final float cr;
-        private final float cg;
-        private final float cb;
-        private final boolean self;
+        protected final int entityId;
+        protected final boolean self;
 
         /** 平滑跟踪得到的胸口位置（世界坐标） */
-        private Vec3 pos;
-        private float height;
+        protected Vec3 pos;
+        protected float height;
         /** 平滑跟踪得到的包围盒对角（体型缩放用） */
-        private float span;
-        private float t;
+        protected float span;
+        protected float t;
 
-        FilterAppliedBurst(net.minecraft.world.entity.Entity target, float r, float g, float b) {
+        protected BodyFollowBurst(net.minecraft.world.entity.Entity target) {
             this.entityId = target.getId();
-            this.cr = r;
-            this.cg = g;
-            this.cb = b;
             Minecraft mc = Minecraft.getInstance();
             this.self = mc.player != null && mc.player.getId() == entityId;
             double h = target.getBbHeight();
@@ -328,13 +333,12 @@ public final class WorldFxBursts {
         }
 
         /** 体型缩放：普通生物 ≈ 1.0，巨兽夹到 3.4（再大就不是"一圈"而是天花板了） */
-        private float bodyScale() {
+        protected float bodyScale() {
             return Math.max(0.55F, Math.min(3.40F, span / HUMANOID_SPAN));
         }
 
-        /** 体型越大，动画给得越长（0.70 ~ 0.94s），否则巨兽上的环还没读完就没了 */
-        private float duration() {
-            return BASE_DURATION + 0.12F * Math.min(2.0F, Math.max(0.0F, bodyScale() - 1.0F));
+        protected float duration() {
+            return BASE_DURATION;
         }
 
         @Override
@@ -373,6 +377,51 @@ public final class WorldFxBursts {
             return t < life;
         }
 
+        /** 相机空间里的绘制中心；目标是自己时放到镜头正前方 1.15 格（否则环会糊满屏幕） */
+        protected Vector3f centerOf(Vec3 camera) {
+            if (self) {
+                Minecraft mc = Minecraft.getInstance();
+                Vec3 look = mc.player != null ? mc.player.getLookAngle() : new Vec3(0.0, 0.0, 1.0);
+                return new Vector3f((float) (look.x * 1.15), (float) (look.y * 1.15 - 0.18),
+                        (float) (look.z * 1.15));
+            }
+            if (pos == null) return null;
+            return new Vector3f((float) (pos.x - camera.x),
+                    (float) (pos.y - camera.y),
+                    (float) (pos.z - camera.z));
+        }
+
+        /** 相机朝向平面的一对轴 {@code {right, up}}；中心就在镜头上时返回 null */
+        protected static Vector3f[] facingAxes(Vector3f center) {
+            Vector3f view = new Vector3f(-center.x, -center.y, -center.z);
+            if (view.lengthSquared() < 1.0E-6F) return null;
+            view.normalize();
+            Vector3f right = new Vector3f(0F, 1F, 0F).cross(view);
+            if (right.lengthSquared() < 1.0E-5F) right.set(1F, 0F, 0F);
+            right.normalize();
+            Vector3f up = new Vector3f(view).cross(right).normalize();
+            return new Vector3f[]{right, up};
+        }
+    }
+
+    private static final class FilterAppliedBurst extends BodyFollowBurst {
+        private final float cr;
+        private final float cg;
+        private final float cb;
+
+        FilterAppliedBurst(net.minecraft.world.entity.Entity target, float r, float g, float b) {
+            super(target);
+            this.cr = r;
+            this.cg = g;
+            this.cb = b;
+        }
+
+        /** 体型越大，动画给得越长（0.70 ~ 0.94s），否则巨兽上的环还没读完就没了 */
+        @Override
+        protected float duration() {
+            return BASE_DURATION + 0.12F * Math.min(2.0F, Math.max(0.0F, bodyScale() - 1.0F));
+        }
+
         @Override
         public void render(Matrix4f pose, Vec3 camera, float time) {
             float life = duration();
@@ -380,30 +429,13 @@ public final class WorldFxBursts {
             if (u >= 1.0F) return;
 
             float scale = bodyScale();
-            Vector3f center;
-            float radiusScale;
-            if (self) {
-                Minecraft mc = Minecraft.getInstance();
-                Vec3 look = mc.player != null ? mc.player.getLookAngle() : new Vec3(0.0, 0.0, 1.0);
-                center = new Vector3f((float) (look.x * 1.15), (float) (look.y * 1.15 - 0.18),
-                        (float) (look.z * 1.15));
-                radiusScale = 0.5F;
-            } else {
-                if (pos == null) return;
-                center = new Vector3f((float) (pos.x - camera.x),
-                        (float) (pos.y - camera.y),
-                        (float) (pos.z - camera.z));
-                radiusScale = scale;
-            }
-
-            // 相机朝向的两个轴：环永远正对镜头（侧看也不会塌成一条线）
-            Vector3f view = new Vector3f(-center.x, -center.y, -center.z);
-            if (view.lengthSquared() < 1.0E-6F) return;
-            view.normalize();
-            Vector3f right = new Vector3f(0F, 1F, 0F).cross(view);
-            if (right.lengthSquared() < 1.0E-5F) right.set(1F, 0F, 0F);
-            right.normalize();
-            Vector3f up = new Vector3f(view).cross(right).normalize();
+            Vector3f center = centerOf(camera);
+            if (center == null) return;
+            Vector3f[] axes = facingAxes(center);
+            if (axes == null) return;
+            Vector3f right = axes[0];
+            Vector3f up = axes[1];
+            float radiusScale = self ? 0.5F : scale;
 
             // ① 咬合：1.30 → 0.42（× 体型），ease-out
             float squeeze = Math.min(1.0F, t / (0.30F * Math.max(1.0F, scale * 0.72F)));
@@ -479,6 +511,133 @@ public final class WorldFxBursts {
         /** 底色 + 效果色（gain 越大越"上色"）；暗色效果也留得住可见度 */
         private static int tint(int base, float gain, float c) {
             return Math.max(0, Math.min(255, Math.round(base + gain * 255.0F * c)));
+        }
+    }
+
+    /**
+     * 要害打击命中：受击者身上「血线贯穿」。
+     * <p>
+     * 与滤镜的「对焦收束」共用 {@link BodyFollowBurst}（体型缩放 + 平滑跟随），
+     * 但形态与配色完全不同：白色冲击属于「削韧」的通用语汇，要害打击用<b>红</b>，
+     * 一条收束环 + 四道从胸口撕出去的血线 + 白热芯十字，短促（0.5s）而尖锐。
+     * <p>
+     * <b>与既有削韧反馈共存</b>：抖屏走 {@code CameraShake}（相机角度），定身冲击走屏幕后处理通道，
+     * 这里只画世界空间缎带 + 粒子，三套互不占用的资源，所以同时触发不会互相顶掉。
+     */
+    public static void vitalStrike(ClientLevel level, net.minecraft.world.entity.Entity target) {
+        BURSTS.add(new VitalStrikeBurst(target));
+
+        // 红色魂尘：数量与散布半径都跟体型走（巨兽身上 0.3 格的小圈等于看不见）
+        float scale = bodyScaleOf(target.getBbWidth(), target.getBbHeight());
+        double h = target.getBbHeight();
+        double cx = target.getX();
+        double cy = target.getY() + h * 0.55;
+        double cz = target.getZ();
+        int wisps = Math.min(26, Math.round(9 * scale));
+        for (int i = 0; i < wisps; i++) {
+            double ang = Math.PI * 2.0 * i / wisps;
+            double rad = (0.28 + level.random.nextDouble() * 0.14) * scale;
+            level.addParticle(ModParticleTypes.SOUL_WISP_RED.get(),
+                    cx + Math.cos(ang) * rad,
+                    cy + (level.random.nextDouble() - 0.5) * 0.22 * scale,
+                    cz + Math.sin(ang) * rad,
+                    0.0, 0.02 + level.random.nextDouble() * 0.03, 0.0);
+        }
+    }
+
+    /** 要害打击：红色收束环 + 四道血线 + 白热芯十字。 */
+    private static final class VitalStrikeBurst extends BodyFollowBurst {
+        private static final float LIFE = 0.52F;
+
+        VitalStrikeBurst(net.minecraft.world.entity.Entity target) {
+            super(target);
+        }
+
+        @Override
+        protected float duration() {
+            return LIFE + 0.06F * Math.min(2.0F, Math.max(0.0F, bodyScale() - 1.0F));
+        }
+
+        @Override
+        public void render(Matrix4f pose, Vec3 camera, float time) {
+            float life = duration();
+            if (t >= life) return;
+            float scale = bodyScale();
+            Vector3f center = centerOf(camera);
+            if (center == null) return;
+            Vector3f[] axes = facingAxes(center);
+            if (axes == null) return;
+            Vector3f right = axes[0];
+            Vector3f up = axes[1];
+            float radiusScale = self ? 0.5F : scale;
+            // 线宽比滤镜那套更粗一档：这一下短促，必须"一眼看见"
+            float lineK = 0.85F + 0.55F * scale;
+
+            WorldFx.Params p = WorldFx.params();
+            p.time = time;
+            p.pulseSpeed = 2.4F;
+            p.pulseSharp = 0.10F;
+            p.edgeSoft = 1.3F;
+            p.coreBoost = 1.0F;
+            p.flicker = 0.15F;
+            p.grow = 1.0F;
+            p.taper = 0.0F;
+            p.alpha = 1.0F;
+
+            BufferBuilder buffer = WorldFx.begin(p);
+
+            // ① 红环收束：1.15 → 0.45（× 体型），0.26s 内咬死
+            float sq = Math.min(1.0F, t / (0.26F * Math.max(1.0F, scale * 0.6F)));
+            float sqE = 1.0F - (1.0F - sq) * (1.0F - sq);
+            float ringR = (1.15F - 0.70F * sqE) * radiusScale;
+            int ringA = Math.round(250.0F * smoothstep(0.0F, 0.04F, t)
+                    * (1.0F - smoothstep(0.20F, 0.50F, t)));
+            if (ringA > 3) {
+                WorldFx.ring(buffer, pose, center, right, up, ringR, 0.052F * lineK,
+                        255, 58, 48, ringA, 64);
+            }
+
+            // ② 四道血线：0.22s 内撕满，末端渐隐
+            float lineU = Math.min(1.0F, t / 0.22F);
+            float lineE = 1.0F - (1.0F - lineU) * (1.0F - lineU);
+            int lineA = Math.round(255.0F * (1.0F - smoothstep(0.22F, 0.52F, t)));
+            if (lineA > 3) {
+                for (int i = 0; i < 4; i++) {
+                    double ang = Math.PI * 0.25 + i * Math.PI * 0.5 + t * 0.6;
+                    float dx = (float) Math.cos(ang);
+                    float dy = (float) Math.sin(ang);
+                    float len = (0.95F + 0.28F * (i & 1)) * radiusScale * lineE;
+                    float bend = 0.10F * radiusScale * ((i & 1) == 0 ? 1.0F : -1.0F);
+                    Vector3f dir = new Vector3f(right).mul(dx).add(new Vector3f(up).mul(dy));
+                    Vector3f perp = new Vector3f(right).mul(-dy).add(new Vector3f(up).mul(dx));
+                    Vector3f[] pts = new Vector3f[]{
+                            new Vector3f(center).add(new Vector3f(dir).mul(len * 0.30F)),
+                            new Vector3f(center).add(new Vector3f(dir).mul(len * 0.68F))
+                                    .add(new Vector3f(perp).mul(bend)),
+                            new Vector3f(center).add(new Vector3f(dir).mul(len)),
+                    };
+                    WorldFx.polyline(buffer, pose, pts, null, 0.040F * lineK,
+                            255, 64, 52, lineA, new float[]{1.0F, 0.7F, 0.0F});
+                }
+            }
+
+            // ③ 白热芯十字：命中那一瞬间的"要害"闪光，最短最亮
+            int coreA = Math.round(255.0F * (1.0F - smoothstep(0.06F, 0.26F, t)));
+            if (coreA > 3) {
+                float arm = 0.34F * radiusScale;
+                WorldFx.polyline(buffer, pose, new Vector3f[]{
+                        new Vector3f(center).add(new Vector3f(right).mul(-arm)),
+                        new Vector3f(center).add(new Vector3f(right).mul(arm)),
+                }, null, 0.034F * lineK, 255, 236, 228, coreA);
+                WorldFx.polyline(buffer, pose, new Vector3f[]{
+                        new Vector3f(center).add(new Vector3f(up).mul(-arm)),
+                        new Vector3f(center).add(new Vector3f(up).mul(arm)),
+                }, null, 0.034F * lineK, 255, 236, 228, coreA);
+                WorldFx.ring(buffer, pose, center, right, up, 0.16F * radiusScale, 0.026F * lineK,
+                        255, 240, 232, coreA, 40);
+            }
+
+            WorldFx.flush(buffer);
         }
     }
 

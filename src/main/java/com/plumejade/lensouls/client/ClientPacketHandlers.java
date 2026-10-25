@@ -102,6 +102,20 @@ public class ClientPacketHandlers {
         );
     }
 
+    /**
+     * 要害打击命中：受击者身上「血线贯穿」。
+     * <p>
+     * 与既有削韧反馈（抖屏 / 通用削韧粒子）共存——这里只多画一层红色世界特效，不占屏幕通道。
+     */
+    public static void handleVitalStrikeFx(com.plumejade.lensouls.network.VitalStrikeFxPacket packet) {
+        Minecraft mc = Minecraft.getInstance();
+        Level level = mc.level;
+        if (!(level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel)) return;
+        Entity target = clientLevel.getEntity(packet.getEntityId());
+        if (!(target instanceof LivingEntity le)) return;
+        com.plumejade.lensouls.client.fx.WorldFxBursts.vitalStrike(clientLevel, le);
+    }
+
     public static void handleToughnessParticle(ToughnessParticlePacket packet) {
         Minecraft mc = Minecraft.getInstance();
         Level level = mc.level;

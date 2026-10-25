@@ -229,6 +229,13 @@ public class PacketHandler {
                 Level2StaffSpikeFxPacket::handle
         );
 
+        // ---- 要害打击命中：受击者身上「血线贯穿」S2C ----
+        registrar.playToClient(
+                VitalStrikeFxPacket.TYPE,
+                VitalStrikeFxPacket.STREAM_CODEC,
+                VitalStrikeFxPacket::handle
+        );
+
         // ---- 最上层 HUD 提示弹窗 S2C ----
         registrar.playToClient(
                 HudHintPacket.TYPE,

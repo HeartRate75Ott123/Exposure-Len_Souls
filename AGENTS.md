@@ -3586,3 +3586,20 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
 - 修法：加 `isDead()` / `prune()`（自然播完或退场播完即死），`show()` 先 `prune` 再只让
   `alphaOf > 0.01` 的旧条目退场；`isVisible()` 与 `render()` 也都先 `prune`。
   **原则：任何"淡出"都只能作用在还看得见的条目上，不能靠时间戳自己判断"它还活着"。**
+
+### 71. 要害打击命中：红色「血线贯穿」（`1.8.15`）
+
+- 新增 `network/VitalStrikeFxPacket`（S2C 只带 entityId，`sendToPlayersTrackingEntityAndSelf`），
+  由 `VitalStrikeHandler` 在 `manager.hit()` 返回非 null（命中成立）后逐目标发送。
+- 客户端 `WorldFxBursts.vitalStrike` → `VitalStrikeBurst`：红环收束（1.15→0.45，0.26s）
+  + 四道从胸口撕出并微弯的血线（末端渐隐，`polyline` 的 alphaFactors）
+  + 白热芯十字与小环（0.06~0.26s 最短最亮），全红 `#FF3A30` 系、总时长 0.52s。
+- **线宽刻意比滤镜那套更粗**：`lineK = 0.85 + 0.55·scale`，环半宽 `0.052×lineK`、血线 `0.040×lineK`、
+  芯 `0.034×lineK` —— 这一下很短，细线等于没有（用户要求"适当增粗，效果明显"）。
+- **抽出了共用基类 `BodyFollowBurst`**：体型缩放（bbox 对角 / 1.90，夹 0.55~3.4）+ 平滑跟随
+  （位置/身高/体型同一条 `1-e^{-16dt}`）+ `centerOf`/`facingAxes`（相机朝向平面）。
+  `FilterAppliedBurst` 与 `VitalStrikeBurst` 都继承它，**以后任何"贴在实体身上"的特效直接继承，别再复制这段**。
+- **与削韧反馈共存**：抖屏走 `CameraShake`（相机角度）、定身冲击走 `ScreenFxManager` 的屏幕通道、
+  通用削韧粒子走 `ToughnessParticlePacket`，红色特效只画世界空间缎带 + 红色魂尘
+  （新增 `SOUL_WISP_RED`，复用 `lensouls:soul_wisp` 贴图做逐粒子染色，不新增贴图）。
+  三套资源互不占用，所以要害打击同时削韧/破韧时不会互相顶掉。

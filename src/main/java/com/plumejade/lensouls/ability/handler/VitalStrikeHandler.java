@@ -87,6 +87,8 @@ public class VitalStrikeHandler {
             if (!manager.has(boss)) manager.register(boss);
             var data = manager.hit(boss, player);
             if (data != null) {
+                // 命中成立才播红色「血线贯穿」：与既有抖动/通用削韧粒子是两套独立资源，可共存
+                com.plumejade.lensouls.network.VitalStrikeFxPacket.send(boss);
                 int interval = BossToughnessAttributes.getInvincibleTicks(boss);
                 int playerInterval = com.plumejade.lensouls.integration.TrophyModifierHandler.applyInvincibleModifier(player, interval);
                 data.setInvincibleTicks(Math.max(1, playerInterval / 2));

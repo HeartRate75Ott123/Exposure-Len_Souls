@@ -460,10 +460,11 @@ public final class TimecoreCurse {
         if (!Float.isFinite(d) || d <= 0.0f) return;
         d = Math.min(d, MAX_SAFE_DAMAGE);
 
-        // 累计承伤类条件（e5 满血 / e10 无正面效果 / e11 低护甲）排查用：
-        // 一眼看出「是不是压根没进诅咒态、血量算不算满血、d 是多少」。
-        AttackDiag.log("⑤受击 血={}/{} d={} e5诅咒={} e5反转={} e10诅咒={} e11诅咒={} 护甲={}",
-                player.getHealth(), player.getMaxHealth(), d,
+        // 累计承伤类条件（e5 满血 / e10 低移速 / e11 低护甲）排查用：
+        // 一眼看出「是不是压根没进诅咒态、血量算不算满血、移速属性值多少、d 是多少」。
+        AttackDiag.log("⑤受击 血={}/{} 移速={} d={} e5诅咒={} e5反转={} e10诅咒={} e11诅咒={} 护甲={}",
+                player.getHealth(), player.getMaxHealth(),
+                moveSpeedOf(player), d,
                 CurseManager.on(player, D, 4), CurseManager.rev(player, D, 4),
                 CurseManager.on(player, D, 9), CurseManager.on(player, D, 10),
                 player.getArmorValue());
@@ -514,8 +515,13 @@ public final class TimecoreCurse {
             player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, true, false, false));
         }
 
-        // e10 夺佑 条件：无任何正面效果时累计承受 5000 点伤害并存活（累计跨死亡/掉线保留）
-        if (CurseManager.on(player, D, 9) && hasNoBeneficialEffect(player)) {
+        // e10 夺佑 条件：**移速属性值 <0.05** 时累计承受 5000 点伤害（死亡不清零，跨掉线保留）。
+        // 0.05 是**属性值本身**，不是百分比：原版玩家 `MOVEMENT_SPEED` 基础值就是 0.1，
+        // 所以 0.05 ≈ 总减速 ≥50%。取 `getValue()`（含全部修饰符的最终值）：
+        // 缓慢效果（每级 −15%）、e17 重负（背包每件 −0.5%）、减速铁板等都体现在这里。
+        // 旧口径「无任何正面效果」已废弃——那条既难自行控制（抗性提升被本条诅咒清掉），
+        // 文案里「并存活」又与「进度保留」自相矛盾。
+        if (CurseManager.on(player, D, 9) && moveSpeedOf(player) < 0.05) {
             CurseManager.tick(player, D, 9, countableDamage(player, d, event.getSource()), 5000L);
         }
 
@@ -527,8 +533,10 @@ public final class TimecoreCurse {
             CurseManager.tick(player, D, 10, countableDamage(player, d, event.getSource()), 2000L);
         }
 
-        // e5 盈伤 条件：在满血状态下累计承受 3000 点伤害并存活（死亡即重置计数）
-        if (CurseManager.on(player, D, 4) && player.getHealth() >= player.getMaxHealth()) {
+        // e5 盈伤 条件：**本次生命内每一次**「满血时挨打」都往 3000 里累加，而不是「一条命只记一次」。
+        // 判定点是「这一击落下时是否满血」：满血被打到残血 → 靠食物/药水/治疗回满 → 再挨打，
+        // 会继续累计（死亡才清零，见 onDeath）。这正是「40 血被打到剩 1 → 回满 → 再被打」应叠加的口径。
+        if (CurseManager.on(player, D, 4) && atFullHealth(player)) {
             long delta = countableDamage(player, d, event.getSource());
             long now2 = CurseManager.tick(player, D, 4, delta, 3000L);
             AttackDiag.log("⑤e5 满血承伤 +{} → 累计 {}", delta, now2);
@@ -650,7 +658,8 @@ public final class TimecoreCurse {
     @SubscribeEvent
     public static void onDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        // e13 余悸 / e5 盈伤 / e8 止息：文案都写了「并存活」⇒ 死亡即重置计数
+        // e13 余悸 / e8 止息：文案都写了「并存活」⇒ 死亡即重置计数
+        // e5 盈伤：文案已写明「死亡清零」⇒ 同样重置（**跨掉线保留**：CurseStateData 走玩家附件，见类尾注释）
         CurseManager.resetProgress(player, D, 12);
         CurseManager.resetProgress(player, D, 4);
         CurseManager.resetProgress(player, D, 7);
@@ -1026,12 +1035,18 @@ public final class TimecoreCurse {
         }
     }
 
-    /** e10 条件用：当前没有任何**正面**效果（文案是「无任何正面效果」，不是「无任何效果」） */
-    private static boolean hasNoBeneficialEffect(ServerPlayer player) {
-        for (MobEffectInstance inst : player.getActiveEffects()) {
-            if (inst.getEffect().value().isBeneficial()) return false;
-        }
-        return true;
+    /** e5 条件用：是否处于满血。带 1e-3 容差——血量是 float，属性变动/治疗溢出后可能差一个 ulp，直接 {@code >=} 会漏记 */
+    private static boolean atFullHealth(ServerPlayer player) {
+        return player.getHealth() >= player.getMaxHealth() - 1.0e-3f;
+    }
+
+    /**
+     * e10 条件用：移速**属性值**（含全部修饰符的最终值，原版玩家基础值 0.1）。
+     * 属性缺失（理论上不会）时回退到 0.1，保证不会误判成「已减速」。
+     */
+    private static double moveSpeedOf(ServerPlayer player) {
+        var attr = player.getAttribute(Attributes.MOVEMENT_SPEED);
+        return attr == null ? 0.1 : attr.getValue();
     }
 
     /** 清掉该玩家的所有瞬时计时（退出世界 / 死亡时调用） */

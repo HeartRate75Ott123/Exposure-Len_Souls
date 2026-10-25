@@ -130,4 +130,28 @@ public class SoulWispParticle extends TextureSheetParticle {
             return particle;
         }
     }
+
+    /**
+     * 红色魂尘（要害打击命中，从受击者身上爆出）。
+     * <p>
+     * 与银白同一套运动，只换配色：血红偏橙（{@code #FF3B30} 一族），亮部略带白热感。
+     * 复用 {@code lensouls:soul_wisp} 贴图（柔光点）+ 逐粒子染色，不新增贴图资源。
+     */
+    public static class RedProvider implements ParticleProvider<SimpleParticleType> {
+        private final SpriteSet sprites;
+
+        public RedProvider(SpriteSet sprites) {
+            this.sprites = sprites;
+        }
+
+        @Override
+        public Particle createParticle(SimpleParticleType type, ClientLevel level,
+                                       double x, double y, double z,
+                                       double xSpeed, double ySpeed, double zSpeed) {
+            SoulWispParticle particle = new SoulWispParticle(level, x, y, z, xSpeed, ySpeed, zSpeed, sprites);
+            float hot = level.random.nextFloat();
+            particle.setColor(1.0f, 0.20f + hot * 0.22f, 0.16f + hot * 0.10f);
+            return particle;
+        }
+    }
 }

@@ -366,6 +366,9 @@ public class LenSoulsClient {
         // N公司2级员工拍照：银白魂尘
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.SOUL_WISP_WHITE.get(),
                 com.plumejade.lensouls.client.particle.SoulWispParticle.WhiteProvider::new);
+        // 要害打击：红色魂尘
+        event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.SOUL_WISP_RED.get(),
+                com.plumejade.lensouls.client.particle.SoulWispParticle.RedProvider::new);
 
         // 韧性粒子
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.TOUGHNESS_HIT.get(),

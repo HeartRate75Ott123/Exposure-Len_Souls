@@ -29,6 +29,10 @@ public class ToughnessPhotoHandler {
             net.minecraft.server.level.ServerPlayer hitter = holder instanceof net.minecraft.server.level.ServerPlayer p ? p : null;
             BossToughnessManager manager = BossToughnessManager.getInstance();
             boolean playedSound = false;
+            // 失败反馈聚合（与要害打击同一口径）：任一目标真的削到韧性 ⇒ 不弹故障叉号；
+            // 一只都没削到、但至少有一只被**白霸体**挡下 ⇒ 弹一次。
+            boolean anyDealt = false;
+            boolean blockedByHyperArmor = false;
 
             // ① 荒厄·封器 反转：被拍摄的敌对生物受到「韧性伤害 × 玩家当前近战伤害」的伤害
             boolean photoDamage = hitter != null
@@ -74,20 +78,47 @@ public class ToughnessPhotoHandler {
                 if (!inManager) continue;
 
                 int bossTier = BossTierLoader.getTier(entity);
-                if (bossTier < 1) { manager.hit(entity, hitter); continue; }
-                if (lensTier >= bossTier) { manager.hit(entity, hitter); continue; }
+                boolean hyperArmor = wasHyperArmor(manager, entity);
+                if (bossTier < 1 || lensTier >= bossTier) {
+                    var r = manager.hitEx(entity, hitter);
+                    if (r.dealt()) anyDealt = true;
+                    else if (hyperArmor) blockedByHyperArmor = true;
+                    continue;
+                }
                 if (!playedSound) failSound(entity, holder);
                 playedSound = true;
+            }
+
+            // 白霸体期间"试图造成韧性伤害"都该闪一次故障叉号（拍照这条路径也要），
+            // 但同一张照片里只要有一只真的削到了就不闪；那几个例外能力保持静默。
+            if (!anyDealt && blockedByHyperArmor && hitter != null
+                    && !ToughnessFailureGate.silenceFailure(hitter)) {
+                com.plumejade.lensouls.network.VitalStrikeRejectPacket.send(hitter);
             }
         } catch (Exception e) {
             LenSouls.LOGGER.error("[ToughnessPhoto] fail", e);
         }
     }
 
+    /**
+     * 削韧前是否处于「白霸体」。
+     * <p>
+     * 必须在 {@code hitEx} <b>之前</b>调用：命中会把新的无敌窗口写进去，事后问不出来；
+     * 而破韧（定身）后 {@code tick()} 不再递减无敌计时，{@code isInvincible()} 会残留 true，
+     * 所以还要求 {@code !isBroken()} —— 否则定身时拍照也会被当成白霸体挡下（已踩过）。
+     */
+    private static boolean wasHyperArmor(BossToughnessManager manager, LivingEntity entity) {
+        var data = manager.get(entity);
+        return data != null && data.isInvincible() && !data.isBroken();
+    }
+
     private static void failSound(LivingEntity entity, Entity holder) {
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntity(entity,
                 new ToughnessHitSoundPacket(entity.getId(), true));
         if (holder instanceof net.minecraft.server.level.ServerPlayer player) {
+            // 能力窃取 / 弱点透镜 / 空间扭曲 / 时空回溯：照片是"拍内容"，不是尝试削韧，不提示
+            // （规则见 ToughnessFailureGate）
+            if (ToughnessFailureGate.silenceFailure(player)) return;
             // 走最上层弹窗通道：动作栏那条会被取景框压住、取景器开着时甚至完全不画
             com.plumejade.lensouls.network.HudHintPacket.send(player,
                     net.minecraft.network.chat.Component.translatable("message.lensouls.lens_tier_insufficient",

@@ -67,6 +67,11 @@ public class VitalStrikeHandler {
         // ── 逐个削韧（视锥内全部 BOSS 均生效） ──
         BossToughnessManager manager = BossToughnessManager.getInstance();
         boolean tierFailedShown = false;
+        /** 视锥内是否至少有一只"真的被削到韧性" —— 有就不该再弹失败叉号 */
+        boolean anyDealt = false;
+        /** 是否有目标是被白霸体挡下的（定身中不算） */
+        boolean blockedByHyperArmor = false;
+
         for (LivingEntity boss : bosses) {
             // ── 镜头等级检测 ──
             int bossTier = BossTierLoader.getTier(boss);
@@ -87,28 +92,35 @@ public class VitalStrikeHandler {
             if (!manager.has(boss)) manager.register(boss);
             // 先取削韧前的状态：命中后无敌窗口会被写进去，事后问不出来"当时是不是白霸体"
             var before = manager.get(boss);
-            boolean wasInvincible = before != null && before.isInvincible();
+            // 定身中必须先判 broken：`BossToughnessData.tick()` 在 broken 后不再递减无敌计时，
+            // 于是 isInvincible() 会残留 true —— 直接拿它判断会把"定身时拍摄"误当成白霸体挡下
+            // （用户实测：定身期间按快门也会闪过故障叉号）。
+            boolean wasBroken = before != null && before.isBroken();
+            boolean wasInvincible = before != null && before.isInvincible() && !wasBroken;
 
             var result = manager.hitEx(boss, player);
-            if (result.data() != null) {
-                // 红色「血线贯穿」只在**真的削到韧性**时播：白霸体（无敌窗口）、定身中、同 tick 去重
-                // 都会被 hitEx 判成 dealt=false —— 那几种情况本来就不算"造成韧性伤害"。
-                if (result.dealt()) {
-                    com.plumejade.lensouls.network.VitalStrikeFxPacket.send(boss);
-                    // "这次白霸体时长缩短 50%" 只对**真的打进去的**那一下生效。
-                    // 原来这段在 dealt/没 dealt 之外无条件执行，于是白霸体期间右键虽然削不动，
-                    // 却会把剩余无敌时长重新写成长度的一半 —— 表现为"miss 反而刷新了白霸体"（已修）。
-                    int interval = BossToughnessAttributes.getInvincibleTicks(boss);
-                    int playerInterval = com.plumejade.lensouls.integration.TrophyModifierHandler
-                            .applyInvincibleModifier(player, interval);
-                    result.data().setInvincibleTicks(Math.max(1, playerInterval / 2));
-                } else if (wasInvincible) {
-                    // 白霸体挡下：只发一句最上层弹窗（不播粒子、不碰无敌时长）。
-                    // 定身中 / 倍率被扣成 0 这两种情况完全静默——要么玩家自己看得见，要么太罕见。
-                    com.plumejade.lensouls.network.VitalStrikeRejectPacket.send(player, boss,
-                            com.plumejade.lensouls.network.VitalStrikeRejectPacket.REASON_INVINCIBLE);
-                }
+            if (result.data() == null) continue;
+            if (result.dealt()) {
+                anyDealt = true;
+                com.plumejade.lensouls.network.VitalStrikeFxPacket.send(boss);
+                // "这次白霸体时长缩短 50%" 只对**真的打进去的**那一下生效。
+                // 原来这段在 dealt/没 dealt 之外无条件执行，于是白霸体期间右键虽然削不动，
+                // 却会把剩余无敌时长重新写成长度的一半 —— 表现为"miss 反而刷新了白霸体"（已修）。
+                int interval = BossToughnessAttributes.getInvincibleTicks(boss);
+                int playerInterval = com.plumejade.lensouls.integration.TrophyModifierHandler
+                        .applyInvincibleModifier(player, interval);
+                result.data().setInvincibleTicks(Math.max(1, playerInterval / 2));
+            } else if (wasInvincible) {
+                blockedByHyperArmor = true;
             }
+        }
+
+        // 失败反馈聚合：视锥内只要有一只成功削到韧性就不弹；没有目标（前面已 return）或
+        // 全部是定身/倍率0 这类"无需解释"的情况也不弹。
+        // 另外按规则，选中能力窃取/弱点透镜/空间扭曲/时空回溯时韧性失败一律静默（ToughnessFailureGate）。
+        if (!anyDealt && blockedByHyperArmor
+                && !com.plumejade.lensouls.boss.ToughnessFailureGate.silenceFailure(player)) {
+            com.plumejade.lensouls.network.VitalStrikeRejectPacket.send(player);
         }
     }
 

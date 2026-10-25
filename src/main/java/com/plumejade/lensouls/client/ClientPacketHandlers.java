@@ -103,6 +103,17 @@ public class ClientPacketHandlers {
     }
 
     /**
+     * 要害打击没削到韧性（白霸体）：整屏故障叉号，压在最上层。
+     * <p>
+     * 按用户定稿："只用叠加叉号部分" —— 不压暗、不加文字、不带任何底层，只把一支巨大的故障 ×
+     * 叠在取景框之上（见 {@link com.plumejade.lensouls.client.hud.VitalDenyOverlay}）。
+     * 定身中 / 倍率被扣成 0 的情况服务端根本不发包，所以这里不需要再分支。
+     */
+    public static void handleVitalStrikeReject(com.plumejade.lensouls.network.VitalStrikeRejectPacket packet) {
+        com.plumejade.lensouls.client.hud.VitalDenyOverlay.show();
+    }
+
+    /**
      * 要害打击命中：受击者身上「血线贯穿」。
      * <p>
      * 与既有削韧反馈（抖屏 / 通用削韧粒子）共存——这里只多画一层红色世界特效，不占屏幕通道。

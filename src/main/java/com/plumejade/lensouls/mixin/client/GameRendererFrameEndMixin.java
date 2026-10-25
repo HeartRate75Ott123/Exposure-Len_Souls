@@ -42,6 +42,8 @@ public class GameRendererFrameEndMixin {
             require = 1)
     private void lensouls$hudTopOverlay(DeltaTracker deltaTracker, boolean renderLevel, CallbackInfo ci) {
         com.plumejade.lensouls.client.hud.ViewfinderOverlay.render();
+        // 要害打击白霸体失败的故障叉号：同一注入点，但它是独立叠加层，不依赖取景器状态
+        com.plumejade.lensouls.client.hud.VitalDenyOverlay.render();
     }
 
     /**

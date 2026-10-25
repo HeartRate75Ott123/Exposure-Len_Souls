@@ -235,6 +235,12 @@ public class PacketHandler {
                 VitalStrikeFxPacket.STREAM_CODEC,
                 VitalStrikeFxPacket::handle
         );
+        // ---- 要害打击没削到韧性：miss 粒子 + 原因 S2C ----
+        registrar.playToClient(
+                VitalStrikeRejectPacket.TYPE,
+                VitalStrikeRejectPacket.STREAM_CODEC,
+                VitalStrikeRejectPacket::handle
+        );
 
         // ---- 最上层 HUD 提示弹窗 S2C ----
         registrar.playToClient(

@@ -93,22 +93,37 @@ public class BossToughnessManager {
 
     // ========== 削韧 ==========
 
+    /**
+     * 一次削韧结算的结果：{@code data} 是实体当前的韧性数据，{@code dealt} 才是
+     * 「这一次<b>真的</b>削到韧性了」——被白霸体、定身中、同 tick 去重拦下时都是 {@code false}。
+     * <p>
+     * 为什么不能只判 {@code data != null}：上面这几种被拦下的情况 {@code data} 同样非 null，
+     * 用它会误判成"命中了"（要害打击的红色特效就吃过这个亏——白霸体里按快门也炸一片红）。
+     */
+    public record HitResult(BossToughnessData data, boolean dealt) {
+    }
+
     /** 拍照/要害打击时调用，削 1 次韧性，返回削韧后的数据 */
     public BossToughnessData hit(LivingEntity entity) {
         return hit(entity, null);
     }
 
     public BossToughnessData hit(LivingEntity entity, @javax.annotation.Nullable net.minecraft.server.level.ServerPlayer player) {
-        if (entity == null || entity.level() == null) return null;
+        return hitEx(entity, player).data();
+    }
+
+    /** 同 {@link #hit(LivingEntity, net.minecraft.server.level.ServerPlayer)}，但额外告诉你这一下有没有真削到 */
+    public HitResult hitEx(LivingEntity entity, @javax.annotation.Nullable net.minecraft.server.level.ServerPlayer player) {
+        if (entity == null || entity.level() == null) return new HitResult(null, false);
         BossToughnessData data = dataMap.get(entity.getUUID());
-        if (data == null) return null;
+        if (data == null) return new HitResult(null, false);
 
         // 高频触发保护：同一实体同一 tick 只结算一次（防弹幕连击期间重复广播/重复累加）
         long now = entity.level().getGameTime();
         Long lastTick = lastHitTick.put(entity.getUUID(), now);
-        if (lastTick != null && lastTick == now) return data;
+        if (lastTick != null && lastTick == now) return new HitResult(data, false);
 
-        if (data.isBroken()) return data;
+        if (data.isBroken()) return new HitResult(data, false);
 
         boolean wasInvincible = data.isInvincible();
         int invTicks = BossToughnessAttributes.getInvincibleTicks(entity);
@@ -122,8 +137,14 @@ public class BossToughnessManager {
             // ① e2 反转的「韧性伤害 -2」是点数加算（§2③）：夹到 ≥0，避免削韧进度倒退
             hitMultiplier = Math.max(0f, hitMultiplier);
         }
+        int hitsBefore = data.getCurrentHits();
+        boolean wasBroken = data.isBroken();
         boolean actuallyHit = data.hit(invTicks, hitMultiplier);
         boolean isBroken = data.isBroken();
+        // "真的削到了"：hit() 放行还不够——倍率被夹成 0 时 hit() 也返回 true 却不推进任何进度，
+        // 那种情况不能算造成韧性伤害（否则要害打击的红色特效会在白霸体里空炸）
+        boolean dealt = actuallyHit
+                && (data.getCurrentHits() > hitsBefore || (!wasBroken && isBroken));
 
         if (!entity.level().isClientSide) {
             if (actuallyHit) {
@@ -148,7 +169,7 @@ public class BossToughnessManager {
             onToughnessBroken(entity, data, player);
         }
         broadcastToughness(entity);
-        return data;
+        return new HitResult(data, dealt);
     }
 
     // ========== 破防处理 ==========

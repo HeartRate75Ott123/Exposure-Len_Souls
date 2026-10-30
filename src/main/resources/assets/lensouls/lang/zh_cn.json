@@ -659,9 +659,9 @@
   "item.lensouls.feather_finalrite.e3.cond": "击杀焰魔",
   "item.lensouls.feather_finalrite.e3.after": "§a改为全伤害 +10%（原 -10%）",
   "item.lensouls.feather_finalrite.e4.name": "秘仪·力竭",
-  "item.lensouls.feather_finalrite.e4.curse": "§c造成伤害时消耗精力值；精力值低于 10% 时，造成伤害 -30%",
-  "item.lensouls.feather_finalrite.e4.cond": "在精力值低于 50% 时，一次造成 5000 点伤害",
-  "item.lensouls.feather_finalrite.e4.after": "§a精力值高于 50% 时，造成伤害 +15%；精力值低于 10% 不再损失伤害",
+  "item.lensouls.feather_finalrite.e4.curse": "§c造成伤害时消耗精力值；精力值 <10% 时，造成伤害 -30%",
+  "item.lensouls.feather_finalrite.e4.cond": "在精力值 <50% 时，单次造成 5000 点伤害",
+  "item.lensouls.feather_finalrite.e4.after": "§a精力值 >50% 时，造成伤害 +15%；精力值 <10% 时不再损失伤害",
   "item.lensouls.feather_finalrite.e5.name": "秘仪·篡命",
   "item.lensouls.feather_finalrite.e5.curse": "§c每装备一件护甲，最大生命上限 ×90%",
   "item.lensouls.feather_finalrite.e5.cond": "击杀斯库拉",
@@ -684,7 +684,7 @@
   "item.lensouls.feather_zeroforge.e1.after": "§a不再吞噬复制之魂；无魂时不再有负面效果",
   "item.lensouls.feather_zeroforge.e2.name": "誓约·反噬",
   "item.lensouls.feather_zeroforge.e2.curse": "§c击杀生物时自身受到 1 点绝对真伤（不吃减伤/护盾/无敌帧），冷却 5 秒",
-  "item.lensouls.feather_zeroforge.e2.cond": "血量低于 20% 时击杀 200 只生物",
+  "item.lensouls.feather_zeroforge.e2.cond": "血量 <20% 时击杀 200 只生物",
   "item.lensouls.feather_zeroforge.e2.after": "§a击杀生物时不再受到伤害，改为回复 2 点生命",
   "item.lensouls.feather_zeroforge.e3.name": "誓约·锈契",
   "item.lensouls.feather_zeroforge.e3.curse": "§c攻击 15% 概率丢失 + 掉落物数量 -1",
@@ -843,5 +843,5 @@
   "item.lensouls.feather_timecore.e15.merged": "§a时运 +2、抢夺 +2；§aBOSS 掉落的复制之魂数量 +50%",
   "item.lensouls.feather_finalrite.e1.merged": "§a受到治疗 +50%",
   "item.lensouls.feather_finalrite.e3.merged": "§a全伤害 +10%",
-  "item.lensouls.feather_finalrite.e4.merged": "§c造成伤害仍消耗精力值；§a精力值低于 10% 不再损失伤害；§a精力值高于 50% 时，造成伤害 +15%"
+  "item.lensouls.feather_finalrite.e4.merged": "§c造成伤害仍消耗精力值；§a精力值 <10% 时不再损失伤害；§a精力值 >50% 时，造成伤害 +15%"
 }

@@ -561,9 +561,9 @@
   "item.lensouls.feather_finalrite.e3.cond": "Kill Ignis",
   "item.lensouls.feather_finalrite.e3.after": "§aAll damage +10% (was -10%)",
   "item.lensouls.feather_finalrite.e4.name": "Rite·Exhaustion",
-  "item.lensouls.feather_finalrite.e4.curse": "§cDealing damage drains stamina; below 10% stamina, damage dealt -30%",
+  "item.lensouls.feather_finalrite.e4.curse": "§cDealing damage drains stamina; while stamina is below 10%, damage dealt -30%",
   "item.lensouls.feather_finalrite.e4.cond": "Deal 5,000 damage in a single hit while stamina is below 50%",
-  "item.lensouls.feather_finalrite.e4.after": "§a+15% damage dealt while stamina is above 50%; no more -30% loss below 10%",
+  "item.lensouls.feather_finalrite.e4.after": "§a+15% damage dealt while stamina is above 50%; no more -30% loss while below 10%",
   "item.lensouls.feather_finalrite.e5.name": "Rite·Usurped Life",
   "item.lensouls.feather_finalrite.e5.curse": "§cEach piece of armor equipped reduces max health ×90%",
   "item.lensouls.feather_finalrite.e5.cond": "Kill Scylla",
@@ -586,7 +586,7 @@
   "item.lensouls.feather_zeroforge.e1.after": "§aNo longer devours Copy Souls; no penalty when you have none",
   "item.lensouls.feather_zeroforge.e2.name": "Oath·Backlash",
   "item.lensouls.feather_zeroforge.e2.curse": "§cKilling a creature deals 1 absolute true damage to you (ignores reduction/shields/i-frames), 5s cooldown",
-  "item.lensouls.feather_zeroforge.e2.cond": "Kill 200 creatures below 20% HP",
+  "item.lensouls.feather_zeroforge.e2.cond": "Kill 200 creatures while health is below 20%",
   "item.lensouls.feather_zeroforge.e2.after": "§aNo longer hurt on kill; heals 2 HP instead",
   "item.lensouls.feather_zeroforge.e3.name": "Oath·Rusted Pact",
   "item.lensouls.feather_zeroforge.e3.curse": "§c15% chance to miss attacks; dropped item count -1",
@@ -843,5 +843,5 @@
   "item.lensouls.feather_timecore.e15.merged": "§aFortune +2, Looting +2; §a+50% copy souls from bosses",
   "item.lensouls.feather_finalrite.e1.merged": "§aHealing received +50%",
   "item.lensouls.feather_finalrite.e3.merged": "§aAll damage +10%",
-  "item.lensouls.feather_finalrite.e4.merged": "§cDealing damage still drains stamina; §ano damage loss below 10% stamina; §a+15% damage dealt above 50% stamina"
+  "item.lensouls.feather_finalrite.e4.merged": "§cDealing damage still drains stamina; §ano damage loss while below 10% stamina; §a+15% damage dealt while above 50%"
 }

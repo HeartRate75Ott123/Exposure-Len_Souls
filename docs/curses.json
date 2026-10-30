@@ -1280,8 +1280,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:187 on",
-            "handler/curse/FinalriteCurse.java:208 rev"
+            "handler/curse/FinalriteCurse.java:191 on",
+            "handler/curse/FinalriteCurse.java:212 rev"
           ]
         },
         {
@@ -1304,8 +1304,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:197 on",
-            "handler/curse/FinalriteCurse.java:214 rev"
+            "handler/curse/FinalriteCurse.java:201 on",
+            "handler/curse/FinalriteCurse.java:218 rev"
           ]
         },
         {
@@ -1329,24 +1329,24 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:299 on",
-            "handler/curse/FinalriteCurse.java:316 rev"
+            "handler/curse/FinalriteCurse.java:312 on",
+            "handler/curse/FinalriteCurse.java:331 rev"
           ]
         },
         {
           "n": 4,
           "maskBit": 46,
           "name": "秘仪·力竭",
-          "curse": "§c造成伤害时消耗精力值；精力值低于 10% 时，造成伤害 -30%",
-          "cond": "在精力值低于 50% 时，一次造成 5000 点伤害",
-          "after": "§a精力值高于 50% 时，造成伤害 +15%；精力值低于 10% 不再损失伤害",
-          "merged": "§c造成伤害仍消耗精力值；§a精力值低于 10% 不再损失伤害；§a精力值高于 50% 时，造成伤害 +15%",
+          "curse": "§c造成伤害时消耗精力值；精力值 <10% 时，造成伤害 -30%",
+          "cond": "在精力值 <50% 时，单次造成 5000 点伤害",
+          "after": "§a精力值 >50% 时，造成伤害 +15%；精力值 <10% 时不再损失伤害",
+          "merged": "§c造成伤害仍消耗精力值；§a精力值 <10% 时不再损失伤害；§a精力值 >50% 时，造成伤害 +15%",
           "en": {
             "name": "Rite·Exhaustion",
-            "curse": "§cDealing damage drains stamina; below 10% stamina, damage dealt -30%",
+            "curse": "§cDealing damage drains stamina; while stamina is below 10%, damage dealt -30%",
             "cond": "Deal 5,000 damage in a single hit while stamina is below 50%",
-            "after": "§a+15% damage dealt while stamina is above 50%; no more -30% loss below 10%",
-            "merged": "§cDealing damage still drains stamina; §ano damage loss below 10% stamina; §a+15% damage dealt above 50% stamina"
+            "after": "§a+15% damage dealt while stamina is above 50%; no more -30% loss while below 10%",
+            "merged": "§cDealing damage still drains stamina; §ano damage loss while below 10% stamina; §a+15% damage dealt while above 50%"
           },
           "target": {
             "goal": 1,
@@ -1354,10 +1354,10 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:305 on",
-            "handler/curse/FinalriteCurse.java:320 rev",
-            "handler/curse/FinalriteCurse.java:347 on",
-            "handler/curse/FinalriteCurse.java:351 tick"
+            "handler/curse/FinalriteCurse.java:319 on",
+            "handler/curse/FinalriteCurse.java:335 rev",
+            "handler/curse/FinalriteCurse.java:382 on",
+            "handler/curse/FinalriteCurse.java:386 tick"
           ]
         },
         {
@@ -1380,7 +1380,7 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:144 on"
+            "handler/curse/FinalriteCurse.java:148 on"
           ]
         },
         {
@@ -1403,8 +1403,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:245 on",
-            "handler/curse/FinalriteCurse.java:251 rev"
+            "handler/curse/FinalriteCurse.java:249 on",
+            "handler/curse/FinalriteCurse.java:255 rev"
           ]
         },
         {
@@ -1427,8 +1427,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:239 rev",
-            "handler/curse/FinalriteCurse.java:275 on"
+            "handler/curse/FinalriteCurse.java:243 rev",
+            "handler/curse/FinalriteCurse.java:279 on"
           ]
         }
       ],
@@ -1437,7 +1437,7 @@
       "noReverse": null,
       "extraLang": {},
       "loopRefs": [
-        "handler/curse/FinalriteCurse.java:383 tick(entry)"
+        "handler/curse/FinalriteCurse.java:418 tick(entry)"
       ]
     },
     {
@@ -1482,13 +1482,13 @@
           "maskBit": 51,
           "name": "誓约·反噬",
           "curse": "§c击杀生物时自身受到 1 点绝对真伤（不吃减伤/护盾/无敌帧），冷却 5 秒",
-          "cond": "血量低于 20% 时击杀 200 只生物",
+          "cond": "血量 <20% 时击杀 200 只生物",
           "after": "§a击杀生物时不再受到伤害，改为回复 2 点生命",
           "merged": null,
           "en": {
             "name": "Oath·Backlash",
             "curse": "§cKilling a creature deals 1 absolute true damage to you (ignores reduction/shields/i-frames), 5s cooldown",
-            "cond": "Kill 200 creatures below 20% HP",
+            "cond": "Kill 200 creatures while health is below 20%",
             "after": "§aNo longer hurt on kill; heals 2 HP instead"
           },
           "target": {

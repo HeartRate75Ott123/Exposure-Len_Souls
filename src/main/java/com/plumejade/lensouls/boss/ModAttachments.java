@@ -26,11 +26,12 @@ public class ModAttachments {
                     () -> AttachmentType.serializable(() -> new BossToughnessData(1)).build());
 
     /**
-     * 浓雾的治愈回血时钟（见 {@link com.plumejade.lensouls.effect.BossHealEffect}）。
+     * 浓雾的治愈的「在场 tick 累计器」（见 {@link BossHealTimer}）。
      * <p>
-     * 以<b>实体绝对时间戳</b>记录「下一次可回血的 tick」，与效果实例的 duration 完全解耦，
-     * 刷新 buff（重设 duration）不会重置计时；非序列化（默认值 0 = 立即可回血，
-     * 但效果首次生效时会自行写入基准），无需同步、随实体一并销毁。
+     * 与效果实例的 {@code duration} 完全解耦：刷新 buff（重设 duration）不会重置累计进度，
+     * 换维度/关卡时钟也不影响节奏。<b>非序列化</b>是刻意的——区块卸载/重载后实体附件重建，
+     * 等效于「断档」⇒ 重新等满 1 秒再回第一跳，不做断档补偿，因此不会出现「重载即暴血」。
+     * 无需同步；随实体一并销毁。
      */
     public static final Supplier<AttachmentType<BossHealTimer>> BOSS_HEAL_TIMER =
             ATTACHMENT_TYPES.register("boss_heal_timer",

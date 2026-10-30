@@ -81,7 +81,7 @@ public final class CurseGoals {
 
         // ==================== ④ 折翼沉渊（偏移 8，12 条） ====================
         // e1「虚无的承诺」无反转条件（CurseDefs.ABYSS noReverse）→ 留空。
-        // e2 神秘雪球：FeatherAbyssHandler:740  tick(..., E2_SNOWBALL, 1L, E2_HIT_GOAL[191]=100)
+        // e2 神秘雪球：FeatherAbyssHandler:795  tick(..., E2_SNOWBALL, 1L, E2_HIT_GOAL[191]=100)
         put(CurseDefs.ABYSS, 1, 100L, TIMES);
         // e3 安魂曲 / e4 愚钝 / e5 自闭：条件由 reach（:356 / :764 / :866）直判，无进度计数 → 留空。
         // e6 厄运：FeatherAbyssHandler:893  tick(..., E6_DOOM, 1L, E6_BLOCK_GOAL[203]=200)
@@ -110,8 +110,8 @@ public final class CurseGoals {
         put(CurseDefs.TIMECORE, 13, 50L, KINDS);     // e14 裁影  :881 setProgress(n)，目标 STOLEN_KIND_GOAL[785]=50 种
         put(CurseDefs.TIMECORE, 14, 500L, KILLS);    // e15 厄运  :629 击杀 500 只
         put(CurseDefs.TIMECORE, 15, 200L, TIMES);    // e16 释刃  :543 主手脱手 200 次
-        put(CurseDefs.TIMECORE, 16, 3000L, CELLS);   // e17 重负  :178 累计移动 3000 格
-        put(CurseDefs.TIMECORE, 17, 10000L, CELLS);  // e18 滞步  :184 缓慢下走地 10000 格
+        put(CurseDefs.TIMECORE, 16, 3000L, CELLS);   // e17 重负  :217 移速属性值 ≤0.02 时累计移动 3000 格（真格累加）
+        put(CurseDefs.TIMECORE, 17, 10000L, CELLS);  // e18 滞步  :221 缓慢下走地 10000 格（真格累加）
         put(CurseDefs.TIMECORE, 18, 50L, KILLS);     // e19 障目  :633 失明下击杀 50 只
         put(CurseDefs.TIMECORE, 19, 1000L, POINTS);  // e20 垂翅  :550 飞行中造成 1000 点
         put(CurseDefs.TIMECORE, 20, 10L, TIMES);     // e21 无援  :673 生命 ≤2 时拍立得拍 10 张
@@ -130,7 +130,7 @@ public final class CurseGoals {
         put(CurseDefs.ZEROFORGE, 1, 200L, KILLS);    // e2 反噬   :1305 低血量击杀 200 只，LOW_KILL_GOAL[108]
         put(CurseDefs.ZEROFORGE, 2, 100L, TIMES);    // e3 锈契   :472 累计丢失 100 次，MISS_GOAL[113]
         put(CurseDefs.ZEROFORGE, 3, 1L, KILLS);      // e4 断供   :1313 击杀远古遗魂
-        put(CurseDefs.ZEROFORGE, 4, 1L, KILLS);      // e5 封库   :1316 击杀炼狱飞龙
+        put(CurseDefs.ZEROFORGE, 4, 1L, KILLS);      // e5 封库   :1316 击杀娜迦（twilightforest:naga）
         put(CurseDefs.ZEROFORGE, 5, 50L, TIMES);     // e6 叛主   :725 承受敌对雪球 50 次，SNOWBALL_HIT_GOAL[129]
         put(CurseDefs.ZEROFORGE, 6, 200L, KILLS);    // e7 易手   :1321 Y <0 处击杀 200 只，LOW_Y_KILL_GOAL[142]
         put(CurseDefs.ZEROFORGE, 7, 1L, TIMES);      // e8 神愤   :868 四种活性药水 ≥10 级（达成一次）

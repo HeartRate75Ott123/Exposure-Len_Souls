@@ -137,11 +137,11 @@ public final class FinalriteCurse {
             }
         }
 
-        // e4 枯井：周围 4 格没有掉落物 → 持续扣血，每 5 秒 1 点
+        // e4 枯井：周围 32 格没有掉落物 → 持续扣血，每 5 秒 1 点
         if (CurseManager.on(player, D, 3)
                 && !player.isCreative() && !player.isSpectator()
                 && now % DRAIN_INTERVAL_TICKS == 0L
-                && nearbyDrops(player) == 0) {
+                && nearbyDrops(player, CURSE_DRAIN_RADIUS) == 0) {
             // 与 ④ 自闭同口径：先清无敌帧，保证这 1 点必中，不被上一次受击吞掉
             ((EntityInvulnerableTimeAccessor) (Object) player).lensouls$setInvulnerableTime(0);
             player.hurt(player.damageSources().magic(), 1.0f);
@@ -165,9 +165,15 @@ public final class FinalriteCurse {
         return n;
     }
 
-    /** 玩家周围 4 格内的掉落物数量 */
-    private static int nearbyDrops(ServerPlayer player) {
-        AABB box = player.getBoundingBox().inflate(NEARBY_RADIUS);
+    /**
+     * 玩家周围 {@code radius} 格内的掉落物数量（AABB，含上下）。
+     * <p>
+     * 两个口径**必须分别传常量**：诅咒态 {@link #CURSE_DRAIN_RADIUS}（32），
+     * 反转态 {@link #NEARBY_RADIUS}（4）。这里不接受「默认半径」，
+     * 免得再出现「只改了诅咒态文案、代码还在按 4 格判定」。
+     */
+    private static int nearbyDrops(ServerPlayer player, double radius) {
+        AABB box = player.getBoundingBox().inflate(radius);
         return player.level().getEntitiesOfClass(ItemEntity.class, box).size();
     }
 
@@ -305,7 +311,7 @@ public final class FinalriteCurse {
             }
             // e4 枯井 反转：周围 4 格内每有 1 个掉落物，造成伤害 +1%（上限 +20%）
             if (CurseManager.rev(player, D, 3)) {
-                bonus += 0.01f * Math.min(DROP_BONUS_CAP, nearbyDrops(player));
+                bonus += 0.01f * Math.min(DROP_BONUS_CAP, nearbyDrops(player, NEARBY_RADIUS));
             }
             if (bonus != 0.0f) {
                 d *= 1.0f + bonus;

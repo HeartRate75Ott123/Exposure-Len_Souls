@@ -524,7 +524,7 @@
   "item.lensouls.feather_timecore.e16.after": "§a造成伤害时不再有概率丢出武器",
   "item.lensouls.feather_timecore.e17.name": "铁序·重负",
   "item.lensouls.feather_timecore.e17.curse": "§c背包每有 1 个物品，移动速度 -0.5%（上限 -70%）",
-  "item.lensouls.feather_timecore.e17.cond": "在移动速度 ≤-30% 时累计移动 3000 格",
+  "item.lensouls.feather_timecore.e17.cond": "在移动速度 ≤-80% 时累计移动 3000 格",
   "item.lensouls.feather_timecore.e17.after": "§a不再减速；每 1% 减速额外提供 +1 点伤害",
   "item.lensouls.feather_timecore.e18.name": "铁序·滞步",
   "item.lensouls.feather_timecore.e18.curse": "§c受到攻击 25% 概率获得缓慢 2 秒",
@@ -600,7 +600,7 @@
   "item.lensouls.feather_abyss.e2.name": "神秘雪球",
   "item.lensouls.feather_abyss.e2.curse": "§c怪物对你造成伤害时，以该怪物为中心环形发射 8 个敌对雪球（3 点魔法伤害）",
   "item.lensouls.feather_abyss.e2.cond": "累计受到 100 次敌对雪球的伤害",
-  "item.lensouls.feather_abyss.e2.after": "§c怪物对你造成伤害时，以该怪物为中心环形发射 §a3 §c个敌对雪球（§a1 §c点魔法伤害）",
+  "item.lensouls.feather_abyss.e2.after": "§a不再发射敌对雪球",
   "item.lensouls.feather_abyss.e3.name": "安魂曲",
   "item.lensouls.feather_abyss.e3.curse": "§c每过一天，最大生命上限 -1（最低 1）；受到的伤害 +13%/天",
   "item.lensouls.feather_abyss.e3.cond": "游戏天数小于 5 天时，把生命上限提升到 20 以上，之后无法再达成",
@@ -659,7 +659,7 @@
   "item.lensouls.feather_finalrite.e3.cond": "击杀焰魔",
   "item.lensouls.feather_finalrite.e3.after": "§a全伤害 +10%",
   "item.lensouls.feather_finalrite.e4.name": "秘仪·枯井",
-  "item.lensouls.feather_finalrite.e4.curse": "§c周围 4 格没有掉落物时，持续扣血，每 5 秒 1 点",
+  "item.lensouls.feather_finalrite.e4.curse": "§c周围 32 格没有掉落物时，持续扣血，每 5 秒 1 点",
   "item.lensouls.feather_finalrite.e4.cond": "击杀炼狱飞龙",
   "item.lensouls.feather_finalrite.e4.after": "§a不再因周围无掉落物扣血；周围 4 格内每有 1 个掉落物，造成伤害 +1%（上限 +20%）；经验正常获取",
   "item.lensouls.feather_finalrite.e5.name": "秘仪·篡命",
@@ -815,5 +815,9 @@
   "gui.lensouls.photos.toast.cleared": "已清空 %s 件照片饰品",
   "gui.lensouls.photos.toast.deduped": "已剔除 %s 件重复照片饰品",
   "gui.lensouls.photos.hint": "§7点击格子获取照片 · §eE§7/§eESC§7 返回",
-  "gui.lensouls.photos.search.mode.name": "名称"
+  "gui.lensouls.photos.search.mode.name": "名称",
+  "death.attack.soul_dot_fire": "%1$s 被镜魂之焰焚尽",
+  "death.attack.soul_dot_water": "%1$s 被镜魂之寒冻结",
+  "death.attack.soul_dot_earth": "%1$s 被镜魂之毒侵蚀殆尽",
+  "death.attack.soul_dot_ender": "%1$s 被镜魂的凋零吞噬"
 }

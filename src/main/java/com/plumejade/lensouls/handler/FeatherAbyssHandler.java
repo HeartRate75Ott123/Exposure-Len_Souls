@@ -99,7 +99,7 @@ import java.util.UUID;
  * 按文案本身乘算）。条目索引 0 基，与 lang 的 {@code eN} 一致：
  * <pre>
  * e1  虚无的承诺(0)  无反转
- * e2  神秘雪球(1)    反转条件=累计受到 100 次敌对雪球伤害 → 伤害 1 点、数量 3 个
+ * e2  神秘雪球(1)    反转条件=累计受到 100 次敌对雪球伤害 → 不再发射任何敌对雪球
  * e3  安魂曲(2)      条件=天数&lt;5（**该玩家自己的已过天数**，见 {@link WorldDays}）且生命上限&gt;20
  *                    → 每天最大生命 +1、受伤 −13%/天
  * e4  愚钝(3)        条件=单次**实际到手** 2000 点经验（本条减半/翻倍后的最终值） → 经验 ×2
@@ -223,12 +223,10 @@ public class FeatherAbyssHandler {
     private static final float E12_ELEMENT_BONUS_GOAL = 50.0f;
 
     // ---- 反转态效果数值（lang 的 .after 文案）----
-    /** e2：雪球伤害 3 点（诅咒态）/ 1 点（反转态） */
+    /** e2：雪球伤害 3 点（只有诅咒态会发射雪球；反转态不再发射） */
     public static final float SNOWBALL_DAMAGE_CURSE = 3.0f;
-    public static final float SNOWBALL_DAMAGE_REVERSED = 1.0f;
-    /** e2：雪球数量 8 个（诅咒态）/ 3 个（反转态） */
+    /** e2：雪球数量 8 个（只有诅咒态会发射雪球） */
     public static final int SNOWBALL_COUNT_CURSE = 8;
-    public static final int SNOWBALL_COUNT_REVERSED = 3;
     /** e5 反转：护甲每层 +5%（**加算**，§2；诅咒态为 ×0.75/层 乘算） */
     public static final double ARMOR_STACK_REVERSED_BONUS = 0.05;
     /** e6 反转：每分钟改为获得 2 个正面效果（20 秒） */
@@ -254,8 +252,6 @@ public class FeatherAbyssHandler {
     private static final String KEY_SUMMON_OWNER = "lensouls:abyss_summon_owner";
     /** e9：已食用过的食物种类（持久化，跨死亡保留） */
     private static final String KEY_FOOD_KINDS = "lensouls:abyss_food_kinds";
-    /** e2：反转态雪球标记（1 点伤害 / 3 个） */
-    private static final String KEY_SNOWBALL_WEAK = "lensouls:abyss_snowball_weak";
 
     /** 「且存活」类条件的待结算条目（e5 / e12）：UUID → 条目索引列表 */
     private static final Map<UUID, List<Integer>> PENDING_REVERSE = new HashMap<>();
@@ -631,14 +627,12 @@ public class FeatherAbyssHandler {
         // e12 需要在 LOWEST 阶段把这个倍率还原掉，才能反推出「元素附加伤害」本身
         TAKEN_FACTOR.put(player.getId(), factor);
 
-        // e2 神秘雪球：以攻击佩戴者的怪物为中心，环形发射雪球（诅咒态 8 个 / 反转态 3 个）
+        // e2 神秘雪球：以攻击佩戴者的怪物为中心，环形发射 8 个敌对雪球。
+        // 反转态是**完全反转**——不再发射任何雪球，所以这里只判诅咒态。
         Entity attacker = event.getSource().getEntity();
-        if (attacker instanceof LivingEntity livingAttacker && !(attacker instanceof Player)) {
-            if (CurseManager.on(player, DEF, E2_SNOWBALL)) {
-                spawnSnowballRing(livingAttacker, false);
-            } else if (CurseManager.rev(player, DEF, E2_SNOWBALL)) {
-                spawnSnowballRing(livingAttacker, true);
-            }
+        if (attacker instanceof LivingEntity livingAttacker && !(attacker instanceof Player)
+                && CurseManager.on(player, DEF, E2_SNOWBALL)) {
+            spawnSnowballRing(livingAttacker);
         }
         // e8 挫败：受击加攻击层（诅咒态与反转态都叠层，只是倍率不同）
         if (CurseManager.on(player, DEF, E8_FRUSTRATION) || CurseManager.rev(player, DEF, E8_FRUSTRATION)) {
@@ -764,9 +758,9 @@ public class FeatherAbyssHandler {
     }
 
     /** 以攻击者（怪物）为中心发射一圈敌对雪球（标记 + owner），命中伤害由 onProjectileImpact 结算 */
-    private static void spawnSnowballRing(LivingEntity center, boolean reversed) {
+    private static void spawnSnowballRing(LivingEntity center) {
         Level level = center.level();
-        int count = reversed ? SNOWBALL_COUNT_REVERSED : SNOWBALL_COUNT_CURSE;
+        int count = SNOWBALL_COUNT_CURSE;
         for (int i = 0; i < count; i++) {
             Snowball snowball = new Snowball(level, center);
             snowball.setPos(center.getX(), center.getEyeY() - 0.2, center.getZ());
@@ -774,9 +768,6 @@ public class FeatherAbyssHandler {
             Vec3 dir = new Vec3(Math.cos(angle), 0, Math.sin(angle));
             snowball.shoot(dir.x, dir.y + 0.1, dir.z, 0.6f, 1.0f);
             snowball.getPersistentData().putBoolean(SNOWBALL_TAG, true);
-            if (reversed) {
-                snowball.getPersistentData().putBoolean(KEY_SNOWBALL_WEAK, true);
-            }
             level.addFreshEntity(snowball);
         }
     }
@@ -792,9 +783,8 @@ public class FeatherAbyssHandler {
             Entity target = entityHit.getEntity();
             if (!(target instanceof LivingEntity) || target == projectile.getOwner()) return;
 
-            // e2 反转：雪球伤害 3 点 → 1 点（发射时按佩戴者当时的状态写标记）
-            float damage = projectile.getPersistentData().getBoolean(KEY_SNOWBALL_WEAK)
-                    ? SNOWBALL_DAMAGE_REVERSED : SNOWBALL_DAMAGE_CURSE;
+            // e2：雪球伤害固定 3 点（反转态根本不发射雪球，故无弱化分支）
+            float damage = SNOWBALL_DAMAGE_CURSE;
             // 清除无敌帧（命中玩家时同样生效，保证伤害必中）
             ((EntityInvulnerableTimeAccessor) (Object) target).lensouls$setInvulnerableTime(0);
             target.hurt(projectile.level().damageSources().magic(), damage);

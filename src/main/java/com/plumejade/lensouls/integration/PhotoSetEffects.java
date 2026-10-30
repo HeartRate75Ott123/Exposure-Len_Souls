@@ -208,6 +208,7 @@ public class PhotoSetEffects {
                     switch (p[0]) {
                         case "maxhp" -> maxhp += Double.parseDouble(p[1]);
                         case "speed" -> speed += Double.parseDouble(p[1]);
+                        // 护甲：数据里写的是「比例」（0.15 = 护甲值 +15%），运算见下方 applyAttr 处
                         case "armor" -> armor += Double.parseDouble(p[1]);
                         case "kb_resist" -> kb += Double.parseDouble(p[1]);
                         case "elem_activity" -> {
@@ -263,7 +264,16 @@ public class PhotoSetEffects {
 
         applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH, ID_MAXHP, maxhp, AttributeModifier.Operation.ADD_MULTIPLIED_BASE, desired);
         applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED, ID_SPEED, speed, AttributeModifier.Operation.ADD_MULTIPLIED_BASE, desired);
-        applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.ARMOR, ID_ARMOR, armor, AttributeModifier.Operation.ADD_VALUE, desired);
+        // 护甲是「百分比」语义（armor:0.15 = 护甲值 +15%），必须走 ADD_MULTIPLIED_TOTAL：
+        // ARMOR 的基值是 0，装备护甲是 LivingEntity.collectEquipmentChanges 里 addTransientModifier 的
+        // ADD_VALUE 项；AttributeInstance.calculateValue 的结算顺序是
+        // (base + Σ ADD_VALUE) → ×(1+Σ ADD_MULTIPLIED_BASE) → ×(1+Σ ADD_MULTIPLIED_TOTAL)。于是：
+        //   · ADD_MULTIPLIED_BASE  → 0 × 0.15 = 0，永远不生效；
+        //   · ADD_VALUE            → 只加 0.15 点，getArmorValue() 取 floor 后护甲条 0 格、减伤 <1%（1.8.31 之前的实况）；
+        //   · ADD_MULTIPLIED_TOTAL → 按当前护甲总值乘 1.15（穿 20 点即 +3 点），与文案「护甲值 +15%」一致。
+        // 多个套装的 armor 比例先相加再加到一个修饰符上（0.15+0.15 = +30%），不会自我复利。
+        applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.ARMOR, ID_ARMOR, armor,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL, desired);
         applyAttr(player, net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE, ID_KB, kb, AttributeModifier.Operation.ADD_VALUE, desired);
         applyAttr(player, com.plumejade.lensouls.attribute.ModAttributes.DODGE_CHANCE, ID_DODGE, dodge, AttributeModifier.Operation.ADD_VALUE, desired);
         // 移速乘区：amount = 乘数 - 1（x1.7 → +70% 的乘法层）

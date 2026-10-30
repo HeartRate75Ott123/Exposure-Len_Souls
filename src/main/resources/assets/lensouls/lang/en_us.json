@@ -502,7 +502,7 @@
   "item.lensouls.feather_abyss.e2.name": "Mystic Snowballs",
   "item.lensouls.feather_abyss.e2.curse": "§cWhen a monster damages you, launch a ring of 8 hostile snowballs around it (3 magic damage each)",
   "item.lensouls.feather_abyss.e2.cond": "Take hostile snowball damage 100 times",
-  "item.lensouls.feather_abyss.e2.after": "§cWhen a mob damages you, a ring of §a3 §chostile snowballs is fired from it (§a1 §cdamage)",
+  "item.lensouls.feather_abyss.e2.after": "§aNo hostile snowballs are launched",
   "item.lensouls.feather_abyss.e3.name": "Requiem",
   "item.lensouls.feather_abyss.e3.curse": "§cEach day: max health -1 (min 1), damage taken +13% per day",
   "item.lensouls.feather_abyss.e3.cond": "Before day 5, push max health above 20; cannot be achieved afterwards",
@@ -561,7 +561,7 @@
   "item.lensouls.feather_finalrite.e3.cond": "Kill Ignis",
   "item.lensouls.feather_finalrite.e3.after": "§aAll damage +10%",
   "item.lensouls.feather_finalrite.e4.name": "Rite·Dry Well",
-  "item.lensouls.feather_finalrite.e4.curse": "§cWith no dropped items within 4 blocks, lose 1 HP every 5 seconds",
+  "item.lensouls.feather_finalrite.e4.curse": "§cWith no dropped items within 32 blocks, lose 1 HP every 5 seconds",
   "item.lensouls.feather_finalrite.e4.cond": "Kill the Infernal Dragon",
   "item.lensouls.feather_finalrite.e4.after": "§aNo more drain when no drops nearby; +1% damage per dropped item within 4 blocks (cap +20%); XP gained normally",
   "item.lensouls.feather_finalrite.e5.name": "Rite·Usurped Life",
@@ -708,7 +708,7 @@
   "item.lensouls.feather_timecore.e16.after": "§aNo longer drops your weapon on hit",
   "item.lensouls.feather_timecore.e17.name": "Order·Heavy Load",
   "item.lensouls.feather_timecore.e17.curse": "§cPer item in your inventory, movement speed -0.5% (cap -70%)",
-  "item.lensouls.feather_timecore.e17.cond": "Move 3,000 blocks while at -30% speed or worse",
+  "item.lensouls.feather_timecore.e17.cond": "Move 3,000 blocks while at -80% speed or worse",
   "item.lensouls.feather_timecore.e17.after": "§aNo slowdown; +1 damage per 1% slowdown that was",
   "item.lensouls.feather_timecore.e18.name": "Order·Sluggish Step",
   "item.lensouls.feather_timecore.e18.curse": "§c25% chance on being hit to gain Slowness for 2s",
@@ -815,5 +815,9 @@
   "gui.lensouls.photos.toast.locked.set": "Set not fully collected",
   "gui.lensouls.photos.toast.cleared": "Cleared %s photo curios",
   "gui.lensouls.photos.toast.deduped": "Removed %s duplicate photo curios",
-  "gui.lensouls.photos.search.mode.name": "name"
+  "gui.lensouls.photos.search.mode.name": "name",
+  "death.attack.soul_dot_fire": "%1$s was burned to ashes by soul fire",
+  "death.attack.soul_dot_water": "%1$s was frozen solid by soul frost",
+  "death.attack.soul_dot_earth": "%1$s withered away from soul rot",
+  "death.attack.soul_dot_ender": "%1$s was consumed by soul decay"
 }

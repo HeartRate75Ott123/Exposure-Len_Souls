@@ -170,8 +170,23 @@ public final class AllyFilter {
      * （不再加"按自定义名认人"的兜底：见 {@link #isFriendlyForAim} 的说明。）
      */
     public static boolean isPlayerOwned(Entity e) {
-        if (e instanceof OwnableEntity own && own.getOwner() instanceof Player) return true;
-        return e instanceof TraceableEntity trace && trace.getOwner() instanceof Player;
+        return playerOwner(e) != null;
+    }
+
+    /**
+     * 归属玩家的实体 → 那个玩家本体；解析不到返回 {@code null}。
+     * <p>
+     * 与 {@link #isPlayerOwned} <b>同源</b>（同一组 {@link OwnableEntity} / {@link TraceableEntity} 判定，
+     * 外加 {@link Projectile#getOwner()}），区别只是这里要「是谁」而不是「属不属于这一类」。
+     * 典型用途：<b>击杀归属</b>——致命一击来自玩家射出的弹幕/召唤物时，回退到它的 owner 才认得出是谁的击杀
+     * （如 {@code block_factorys_bosses} 的船炮、第三方 mod 的"只传直接实体"的伤害源）。
+     */
+    public static Player playerOwner(Entity e) {
+        if (e == null) return null;
+        if (e instanceof Projectile proj && proj.getOwner() instanceof Player p) return p;
+        if (e instanceof OwnableEntity own && own.getOwner() instanceof Player p) return p;
+        if (e instanceof TraceableEntity trace && trace.getOwner() instanceof Player p) return p;
+        return null;
     }
 
     /**

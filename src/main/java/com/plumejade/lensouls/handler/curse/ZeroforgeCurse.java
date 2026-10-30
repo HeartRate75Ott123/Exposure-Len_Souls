@@ -33,6 +33,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
@@ -763,41 +764,183 @@ public final class ZeroforgeCurse {
         }
     }
 
-    // ==================== e6 誓约·叛主（雪球侧） ====================
+    // ==================== e6 誓约·叛主（雪球侧 + 无人机增伤） ====================
 
     /**
-     * e6 叛主：无人机造成伤害后，2% 概率朝佩戴者发射一发 10 点魔法伤害的敌对雪球。
+     * e6 叛主：无人机对<b>任意目标</b>造成伤害后，2% 概率转向朝佩戴者发射一发 10 点魔法伤害的敌对雪球。
      * <p>
-     * 触发面：<b>佩戴者受到</b>伤害，且该伤害的攻击方式是无人机 / 构造体
-     * （{@link #isDroneDamage}，与 {@code DamageHandler} 的 gytrinket 判定同口径——
-     * 这类伤害的 causing entity 常常就是玩家本人，构造体归玩家所有）。
-     * 雪球从无人机位置朝佩戴者发射、以佩戴者为 owner，命中时清无敌帧后结算 10 点魔法伤害。
+     * <b>为什么不能按「受害者是玩家」写</b>（gytrinket 1.2.4 实机 jar 逐条 {@code javap -p -c} 核实）：
+     * 该模组构造体的伤害，其 {@code causing entity} 就是<b>构造体本体</b>，不是玩家 ——
+     * {@code DroneBullet(Level, LivingEntity, float)} 把 owner 设成无人机，
+     * {@code createDamageSource()} 再把 owner 当 causing entity；近战 / 僚机横扫走
+     * {@code ModDamageSources.mobAttackWithGuardAggro}，同样是构造体。
+     * 所以「无人机打怪」这条主路上 {@code event.getEntity()} 是怪、{@code getSource().getEntity()}
+     * 是无人机，旧写法（要求受害者是玩家）永远进不来 —— 实机表现就是「无人机输出半天一发雪球都没有」。
+     * <p>
+     * 现口径：伤害来源命中 {@link #isConstructDamage}（来源链里真有构造体）→ 用 {@link OwnableEntity#getOwner()}
+     * 反查构造体主人当佩戴者（{@code AbstractConstructEntity#getOwner} 内部是
+     * {@code level.getPlayerByUUID}）；多人环境下若被打的玩家本人戴着 e6，也认（兜底）。
+     * <p>
+     * 雪球以<b>无人机</b>为 owner 发射（语义上就是它叛主），同时绕开 gytrinket
+     * {@code ProjectileBurstManager} 对「owner 是 ServerPlayer 的弹射物」的连击复制 ——
+     * 否则装了连击模块的玩家会一次吃到好几发、50 次进度瞬间刷穿。
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onDroneDamage(LivingDamageEvent.Pre event) {
         try {
             if (event.getEntity().level().isClientSide) return;
-            if (!(event.getEntity() instanceof ServerPlayer player)) return;
-            if (!active(player)) return;
-            if (!CurseManager.on(player, D, 5)) return;
-            if (!isDroneDamage(event.getSource())) return;
+            if (event.getNewDamage() <= 0.0f) return;
+            net.minecraft.world.damagesource.DamageSource source = event.getSource();
+            if (!isConstructDamage(source)) return;
+
+            ServerPlayer player = snowballTarget(source, event.getEntity());
+            if (player == null) return;
             if (player.getRandom().nextFloat() >= DRONE_SNOWBALL_CHANCE) return;
 
-            Entity drone = event.getSource().getDirectEntity();
-            if (drone == null) drone = event.getSource().getEntity();
-            double x = drone != null ? drone.getX() : player.getX();
-            double y = drone != null ? drone.getEyeY() : player.getEyeY();
-            double z = drone != null ? drone.getZ() : player.getZ();
-
-            Level level = player.level();
-            Snowball snowball = new Snowball(level, player);
-            snowball.setPos(x, y - 0.1D, z);
-            Vec3 aim = new Vec3(player.getX() - x, player.getEyeY() - y, player.getZ() - z).normalize();
-            snowball.shoot(aim.x, aim.y, aim.z, 1.2f, 1.0f);
-            snowball.getPersistentData().putBoolean(SNOWBALL_TAG, true);
-            level.addFreshEntity(snowball);
+            launchHostileSnowball(player, source);
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ⑦ e6 叛主雪球异常", t);
+        }
+    }
+
+    /**
+     * gytrinket 构造体（无人机 / 蜂群 / 僚机）的公共包前缀。
+     * <b>按包前缀判定，不用 {@link #isDroneDamage} 的「伤害类型命名空间」口径</b>：
+     * 后者是给武器匹配惩罚豁免用的（{@code execute_damage} 等归属玩家的伤害类型也算），
+     * 拿来判「是不是无人机打出去的」会把玩家的护盾汲取 / 武器斩杀误判成无人机。
+     */
+    private static final String CONSTRUCT_PACKAGE = "com.gytrinket.gytrinket.core.entity.construct.";
+
+    /** 这次伤害是不是真的由构造体（或其弹射物）打出去的：来源链里必须真有构造体 */
+    private static boolean isConstructDamage(net.minecraft.world.damagesource.DamageSource source) {
+        if (source == null) return false;
+        Entity direct = source.getDirectEntity();
+        Entity causing = source.getEntity();
+        if (isConstructType(direct) || isConstructType(causing)) return true;
+        // 弹射物本体不在 construct 包（如别的模组转手）时，再看它的发射者
+        if (direct instanceof Projectile p && isConstructType(p.getOwner())) return true;
+        return causing instanceof Projectile p && isConstructType(p.getOwner());
+    }
+
+    private static boolean isConstructType(Entity entity) {
+        return entity != null && entity.getClass().getName().startsWith(CONSTRUCT_PACKAGE);
+    }
+
+    /** e6：这次无人机伤害该「叛」到谁头上（= 佩戴者）；不满足诅咒条件返回 null */
+    private static ServerPlayer snowballTarget(net.minecraft.world.damagesource.DamageSource source,
+                                               LivingEntity victim) {
+        ServerPlayer owner = droneOwner(source);
+        if (owner != null && active(owner) && CurseManager.on(owner, D, 5)) return owner;
+        // 兜底：被打的玩家本人戴着 e6（别人家的无人机打你时也按「叛主」处理）
+        if (victim instanceof ServerPlayer hurt && active(hurt) && CurseManager.on(hurt, D, 5)) return hurt;
+        return null;
+    }
+
+    /**
+     * 无人机的主人（= 佩戴者候选）。按可信度依次：伤害直接归属玩家 → 弹射物 owner → 构造体 owner
+     * （{@code AbstractConstructEntity} 实现 {@link OwnableEntity}）。
+     */
+    private static ServerPlayer droneOwner(net.minecraft.world.damagesource.DamageSource source) {
+        Entity direct = source.getDirectEntity();
+        Entity causing = source.getEntity();
+        if (causing instanceof ServerPlayer p) return p;
+        if (direct instanceof ServerPlayer p) return p;
+        for (Entity e : new Entity[]{direct, causing}) {
+            if (e instanceof Projectile projectile && projectile.getOwner() instanceof ServerPlayer p) return p;
+        }
+        for (Entity e : new Entity[]{causing, direct}) {
+            if (e instanceof OwnableEntity ownable && ownable.getOwner() instanceof ServerPlayer p) return p;
+        }
+        return null;
+    }
+
+    /**
+     * 发射雪球的那个活体（无人机本体）。优先取构造体（{@code com.gytrinket.} 的 LivingEntity），
+     * 其次取弹射物的发射者，都没有就退回佩戴者。
+     */
+    private static LivingEntity droneShooter(net.minecraft.world.damagesource.DamageSource source,
+                                             ServerPlayer fallback) {
+        Entity direct = source.getDirectEntity();
+        Entity causing = source.getEntity();
+        for (Entity e : new Entity[]{causing, direct}) {
+            if (e instanceof LivingEntity living && e.getClass().getName().startsWith("com.gytrinket.")) return living;
+        }
+        for (Entity e : new Entity[]{direct, causing}) {
+            if (e instanceof Projectile projectile && projectile.getOwner() instanceof LivingEntity living) return living;
+        }
+        return fallback;
+    }
+
+    private static void launchHostileSnowball(ServerPlayer player,
+                                              net.minecraft.world.damagesource.DamageSource source) {
+        LivingEntity shooter = droneShooter(source, player);
+        Level level = player.level();
+
+        double x = shooter != player ? shooter.getX() : player.getX();
+        double y = shooter != player ? shooter.getEyeY() : player.getEyeY() + 0.6D;
+        double z = shooter != player ? shooter.getZ() : player.getZ();
+
+        // 瞄准胸口（原来瞄眼睛，贴脸时会打高）
+        double dx = player.getX() - x;
+        double dy = player.getY() + player.getBbHeight() * 0.5D - y;
+        double dz = player.getZ() - z;
+        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        Vec3 aim;
+        if (dist < 5.0E-2D) {
+            // 无人机贴在身上：从头顶正上方往下打，避免零向量归一化出 NaN
+            x = player.getX();
+            y = player.getY() + player.getBbHeight() + 0.8D;
+            z = player.getZ();
+            aim = new Vec3(0.0D, -1.0D, 0.0D);
+            dist = 0.8D;
+        } else {
+            aim = new Vec3(dx / dist, dy / dist, dz / dist);
+        }
+
+        Snowball snowball = new Snowball(level, shooter);
+        // 别把雪球生成在发射者包围盒里：构造体的 canBeHitByProjectile() 返回 true（isPickable 才是 false），
+        // 生成在同一个格子上第一刻就会被自己的无人机打掉 → discard，实机表现是「雪球一发都没有」。
+        // 沿瞄准方向前移，直到脱离发射者包围盒（最多走到目标身上，绝不越过）。
+        double travel = 0.0D;
+        for (int i = 0; i < 12; i++) {
+            snowball.setPos(x + aim.x * travel, y + aim.y * travel, z + aim.z * travel);
+            if (!snowball.getBoundingBox().intersects(shooter.getBoundingBox())) break;
+            if (travel + 0.25D >= dist) break;
+            travel += 0.25D;
+        }
+        snowball.shoot(aim.x, aim.y, aim.z, 1.2f, 0.0f);
+        snowball.getPersistentData().putBoolean(SNOWBALL_TAG, true);
+        level.addFreshEntity(snowball);
+        // 2% 才出一次，量很小；`/lensouls curse debug true` 时用来确认触发面真的通了
+        AttackDiag.log("e6 叛主·敌对雪球 佩戴者={} 发射者={} 前移={} 位置=({}, {}, {})",
+                player.getGameProfile().getName(), shooter.getType(), travel,
+                snowball.getX(), snowball.getY(), snowball.getZ());
+    }
+
+    /**
+     * e6 反转：无人机造成伤害 +100%。
+     * <p>
+     * <b>为什么不放在 {@link #onDealDamage}</b>：那边以 {@code source.getEntity() instanceof ServerPlayer}
+     * 为入口（「玩家自己造成伤害」），而无人机伤害的 causing entity 是构造体 —— 入口直接 return，
+     * 反转过也永远吃不到这条加成（同一处兼容坑，只是症状在增伤侧）。
+     * 这里按同样的 owner 反查收口；单条生效时「乘算 ×2」与 §2「加算 +1.0」数值等价。
+     */
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onDroneDealDamage(LivingDamageEvent.Pre event) {
+        try {
+            if (event.getEntity().level().isClientSide) return;
+            net.minecraft.world.damagesource.DamageSource source = event.getSource();
+            if (!isConstructDamage(source)) return;
+            // 已经能走 onDealDamage 的口径（causing entity 本身就是玩家）交给它，别乘两遍
+            if (source.getEntity() instanceof Player) return;
+            float d = event.getNewDamage();
+            if (d <= 0.0f) return;
+            ServerPlayer player = droneOwner(source);
+            if (player == null) return;
+            if (!active(player) || !CurseManager.rev(player, D, 5)) return;
+            event.setNewDamage(d * DRONE_DAMAGE_MULTIPLIER);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ⑦ e6 叛主无人机增伤异常", t);
         }
     }
 
@@ -818,6 +961,8 @@ public final class ZeroforgeCurse {
                     .lensouls$setInvulnerableTime(0);
             player.hurt(player.level().damageSources().magic(), DRONE_SNOWBALL_DAMAGE);
             CurseManager.tick(player, D, 5, 1L, SNOWBALL_HIT_GOAL);
+            AttackDiag.log("e6 叛主·雪球命中 佩戴者={} 伤害={}",
+                    player.getGameProfile().getName(), DRONE_SNOWBALL_DAMAGE);
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ⑦ e6 叛主雪球命中异常", t);
         }

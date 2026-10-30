@@ -114,8 +114,6 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.integration.PhotoSetEffects.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.SuppressHandler.class);
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.IgnisBrandHandler.class);
-        // ---- 浓雾的治愈（boss_heal）回血时钟：移除/到时清空，只保留「获得时起算」 ----
-        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.BossHealEffectHandler.class);
         // ---- 石之心（单次受伤上限 25% 最大生命，受到伤害 +17%） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.HeartOfStoneHandler.class);
         // ---- 虚影核心 / 虚影残像（死亡掉落托管容器） ----

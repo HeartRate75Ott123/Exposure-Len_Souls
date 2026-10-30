@@ -1,14 +1,15 @@
 package com.plumejade.lensouls.handler;
 
+import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.effect.SoulDotEffect;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
-import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -33,7 +34,10 @@ import java.util.UUID;
  *   <li>每跳伤害 = 命中瞬间攻击面板（{@link Attributes#ATTACK_DAMAGE}）的 {@link #DAMAGE_FRACTION}，
  *       BOSS 镜魂（{@link SoulDotEffect#getPlayerSoulId} 非空）×2；</li>
  *   <li>同一目标并发实例上限 = 镜魂等级（amplifier + 1，1~5），满时顶掉最老实例；</li>
- *   <li>伤害按元素分流：火→inFire、水→freeze、土→magic、末影→wither，攻击者记为伤害来源（击杀归属玩家）。</li>
+ *   <li>伤害按元素分流：火→{@code lensouls:soul_dot_fire}、水→{@code soul_dot_water}、
+ *       土→{@code soul_dot_earth}、末影→{@code soul_dot_ender}（本模组自定义伤害类型，
+ *       不再借用原版 in_fire/freeze/magic/wither——原版类型会被目标的抗火/元素免疫整段拒掉），
+ *       攻击者记为伤害来源（击杀归属玩家）。</li>
  * </ul>
  * 增益结束前已挂上的实例自然走完；DoT 结算期间置 {@link #applyingDot} 护栏防止自触发。
  */
@@ -46,13 +50,30 @@ public class SoulDotHandler {
     /** 每实例跳数（总持续 = 4 × 5 = 20 tick） */
     public static final int TOTAL_JUMPS = 4;
 
-    /** DoT 伤害类型按元素分流 */
+    /**
+     * DoT 伤害类型按元素分流 —— **一律走本模组自定义的伤害类型**
+     * （{@code data/lensouls/damage_type/soul_dot_*.json}），不再借用原版 in_fire / freeze / magic / wither。
+     * <p>
+     * 为什么必须自建：原版类型会被目标的「元素免疫」整段拒掉，最典型的是
+     * {@code Entity.isInvulnerableTo} 里的 {@code source.is(IS_FIRE) && fireImmune()}——
+     * 灾变几乎全部生物（含焰魔 / 下界合金巨兽）与其它模组的大量 BOSS 都是 fireImmune，
+     * 火焰 DoT 打上去连 {@code LivingDamageEvent} 都不会派发，实机表现就是「DoT 完全不触发」。
+     * 自定义类型不带 {@code is_fire} / {@code is_freezing} 等标签，元素归属改由
+     * {@code data/lensouls/damage_type_element/soul_dot.json} 配置（activity 2.5），
+     * 于是元素增伤、弱点判定照旧，抗火免疫不再生效。
+     */
     private static final Map<ElementDamage, ResourceKey<DamageType>> DOT_DAMAGE_TYPES = Map.of(
-            ElementDamage.FIRE, DamageTypes.IN_FIRE,
-            ElementDamage.WATER, DamageTypes.FREEZE,
-            ElementDamage.EARTH, DamageTypes.MAGIC,
-            ElementDamage.ENDER, DamageTypes.WITHER
+            ElementDamage.FIRE, dotType("soul_dot_fire"),
+            ElementDamage.WATER, dotType("soul_dot_water"),
+            ElementDamage.EARTH, dotType("soul_dot_earth"),
+            ElementDamage.ENDER, dotType("soul_dot_ender")
     );
+
+    /** 本模组自定义 DoT 伤害类型的 ResourceKey（注册项在数据包 JSON 里，Java 侧只需键） */
+    private static ResourceKey<DamageType> dotType(String path) {
+        return ResourceKey.create(Registries.DAMAGE_TYPE,
+                ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, path));
+    }
 
     /** 单个 DoT 实例（damagePerTick 在命中时按攻击面板快照） */
     private record DotInstance(ElementDamage element, float damagePerTick,

@@ -18,17 +18,18 @@ import net.minecraft.world.entity.LivingEntity;
  * 图标见 {@code textures/mob_effect/boss_heal.png}，无可见转圈粒子（隐藏粒子）。
  * 已加入灾变 {@code cataclysm:tags/mob_effect/effective_for_bosses}，可对灾变 Boss 生效。
  * <p>
- * <b>回血节奏</b>（模仿原版生命恢复：刷新 buff 不重置计时，只在获得时起算）：
- * 不能用 {@code duration % 20} 判定——buff 每次被重新施加都会重设 duration，
- * 那样「高频获得 buff = 高频回血」，与「每秒固定回复量」的设计目标不符。
- * 改为读取实体附件 {@link ModAttachments#BOSS_HEAL_TIMER} 的绝对 tick 时间戳：
- * 获得 buff 后首次生效只写入 {@code now + 20}（满 1 秒才回第一次血），
- * 此后每次回血把时间戳推后 20 tick；刷新 buff 不触碰时间戳，故回血速度恒定为每秒一次。
+ * <b>回血节奏</b>：模仿原版再生——按 tick 累积、满一秒回一跳；但相位锚在<b>实体</b>
+ * （{@link ModAttachments#BOSS_HEAL_TIMER} 的在场 tick 累计器）而不是效果实例的
+ * {@code duration}，所以：
+ * <ul>
+ *   <li><b>刷新 buff 不影响节奏</b>：{@code MobEffectInstance.update()} 只改 duration/amplifier，
+ *       碰不到累计器 ⇒ 高频刷新（如整合包脚本每次挨打都重刷）仍是每秒一跳；</li>
+ *   <li><b>获得后满 1 秒才第一跳</b>：不存在「获得即回一次」的免费回血
+ *       （旧实现的 {@code duration % 20} 与新时长的 20 倍数对齐就会立刻回）。</li>
+ * </ul>
+ * 节流细节全部在 {@link BossHealTimer}，本类只负责「该回血了 → 按等级回多少」。
  */
 public class BossHealEffect extends MobEffect {
-
-    /** 回血间隔：每秒一次（20 tick） */
-    private static final int HEAL_INTERVAL_TICKS = 20;
 
     public BossHealEffect(MobEffectCategory category, int color) {
         super(category, color);
@@ -41,7 +42,7 @@ public class BossHealEffect extends MobEffect {
     }
 
     /**
-     * 每 tick 都进入 {@link #applyEffectTick}，由附件时间戳自行节流。
+     * 每 tick 都进入 {@link #applyEffectTick}，由 {@link BossHealTimer} 的累计器自行节流。
      * <p>
      * 不能返回 {@code duration % 20 == 0}：duration 会被 buff 刷新重设，
      * 新时长的每个 20 的整数倍都会误触发一次回血。
@@ -53,14 +54,12 @@ public class BossHealEffect extends MobEffect {
 
     @Override
     public boolean applyEffectTick(LivingEntity entity, int amplifier) {
-        long now = entity.level().getGameTime();
         BossHealTimer timer = entity.getData(ModAttachments.BOSS_HEAL_TIMER);
 
-        // 时间戳仍在未来 → 未到回血时刻（首次生效时只起算，不回血）
-        if (timer.nextHealTick > now) {
+        // 累计器判定「这一 tick 该不该回」：刷新不推进、真断档自动重算
+        if (!timer.tickAndShouldHeal(entity.tickCount)) {
             return true;
         }
-        timer.nextHealTick = now + HEAL_INTERVAL_TICKS;
 
         int level = Mth.clamp(amplifier, 0, 254) + 1;   // 存储 0..254 → 原版 1..255
         float pct = level * 0.2f;                        // 每级 0.2% 最大生命

@@ -8,11 +8,13 @@ import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.FeatherEquip;
 import com.plumejade.lensouls.item.ModItems;
+import com.plumejade.lensouls.util.AllyFilter;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
@@ -65,6 +67,8 @@ public class FeatherHardmanHandler {
     public static final int DISTINCT_BOSS_GOAL = 4;
     /** 「已击杀过的不同 BOSS」持久化键（逗号分隔的实体 id 列表） */
     private static final String KEY_BOSS_KILLS = "lensouls:hardman_boss_kills";
+    /** 「认不出击杀者」日志节流（60 秒一条） */
+    private static long lastUnattributedLog;
 
     // ==================== e1 蚀灵 ====================
 
@@ -263,26 +267,82 @@ public class FeatherHardmanHandler {
     @SubscribeEvent
     public static void onKill(LivingDeathEvent event) {
         try {
-            if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
             LivingEntity dead = event.getEntity();
-            if (dead == player) return;
-            if (!CurseManager.isActive(player, D)) return;
-            // 注：旧版的「空余照片饰品栏位 ≥5」前置条件已按要求取消——只保留「4 只不同 BOSS」。
-
-            // BOSS 判定：首领清单（bosslist）
-            if (!BossEntityLoader.isBoss(dead)) return;
-            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(dead.getType());
-            if (id == null) return;
-
-            Set<String> seen = loadBossKills(player);
-            if (!seen.add(id.toString())) return;         // 必须是「不同」BOSS
-            saveBossKills(player, seen);
-
-            for (int i = 0; i < D.entries(); i++) {
-                CurseManager.tick(player, D, i, 1L, DISTINCT_BOSS_GOAL);
+            ServerPlayer killer = resolveKiller(event.getSource(), dead);
+            if (killer != null) {
+                creditBossKill(killer, dead);
+            } else if (BossEntityLoader.isBoss(dead)) {
+                logUnattributed(dead, event.getSource());
             }
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ① 反转条件（BOSS 击杀）结算异常", t);
+        }
+    }
+
+    /**
+     * 解析「这一刀算谁的击杀」。
+     * <p>
+     * 致命一击<b>不一定</b>是玩家本体：玩家射出的弹幕/船炮/召唤物、第三方 mod 只传 directEntity 的伤害源、
+     * 以及「濒死演出结束后的环境伤害」都会让 {@code source.getEntity()} 不是玩家——直接用它会漏记
+     * （实测案：block_factorys_bosses 的 Kraken 本体被打死、掉落齐全，但致命一击没记在玩家头上）。
+     * 逐级回退：
+     * <ol>
+     *   <li>{@code source.getEntity()} 本身就是玩家 → 用它；</li>
+     *   <li>直接实体 / 间接实体归属某个玩家（{@link AllyFilter#playerOwner}）→ 用那个玩家；</li>
+     *   <li>{@link LivingEntity#getKillCredit()}——<b>原版发「击杀统计」和
+     *       {@code player_killed_entity} 成就用的就是它</b>（最近 100 tick 内伤害过它的玩家），
+     *       前两条都空时以它为准，保证我们与游戏自己的击杀口径一致。</li>
+     * </ol>
+     */
+    private static ServerPlayer resolveKiller(DamageSource source, LivingEntity dead) {
+        if (source != null) {
+            if (source.getEntity() instanceof ServerPlayer sp) return sp;
+            if (AllyFilter.playerOwner(source.getDirectEntity()) instanceof ServerPlayer sp) return sp;
+            if (AllyFilter.playerOwner(source.getEntity()) instanceof ServerPlayer sp) return sp;
+        }
+        if (dead != null && dead.getKillCredit() instanceof ServerPlayer sp) return sp;
+        return null;
+    }
+
+    /** 首领死了却认不出玩家击杀：60 秒一条，实机取证用（正常游玩不该出现）。 */
+    private static void logUnattributed(LivingEntity dead, DamageSource source) {
+        long now = System.currentTimeMillis();
+        if (now - lastUnattributedLog < 60_000L) return;
+        lastUnattributedLog = now;
+        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(dead.getType());
+        LenSouls.LOGGER.info("[Curse] boss-kill 未归属：{}（source={}）—— 这一刀不是玩家造成的，进度未记",
+                id, source == null ? "null" : source.getMsgId());
+    }
+
+    /**
+     * 记一次「击杀 BOSS」进度（目标 {@link #DISTINCT_BOSS_GOAL}）。
+     * <p>
+     * 两个入口共用这一份实现，保证口径一致：
+     * <ol>
+     *   <li>常规死亡 —— {@link #onKill}（{@code LivingDeathEvent}）；</li>
+     *   <li><b>挑战胜利但没有死亡事件</b> —— 永恒星光守门人
+     *       {@code TheGatekeeper.die()} 走 {@code permitPlayer → trySpawnLoot() → abortFight()}，
+     *       从不调 {@code super.die()}，{@code LivingDeathEvent} 根本不派发，
+     *       由 {@code GatekeeperSoulDropMixin} 在同一个注入点补记。</li>
+     * </ol>
+     * 去重集合共用 {@link #loadBossKills} ⇒ 两条路径同时走到也不会重复计数。
+     */
+    public static void creditBossKill(ServerPlayer player, LivingEntity dead) {
+        if (player == null || dead == null || dead == player) return;
+        if (!CurseManager.isActive(player, D)) return;
+        // 注：旧版的「空余照片饰品栏位 ≥5」前置条件已按要求取消——只保留「4 只不同 BOSS」。
+
+        // BOSS 判定：首领清单（bosslist）
+        if (!BossEntityLoader.isBoss(dead)) return;
+        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(dead.getType());
+        if (id == null) return;
+
+        Set<String> seen = loadBossKills(player);
+        if (!seen.add(id.toString())) return;         // 必须是「不同」BOSS
+        saveBossKills(player, seen);
+
+        for (int i = 0; i < D.entries(); i++) {
+            CurseManager.tick(player, D, i, 1L, DISTINCT_BOSS_GOAL);
         }
     }
 

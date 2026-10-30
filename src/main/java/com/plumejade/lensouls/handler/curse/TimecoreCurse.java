@@ -56,16 +56,28 @@ public final class TimecoreCurse {
     private static final ResourceLocation ARMOR_MOD = ResourceLocation.parse("lensouls:curse_rust_armor");
     private static final ResourceLocation WEIGHT_MOD = ResourceLocation.parse("lensouls:curse_weight");
 
+    /**
+     * e17 条件：移速**属性值** ≤0.02（原版玩家基础值 0.1 ⇒ ≈ 总减速 ≥80%）。
+     * <p>
+     * 直接读最终属性值（含缓慢、e17 重负、减速铁板、照片等全部修饰符），<b>不读单条修饰符的 amount()</b>：
+     * 原版 {@code generic.movement_speed} 下限是 0（按「-30%」这种负值判永远不成立），而 e17 自己的
+     * {@code WEIGHT_MOD} 最多 {@code -0.005 × 41 格 = -20.5%}，从来摸不到 -30% —— 旧写法
+     * {@code mod.amount() <= -0.30} 恒为 false，本条进度永远是 0、无法反转。
+     */
+    private static final double E17_SPEED_THRESHOLD = 0.02;
+
     /** e8 止息：连续无治疗计时（tick） */
     private static final Map<UUID, Long> NO_HEAL_TICKS = new HashMap<>();
     /** e2 饥禁：饱食度 <5 的累计 tick */
     private static final Map<UUID, Long> STARVE_TICKS = new HashMap<>();
     /** e2/e9：上一 tick 的饱食度（检测"进食"） */
     private static final Map<UUID, Integer> LAST_FOOD = new HashMap<>();
-    /** e17 重负：上一 tick 的位置（累计移动距离） */
-    private static final Map<UUID, double[]> LAST_POS = new HashMap<>();
-    /** e18 滞步：缓慢状态下的走地距离（格） */
-    private static final Map<UUID, Double> SLOW_WALK = new HashMap<>();
+    /** e17 重负 / e18 滞步：上一 tick 的**水平**位置（只算 XZ，见位移结算处注释） */
+    private static final Map<UUID, Pos> LAST_POS = new HashMap<>();
+    /** e17/e18 真格累加的余数（下标 0=e17、1=e18）：慢走 0.2 格/tick 不能靠 ceil 记成 1 格 */
+    private static final Map<UUID, double[]> MOVE_CARRY = new HashMap<>();
+    private static final int MOVE_SLOT_E17 = 0;
+    private static final int MOVE_SLOT_E18 = 1;
     /** e13 余悸：大击窗口到期 tick */
     private static final Map<UUID, Long> FEAR_UNTIL = new HashMap<>();
     /** e23 平势：本 tick 已经反击过（多段/范围伤害同一 tick 只反击一次） */
@@ -188,27 +200,32 @@ public final class TimecoreCurse {
             }
         }
 
-        // e17 条件：移速 ≤-30% 时累计移动 3000 格
-        double[] last = LAST_POS.get(player.getUUID());
-        double[] now = {player.getX(), player.getY(), player.getZ()};
+        // e17 条件：移速属性值 ≤0.02（≈ 总减速 ≥80%）时累计移动 3000 格
+        // e18 条件：缓慢状态下累计走地 10000 格（文案「走地」/设计文档「仅计地面位移」）
+        // 距离口径：只算 XZ 水平位移（把 Y 算进去，跳跃/下落会白送进度），且**真格累加**——
+        // 低移速下每 tick 只有 0.1~0.2 格，用 ceil 会把一个移动 tick 记成 1 格（进度放大 4~7 倍，
+        // 「3000 格」实际变成 3000 tick = 150 秒）。余数留在 MOVE_CARRY 里等下一 tick 补满。
+        Pos last = LAST_POS.get(player.getUUID());
+        double px = player.getX();
+        double pz = player.getZ();
         if (last != null && active) {
-            double dist = Math.sqrt(Math.pow(now[0] - last[0], 2) + Math.pow(now[2] - last[2], 2));
+            double dx = px - last.x();
+            double dz = pz - last.z();
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            // >8 格/tick 只可能是 /tp、维度切换、重生传送，不计入
             if (dist > 0 && dist < 8.0) {
-                // 移速加成 ≤ -30%（即属性修饰符 ≤ -0.3）
-                AttributeModifier mod = speed != null ? speed.getModifier(WEIGHT_MOD) : null;
-                if (CurseManager.on(player, D, 16) && mod != null && mod.amount() <= -0.30) {
-                    CurseManager.tick(player, D, 16, (long) Math.ceil(dist), 3000L);
+                if (CurseManager.on(player, D, 16) && moveSpeedOf(player) <= E17_SPEED_THRESHOLD) {
+                    long cells = wholeCells(player.getUUID(), MOVE_SLOT_E17, dist);
+                    if (cells > 0L) CurseManager.tick(player, D, 16, cells, 3000L);
                 }
-                // e18 滞步 条件：缓慢状态下累计走地 10000 格（文案「走地」/设计文档「仅计地面位移」）
                 if (CurseManager.on(player, D, 17) && player.onGround()
                         && player.hasEffect(MobEffects.MOVEMENT_SLOWDOWN)) {
-                    double walked = SLOW_WALK.merge(player.getUUID(), dist, Double::sum);
-                    CurseManager.tick(player, D, 17, (long) Math.ceil(dist), 10000L);
-                    if (walked >= 10000.0) SLOW_WALK.remove(player.getUUID());
+                    long cells = wholeCells(player.getUUID(), MOVE_SLOT_E18, dist);
+                    if (cells > 0L) CurseManager.tick(player, D, 17, cells, 10000L);
                 }
             }
         }
-        LAST_POS.put(player.getUUID(), now);
+        LAST_POS.put(player.getUUID(), new Pos(px, pz));
 
         // e18 滞步 反转：免疫缓慢
         if (CurseManager.rev(player, D, 17)) {
@@ -667,8 +684,8 @@ public final class TimecoreCurse {
         NO_HEAL_TICKS.remove(player.getUUID());
         STARVE_TICKS.remove(player.getUUID());
         LAST_POS.remove(player.getUUID());
+        MOVE_CARRY.remove(player.getUUID());
         LAST_FOOD.remove(player.getUUID());
-        SLOW_WALK.remove(player.getUUID());
 
         // e11 锈甲 反转：受近战伤害时反弹 25%（放在死亡前结算里不合适，见 onDealDamage 外的反弹逻辑）
     }
@@ -1049,6 +1066,26 @@ public final class TimecoreCurse {
         return attr == null ? 0.1 : attr.getValue();
     }
 
+    /**
+     * e17/e18 的**真格累加**：把本 tick 的位移并入该条件的整格计数，不足 1 格的余数留到下一 tick。
+     * <p>
+     * 不能写成 {@code ceil(dist)} 或 {@code round(dist)}：慢走每 tick 只有 0.1~0.2 格，
+     * ceil 会把每个移动 tick 都记成 1 格（进度放大 4~7 倍），round 则永远记 0。
+     *
+     * @return 本次应当计入进度的整格数（通常为 0，每 5~7 tick 出一次 1）
+     */
+    private static long wholeCells(UUID id, int slot, double dist) {
+        double[] carry = MOVE_CARRY.computeIfAbsent(id, k -> new double[2]);
+        carry[slot] += dist;
+        long whole = (long) carry[slot];
+        carry[slot] -= whole;
+        return whole;
+    }
+
+    /** 上一 tick 的水平位置（XZ）——Y 不计入移动距离，见位移结算处注释 */
+    private record Pos(double x, double z) {
+    }
+
     /** 清掉该玩家的所有瞬时计时（退出世界 / 死亡时调用） */
     public static void clear(UUID id) {
         if (id == null) return;
@@ -1056,7 +1093,7 @@ public final class TimecoreCurse {
         STARVE_TICKS.remove(id);
         LAST_FOOD.remove(id);
         LAST_POS.remove(id);
-        SLOW_WALK.remove(id);
+        MOVE_CARRY.remove(id);
         FEAR_UNTIL.remove(id);
         LAST_FIELD_TICK.remove(id);
         CurseHandDrop.clear(id);

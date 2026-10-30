@@ -1,0 +1,18 @@
+{
+  "lensouls:soul_dot_fire": {
+    "element": "fire",
+    "activity": 2.5
+  },
+  "lensouls:soul_dot_water": {
+    "element": "water",
+    "activity": 2.5
+  },
+  "lensouls:soul_dot_earth": {
+    "element": "earth",
+    "activity": 2.5
+  },
+  "lensouls:soul_dot_ender": {
+    "element": "ender",
+    "activity": 2.5
+  }
+}

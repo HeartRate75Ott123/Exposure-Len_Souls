@@ -62,8 +62,13 @@ public class CopySoulDropHandler {
                 new ItemStack(ModItems.COPY_SOUL.get(), count)));
     }
 
-    /** 击杀者是否处于「⑤ 铁序·厄运 已反转」→ 复制之魂掉落 ×1.5 */
-    private static float copySoulMult(net.minecraft.world.entity.Entity killer) {
+    /**
+     * 击杀者是否处于「⑤ 铁序·厄运 已反转」→ 复制之魂掉落 ×1.5。
+     * <p>
+     * 对所有缺口开放：正常死亡走 {@link #onLivingDrops}，守门人「挑战胜利」那条
+     * （{@code GatekeeperSoulDropMixin}，不走 LivingDeathEvent）自己调这里取倍率。
+     */
+    public static float copySoulMult(net.minecraft.world.entity.Entity killer) {
         if (killer instanceof net.minecraft.server.level.ServerPlayer sp
                 && com.plumejade.lensouls.feather.CurseManager.rev(sp,
                         com.plumejade.lensouls.feather.CurseDefs.TIMECORE, 14)) {

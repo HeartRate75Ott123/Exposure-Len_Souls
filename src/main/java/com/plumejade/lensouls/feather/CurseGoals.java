@@ -88,7 +88,9 @@ public final class CurseGoals {
         put(CurseDefs.ABYSS, 5, 200L, BLOCKS);
         // e7 祸之可能性：FeatherAbyssHandler:1261  tick(..., 1L, E7_SUMMON_KILL_GOAL[205]=100)
         put(CurseDefs.ABYSS, 6, 100L, KILLS);
-        // e8 挫败 / e10 失忆 / e11 疯狂 / e12 恶意：reach（:1267 / :1274 / :1281 / markPendingReverse :689）直判 → 留空。
+        // e8 挫败 / e10 失忆 / e12 恶意：reach（:1267 / :1274 / :1281 / markPendingReverse :689）直判 → 留空。
+        // e11 疯狂：FeatherAbyssHandler:1318 一次「移速>2 一击致死」即 tick(..., E11_MADNESS, 1L, 1L) ⇒ 目标 1
+        put(CurseDefs.ABYSS, 10, 1L, TIMES);
         // e9 食之无味：FeatherAbyssHandler:812 setProgress(n) + :814 reach，目标 E9_FOOD_KIND_GOAL[209]=50
         put(CurseDefs.ABYSS, 8, 50L, KINDS);
 
@@ -98,20 +100,20 @@ public final class CurseGoals {
         put(CurseDefs.TIMECORE, 1, 12000L, TIME);    // e2 饥禁   :114 每 tick +1 → 12000 tick = 10 分钟
         put(CurseDefs.TIMECORE, 2, 1000L, BLOCKS);   // e3 迟凿   :293 挖 1000 个方块
         put(CurseDefs.TIMECORE, 3, 150L, TIMES);     // e4 徒劳   :302 被吞掉落 150 次
-        put(CurseDefs.TIMECORE, 4, 3000L, POINTS);   // e5 盈伤   :539 每次满血挨打都累加（同一条命可反复满血累加，死亡清零）
-        put(CurseDefs.TIMECORE, 5, 1L, TIMES);       // e6 坠渊   :436 单次摔落 ≥15 点并存活 → 1 次
+        put(CurseDefs.TIMECORE, 4, 3000L, POINTS);   // e5 盈伤   DamageIntake→:539 打前满血时按**真实扣血**累加（不看来源，含自伤；死亡清零）
+        put(CurseDefs.TIMECORE, 5, 1L, TIMES);       // e6 坠渊   :436 单次摔落真实扣血 ≥15 点并存活 → 1 次
         put(CurseDefs.TIMECORE, 6, 10000L, POINTS);  // e7 钝锋   :512 累计造成 10000 点
         put(CurseDefs.TIMECORE, 7, 6000L, TIME);     // e8 止息   :127 每 tick +1 → 6000 tick = 5 分钟
         put(CurseDefs.TIMECORE, 8, 200L, KILLS);     // e9 断粮   :623 饥饿 V 下击杀 200 只
-        put(CurseDefs.TIMECORE, 9, 5000L, POINTS);   // e10 夺佑  :524 移速属性值 <0.05 时承受 5000 点（死亡不清零）
-        put(CurseDefs.TIMECORE, 10, 2000L, POINTS);  // e11 锈甲  :473 护甲 ≤5 时承受 2000 点物理
+        put(CurseDefs.TIMECORE, 9, 5000L, POINTS);   // e10 夺佑  DamageIntake 移速属性值 <0.05 时承受 5000 点真实扣血（死亡不清零）
+        put(CurseDefs.TIMECORE, 10, 2000L, POINTS);  // e11 锈甲  DamageIntake 护甲 ≤5 时承受 2000 点物理真实扣血
         put(CurseDefs.TIMECORE, 11, 10000L, POINTS); // e12 缚己  :721 夺魂索命累计 10000 点
-        put(CurseDefs.TIMECORE, 12, 30L, TIMES);     // e13 余悸  :445 累计 30 次大击
+        put(CurseDefs.TIMECORE, 12, 30L, TIMES);     // e13 余悸  DamageIntake 真实扣血 >40% 最大生命累计 30 次
         put(CurseDefs.TIMECORE, 13, 50L, KINDS);     // e14 裁影  :881 setProgress(n)，目标 STOLEN_KIND_GOAL[785]=50 种
         put(CurseDefs.TIMECORE, 14, 500L, KILLS);    // e15 厄运  :629 击杀 500 只
         put(CurseDefs.TIMECORE, 15, 200L, TIMES);    // e16 释刃  :543 主手脱手 200 次
-        put(CurseDefs.TIMECORE, 16, 3000L, CELLS);   // e17 重负  :217 移速属性值 ≤0.02 时累计移动 3000 格（真格累加）
-        put(CurseDefs.TIMECORE, 17, 10000L, CELLS);  // e18 滞步  :221 缓慢下走地 10000 格（真格累加）
+        put(CurseDefs.TIMECORE, 16, 3000L, CELLS);   // e17 重负  :209 移动速度值 <0.02 时累计移动 3000 格（真格累加）
+        put(CurseDefs.TIMECORE, 17, 10000L, CELLS);  // e18 滞步  :224 缓慢下走地 10000 格（真格累加）
         put(CurseDefs.TIMECORE, 18, 50L, KILLS);     // e19 障目  :633 失明下击杀 50 只
         put(CurseDefs.TIMECORE, 19, 1000L, POINTS);  // e20 垂翅  :550 飞行中造成 1000 点
         put(CurseDefs.TIMECORE, 20, 10L, TIMES);     // e21 无援  :673 生命 ≤2 时拍立得拍 10 张
@@ -119,10 +121,12 @@ public final class CurseGoals {
         put(CurseDefs.TIMECORE, 22, 1L, KILLS);      // e23 平势  :638 击杀暮色巫妖
 
         // ==================== ⑥ 终焉秘仪（偏移 43，7 条） ====================
-        // 七条各配一只 BOSS：FinalriteCurse:95-103 BOSS_ENTRY → :344 tick(player, D, entry, 1L, 1L)
+        // 其中 6 条各配一只 BOSS：FinalriteCurse BOSS_ENTRY → tick(player, D, entry, 1L, 1L)
         for (int i = 0; i < CurseDefs.FINALRITE.entries(); i++) {
             put(CurseDefs.FINALRITE, i, 1L, KILLS);
         }
+        // e4 力竭 是例外：不击杀 BOSS，而是「精力低于 50% 时一次打出 5000 点伤害」→ 单次达成，单位「次」
+        put(CurseDefs.FINALRITE, 3, 1L, TIMES);
 
         // ==================== ⑦ 零号誓炉（偏移 50，14 = 7 诅咒 + 7 祝福） ====================
         // 全部出自 handler/curse/ZeroforgeCurse.java。

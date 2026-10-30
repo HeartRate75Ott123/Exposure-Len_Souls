@@ -117,10 +117,15 @@ public class VitalStrikeHandler {
 
         // 失败反馈聚合：视锥内只要有一只成功削到韧性就不弹；没有目标（前面已 return）或
         // 全部是定身/倍率0 这类"无需解释"的情况也不弹。
-        // 另外按规则，选中能力窃取/弱点透镜/空间扭曲/时空回溯时韧性失败一律静默（ToughnessFailureGate）。
-        if (!anyDealt && blockedByHyperArmor
-                && !com.plumejade.lensouls.boss.ToughnessFailureGate.silenceFailure(player)) {
-            com.plumejade.lensouls.network.VitalStrikeRejectPacket.send(player);
+        // 弹哪一种由服务端一次定死（客户端只看得到自己手上的相机）：
+        //   闪光灯槽装着「机械眼」→ 沿用旧的大故障叉号；
+        //   否则 / 以及四个静默能力（能力窃取·弱点透镜·空间扭曲·时空回溯）→ 原版虚弱小图标。
+        // 四个静默能力仍<b>不弹大叉号</b>（用户定：那四个不是在建韧），但小图标照弹。
+        if (!anyDealt && blockedByHyperArmor) {
+            boolean mechanicalEye = com.plumejade.lensouls.integration.ExposureHelper.hasMechanicalEye(stack);
+            boolean cross = mechanicalEye
+                    && !com.plumejade.lensouls.boss.ToughnessFailureGate.silenceFailure(player);
+            com.plumejade.lensouls.network.VitalStrikeRejectPacket.send(player, cross);
         }
     }
 

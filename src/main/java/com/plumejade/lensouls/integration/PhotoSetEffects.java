@@ -267,7 +267,11 @@ public class PhotoSetEffects {
         // 护甲是「百分比」语义（armor:0.15 = 护甲值 +15%），必须走 ADD_MULTIPLIED_TOTAL：
         // ARMOR 的基值是 0，装备护甲是 LivingEntity.collectEquipmentChanges 里 addTransientModifier 的
         // ADD_VALUE 项；AttributeInstance.calculateValue 的结算顺序是
-        // (base + Σ ADD_VALUE) → ×(1+Σ ADD_MULTIPLIED_BASE) → ×(1+Σ ADD_MULTIPLIED_TOTAL)。于是：
+        //   (base + Σ ADD_VALUE) → ×(1 + Σ ADD_MULTIPLIED_BASE) → ×Π(1 + ADD_MULTIPLIED_TOTAL 逐条) → 末尾 clamp 一次。
+        // 注意第三个桶的行为与中间桶不同（javap -c 实测字节码：中间桶是 `d3 += d0 * amount` 相加，
+        // 末尾桶是 `d3 *= 1 + amount` 逐条相乘）——**只有单个 TOTAL 修饰符时**才等价于「×(1+Σ)」。
+        // 多条 TOTAL 同时存在时是连乘：例如本条的 +15% 护甲与 ⑤ e11 锈甲的 -60%（也是 TOTAL）结果是
+        // ×0.4 × 1.15 = ×0.46，而不是 ×(1 - 0.6 + 0.15) = ×0.55。于是：
         //   · ADD_MULTIPLIED_BASE  → 0 × 0.15 = 0，永远不生效；
         //   · ADD_VALUE            → 只加 0.15 点，getArmorValue() 取 floor 后护甲条 0 格、减伤 <1%（1.8.31 之前的实况）；
         //   · ADD_MULTIPLIED_TOTAL → 按当前护甲总值乘 1.15（穿 20 点即 +3 点），与文案「护甲值 +15%」一致。

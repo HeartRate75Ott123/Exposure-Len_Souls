@@ -40,15 +40,18 @@ public abstract class GatekeeperSoulDropMixin {
     private void lensouls$onChallengeWin(DamageSource source, CallbackInfo ci) {
         var self = (net.minecraft.world.entity.LivingEntity) (Object) this;
         if (!(self.level() instanceof ServerLevel serverLevel)) return;
-        // ① 复制之魂：挑战成功即掉落
-        if (source != null) {
-            CopySoulDropHandler.spawnCopySoulDrop(serverLevel, self.getX(), self.getY(), self.getZ());
-        }
-        // ② 诅咒进度：挑战成功算一次 BOSS 击杀（没有 LivingDeathEvent，只能在这里补）
+        // 挑战者先解析出来：下面两条都要用（掉落倍率 / 诅咒击杀进度）
         ServerPlayer winner = fightTarget(self);
         if (winner == null && source != null && source.getEntity() instanceof ServerPlayer sp) {
             winner = sp;
         }
+        // ① 复制之魂：挑战成功即掉落；⑤ 铁序·厄运 反转后「掉落 +50%」在这里同样生效
+        //   （这条路径不进 LivingDeathEvent，所以必须自己带上倍率，否则同一只 boss 换条死法就没加成了）
+        if (source != null) {
+            CopySoulDropHandler.spawnCopySoulDrop(serverLevel, self.getX(), self.getY(), self.getZ(),
+                    CopySoulDropHandler.copySoulMult(winner));
+        }
+        // ② 诅咒进度：挑战成功算一次 BOSS 击杀（没有 LivingDeathEvent，只能在这里补）
         if (winner != null) {
             FeatherHardmanHandler.creditBossKill(winner, self);
         }

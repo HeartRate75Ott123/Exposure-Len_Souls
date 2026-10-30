@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.integration;
 
 import com.plumejade.lensouls.LenSouls;
+import io.github.mortuusars.exposure.world.item.component.StoredItemStack;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -43,6 +44,29 @@ public class ExposureHelper {
      */
     public static boolean isPlayerEntityId(ResourceLocation id) {
         return PLAYER_ENTITY_ID.equals(id);
+    }
+
+    /**
+     * 相机的<b>闪光灯槽</b>里是否装着「机械眼」（{@code lensouls:mechanical_eye}）。
+     * <p>
+     * 只由服务端两个削韧失败出口调用（贴脸右键的要害打击 / 拍照的 {@code FrameAddedEvent}），
+     * 用来决定「白霸体挡下」那一下弹<b>大故障叉号</b>还是<b>原版虚弱小图标</b>：
+     * 装了机械眼 → 沿用旧的大叉号；没装 → 小图标。
+     * <p>
+     * 闪光灯槽在数据里就是 {@code Exposure.DataComponents.FLASH}（{@code StoredItemStack}），
+     * 与镜头槽 {@code LENS} 同一套写法。拍立得（{@code exposure_polaroid:instant_camera}）
+     * 的附件清单只有滑片槽、没有闪光灯槽，因此拍立得永远返回 false（永远走小图标）。
+     */
+    public static boolean hasMechanicalEye(ItemStack camera) {
+        if (camera == null || camera.isEmpty()) return false;
+        try {
+            StoredItemStack stored = camera.get(io.github.mortuusars.exposure.Exposure.DataComponents.FLASH);
+            return stored != null
+                    && stored.getForReading().getItem() instanceof com.plumejade.lensouls.item.MechanicalEyeItem;
+        } catch (Throwable ignored) {
+            // 读组件失败按"没装"处理：宁可给默认的小图标，也别把叉号误弹出来
+            return false;
+        }
     }
 
     /**

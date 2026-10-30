@@ -1,0 +1,1842 @@
+{
+  "_meta": {
+    "what": "Len Souls 7 款羽系诅咒的全量数据：中文/英文文案 + 反转条件目标值 + 代码落点",
+    "generatedBy": "python tools/gen_curse_json.py（不要手改本文件，改源码后重跑）",
+    "sources": [
+      "feather/CurseDefs.java（掩码布局/条目数/blessing/noReverse）",
+      "feather/CurseGoals.java（目标值 + 单位）",
+      "lang/zh_cn.json + lang/en_us.json（文案）",
+      "各 handler 的 CurseManager.on/rev/tick/reach 调用（代码落点）"
+    ],
+    "maskLayout": "一个 long 共 64 位，位序 = maskOffset + 条目下标；① 0..2 ② 3..5 ③ 6..7 ④ 8..19 ⑤ 20..42 ⑥ 43..49 ⑦ 50..63",
+    "stackingRule": "诅咒态乘算、反转态加算（设计文档 §2「叠加口径（定稿）」）；⑦ 第 8 条起是祝福不是诅咒",
+    "state": "进度存玩家附件 CurseStateData（copyOnDeath）；查/改统一走 CurseManager.on/rev/tick/reach/resetProgress",
+    "caveats": [
+      "① ② ③ 三条/两条共用 def 级 cond_shared，逐条没有各自的条件文案",
+      "④ e1「虚无的承诺」无反转条件（noReverse），progress 显示 /11",
+      "⑦ 第 8~14 条是「祝福」（blessing），after 字段是解锁后的增益",
+      "refs 是调用点快照（文件:行），源码增删行后行号会漂移——以本脚本重跑结果为准",
+      "target.goal 与 handler 里 tick 的目标实参应当一致，脚本会把两边都抓下来，不一致见 _meta.targetMismatches"
+    ],
+    "targetMismatches": []
+  },
+  "totals": {
+    "feathers": 7,
+    "curses": 57,
+    "blessings": 7,
+    "entries": 64
+  },
+  "feathers": [
+    {
+      "number": "①",
+      "key": "HARDMAN",
+      "itemId": "lensouls:feather_hardman",
+      "name": "§d羽·荒厄遗咒",
+      "motto": "荒厄之咒",
+      "desc": "§d——被荒厄诅咒缠绕的羽毛——",
+      "wear": "§e佩戴在羽毛栏任意槽位即可生效；§c佩戴后生存模式不可取下",
+      "progressText": "§8已反转 %s / 3",
+      "maskOffset": 0,
+      "entries": [
+        {
+          "n": 1,
+          "maskBit": 0,
+          "name": "荒厄·蚀灵",
+          "curse": "§c失去所有元素亲和力，药水活性对你无效",
+          "cond": "击杀 4 只不同 BOSS",
+          "after": "§a元素亲和恢复（可正常获取活性效果）；§c活性效果 -2；§a每有 1 级正数活性，额外提供 1 点附加伤害",
+          "merged": null,
+          "en": {
+            "name": "Blight·Essence Rot",
+            "curse": "§cAll elemental affinity lost; potion activity has no effect on you",
+            "after": "§aElemental affinity restored; §cactivity -2§a; each level of positive activity grants +1 bonus damage"
+          },
+          "target": {
+            "goal": 4,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/FeatherHardmanHandler.java:142 on",
+            "handler/FeatherHardmanHandler.java:199 rev"
+          ]
+        },
+        {
+          "n": 2,
+          "maskBit": 1,
+          "name": "荒厄·封器",
+          "curse": "§c无法发动相机能力，但仍可拍普通照片",
+          "cond": "击杀 4 只不同 BOSS",
+          "after": "§a相机能力解禁（所有能力可正常发动）；§c被拍生物的韧性伤害 -2；§a被拍摄的敌对生物受到「韧性伤害 × 你当前近战伤害」的伤害",
+          "merged": null,
+          "en": {
+            "name": "Blight·Sealed Lens",
+            "curse": "§cCannot use camera abilities, but plain photos still work",
+            "after": "§aCamera unlocked; §ctoughness damage -2§a; photographed hostiles take toughness damage × your melee damage"
+          },
+          "target": {
+            "goal": 4,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/FeatherHardmanHandler.java:410 rev",
+            "handler/FeatherHardmanHandler.java:415 on",
+            "handler/FeatherHardmanHandler.java:420 rev"
+          ]
+        },
+        {
+          "n": 3,
+          "maskBit": 2,
+          "name": "荒厄·蚀峰",
+          "curse": "§c造成伤害 -35%、受到伤害 +35%；额外造成「你当前伤害 × 空余照片饰品栏位 ×5%」的附加伤害（真伤）",
+          "cond": "击杀 4 只不同 BOSS",
+          "after": "§a护甲 +5；§a附加伤害系数 5% → 6%",
+          "merged": "§c造成伤害 -35%、受到伤害 +35%；§a护甲 +5；§a附加伤害提升为「你当前伤害 × 空余照片饰品栏位 × 6%」（真伤）",
+          "en": {
+            "name": "Blight·Eroded Peak",
+            "curse": "§cDamage dealt -35%, damage taken +35%; extra damage equal to your damage × free photo trinket slots × 5% (true damage)",
+            "after": "§aArmor +5; bonus coefficient 5% → 6%",
+            "merged": "§cDamage dealt -35%, damage taken +35% §8·§a Armor +5; extra damage now uses 6% (true damage)"
+          },
+          "target": {
+            "goal": 4,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/FeatherHardmanHandler.java:175 rev",
+            "handler/FeatherHardmanHandler.java:214 on",
+            "handler/FeatherHardmanHandler.java:214 rev",
+            "handler/FeatherHardmanHandler.java:239 on",
+            "handler/FeatherHardmanHandler.java:239 rev",
+            "handler/FeatherHardmanHandler.java:244 rev"
+          ]
+        }
+      ],
+      "sharedCond": "击杀 4 只不同 BOSS",
+      "blessingsFrom": null,
+      "noReverse": null,
+      "extraLang": {},
+      "loopRefs": [
+        "handler/FeatherHardmanHandler.java:345 tick(i)"
+      ]
+    },
+    {
+      "number": "②",
+      "key": "TWITCHER",
+      "itemId": "lensouls:feather_twitcher",
+      "name": "§d羽·扭曲之人",
+      "motto": "扭曲之咒",
+      "desc": "§d——被扭曲命运纠缠的羽毛——",
+      "wear": "§e佩戴在羽毛栏任意槽位即可生效；§c佩戴后生存模式不可取下",
+      "progressText": "§8已反转 %s / 3",
+      "maskOffset": 3,
+      "entries": [
+        {
+          "n": 1,
+          "maskBit": 3,
+          "name": "扭曲·外伤",
+          "curse": "§c受到的伤害 +100%",
+          "cond": "在扭曲值 100、护甲值为 0 时，击杀 6 万血以上的生物",
+          "after": "§a改为受到伤害 -25%（原 +100%）",
+          "merged": "§a受到伤害 -25%",
+          "en": {
+            "name": "Twist·Trauma",
+            "curse": "§cDamage taken +100%",
+            "after": "§aDamage taken becomes -25% (was +100%)",
+            "merged": "§aDamage taken -25%"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/FeatherTwitcherHandler.java:239 on",
+            "handler/FeatherTwitcherHandler.java:241 rev"
+          ]
+        },
+        {
+          "n": 2,
+          "maskBit": 4,
+          "name": "扭曲·苦楚",
+          "curse": "§c每点扭曲值：造成伤害 +1%、受到伤害 +1%；扭曲值上限 100",
+          "cond": "在扭曲值 100、护甲值为 0 时，击杀 6 万血以上的生物",
+          "after": "§a造成伤害 +1% 转为增益；§a扭曲值获取 ×1.2",
+          "merged": "§c每点扭曲值：受到伤害 +1%；§a造成伤害 +1%；§a扭曲值获取 ×1.2；§7扭曲值上限 100",
+          "en": {
+            "name": "Twist·Anguish",
+            "curse": "§cPer distortion point: damage dealt +1%, damage taken +1%; distortion cap 100",
+            "after": "§aDamage dealt +1% becomes a bonus; §aTwist gain ×1.2",
+            "merged": "§cPer point: damage taken +1%; §aDamage dealt +1%; §aTwist gain ×1.2; §7Twist cap 100"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/FeatherTwitcherHandler.java:196 rev",
+            "handler/FeatherTwitcherHandler.java:205 rev",
+            "handler/FeatherTwitcherHandler.java:246 on",
+            "handler/FeatherTwitcherHandler.java:292 on"
+          ]
+        },
+        {
+          "n": 3,
+          "maskBit": 5,
+          "name": "扭曲·狂喜",
+          "curse": "§c受到伤害时，每 1 点伤害提升 0.1 扭曲值；扭曲值满 100 时死亡 → 强制掉落全部物品（无视死亡不掉落；有虚影核心则由它收纳），并生成扭曲者",
+          "cond": "在扭曲值 100、护甲值为 0 时，击杀 6 万血以上的生物",
+          "after": "§a扭曲值 ≥100 时，消耗 100 阻止死亡 3 秒（期间每刻额外消耗 1 点 + 当前值 3%，每点延长 0.1 秒，可突破上限）",
+          "merged": "§c受到伤害时，每 1 点伤害提升 0.1 扭曲值；§a扭曲值 ≥100 时，消耗 100 阻止死亡 3 秒（期间每刻额外消耗 1 点 + 当前值 3%，每点延长 0.1 秒，可突破上限）；§c若 3 秒后仍死亡，依旧强制掉落全部物品并生成扭曲者",
+          "en": {
+            "name": "Twist·Ecstasy",
+            "curse": "§cWhen damaged, each 1 damage adds 0.1 distortion; dying at 100 distortion forces a full item drop (even with keepInventory on; a Phantom Core stores them instead) and spawns a Twisted",
+            "after": "§aAt 100+ Twist, spend 100 to deny death for 3s (drains 1 + 3% of current value per tick, each point extends it 0.1s, may exceed cap)",
+            "merged": "§cTaking damage adds 0.1 Twist per damage point; §aat 100+ Twist, spend 100 to deny death for 3s (drains 1 + 3% per tick, +0.1s per point, may exceed cap); §cif you still die after 3s, the forced drop and Twisted spawn still happen"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/FeatherTwitcherHandler.java:276 on",
+            "handler/FeatherTwitcherHandler.java:276 rev",
+            "handler/FeatherTwitcherHandler.java:383 rev",
+            "handler/FeatherTwitcherHandler.java:394 on"
+          ]
+        }
+      ],
+      "sharedCond": "在扭曲值 100、护甲值为 0 时，击杀 6 万血以上的生物",
+      "blessingsFrom": null,
+      "noReverse": null,
+      "extraLang": {},
+      "loopRefs": [
+        "handler/FeatherTwitcherHandler.java:481 tick(i)"
+      ]
+    },
+    {
+      "number": "③",
+      "key": "ELEMENTRISE",
+      "itemId": "lensouls:feather_elementrise",
+      "name": "§d羽·元素觉醒者",
+      "motto": "元素之咒",
+      "desc": "§d——七塔合四席，余音未散——",
+      "wear": "§e佩戴在羽毛栏任意槽位即可生效；§c佩戴后生存模式不可取下",
+      "progressText": "§8已反转 %s / 2",
+      "maskOffset": 6,
+      "entries": [
+        {
+          "n": 1,
+          "maskBit": 6,
+          "name": "元素·躁动",
+          "curse": "§a每（4 × 活性等级²）秒，所有活性等级 +1；§c每个活性等级使受到伤害 +2.6%",
+          "cond": "活性等级 ≥10 且生命值 ≥90% 时，造成一次 10000 点元素附加伤害",
+          "after": "§a每级活性使受到伤害 +2.6% → +2%",
+          "merged": "§a每（4 × 活性等级²）秒，所有活性等级 +1；§c每个活性等级使受到伤害 +2%",
+          "en": {
+            "name": "Element·Restless",
+            "curse": "§cEvery (4 × activity²) seconds all activity +1; each activity level makes damage taken +2.6%",
+            "after": "§aDamage taken per element level 2.6% → 2%",
+            "merged": "§aEvery (4 × level²)s all element levels +1; §cdamage taken +2% per level"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/FeatherElementRiseHandler.java:110 on",
+            "handler/FeatherElementRiseHandler.java:112 rev"
+          ]
+        },
+        {
+          "n": 2,
+          "maskBit": 7,
+          "name": "元素·余灰",
+          "curse": "§cDoT 伤害随剩余血量百分比变化：剩余血量越多，DoT 伤害越高（最高 +100%、最低 -50%）",
+          "cond": "活性等级 ≥10 且生命值 ≥90% 时，造成一次 10000 点元素附加伤害",
+          "after": "§aDoT 最低值 -50% → -20%（最高 +100% 不变）",
+          "merged": "§7DoT 伤害随剩余血量百分比变化：§a剩余越多 DoT 越高（最高 +100%）；§a最低 -20%",
+          "en": {
+            "name": "Element·Embers",
+            "curse": "§cDoT damage scales with remaining HP: the more HP left, the higher the DoT (max +100%, min -50%)",
+            "after": "§aMinimum DoT -50% → -20% (max +100% unchanged)",
+            "merged": "§7DoT scales with remaining HP: §ahigher HP → higher DoT (up to +100%); §aminimum -20%"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/FeatherElementRiseHandler.java:234 on",
+            "handler/FeatherElementRiseHandler.java:235 rev"
+          ]
+        }
+      ],
+      "sharedCond": "活性等级 ≥10 且生命值 ≥90% 时，造成一次 10000 点元素附加伤害",
+      "blessingsFrom": null,
+      "noReverse": null,
+      "extraLang": {},
+      "loopRefs": [
+        "handler/FeatherElementRiseHandler.java:267 tick(i)"
+      ]
+    },
+    {
+      "number": "④",
+      "key": "ABYSS",
+      "itemId": "lensouls:feather_abyss",
+      "name": "§d羽·折翼沉渊",
+      "motto": "沉渊之咒",
+      "desc": "§d——散发妖气的羽毛，沾染了神秘的东方气息——",
+      "wear": "§e佩戴在羽毛栏任意槽位即可生效；§c佩戴后生存模式不可取下",
+      "progressText": "§8已反转 %s / 11",
+      "maskOffset": 8,
+      "entries": [
+        {
+          "n": 1,
+          "maskBit": 8,
+          "name": "虚无的承诺",
+          "curse": "§a手持超立方体时自动切创造，松开/登出恢复",
+          "cond": "—",
+          "after": "§7本条本就是增益，无需反转",
+          "merged": null,
+          "en": {
+            "name": "Nihil Promise",
+            "curse": "§aAutomatically switch to Creative while holding the Tesseract; reverts on release/logout",
+            "cond": "—",
+            "after": "§7Already a benefit; nothing to reverse"
+          },
+          "target": {
+            "goal": 0,
+            "unit": "none",
+            "unitText": "%s"
+          },
+          "noReverse": true,
+          "refs": [
+            "handler/FeatherAbyssHandler.java:352 on"
+          ]
+        },
+        {
+          "n": 2,
+          "maskBit": 9,
+          "name": "神秘雪球",
+          "curse": "§c怪物对你造成伤害时，以该怪物为中心环形发射 8 个敌对雪球（3 点魔法伤害）",
+          "cond": "累计受到 100 次敌对雪球的伤害",
+          "after": "§a不再发射敌对雪球",
+          "merged": null,
+          "en": {
+            "name": "Mystic Snowballs",
+            "curse": "§cWhen a monster damages you, launch a ring of 8 hostile snowballs around it (3 magic damage each)",
+            "cond": "Take hostile snowball damage 100 times",
+            "after": "§aNo hostile snowballs are launched"
+          },
+          "target": {
+            "goal": 100,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:634 on",
+            "handler/FeatherAbyssHandler.java:794 on",
+            "handler/FeatherAbyssHandler.java:795 tick"
+          ]
+        },
+        {
+          "n": 3,
+          "maskBit": 10,
+          "name": "安魂曲",
+          "curse": "§c每过一天，最大生命上限 -1（最低 1）；受到的伤害 +13%/天",
+          "cond": "游戏天数小于 5 天时，把生命上限提升到 20 以上，之后无法再达成",
+          "after": "§a改为：每过一天最大生命 +1、受到伤害 -13%",
+          "merged": "§a每过一天，最大生命上限 +1；§a受到的伤害 -13%/天",
+          "en": {
+            "name": "Requiem",
+            "curse": "§cEach day: max health -1 (min 1), damage taken +13% per day",
+            "cond": "Before day 5, push max health above 20; cannot be achieved afterwards",
+            "after": "§aNow: +1 max HP and -13% damage taken per day",
+            "merged": "§a+1 max HP per day; §a-13% damage taken per day"
+          },
+          "target": {
+            "goal": 0,
+            "unit": "none",
+            "unitText": "%s"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:355 rev",
+            "handler/FeatherAbyssHandler.java:376 on",
+            "handler/FeatherAbyssHandler.java:379 reach",
+            "handler/FeatherAbyssHandler.java:610 on",
+            "handler/FeatherAbyssHandler.java:612 rev",
+            "handler/FeatherAbyssHandler.java:1365 rev"
+          ]
+        },
+        {
+          "n": 4,
+          "maskBit": 11,
+          "name": "愚钝",
+          "curse": "§c经验获取 -50%",
+          "cond": "一次性获取 2000 点经验",
+          "after": "§a改为经验获取 ×2（原 -50%）",
+          "merged": "§a经验获取 ×2",
+          "en": {
+            "name": "Obtuse",
+            "curse": "§cExperience gained -50%",
+            "cond": "Gain 2,000 XP at once",
+            "after": "§aXP gain ×2 (was -50%)",
+            "merged": "§aXP gain ×2"
+          },
+          "target": {
+            "goal": 0,
+            "unit": "none",
+            "unitText": "%s"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:811 on",
+            "handler/FeatherAbyssHandler.java:812 rev",
+            "handler/FeatherAbyssHandler.java:819 reach"
+          ]
+        },
+        {
+          "n": 5,
+          "maskBit": 12,
+          "name": "自闭",
+          "curse": "§c16 格内每加入一个生物，你受 0.5 魔法伤害、护甲 ×75%/层（每层 3 秒）",
+          "cond": "16 格内一次性加入 50 只生物并存活（旁观者模式不计）",
+          "after": "§a护甲改为每层 +5%（3 秒，不再衰减）",
+          "merged": "§c16 格内每加入一个生物，你受 0.5 魔法伤害；§a护甲改为每层 +5%（3 秒，不再衰减）",
+          "en": {
+            "name": "Seclusion",
+            "curse": "§cEach creature joining within 16 blocks deals 0.5 magic damage and reduces armor ×75% per stack (3s each)",
+            "cond": "50 creatures join within 16 blocks at once while you survive (spectator mode does not count)",
+            "after": "§aArmor +5% per stack (3s, no decay)",
+            "merged": "§cEach mob entering 16 blocks deals 0.5 magic damage; §aarmor +5% per stack (3s, no decay)"
+          },
+          "target": {
+            "goal": 0,
+            "unit": "none",
+            "unitText": "%s"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:516 rev",
+            "handler/FeatherAbyssHandler.java:884 on",
+            "handler/FeatherAbyssHandler.java:885 rev"
+          ]
+        },
+        {
+          "n": 6,
+          "maskBit": 13,
+          "name": "厄运",
+          "curse": "§c挖掘方块 0.8% 概率生成 15 只蠹虫；每分钟从饥饿/失明/迟缓/挖掘疲劳/中毒/虚弱/漂浮中抽 2 个不重复（20 秒，等级 3 至 20）",
+          "cond": "累计挖掘 200 个方块",
+          "after": "§a挖掘方块不再生成蠹虫；§a每分钟改为获得 2 个正面效果（20 秒）",
+          "merged": null,
+          "en": {
+            "name": "Doom",
+            "curse": "§c0.8% chance per mined block to spawn 15 silverfish; every minute draw 2 unique debuffs from hunger/blindness/slowness/mining fatigue/poison/weakness/levitation (20s, level 3-20)",
+            "cond": "Mine 200 blocks in total",
+            "after": "§aBreaking blocks no longer spawns silverfish; §aearn 2 random buffs per minute (20s)"
+          },
+          "target": {
+            "goal": 200,
+            "unit": "blocks",
+            "unitText": "%s 格 / %s 格"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:947 on",
+            "handler/FeatherAbyssHandler.java:948 tick",
+            "handler/FeatherAbyssHandler.java:951 on",
+            "handler/FeatherAbyssHandler.java:1211 rev"
+          ]
+        },
+        {
+          "n": 7,
+          "maskBit": 14,
+          "name": "祸之可能性",
+          "curse": "§c充能 15 分钟（扭曲值越高越快，最短 2 分钟）；充能完毕且 7 格内 ≥5 只怪物 → 末影龙之吼 + 3 秒倒计时 → 召唤 5 只（僵尸/骷髅/洞穴蜘蛛其一）",
+          "cond": "累计击杀由祸之可能性召唤的怪物 100 只",
+          "after": "§a充能完毕后，改为对 7 格内怪物落雷（15 点魔法伤害），不再召唤怪物",
+          "merged": "§c充能 15 分钟（扭曲值越高越快，最短 2 分钟）；§a充能完毕且 7 格内 ≥5 只怪物 → 落雷（15 点魔法伤害），不再召唤",
+          "en": {
+            "name": "Disaster",
+            "curse": "§cCharges for 15 minutes (faster with distortion, min 2 min); once charged, if 5+ monsters are within 7 blocks, the Ender Dragon roars, a 3s countdown appears, then 5 mobs (zombie/skeleton/cave spider) spawn",
+            "cond": "Kill 100 monsters summoned by Disaster",
+            "after": "§aWhen fully charged, lightning strikes mobs within 7 blocks (15 magic) instead of summoning",
+            "merged": "§cCharges over 15 min (faster with Twist, min 2 min); §aon full charge with 5+ mobs within 7 blocks → lightning (15 magic), no summons"
+          },
+          "target": {
+            "goal": 100,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:1037 rev",
+            "handler/FeatherAbyssHandler.java:1325 on",
+            "handler/FeatherAbyssHandler.java:1326 tick"
+          ]
+        },
+        {
+          "n": 8,
+          "maskBit": 15,
+          "name": "挫败",
+          "curse": "§c每次受伤，你造成的伤害 ×0.94/层（每层 5 秒）",
+          "cond": "在挫败层数 ≥3 时击杀 1 只 BOSS",
+          "after": "§a改为每次受伤使造成伤害 ×1.06/层（原 ×0.94）",
+          "merged": "§a每次受伤，你造成的伤害 ×1.06/层（5 秒）",
+          "en": {
+            "name": "Frustration",
+            "curse": "§cEach hit taken reduces your damage by ×0.94 per stack (5s each)",
+            "cond": "Kill a boss while at 3+ Frustration stacks",
+            "after": "§aEach hit taken now gives ×1.06 damage per stack (was ×0.94)",
+            "merged": "§aEach hit taken: your damage ×1.06 per stack (5s)"
+          },
+          "target": {
+            "goal": 0,
+            "unit": "none",
+            "unitText": "%s"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:522 rev",
+            "handler/FeatherAbyssHandler.java:638 on",
+            "handler/FeatherAbyssHandler.java:638 rev",
+            "handler/FeatherAbyssHandler.java:1329 on",
+            "handler/FeatherAbyssHandler.java:1332 reach"
+          ]
+        },
+        {
+          "n": 9,
+          "maskBit": 16,
+          "name": "食之无味",
+          "curse": "§c无法通过食物回血",
+          "cond": "累计食用 50 种不同食物",
+          "after": "§a可正常通过食物回血，且回血 ×2",
+          "merged": null,
+          "en": {
+            "name": "Tasteless",
+            "curse": "§cCannot heal through food",
+            "cond": "Eat 50 different kinds of food",
+            "after": "§aFood heals you again, and heals ×2"
+          },
+          "target": {
+            "goal": 50,
+            "unit": "kinds",
+            "unitText": "%s 种 / %s 种"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:844 on",
+            "handler/FeatherAbyssHandler.java:867 setProgress",
+            "handler/FeatherAbyssHandler.java:869 reach"
+          ]
+        },
+        {
+          "n": 10,
+          "maskBit": 17,
+          "name": "失忆",
+          "curse": "§c无法使用复制之魂，但仍会正常掉落",
+          "cond": "空手击杀湮灭构造体",
+          "after": "§a复制之魂解禁（可正常使用，且仍正常掉落）",
+          "merged": null,
+          "en": {
+            "name": "Amnesia",
+            "curse": "§cCannot use Copy Souls, but they still drop normally",
+            "cond": "Kill the Obliterator with empty hands",
+            "after": "§aCopy Souls unlocked (usable again, still drop normally)"
+          },
+          "target": {
+            "goal": 0,
+            "unit": "none",
+            "unitText": "%s"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:1335 on",
+            "handler/FeatherAbyssHandler.java:1339 reach"
+          ]
+        },
+        {
+          "n": 11,
+          "maskBit": 18,
+          "name": "疯狂",
+          "curse": "§c扭曲值上限 100，每合成 1 个物品 +1；每点 → 受到伤害 +0.2%、造成伤害 +1%；死亡清零；击杀怪物 3% 概率 -1",
+          "cond": "移动速度大于 2 时，一击杀死血量 6 万以上的生物",
+          "after": "§a每点改为：受到伤害 -0.2%（造成伤害 +1% 不变）",
+          "merged": "§c扭曲值上限 100，每合成 1 个物品 +1；死亡清零；击杀怪物 3% 概率 -1；§a每点：造成伤害 +1%、受到伤害 -0.2%",
+          "en": {
+            "name": "Madness",
+            "curse": "§cDistortion cap 100, +1 per crafted item; each point: damage taken +0.2%, damage dealt +1%; resets on death; 3% chance per kill to lose 1",
+            "cond": "At movement speed above 2, kill a creature with 60,000+ HP in one hit",
+            "after": "§aNow per point: damage taken -0.2% (damage dealt +1% unchanged)",
+            "merged": "§cTwist cap 100, +1 per crafted item; resets on death; 3% chance -1 per kill; §aper point: +1% damage dealt, -0.2% damage taken"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:618 on",
+            "handler/FeatherAbyssHandler.java:620 rev",
+            "handler/FeatherAbyssHandler.java:660 on",
+            "handler/FeatherAbyssHandler.java:687 on",
+            "handler/FeatherAbyssHandler.java:1315 on",
+            "handler/FeatherAbyssHandler.java:1318 tick"
+          ]
+        },
+        {
+          "n": 12,
+          "maskBit": 19,
+          "name": "恶意",
+          "curse": "§c你受到的元素附加伤害 +12%",
+          "cond": "承受一次源伤害 ≥50 点的元素附加伤害并存活",
+          "after": "§a改为受到的元素附加伤害 -12%（原 +12%）",
+          "merged": "§a受到的元素附加伤害 -12%",
+          "en": {
+            "name": "Malice",
+            "curse": "§cElemental bonus damage you take +12%",
+            "cond": "Survive a single elemental bonus hit whose source damage is 50+",
+            "after": "§aElemental bonus damage taken -12% (was +12%)",
+            "merged": "§aElemental bonus damage taken -12%"
+          },
+          "target": {
+            "goal": 0,
+            "unit": "none",
+            "unitText": "%s"
+          },
+          "refs": [
+            "handler/FeatherAbyssHandler.java:727 on",
+            "handler/FeatherAbyssHandler.java:728 rev"
+          ]
+        }
+      ],
+      "sharedCond": null,
+      "blessingsFrom": null,
+      "noReverse": [
+        1
+      ],
+      "extraLang": {},
+      "loopRefs": [
+        "handler/FeatherAbyssHandler.java:1432 reach(entry)"
+      ]
+    },
+    {
+      "number": "⑤",
+      "key": "TIMECORE",
+      "itemId": "lensouls:feather_timecore",
+      "name": "§d羽·断时炉心",
+      "motto": "归一之律",
+      "desc": "§d——铁序王国的断时炉心，归一之律的残骸——",
+      "wear": "§e佩戴在羽毛栏任意槽位即可生效；§c佩戴后生存模式不可取下",
+      "progressText": "§8已反转 %s / 23",
+      "maskOffset": 20,
+      "entries": [
+        {
+          "n": 1,
+          "maskBit": 20,
+          "name": "铁序·绝疗",
+          "curse": "§c受到治疗 -80%",
+          "cond": "累计治疗 2000 点生命",
+          "after": "§a治疗不再衰减；回满血后多出来的治疗量 ×2 转成伤害吸收（黄心，每 4 点 = 1 级），最多 V 级、持续 30 秒，且不超过最大生命的 30%",
+          "merged": null,
+          "en": {
+            "name": "Order·Heal Seal",
+            "curse": "§cHealing received -80%",
+            "cond": "Heal 2,000 HP in total",
+            "after": "§aHealing no longer reduced; healing beyond full HP is doubled into Absorption (yellow hearts, 4 HP per level), up to level V for 30s, capped at 30% max health"
+          },
+          "target": {
+            "goal": 2000,
+            "unit": "points",
+            "unitText": "%s 点 / %s 点"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:281 on",
+            "handler/curse/TimecoreCurse.java:306 on",
+            "handler/curse/TimecoreCurse.java:307 tick",
+            "handler/curse/TimecoreCurse.java:311 rev"
+          ]
+        },
+        {
+          "n": 2,
+          "maskBit": 21,
+          "name": "铁序·饥禁",
+          "curse": "§c饱食度 <5 时禁疗",
+          "cond": "在饱食度 <5 状态下存活 10 分钟",
+          "after": "§a饱食度 <5 时也能正常回血；进食额外获得 3 秒生命恢复 II",
+          "merged": null,
+          "en": {
+            "name": "Order·Hunger Seal",
+            "curse": "§cCannot heal while hunger is below 5",
+            "cond": "Survive 10 minutes with hunger below 5",
+            "after": "§aHeal normally even below 5 hunger; eating also grants Regeneration II for 3s"
+          },
+          "target": {
+            "goal": 12000,
+            "unit": "time",
+            "unitText": "%s / %s"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:143 rev",
+            "handler/curse/TimecoreCurse.java:148 on",
+            "handler/curse/TimecoreCurse.java:150 tick",
+            "handler/curse/TimecoreCurse.java:156 setProgress",
+            "handler/curse/TimecoreCurse.java:285 on"
+          ]
+        },
+        {
+          "n": 3,
+          "maskBit": 22,
+          "name": "铁序·迟凿",
+          "curse": "§c挖掘速度 -50%",
+          "cond": "累计挖掘 1000 个方块",
+          "after": "§a改为挖掘速度 +50%（原 -50%）",
+          "merged": "§a挖掘速度 +50%",
+          "en": {
+            "name": "Order·Slow Pick",
+            "curse": "§cMining speed -50%",
+            "cond": "Mine 1,000 blocks in total",
+            "after": "§aMining speed +50% (was -50%)",
+            "merged": "§aMining speed +50%"
+          },
+          "target": {
+            "goal": 1000,
+            "unit": "blocks",
+            "unitText": "%s 格 / %s 格"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:375 on",
+            "handler/curse/TimecoreCurse.java:376 tick"
+          ]
+        },
+        {
+          "n": 4,
+          "maskBit": 23,
+          "name": "铁序·徒劳",
+          "curse": "§c挖掘任意原版方块 30% 概率不掉落",
+          "cond": "累计被吞掉 150 次掉落",
+          "after": "§a不再吞掉落；时运 +2",
+          "merged": null,
+          "en": {
+            "name": "Order·Fruitless",
+            "curse": "§c30% chance that mining a vanilla block drops nothing",
+            "cond": "Have 150 drops swallowed",
+            "after": "§aDrops no longer swallowed; Fortune +2"
+          },
+          "target": {
+            "goal": 150,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:380 on",
+            "handler/curse/TimecoreCurse.java:385 tick",
+            "handler/curse/TimecoreCurse.java:416 on"
+          ]
+        },
+        {
+          "n": 5,
+          "maskBit": 24,
+          "name": "铁序·盈伤",
+          "curse": "§c当前生命 >50% 时，受到伤害 +50%",
+          "cond": "在满血状态下累计承受 3000 点伤害；回满血后继续受伤可继续累计（死亡清零）",
+          "after": "§a改为生命 >50% 时受到伤害 -25%（原 +50%）",
+          "merged": "§a生命 >50% 时受到伤害 -25%",
+          "en": {
+            "name": "Order·Full Wound",
+            "curse": "§cAbove 50% HP, damage taken +50%",
+            "cond": "Take 3,000 damage while at full health; healing back to full lets it stack again (reset on death)",
+            "after": "§aDamage taken -25% above 50% HP (was +50%)",
+            "merged": "§aDamage taken -25% while above 50% HP"
+          },
+          "target": {
+            "goal": 3000,
+            "unit": "points",
+            "unitText": "%s 点 / %s 点"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:495 on",
+            "handler/curse/TimecoreCurse.java:495 rev",
+            "handler/curse/TimecoreCurse.java:501 on",
+            "handler/curse/TimecoreCurse.java:503 rev",
+            "handler/curse/TimecoreCurse.java:572 on",
+            "handler/curse/TimecoreCurse.java:573 tick"
+          ]
+        },
+        {
+          "n": 6,
+          "maskBit": 25,
+          "name": "铁序·坠渊",
+          "curse": "§c受到摔落伤害 +500%",
+          "cond": "单次摔落伤害 ≥15 点并存活",
+          "after": "§a免疫摔落伤害",
+          "merged": null,
+          "en": {
+            "name": "Order·Abyss Fall",
+            "curse": "§cFall damage +500%",
+            "cond": "Survive a single fall of 15+ damage",
+            "after": "§aImmune to fall damage"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:510 on",
+            "handler/curse/TimecoreCurse.java:512 rev",
+            "handler/curse/TimecoreCurse.java:597 on",
+            "handler/curse/TimecoreCurse.java:600 tick"
+          ]
+        },
+        {
+          "n": 7,
+          "maskBit": 26,
+          "name": "铁序·钝锋",
+          "curse": "§c造成所有伤害 -10%",
+          "cond": "累计造成 10000 点伤害",
+          "after": "§a攻击无视目标 10% 的护甲",
+          "merged": null,
+          "en": {
+            "name": "Order·Blunt Edge",
+            "curse": "§cAll damage dealt -10%",
+            "cond": "Deal 10,000 damage in total",
+            "after": "§aAttacks ignore 10% of target armor"
+          },
+          "target": {
+            "goal": 10000,
+            "unit": "points",
+            "unitText": "%s 点 / %s 点"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:624 on",
+            "handler/curse/TimecoreCurse.java:626 tick",
+            "handler/curse/TimecoreCurse.java:627 rev"
+          ]
+        },
+        {
+          "n": 8,
+          "maskBit": 27,
+          "name": "铁序·止息",
+          "curse": "§c生命自然恢复与再生类效果对你无效",
+          "cond": "连续 5 分钟不获得任何治疗并存活",
+          "after": "§a生命自然恢复 ×2；再生类效果正常生效",
+          "merged": null,
+          "en": {
+            "name": "Order·Ceased Breath",
+            "curse": "§cNatural regeneration and Regeneration effects do nothing for you",
+            "cond": "Survive 5 minutes without any healing",
+            "after": "§aNatural regeneration ×2; regeneration effects work normally"
+          },
+          "target": {
+            "goal": 6000,
+            "unit": "time",
+            "unitText": "%s / %s"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:161 on",
+            "handler/curse/TimecoreCurse.java:163 tick",
+            "handler/curse/TimecoreCurse.java:278 rev",
+            "handler/curse/TimecoreCurse.java:291 on",
+            "handler/curse/TimecoreCurse.java:302 setProgress"
+          ]
+        },
+        {
+          "n": 9,
+          "maskBit": 28,
+          "name": "铁序·断粮",
+          "curse": "§c永久获得饥饿 III",
+          "cond": "在外部来源的饥饿 V 状态下击杀 200 只生物",
+          "after": "§a每恢复 1 点饱食度，同步恢复 1 点生命",
+          "merged": null,
+          "en": {
+            "name": "Order·Cut Rations",
+            "curse": "§cPermanent Hunger III",
+            "cond": "Kill 200 creatures while at Hunger V from an external source",
+            "after": "§aEach 1 hunger restored also heals 1 HP"
+          },
+          "target": {
+            "goal": 200,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:128 on",
+            "handler/curse/TimecoreCurse.java:138 rev",
+            "handler/curse/TimecoreCurse.java:731 on",
+            "handler/curse/TimecoreCurse.java:734 tick"
+          ]
+        },
+        {
+          "n": 10,
+          "maskBit": 29,
+          "name": "铁序·夺佑",
+          "curse": "§c抗性提升无效",
+          "cond": "移动速度值 <0.05 时累计承受 5000 点伤害（死亡不清零）",
+          "after": "§a抗性提升正常生效；每有 1 级抗性提升，伤害 +5%",
+          "merged": null,
+          "en": {
+            "name": "Order·Seized Blessing",
+            "curse": "§cResistance has no effect",
+            "cond": "Take 5,000 damage while movement speed is below 0.05 (progress kept on death)",
+            "after": "§aResistance works normally; +5% damage per Resistance level"
+          },
+          "target": {
+            "goal": 5000,
+            "unit": "points",
+            "unitText": "%s 点 / %s 点"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:123 on",
+            "handler/curse/TimecoreCurse.java:496 on",
+            "handler/curse/TimecoreCurse.java:580 on",
+            "handler/curse/TimecoreCurse.java:581 tick",
+            "handler/curse/TimecoreCurse.java:667 rev"
+          ]
+        },
+        {
+          "n": 11,
+          "maskBit": 30,
+          "name": "铁序·锈甲",
+          "curse": "§c护甲 ×40%",
+          "cond": "在护甲值 ≤5 时累计承受 2000 点物理伤害",
+          "after": "§a护甲不再被削减；受近战伤害时反弹该次伤害的 25%",
+          "merged": null,
+          "en": {
+            "name": "Order·Rust Armor",
+            "curse": "§cArmor ×40%",
+            "cond": "Take 2,000 physical damage while armor is 5 or less",
+            "after": "§aArmor no longer reduced; reflect 25% of melee damage taken"
+          },
+          "target": {
+            "goal": 2000,
+            "unit": "points",
+            "unitText": "%s 点 / %s 点"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:172 on",
+            "handler/curse/TimecoreCurse.java:496 on",
+            "handler/curse/TimecoreCurse.java:585 on",
+            "handler/curse/TimecoreCurse.java:590 tick",
+            "handler/curse/TimecoreCurse.java:758 rev"
+          ]
+        },
+        {
+          "n": 12,
+          "maskBit": 31,
+          "name": "铁序·缚己",
+          "curse": "§c每有一点护甲值，伤害 -0.5%",
+          "cond": "在护甲值 ≥30 时，用夺魂索命累计造成 10000 点伤害",
+          "after": "§a每点护甲增加 1% 清空对方护甲的概率；不再因护甲损失伤害",
+          "merged": null,
+          "en": {
+            "name": "Order·Bound Self",
+            "curse": "§cPer point of armor, damage -0.5%",
+            "cond": "While armor is 30 or higher, deal 10,000 damage with Soul Sever",
+            "after": "§a+1% chance per armor point to strip target armor; no more damage loss from armor"
+          },
+          "target": {
+            "goal": 10000,
+            "unit": "points",
+            "unitText": "%s 点 / %s 点"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:636 on",
+            "handler/curse/TimecoreCurse.java:638 rev",
+            "handler/curse/TimecoreCurse.java:901 on",
+            "handler/curse/TimecoreCurse.java:902 tick"
+          ]
+        },
+        {
+          "n": 13,
+          "maskBit": 32,
+          "name": "铁序·余悸",
+          "curse": "§c受到超过最大生命 40% 的一击后，5 秒内受到伤害 +20%",
+          "cond": "累计承受 30 次超过最大生命 40% 的伤害并存活（死亡清零）",
+          "after": "§a窗口内改为受到伤害 -70%（原 +20%）",
+          "merged": "§7受到超过最大生命 40% 的一击后，5 秒内 §a受到伤害 -70%",
+          "en": {
+            "name": "Order·Lingering Fear",
+            "curse": "§cFor 5s after a hit over 40% max HP, damage taken +20%",
+            "cond": "Survive 30 hits over 40% max HP (reset on death)",
+            "after": "§aIn the window, damage taken becomes -70% (was +20%)",
+            "merged": "§7After a hit over 40% max health, §adamage taken -70% for 5s"
+          },
+          "target": {
+            "goal": 30,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:521 on",
+            "handler/curse/TimecoreCurse.java:523 rev",
+            "handler/curse/TimecoreCurse.java:606 on",
+            "handler/curse/TimecoreCurse.java:607 tick"
+          ]
+        },
+        {
+          "n": 14,
+          "maskBit": 33,
+          "name": "铁序·裁影",
+          "curse": "§c照片栏位 -2",
+          "cond": "累计给 50 种不同生物拍出能力窃取照片",
+          "after": "§a改为照片栏位 +4（原 -2）",
+          "merged": "§a照片栏位 +4",
+          "en": {
+            "name": "Order·Trimmed Frame",
+            "curse": "§cPhoto slots -2",
+            "cond": "Take ability-steal photos of 50 different creatures",
+            "after": "§aPhoto slots +4 (was -2)",
+            "merged": "§aPhoto slots +4"
+          },
+          "target": {
+            "goal": 50,
+            "unit": "kinds",
+            "unitText": "%s 种 / %s 种"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:933 on",
+            "handler/curse/TimecoreCurse.java:934 rev",
+            "handler/curse/TimecoreCurse.java:1066 on",
+            "handler/curse/TimecoreCurse.java:1079 setProgress",
+            "handler/curse/TimecoreCurse.java:1081 reach"
+          ]
+        },
+        {
+          "n": 15,
+          "maskBit": 34,
+          "name": "铁序·厄运",
+          "curse": "§c时运 -2、抢夺 -2",
+          "cond": "累计击杀 500 只生物",
+          "after": "§a抢夺 -2 → +2、时运 -2 → +2；§aBOSS 掉落的复制之魂 +50%",
+          "merged": "§a时运 +2、抢夺 +2；§aBOSS 掉落的复制之魂数量 +50%",
+          "en": {
+            "name": "Order·Ill Fortune",
+            "curse": "§cFortune -2, Looting -2",
+            "cond": "Kill 500 creatures in total",
+            "after": "§aLooting and Fortune -2 → +2; §a+50% copy souls from bosses",
+            "merged": "§aFortune +2, Looting +2; §a+50% copy souls from bosses"
+          },
+          "target": {
+            "goal": 500,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:425 on",
+            "handler/curse/TimecoreCurse.java:457 on",
+            "handler/curse/TimecoreCurse.java:739 on",
+            "handler/curse/TimecoreCurse.java:740 tick"
+          ]
+        },
+        {
+          "n": 16,
+          "maskBit": 35,
+          "name": "铁序·释刃",
+          "curse": "§c造成伤害时 2% 概率把主手武器丢出去",
+          "cond": "累计触发 200 次主手武器脱手",
+          "after": "§a造成伤害时不再有概率丢出武器",
+          "merged": null,
+          "en": {
+            "name": "Order·Slip Grip",
+            "curse": "§c2% chance when dealing damage to fling your main-hand weapon away",
+            "cond": "Drop your main-hand weapon 200 times",
+            "after": "§aNo longer drops your weapon on hit"
+          },
+          "target": {
+            "goal": 200,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:652 on",
+            "handler/curse/TimecoreCurse.java:654 tick"
+          ]
+        },
+        {
+          "n": 17,
+          "maskBit": 36,
+          "name": "铁序·重负",
+          "curse": "§c背包每有 1 个物品（按堆叠数量计），移动速度 -0.5%（上限 -70%）",
+          "cond": "在移动速度值 <0.02 时累计移动 3000 格",
+          "after": "§a不再减速；每 1% 减速额外提供 +1 点伤害",
+          "merged": null,
+          "en": {
+            "name": "Order·Heavy Load",
+            "curse": "§cPer item in your inventory (stack size counts), movement speed -0.5% (cap -70%)",
+            "cond": "Move 3,000 blocks while movement speed is below 0.02",
+            "after": "§aNo slowdown; +1 damage per 1% movement speed lost"
+          },
+          "target": {
+            "goal": 3000,
+            "unit": "cells",
+            "unitText": "%s 格 / %s 格"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:185 on",
+            "handler/curse/TimecoreCurse.java:225 on",
+            "handler/curse/TimecoreCurse.java:228 tick",
+            "handler/curse/TimecoreCurse.java:695 rev"
+          ]
+        },
+        {
+          "n": 18,
+          "maskBit": 37,
+          "name": "铁序·滞步",
+          "curse": "§c受到攻击 25% 概率获得缓慢 2 秒",
+          "cond": "在缓慢状态下累计走地 10000 格",
+          "after": "§a免疫缓慢",
+          "merged": null,
+          "en": {
+            "name": "Order·Sluggish Step",
+            "curse": "§c25% chance on being hit to gain Slowness for 2s",
+            "cond": "Walk 10,000 blocks while slowed",
+            "after": "§aImmune to Slowness"
+          },
+          "target": {
+            "goal": 10000,
+            "unit": "cells",
+            "unitText": "%s 格 / %s 格"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:230 on",
+            "handler/curse/TimecoreCurse.java:233 tick",
+            "handler/curse/TimecoreCurse.java:240 rev",
+            "handler/curse/TimecoreCurse.java:529 on"
+          ]
+        },
+        {
+          "n": 19,
+          "maskBit": 38,
+          "name": "铁序·障目",
+          "curse": "§c受到攻击 25% 概率获得失明 2 秒",
+          "cond": "在失明状态下击杀 50 只生物",
+          "after": "§a免疫失明",
+          "merged": null,
+          "en": {
+            "name": "Order·Blinded Eye",
+            "curse": "§c25% chance on being hit to gain Blindness for 2s",
+            "cond": "Kill 50 creatures while blinded",
+            "after": "§aImmune to Blindness"
+          },
+          "target": {
+            "goal": 50,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:244 rev",
+            "handler/curse/TimecoreCurse.java:532 on",
+            "handler/curse/TimecoreCurse.java:743 on",
+            "handler/curse/TimecoreCurse.java:744 tick"
+          ]
+        },
+        {
+          "n": 20,
+          "maskBit": 39,
+          "name": "铁序·垂翅",
+          "curse": "§c飞行/腾空时造成伤害 -50%",
+          "cond": "在飞行状态下累计造成 1000 点伤害",
+          "after": "§a飞行/腾空不再减伤；创造飞行时造成伤害 +25%",
+          "merged": null,
+          "en": {
+            "name": "Order·Clipped Wings",
+            "curse": "§cDamage dealt while flying or airborne -50%",
+            "cond": "Deal 1,000 damage while flying",
+            "after": "§aNo flight penalty; +25% damage dealt while in creative flight"
+          },
+          "target": {
+            "goal": 1000,
+            "unit": "points",
+            "unitText": "%s 点 / %s 点"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:658 on",
+            "handler/curse/TimecoreCurse.java:660 tick",
+            "handler/curse/TimecoreCurse.java:690 rev"
+          ]
+        },
+        {
+          "n": 21,
+          "maskBit": 40,
+          "name": "铁序·无援",
+          "curse": "§c不死图腾不触发、时空回溯照片不生效",
+          "cond": "在生命 ≤2 点时用拍立得拍出 10 张照片",
+          "after": "§a保命手段全部恢复；触发后 10 秒内伤害 +50%、免疫一切负面效果",
+          "merged": null,
+          "en": {
+            "name": "Order·No Aid",
+            "curse": "§cTotems of Undying do not trigger; Temporal Recall photos do not work",
+            "cond": "Take 10 instant photos with a Polaroid at 2 HP or less",
+            "after": "§aAll safety nets restored; after triggering: +50% damage and immunity to debuffs for 10s"
+          },
+          "target": {
+            "goal": 10,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:252 rev",
+            "handler/curse/TimecoreCurse.java:778 on",
+            "handler/curse/TimecoreCurse.java:804 on",
+            "handler/curse/TimecoreCurse.java:808 rev",
+            "handler/curse/TimecoreCurse.java:817 on",
+            "handler/curse/TimecoreCurse.java:819 tick",
+            "handler/curse/TimecoreCurse.java:1006 rev"
+          ]
+        },
+        {
+          "n": 22,
+          "maskBit": 41,
+          "name": "铁序·封镜",
+          "curse": "§cY ≥50 时无法发动相机能力，但仍可拍普通照片",
+          "cond": "在 Y ≥200 处拍出 100 张普通照片",
+          "after": "§a解除高度限制；Y ≥100 时照片弹幕伤害 +50%",
+          "merged": null,
+          "en": {
+            "name": "Order·Sealed Lens",
+            "curse": "§cAbove Y 50 you cannot use camera abilities, but plain photos still work",
+            "cond": "Take 100 plain photos above Y 200",
+            "after": "§aHeight limit removed; +50% photo barrage damage at Y ≥100"
+          },
+          "target": {
+            "goal": 100,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:678 rev",
+            "handler/curse/TimecoreCurse.java:971 on",
+            "handler/curse/TimecoreCurse.java:973 tick"
+          ]
+        },
+        {
+          "n": 23,
+          "maskBit": 42,
+          "name": "铁序·平势",
+          "curse": "§c目标生命每高于你 100%，对方受伤时对你触发一次反击",
+          "cond": "击杀巫妖",
+          "after": "§a不再被对方反击；目标生命每高于你 50% 时，你受伤有 20% 概率反制（清除对方无敌帧）",
+          "merged": null,
+          "en": {
+            "name": "Order·Level Field",
+            "curse": "§cEach time a target’s HP is 100% above yours, it counterattacks you",
+            "cond": "Kill the Twilight Lich",
+            "after": "§aNo longer counterattacked; when target health exceeds yours by 50%, 20% chance to counter when hit (clears their invulnerability frames)"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/TimecoreCurse.java:541 rev",
+            "handler/curse/TimecoreCurse.java:749 tick",
+            "handler/curse/TimecoreCurse.java:859 on"
+          ]
+        }
+      ],
+      "sharedCond": null,
+      "blessingsFrom": null,
+      "noReverse": null,
+      "extraLang": {
+        "grand": "§6【大成】23 条全部反转后：全属性 +50%、受到伤害 -25%、免疫一切负面效果"
+      },
+      "loopRefs": [
+        "handler/curse/TimecoreCurse.java:359 on(entry)",
+        "handler/curse/TimecoreCurse.java:365 rev(entry)"
+      ]
+    },
+    {
+      "number": "⑥",
+      "key": "FINALRITE",
+      "itemId": "lensouls:feather_finalrite",
+      "name": "§d羽·终焉秘仪",
+      "motto": "代价之律",
+      "desc": "§d——秘仪联邦的终焉秘仪核心，代价之律的残骸——",
+      "wear": "§e佩戴在羽毛栏任意槽位即可生效；§c佩戴后生存模式不可取下",
+      "progressText": "§8已反转 %s / 7",
+      "maskOffset": 43,
+      "entries": [
+        {
+          "n": 1,
+          "maskBit": 43,
+          "name": "秘仪·竭泉",
+          "curse": "§c每持有 1 级生命恢复，受到治疗 -25%（上限 -50%）",
+          "cond": "击杀监守者",
+          "after": "§a改为受到治疗 +50%（原每级再生 -25%，上限 -50%）",
+          "merged": "§a受到治疗 +50%",
+          "en": {
+            "name": "Rite·Dried Spring",
+            "curse": "§cPer level of Regeneration you have, healing received -25% (cap -50%)",
+            "cond": "Kill the Warden",
+            "after": "§aHealing +50% (was -25% per Regeneration level, cap -50%)",
+            "merged": "§aHealing received +50%"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/FinalriteCurse.java:187 on",
+            "handler/curse/FinalriteCurse.java:208 rev"
+          ]
+        },
+        {
+          "n": 2,
+          "maskBit": 44,
+          "name": "秘仪·血偿",
+          "curse": "§c造成伤害后 5 秒内，自身治疗量 -50%",
+          "cond": "击杀堕落圣骑",
+          "after": "§a造成伤害后不再有治疗惩罚；每次受到治疗时，对 4 格内敌人造成治疗量 ×50% 的魔法伤害",
+          "merged": null,
+          "en": {
+            "name": "Rite·Blood Price",
+            "curse": "§cFor 5s after dealing damage, your healing is -50%",
+            "cond": "Kill the Possessed Paladin",
+            "after": "§aNo healing penalty after dealing damage; healing you receive deals 50% of it as magic damage to enemies within 4 blocks"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/FinalriteCurse.java:197 on",
+            "handler/curse/FinalriteCurse.java:214 rev"
+          ]
+        },
+        {
+          "n": 3,
+          "maskBit": 45,
+          "name": "秘仪·蚀力",
+          "curse": "§c全伤害 -10%",
+          "cond": "击杀焰魔",
+          "after": "§a改为全伤害 +10%（原 -10%）",
+          "merged": "§a全伤害 +10%",
+          "en": {
+            "name": "Rite·Eroded Might",
+            "curse": "§cAll damage -10%",
+            "cond": "Kill Ignis",
+            "after": "§aAll damage +10% (was -10%)",
+            "merged": "§aAll damage +10%"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/FinalriteCurse.java:299 on",
+            "handler/curse/FinalriteCurse.java:316 rev"
+          ]
+        },
+        {
+          "n": 4,
+          "maskBit": 46,
+          "name": "秘仪·力竭",
+          "curse": "§c造成伤害时消耗精力值；精力值低于 10% 时，造成伤害 -30%",
+          "cond": "在精力值低于 50% 时，一次造成 5000 点伤害",
+          "after": "§a精力值高于 50% 时，造成伤害 +15%；精力值低于 10% 不再损失伤害",
+          "merged": "§c造成伤害仍消耗精力值；§a精力值低于 10% 不再损失伤害；§a精力值高于 50% 时，造成伤害 +15%",
+          "en": {
+            "name": "Rite·Exhaustion",
+            "curse": "§cDealing damage drains stamina; below 10% stamina, damage dealt -30%",
+            "cond": "Deal 5,000 damage in a single hit while stamina is below 50%",
+            "after": "§a+15% damage dealt while stamina is above 50%; no more -30% loss below 10%",
+            "merged": "§cDealing damage still drains stamina; §ano damage loss below 10% stamina; §a+15% damage dealt above 50% stamina"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/curse/FinalriteCurse.java:305 on",
+            "handler/curse/FinalriteCurse.java:320 rev",
+            "handler/curse/FinalriteCurse.java:347 on",
+            "handler/curse/FinalriteCurse.java:351 tick"
+          ]
+        },
+        {
+          "n": 5,
+          "maskBit": 47,
+          "name": "秘仪·篡命",
+          "curse": "§c每装备一件护甲，最大生命上限 ×90%",
+          "cond": "击杀斯库拉",
+          "after": "§a不再削减最大生命上限",
+          "merged": null,
+          "en": {
+            "name": "Rite·Usurped Life",
+            "curse": "§cEach piece of armor equipped reduces max health ×90%",
+            "cond": "Kill Scylla",
+            "after": "§aNo longer reduces max health"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/FinalriteCurse.java:144 on"
+          ]
+        },
+        {
+          "n": 6,
+          "maskBit": 48,
+          "name": "秘仪·献祭",
+          "curse": "§c满血时受到伤害 +70%",
+          "cond": "击杀末影守卫",
+          "after": "§7不再因满血受罚；§a每损失 1% 最大生命，受到伤害 -0.5%",
+          "merged": null,
+          "en": {
+            "name": "Rite·Offering",
+            "curse": "§cAt full health, damage taken +70%",
+            "cond": "Kill the Ender Guardian",
+            "after": "§7No more full-health penalty; §a-0.5% damage taken per 1% max health lost"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/FinalriteCurse.java:245 on",
+            "handler/curse/FinalriteCurse.java:251 rev"
+          ]
+        },
+        {
+          "n": 7,
+          "maskBit": 49,
+          "name": "秘仪·穿甲",
+          "curse": "§c每次受伤有 50% 的伤害无视护甲",
+          "cond": "击杀先驱者",
+          "after": "§7不再无视护甲；§a每次受伤有 10% 概率无视这次伤害",
+          "merged": null,
+          "en": {
+            "name": "Rite·Armor Pierce",
+            "curse": "§c50% of each hit ignores your armor",
+            "cond": "Kill The Harbinger",
+            "after": "§7No longer ignores armor; §a10% chance to ignore a hit entirely"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/FinalriteCurse.java:239 rev",
+            "handler/curse/FinalriteCurse.java:275 on"
+          ]
+        }
+      ],
+      "sharedCond": null,
+      "blessingsFrom": null,
+      "noReverse": null,
+      "extraLang": {},
+      "loopRefs": [
+        "handler/curse/FinalriteCurse.java:383 tick(entry)"
+      ]
+    },
+    {
+      "number": "⑦",
+      "key": "ZEROFORGE",
+      "itemId": "lensouls:feather_zeroforge",
+      "name": "§d羽·零号誓炉",
+      "motto": "失控之律",
+      "desc": "§d——机誓合众国的零号誓炉，失控之律的残骸——",
+      "wear": "§e佩戴在羽毛栏任意槽位即可生效；§c佩戴后生存模式不可取下",
+      "progressText": "§8反转 %s / %s §7· §8祝福 %s / %s",
+      "maskOffset": 50,
+      "entries": [
+        {
+          "n": 1,
+          "maskBit": 50,
+          "name": "誓约·燃魂",
+          "curse": "§c每 30 秒吞噬 1 个复制之魂（物品栏、背包、维度网络）；无魂时持续饥饿 VI + 虚弱 III",
+          "cond": "在「无复制之魂」状态下存活 30 分钟",
+          "after": "§a不再吞噬复制之魂；无魂时不再有负面效果",
+          "merged": null,
+          "en": {
+            "name": "Oath·Soul Burn",
+            "curse": "§cDevours 1 Copy Soul every 30s (inventory, backpacks, dimension network); without souls, permanent Hunger VI + Weakness III",
+            "cond": "Survive 30 minutes with no Copy Souls",
+            "after": "§aNo longer devours Copy Souls; no penalty when you have none"
+          },
+          "target": {
+            "goal": 36000,
+            "unit": "time",
+            "unitText": "%s / %s"
+          },
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:367 on",
+            "handler/curse/ZeroforgeCurse.java:372 on",
+            "handler/curse/ZeroforgeCurse.java:374 tick",
+            "handler/curse/ZeroforgeCurse.java:380 on"
+          ]
+        },
+        {
+          "n": 2,
+          "maskBit": 51,
+          "name": "誓约·反噬",
+          "curse": "§c击杀生物时自身受到 1 点绝对真伤（不吃减伤/护盾/无敌帧），冷却 5 秒",
+          "cond": "血量低于 20% 时击杀 200 只生物",
+          "after": "§a击杀生物时不再受到伤害，改为回复 2 点生命",
+          "merged": null,
+          "en": {
+            "name": "Oath·Backlash",
+            "curse": "§cKilling a creature deals 1 absolute true damage to you (ignores reduction/shields/i-frames), 5s cooldown",
+            "cond": "Kill 200 creatures below 20% HP",
+            "after": "§aNo longer hurt on kill; heals 2 HP instead"
+          },
+          "target": {
+            "goal": 200,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:421 on",
+            "handler/curse/ZeroforgeCurse.java:426 rev",
+            "handler/curse/ZeroforgeCurse.java:1591 on",
+            "handler/curse/ZeroforgeCurse.java:1593 tick"
+          ]
+        },
+        {
+          "n": 3,
+          "maskBit": 52,
+          "name": "誓约·锈契",
+          "curse": "§c攻击 15% 概率丢失 + 掉落物数量 -1",
+          "cond": "累计 100 次攻击丢失",
+          "after": "§a攻击不再丢失、掉落数量不再减少",
+          "merged": null,
+          "en": {
+            "name": "Oath·Rusted Pact",
+            "curse": "§c15% chance to miss attacks; dropped item count -1",
+            "cond": "Miss 100 attacks in total",
+            "after": "§aAttacks no longer miss; drop count no longer reduced"
+          },
+          "target": {
+            "goal": 100,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:482 on",
+            "handler/curse/ZeroforgeCurse.java:492 tick",
+            "handler/curse/ZeroforgeCurse.java:513 on",
+            "handler/curse/ZeroforgeCurse.java:523 tick",
+            "handler/curse/ZeroforgeCurse.java:554 on"
+          ]
+        },
+        {
+          "n": 4,
+          "maskBit": 53,
+          "name": "誓约·断供",
+          "curse": "§c饱食度未满时，伤害 -70%",
+          "cond": "击杀远古遗魂",
+          "after": "§a饱食度不满时不再有诅咒；免疫反胃；饱食度满时，伤害 +10%",
+          "merged": null,
+          "en": {
+            "name": "Oath·Cut Supply",
+            "curse": "§cWhile hunger is not full, damage -70%",
+            "cond": "Kill the Ancient Remnant",
+            "after": "§aNo curse when hunger is not full; immune to Nausea; +10% damage at full hunger"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:586 on",
+            "handler/curse/ZeroforgeCurse.java:594 rev",
+            "handler/curse/ZeroforgeCurse.java:623 on",
+            "handler/curse/ZeroforgeCurse.java:1601 tick",
+            "handler/curse/ZeroforgeCurse.java:1623 rev"
+          ]
+        },
+        {
+          "n": 5,
+          "maskBit": 54,
+          "name": "誓约·封库",
+          "curse": "§c无法打开精妙背包，无法打开维度网络",
+          "cond": "击杀娜迦",
+          "after": "§a正常打开精妙背包与维度网络；且攻击速度 +15%",
+          "merged": null,
+          "en": {
+            "name": "Oath·Sealed Vault",
+            "curse": "§cCannot open Sophisticated Backpacks or the dimension network",
+            "cond": "Kill the Naga",
+            "after": "§aSophisticated Backpacks and the dimension network open normally; +15% attack speed"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:689 on",
+            "handler/curse/ZeroforgeCurse.java:697 on",
+            "handler/curse/ZeroforgeCurse.java:713 on",
+            "handler/curse/ZeroforgeCurse.java:739 on",
+            "handler/curse/ZeroforgeCurse.java:754 rev",
+            "handler/curse/ZeroforgeCurse.java:1604 tick"
+          ]
+        },
+        {
+          "n": 6,
+          "maskBit": 55,
+          "name": "誓约·叛主",
+          "curse": "§c无人机造成伤害后，有 2% 概率朝你发射一发 10 点魔法伤害的敌对雪球",
+          "cond": "累计承受 50 次无人机的敌对雪球",
+          "after": "§a不再有敌对雪球；无人机伤害 +100%",
+          "merged": null,
+          "en": {
+            "name": "Oath·Betrayal",
+            "curse": "§cAfter a drone deals damage, 2% chance to fire a hostile snowball at you (10 magic damage)",
+            "cond": "Take 50 hostile drone snowballs in total",
+            "after": "§aNo hostile snowballs; drone damage +100%"
+          },
+          "target": {
+            "goal": 50,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:598 rev",
+            "handler/curse/ZeroforgeCurse.java:833 on",
+            "handler/curse/ZeroforgeCurse.java:835 on",
+            "handler/curse/ZeroforgeCurse.java:940 rev",
+            "handler/curse/ZeroforgeCurse.java:958 on",
+            "handler/curse/ZeroforgeCurse.java:963 tick"
+          ]
+        },
+        {
+          "n": 7,
+          "maskBit": 56,
+          "name": "誓约·易手",
+          "curse": "§c非坐骑状态下每 8 秒强制交换主副手物品（Y < 20 时缩短为 4 秒）；每次交换有 3% 概率把其中一件丢到脚下",
+          "cond": "在 Y < 0 处击杀 200 只生物",
+          "after": "§a解除诅咒（不再强制换手、不再丢物品）；每次主副手交换时有 5% 概率获得力量 X（10 秒），触发后冷却 7 秒",
+          "merged": null,
+          "en": {
+            "name": "Oath·Swapped Hands",
+            "curse": "§cWhile not riding, main and off hand swap every 8s (4s below Y 20); each swap has a 3% chance to drop one item at your feet",
+            "cond": "Kill 200 creatures below Y 0",
+            "after": "§aCurse lifted (no forced swaps or drops); 5% chance to gain Strength X for 10s on each swap, 7s cooldown"
+          },
+          "target": {
+            "goal": 200,
+            "unit": "kills",
+            "unitText": "%s 只 / %s 只"
+          },
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:1003 on",
+            "handler/curse/ZeroforgeCurse.java:1044 rev",
+            "handler/curse/ZeroforgeCurse.java:1608 on",
+            "handler/curse/ZeroforgeCurse.java:1609 tick"
+          ]
+        },
+        {
+          "n": 8,
+          "maskBit": 57,
+          "name": "零号·神愤",
+          "curse": "§a元素附加伤害 +17%",
+          "cond": "同时拥有四种元素活性药水效果且均达到 10 级以上（只需达成一次）",
+          "after": "§a元素附加伤害 +25%",
+          "merged": null,
+          "en": {
+            "name": "Zero·Divine Wrath",
+            "curse": "§aElemental bonus damage +17%",
+            "cond": "Have all four elemental activity potion effects at level 10+ at the same time (needed only once)",
+            "after": "§aElemental bonus damage +25%"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "isBlessing": true,
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:604 rev",
+            "handler/curse/ZeroforgeCurse.java:1140 on",
+            "handler/curse/ZeroforgeCurse.java:1145 tick"
+          ]
+        },
+        {
+          "n": 9,
+          "maskBit": 58,
+          "name": "零号·阅历",
+          "curse": "§a经验获取 ×3",
+          "cond": "经验等级达到 30 级",
+          "after": "§a经验获取 ×5",
+          "merged": null,
+          "en": {
+            "name": "Zero·Experience",
+            "curse": "§aExperience gained ×3",
+            "cond": "Reach experience level 30",
+            "after": "§aXP gain ×5"
+          },
+          "target": {
+            "goal": 1,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "isBlessing": true,
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:1152 on",
+            "handler/curse/ZeroforgeCurse.java:1154 tick",
+            "handler/curse/ZeroforgeCurse.java:1163 rev",
+            "handler/curse/ZeroforgeCurse.java:1164 on"
+          ]
+        },
+        {
+          "n": 10,
+          "maskBit": 59,
+          "name": "零号·灵通",
+          "curse": "§a视野内敌对生物发光",
+          "cond": "用「见微知著」解锁 10 种生物图鉴",
+          "after": "§a视野内敌对生物发光；发光目标受到伤害 +7%",
+          "merged": null,
+          "en": {
+            "name": "Zero·Insight",
+            "curse": "§aHostile creatures within sight glow",
+            "cond": "Unlock 10 creature entries with Wild Glimpse",
+            "after": "§aHostile mobs in sight glow; glowing targets take +7% damage"
+          },
+          "target": {
+            "goal": 10,
+            "unit": "kinds",
+            "unitText": "%s 种 / %s 种"
+          },
+          "isBlessing": true,
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:607 rev",
+            "handler/curse/ZeroforgeCurse.java:1184 on",
+            "handler/curse/ZeroforgeCurse.java:1188 setProgress",
+            "handler/curse/ZeroforgeCurse.java:1191 reach",
+            "handler/curse/ZeroforgeCurse.java:1196 on",
+            "handler/curse/ZeroforgeCurse.java:1196 rev"
+          ]
+        },
+        {
+          "n": 11,
+          "maskBit": 60,
+          "name": "零号·博识",
+          "curse": "§a对击杀过的生物造成伤害 +15%",
+          "cond": "累计击杀 50 种不同生物",
+          "after": "§a对击杀过的生物造成伤害 +30%",
+          "merged": null,
+          "en": {
+            "name": "Zero·Erudition",
+            "curse": "§a+15% damage to creatures you have killed before",
+            "cond": "Kill 50 different kinds of creatures",
+            "after": "§a+30% damage against species you have killed"
+          },
+          "target": {
+            "goal": 50,
+            "unit": "kinds",
+            "unitText": "%s 种 / %s 种"
+          },
+          "isBlessing": true,
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:613 rev",
+            "handler/curse/ZeroforgeCurse.java:1302 on",
+            "handler/curse/ZeroforgeCurse.java:1305 setProgress",
+            "handler/curse/ZeroforgeCurse.java:1308 reach"
+          ]
+        },
+        {
+          "n": 12,
+          "maskBit": 61,
+          "name": "零号·天卷",
+          "curse": "§a头部饰品栏位 +2",
+          "cond": "累计装备过 12 件不同饰品",
+          "after": "§a头部饰品栏位 +3",
+          "merged": null,
+          "en": {
+            "name": "Zero·Scroll",
+            "curse": "§aHead trinket slots +2",
+            "cond": "Equip 12 different trinkets in total",
+            "after": "§a+3 head trinket slots"
+          },
+          "target": {
+            "goal": 12,
+            "unit": "kinds",
+            "unitText": "%s 种 / %s 种"
+          },
+          "isBlessing": true,
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:1340 on",
+            "handler/curse/ZeroforgeCurse.java:1342 rev",
+            "handler/curse/ZeroforgeCurse.java:1382 on",
+            "handler/curse/ZeroforgeCurse.java:1386 setProgress",
+            "handler/curse/ZeroforgeCurse.java:1389 reach"
+          ]
+        },
+        {
+          "n": 13,
+          "maskBit": 62,
+          "name": "零号·坚毅",
+          "curse": "§a获得负面效果时 20% 概率回复 10 点生命",
+          "cond": "累计获得 500 次负面效果",
+          "after": "§a获得负面效果时 70% 概率回复 10 点生命",
+          "merged": null,
+          "en": {
+            "name": "Zero·Resolve",
+            "curse": "§a20% chance to restore 10 HP when you gain a debuff",
+            "cond": "Gain 500 debuffs in total",
+            "after": "§a70% chance to heal 10 HP when receiving a debuff"
+          },
+          "target": {
+            "goal": 500,
+            "unit": "times",
+            "unitText": "%s 次 / %s 次"
+          },
+          "isBlessing": true,
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:1417 on",
+            "handler/curse/ZeroforgeCurse.java:1418 tick",
+            "handler/curse/ZeroforgeCurse.java:1420 rev",
+            "handler/curse/ZeroforgeCurse.java:1421 on"
+          ]
+        },
+        {
+          "n": 14,
+          "maskBit": 63,
+          "name": "零号·银环",
+          "curse": "§a所有镜魂冷却 -30%",
+          "cond": "累计用过 6 种不同镜魂",
+          "after": "§a所有镜魂冷却 -50%",
+          "merged": null,
+          "en": {
+            "name": "Zero·Silver Ring",
+            "curse": "§aAll soul item cooldowns -30%",
+            "cond": "Use 6 different kinds of soul items",
+            "after": "§a-50% cooldown on all Len Souls"
+          },
+          "target": {
+            "goal": 6,
+            "unit": "kinds",
+            "unitText": "%s 种 / %s 种"
+          },
+          "isBlessing": true,
+          "refs": [
+            "handler/curse/ZeroforgeCurse.java:1435 on",
+            "handler/curse/ZeroforgeCurse.java:1436 rev",
+            "handler/curse/ZeroforgeCurse.java:1455 on",
+            "handler/curse/ZeroforgeCurse.java:1459 setProgress",
+            "handler/curse/ZeroforgeCurse.java:1462 reach"
+          ]
+        }
+      ],
+      "sharedCond": null,
+      "blessingsFrom": 7,
+      "noReverse": null,
+      "extraLang": {},
+      "loopRefs": null
+    }
+  ]
+}

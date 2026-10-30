@@ -5,6 +5,7 @@ import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.CurseSideQuery;
+import com.plumejade.lensouls.handler.CurioSlotBonuses;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -57,7 +58,8 @@ public final class TimecoreCurse {
     private static final ResourceLocation WEIGHT_MOD = ResourceLocation.parse("lensouls:curse_weight");
 
     /**
-     * e17 条件：移速**属性值** ≤0.02（原版玩家基础值 0.1 ⇒ ≈ 总减速 ≥80%）。
+     * e17 条件：移动速度**属性值** &lt; 0.02（原版玩家基础值 0.1 ⇒ ≈ 总减速 ≥80%）。
+     * 文案与 e10 夺佑 / ④ e11 疯狂同款：直接说「速度值 < 0.02」，不写百分比。
      * <p>
      * 直接读最终属性值（含缓慢、e17 重负、减速铁板、照片等全部修饰符），<b>不读单条修饰符的 amount()</b>：
      * 原版 {@code generic.movement_speed} 下限是 0（按「-30%」这种负值判永远不成立），而 e17 自己的
@@ -185,7 +187,11 @@ public final class TimecoreCurse {
             if (on) {
                 int count = 0;
                 for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-                    if (!player.getInventory().getItem(i).isEmpty()) count++;
+                    // 按**堆叠数量**累计（64 个方块算 64 件），不是按占用的槽位数——
+                    // 41 个槽位 × -0.5% 最多只有 -20.5%，文案写的「上限 -70%」需要 140 件，
+                    // 只有把堆叠数量算进来那条上限才有意义（140 件 = 比如 3 组铁 + 若干）。
+                    // 时间口径仍是「当前背包」，丢掉物品立刻回落（属性修饰符每 tick 重算）。
+                    count += player.getInventory().getItem(i).getCount();
                 }
                 amount = Math.max(-0.70, -0.005 * count);
             }
@@ -200,7 +206,7 @@ public final class TimecoreCurse {
             }
         }
 
-        // e17 条件：移速属性值 ≤0.02（≈ 总减速 ≥80%）时累计移动 3000 格
+        // e17 条件：移动速度值 <0.02（≈ 总减速 ≥80%）时累计移动 3000 格
         // e18 条件：缓慢状态下累计走地 10000 格（文案「走地」/设计文档「仅计地面位移」）
         // 距离口径：只算 XZ 水平位移（把 Y 算进去，跳跃/下落会白送进度），且**真格累加**——
         // 低移速下每 tick 只有 0.1~0.2 格，用 ceil 会把一个移动 tick 记成 1 格（进度放大 4~7 倍，
@@ -214,7 +220,10 @@ public final class TimecoreCurse {
             double dist = Math.sqrt(dx * dx + dz * dz);
             // >8 格/tick 只可能是 /tp、维度切换、重生传送，不计入
             if (dist > 0 && dist < 8.0) {
-                if (CurseManager.on(player, D, 16) && moveSpeedOf(player) <= E17_SPEED_THRESHOLD) {
+                // e17 骑乘不算：船/矿车/马的位移与**自身**移速无关（矿车约 8 格/秒，6 分钟就能刷满 3000 格），
+                // 不排除会把「速度 <0.02」这道门整体架空。e18 刻意不加（用户定：它本就要求缓慢 + 走地）。
+                if (CurseManager.on(player, D, 16) && !player.isPassenger()
+                        && moveSpeedOf(player) < E17_SPEED_THRESHOLD) {
                     long cells = wholeCells(player.getUUID(), MOVE_SLOT_E17, dist);
                     if (cells > 0L) CurseManager.tick(player, D, 16, cells, 3000L);
                 }
@@ -435,7 +444,8 @@ public final class TimecoreCurse {
      * <b>反转态的 +2 不在这里</b>：见 {@link CurseLootBonus}（按真正的附魔等级回话，
      * 只对原版写了抢夺的生物掉落生效）。这里只剩诅咒态的 −2 —— 原版没有「负等级附魔」，
      * 只能用「按概率删掉 0~2 件掉落（至少留 1 件）」近似，对玩家是纯惩罚，近似无害。
-     * BOSS 掉魂 +50% 在 {@code CopySoulDropHandler} 侧（未接，见交付说明）。
+     * BOSS 掉魂 +50% <b>不在本类</b>：见 {@code handler/CopySoulDropHandler.copySoulMult}
+     * （e15 已反转 ⇒ 掉落 ×1.5，正常死亡与守门人「挑战胜利」两条路径都取这个倍率）。
      */
     @SubscribeEvent
     public static void onDrops(net.neoforged.neoforge.event.entity.living.LivingDropsEvent event) {
@@ -503,20 +513,11 @@ public final class TimecoreCurse {
                 event.setCanceled(true);
                 return;
             }
-            // e6 条件：单次摔落伤害 ≥15 点并存活
-            if (CurseManager.on(player, D, 5) && d >= 15.0f) {
-                CurseManager.tick(player, D, 5, 1L, 1L);
-            }
         }
 
-        // e13 余悸：受到超过 40% 最大生命的一击后，5 秒内受伤 +20%（乘算）/ 反转 -70%（加算）
-        if (d > player.getMaxHealth() * 0.40f) {
-            FEAR_UNTIL.put(player.getUUID(), player.level().getGameTime() + 100L);
-            // 条件：累计承受 30 次（死亡即重置）
-            if (CurseManager.on(player, D, 12)) {
-                CurseManager.tick(player, D, 12, 1L, 30L);
-            }
-        } else if (FEAR_UNTIL.containsKey(player.getUUID())) {
+        // e13 余悸：上一击是「大击」时，5 秒内受伤 +20%（乘算）/ 反转 -70%（加算）
+        // 「大击」的判定（真实扣血 > 40% 最大生命）与 30 次计数都在 DamageIntake 结算后做
+        if (FEAR_UNTIL.containsKey(player.getUUID())) {
             if (CurseManager.on(player, D, 12)) {
                 d *= 1.2f;
             } else if (CurseManager.rev(player, D, 12)) {
@@ -532,32 +533,9 @@ public final class TimecoreCurse {
             player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, true, false, false));
         }
 
-        // e10 夺佑 条件：**移速属性值 <0.05** 时累计承受 5000 点伤害（死亡不清零，跨掉线保留）。
-        // 0.05 是**属性值本身**，不是百分比：原版玩家 `MOVEMENT_SPEED` 基础值就是 0.1，
-        // 所以 0.05 ≈ 总减速 ≥50%。取 `getValue()`（含全部修饰符的最终值）：
-        // 缓慢效果（每级 −15%）、e17 重负（背包每件 −0.5%）、减速铁板等都体现在这里。
-        // 旧口径「无任何正面效果」已废弃——那条既难自行控制（抗性提升被本条诅咒清掉），
-        // 文案里「并存活」又与「进度保留」自相矛盾。
-        if (CurseManager.on(player, D, 9) && moveSpeedOf(player) < 0.05) {
-            CurseManager.tick(player, D, 9, countableDamage(player, d, event.getSource()), 5000L);
-        }
-
-        // e11 锈甲 条件：护甲值 ≤5 时累计承受 2000 点物理伤害
-        if (CurseManager.on(player, D, 10)
-                && player.getArmorValue() <= 5
-                && event.getSource().is(net.minecraft.tags.DamageTypeTags.IS_PROJECTILE) == false
-                && event.getSource().getDirectEntity() instanceof LivingEntity) {
-            CurseManager.tick(player, D, 10, countableDamage(player, d, event.getSource()), 2000L);
-        }
-
-        // e5 盈伤 条件：**本次生命内每一次**「满血时挨打」都往 3000 里累加，而不是「一条命只记一次」。
-        // 判定点是「这一击落下时是否满血」：满血被打到残血 → 靠食物/药水/治疗回满 → 再挨打，
-        // 会继续累计（死亡才清零，见 onDeath）。这正是「40 血被打到剩 1 → 回满 → 再被打」应叠加的口径。
-        if (CurseManager.on(player, D, 4) && atFullHealth(player)) {
-            long delta = countableDamage(player, d, event.getSource());
-            long now2 = CurseManager.tick(player, D, 4, delta, 3000L);
-            AttackDiag.log("⑤e5 满血承伤 +{} → 累计 {}", delta, now2);
-        }
+        // e10 夺佑 / e11 锈甲 / e5 盈伤 / e6 坠渊 的**条件计数**不在这里做：
+        // 一律由 {@link DamageIntake} 在 {@code LivingDamageEvent.Post} 用「真实扣血」派发到
+        // {@link #onDamageTaken}。这里只负责改伤害（倍率/取消/反弹）。
 
         // e23 平势 反转：目标最大生命高于你 50% 时，你受伤有 20% 概率**反制**（并清掉对方无敌帧）
         if (CurseManager.rev(player, D, 22)
@@ -575,6 +553,60 @@ public final class TimecoreCurse {
         }
 
         event.setAmount(d);
+    }
+
+    // ==================== 受伤结算后（统一口径） ====================
+
+    /**
+     * 所有「累计受伤 / 受伤阈值」类条件的**唯一入口**，由 {@link DamageIntake} 在
+     * {@code LivingDamageEvent.Post} 里派发 —— 此时护甲、附魔、抗性、免伤、本类的全部倍率
+     * 都已算完，数值是这一击**真正落到玩家身上的伤害**。
+     *
+     * @param dealt   这一击的真实扣血（{@code Post.getNewDamage()}，**含**被伤害吸收吃掉的那部分）
+     * @param points  已裁过的计入点数（单次不超过 10×最大生命、必死级来源不计，向上取整）
+     * @param wasFull 这一击落下**之前**是否满血（{@code DamageIntake} 在 Incoming 阶段快照，1e-3 容差）
+     */
+    public static void onDamageTaken(ServerPlayer player, net.minecraft.world.damagesource.DamageSource src,
+                                     float dealt, long points, boolean wasFull) {
+        // e5 盈伤：打前满血 ⇒ 这一下的真实扣血全部计入（不看谁打来的，自伤也算）
+        if (wasFull && CurseManager.on(player, D, 4)) {
+            long now = CurseManager.tick(player, D, 4, points, 3000L);
+            AttackDiag.log("⑤e5 满血真实扣血 +{} → 累计 {}", points, now);
+        }
+
+        // e10 夺佑：移速属性值 <0.05 时累计承受 5000 点伤害（死亡不清零，跨掉线保留）。
+        // 0.05 是**属性值本身**，不是百分比：原版玩家 MOVEMENT_SPEED 基础值就是 0.1，≈ 总减速 ≥50%。
+        // 取 getValue()（含全部修饰符的最终值）：缓慢效果（每级 −15%）、e17 重负、减速铁板都体现在这里。
+        if (CurseManager.on(player, D, 9) && moveSpeedOf(player) < 0.05) {
+            CurseManager.tick(player, D, 9, points, 5000L);
+        }
+
+        // e11 锈甲：护甲值 ≤5 时累计承受 2000 点物理伤害（近战口径：非弹射物且直接实体是生物）
+        if (CurseManager.on(player, D, 10)
+                && player.getArmorValue() <= 5
+                && src != null
+                && !src.is(net.minecraft.tags.DamageTypeTags.IS_PROJECTILE)
+                && src.getDirectEntity() instanceof LivingEntity) {
+            CurseManager.tick(player, D, 10, points, 2000L);
+        }
+
+        // e6 坠渊：单次摔落真实扣血 ≥15 点**并存活**。
+        // 注意：`LivingDamageEvent.Post` 在 `LivingEntity.actuallyHurt` 末尾派发，而 `die()` 在 `hurt()`
+        // 里更后面（javap：actuallyHurt 431/470、die 872）⇒ **致死一击同样会走到这里**，
+        // 「并存活」不能靠"Post 就代表活着扛下来了"，必须显式看血量（Post 时 setHealth 已跑完）。
+        if (CurseManager.on(player, D, 5) && src != null
+                && src.is(net.minecraft.tags.DamageTypeTags.IS_FALL) && dealt >= 15.0f
+                && player.getHealth() > 0.0f) {
+            CurseManager.tick(player, D, 5, 1L, 1L);
+        }
+
+        // e13 余悸：这一下真实扣血 > 40% 最大生命 ⇒ 开 5 秒窗口，并计「大击 30 次」（死亡即重置）
+        if (dealt > player.getMaxHealth() * 0.40f) {
+            FEAR_UNTIL.put(player.getUUID(), player.level().getGameTime() + 100L);
+            if (CurseManager.on(player, D, 12)) {
+                CurseManager.tick(player, D, 12, 1L, 30L);
+            }
+        }
     }
 
     // ==================== 造成伤害 ====================
@@ -732,25 +764,6 @@ public final class TimecoreCurse {
     // ==================== e21 无援 ====================
 
     /**
-     * 「累计承伤」类条件的**有效承伤**。
-     * <p>
-     * 直接把 {@code event.getAmount()} 累加会出两种事故：
-     * <ul>
-     *   <li>{@code /kill} 打的是 {@code genericKill} + {@code Float.MAX_VALUE}（3.4e38）——
-     *       一次就把 3000/5000 的进度瞬间打满（实测：{@code /kill} 直接弹「盈伤 反转达成」），
-     *       而且把进度写成天文数字留在存档里；</li>
-     *   <li>虚空/必死级伤害同样属 {@code BYPASSES_INVULNERABILITY}，不该算「承受的伤害」。</li>
-     * </ul>
-     * 因此：必死级来源一律不计；单次再大也按「10 倍最大生命」封顶。
-     */
-    private static long countableDamage(ServerPlayer player, float d, net.minecraft.world.damagesource.DamageSource src) {
-        if (!Float.isFinite(d) || d <= 0.0f) return 0L;
-        if (src != null && src.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) return 0L;
-        long cap = Math.max(1L, (long) Math.ceil(player.getMaxHealth() * 10.0f));
-        return Math.min((long) Math.ceil(d), cap);
-    }
-
-    /**
      * ⑤ e21 无援（诅咒态）是否**封掉一切不死图腾**。
      * <p>
      * 供两条「原版事件拦不到」的路径使用：
@@ -904,12 +917,29 @@ public final class TimecoreCurse {
      * 加完必须 {@code stacks.update()} 把惰性 resize 落实，否则尺寸要等下次被读取才生效；
      * 再把 {@code getUpdatingInventories()} 发一次同步包，客户端才会 applySyncTag）。
      */
+    /**
+     * 强制重算 e14 的照片栏位加成（绕过 {@code PHOTO_SLOT_TAG} 的「值没变就不动」短路）。
+     * <p>
+     * 供 {@code CurioSlotBonuses.refresh} 调用（虚影残像归还时必须先把槽位数还原）。
+     */
+    public static void refreshPhotoSlots(ServerPlayer player) {
+        if (player == null) return;
+        player.getPersistentData().remove(PHOTO_SLOT_TAG);
+        updatePhotoSlots(player);
+    }
+
     private static void updatePhotoSlots(ServerPlayer player) {
         int want = 0;
         if (CurseManager.on(player, D, 13)) want = -2;
         else if (CurseManager.rev(player, D, 13)) want = 4;
 
-        if (player.getPersistentData().getInt(PHOTO_SLOT_TAG) == want) return;
+        // 自愈：只比 persistentData 里的「上次写入多少」是不够的 —— 死亡/重生会重建 Curios 容器，
+        // 标记位还在、修饰符却已经没了，于是永远不再重写（照片栏位就永久少/多一截）。
+        // 必须同时核对玩家身上该修饰符的现值。
+        if (player.getPersistentData().getInt(PHOTO_SLOT_TAG) == want
+                && CurioSlotBonuses.slotModifierAmount(player, "photograph", PHOTO_SLOT_MOD) == want) {
+            return;
+        }
         player.getPersistentData().putInt(PHOTO_SLOT_TAG, want);
         final int target = want;
 
@@ -1050,11 +1080,6 @@ public final class TimecoreCurse {
         if (n >= STOLEN_KIND_GOAL) {
             CurseManager.reach(player, D, 13);
         }
-    }
-
-    /** e5 条件用：是否处于满血。带 1e-3 容差——血量是 float，属性变动/治疗溢出后可能差一个 ulp，直接 {@code >=} 会漏记 */
-    private static boolean atFullHealth(ServerPlayer player) {
-        return player.getHealth() >= player.getMaxHealth() - 1.0e-3f;
     }
 
     /**

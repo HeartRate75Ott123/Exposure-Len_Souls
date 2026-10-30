@@ -89,11 +89,14 @@ public class ToughnessPhotoHandler {
                 playedSound = true;
             }
 
-            // 白霸体期间"试图造成韧性伤害"都该闪一次故障叉号（拍照这条路径也要），
-            // 但同一张照片里只要有一只真的削到了就不闪；那几个例外能力保持静默。
-            if (!anyDealt && blockedByHyperArmor && hitter != null
-                    && !ToughnessFailureGate.silenceFailure(hitter)) {
-                com.plumejade.lensouls.network.VitalStrikeRejectPacket.send(hitter);
+            // 白霸体期间"试图造成韧性伤害"都该弹一次提示（拍照这条路径也要），
+            // 但同一张照片里只要有一只真的削到了就不弹。
+            // 弹哪一种：闪光灯槽装着机械眼 → 旧的大故障叉号；否则（含四个静默能力）→ 原版虚弱小图标。
+            if (!anyDealt && blockedByHyperArmor && hitter != null) {
+                boolean mechanicalEye =
+                        com.plumejade.lensouls.integration.ExposureHelper.hasMechanicalEye(camera);
+                boolean cross = mechanicalEye && !ToughnessFailureGate.silenceFailure(hitter);
+                com.plumejade.lensouls.network.VitalStrikeRejectPacket.send(hitter, cross);
             }
         } catch (Exception e) {
             LenSouls.LOGGER.error("[ToughnessPhoto] fail", e);

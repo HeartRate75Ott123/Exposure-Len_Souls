@@ -149,6 +149,8 @@ public class LenSouls {
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.CurseMigrationHandler.class);
         // ---- ⑤ 羽·断时炉心（铁序 · 归一之律 23 条枷锁） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.curse.TimecoreCurse.class);
+        // ---- 「累计受伤」统一口径：LivingDamageEvent.Post 的真实扣血（打前血量在 Incoming 快照） ----
+        NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.curse.DamageIntake.class);
         // ---- ⑥ 羽·终焉秘仪（秘仪 · 代价之律 7 条） ----
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.handler.curse.FinalriteCurse.class);
         // ---- ⑦ 羽·零号誓炉（机誓 · 失控之律 7 诅咒 + 7 祝福） ----

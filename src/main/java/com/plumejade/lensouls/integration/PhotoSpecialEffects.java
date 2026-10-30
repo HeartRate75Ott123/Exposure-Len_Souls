@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.integration;
 
 import com.plumejade.lensouls.attribute.ModAttributes;
+import com.plumejade.lensouls.handler.CurioSlotBonuses;
 import com.plumejade.lensouls.config.DataPackLoader;
 import com.plumejade.lensouls.damage.ElementDamage;
 import com.plumejade.lensouls.item.PhotoAlbumItem;
@@ -914,6 +915,19 @@ public class PhotoSpecialEffects {
         }
     }
 
+    /**
+     * 强制重算照片栏位加成（绕过 {@link #SLOT_TAG} 的「值没变就不动」短路）。
+     * <p>
+     * 给「刚把照片装回饰品栏、必须立刻拿到正确槽位数」的场景用，例如
+     * {@code PhantomRemnantData.restore}：照片栏位是<b>按已装备照片推导</b>的，
+     * 死亡时照片被搬空 ⇒ 加成归零、容器缩回基础 3 格，不强制重算就装不回去。
+     */
+    public static void refreshPhotoSlots(ServerPlayer player) {
+        if (player == null) return;
+        player.getPersistentData().remove(SLOT_TAG);
+        updatePhotoSlots(player, collectGearEntities(player));
+    }
+
     /** Curios 照片槽位扩展：vindicator 恒定 +1，弱照片组按各自分配值累加（无上限） */
     private static void updatePhotoSlots(ServerPlayer player, List<String> gearEntities) {
         int extra = 0;
@@ -923,13 +937,18 @@ public class PhotoSpecialEffects {
         }
 
         int cur = player.getPersistentData().getInt(SLOT_TAG);
-        if (cur == extra) return;
+        // 自愈：只比 persistentData 里的「上次写入多少」是不够的 —— 死亡/重生会重建 Curios 容器，
+        // 标记位还在、修饰符却已经没了，于是永远不再重写（照片栏位就永久少一截）。
+        // 必须同时核对玩家身上该修饰符的现值。
+        if (cur == extra && CurioSlotBonuses.slotModifierAmount(player, "photograph",
+                ResourceLocation.parse(SLOT_MOD_ID)) == extra) {
+            return;
+        }
 
         final int targetExtra = extra;
         CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
-            if (cur > 0) {
-                handler.removeSlotModifier("photograph", ResourceLocation.parse(SLOT_MOD_ID));
-            }
+            // 无条件撤：原来只在 cur > 0 时才撤，会留下「标记位是 0、修饰符却还挂着」的脏状态
+            handler.removeSlotModifier("photograph", ResourceLocation.parse(SLOT_MOD_ID));
             if (targetExtra > 0) {
                 handler.addTransientSlotModifier("photograph", ResourceLocation.parse(SLOT_MOD_ID),
                         targetExtra, AttributeModifier.Operation.ADD_VALUE);

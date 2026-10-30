@@ -103,14 +103,22 @@ public class ClientPacketHandlers {
     }
 
     /**
-     * 要害打击没削到韧性（白霸体）：整屏故障叉号，压在最上层。
+     * 要害打击没削到韧性（白霸体）：弹一次提示，压在最上层。
      * <p>
      * 按用户定稿："只用叠加叉号部分" —— 不压暗、不加文字、不带任何底层，只把一支巨大的故障 ×
      * 叠在取景框之上（见 {@link com.plumejade.lensouls.client.hud.VitalDenyOverlay}）。
-     * 定身中 / 倍率被扣成 0 的情况服务端根本不发包，所以这里不需要再分支。
+     * 定身中 / 倍率被扣成 0 的情况服务端根本不发包，所以这里不再判那两类。
+     * <p>
+     * <b>画哪一种由服务端的 {@code cross} 字段定死</b>（客户端看不到"有没有别的 BOSS 真吃到韧性"）：
+     * {@code true} = 大故障叉号（闪光灯槽装了「机械眼」）；{@code false} = 原版虚弱小图标（默认形态，
+     * 含拍立得与四个静默能力）。见 {@link com.plumejade.lensouls.client.hud.HyperArmorDenyIcon}。
      */
     public static void handleVitalStrikeReject(com.plumejade.lensouls.network.VitalStrikeRejectPacket packet) {
-        com.plumejade.lensouls.client.hud.VitalDenyOverlay.show();
+        if (packet.cross()) {
+            com.plumejade.lensouls.client.hud.VitalDenyOverlay.show();
+        } else {
+            com.plumejade.lensouls.client.hud.HyperArmorDenyIcon.show();
+        }
     }
 
     /**

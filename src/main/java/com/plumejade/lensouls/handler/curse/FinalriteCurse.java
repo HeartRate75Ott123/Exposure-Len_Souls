@@ -4,18 +4,22 @@ import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
-import com.plumejade.lensouls.mixin.EntityInvulnerableTimeAccessor;
+import com.plumejade.lensouls.integration.ParagliderStamina;
+import com.plumejade.lensouls.util.AllyFilter;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
@@ -40,7 +44,7 @@ import java.util.UUID;
  * 反转态**加算**（{@code d * (1 + Σ 加算值)}）；**受伤侧一律乘算**、**治疗侧一律乘算**。
  * 本类 输出侧的 e3（+10%）与 e4（+1%/掉落物）两条反转加算在同一个事件里**统一收口一次**。
  * <p>
- * 条目序号（0 基）与 lang 的 {@code eN} 一致：e1=竭泉 e2=血偿 e3=蚀力 e4=枯井
+ * 条目序号（0 基）与 lang 的 {@code eN} 一致：e1=竭泉 e2=血偿 e3=蚀力 e4=力竭
  * e5=篡命 e6=献祭 e7=穿甲。
  * <p>
  * ⚠ 本类只写效果，**注册由 LenSouls 主构造器统一做**（{@code NeoForge.EVENT_BUS.register(FinalriteCurse.class)}）。
@@ -64,14 +68,22 @@ public final class FinalriteCurse {
     private static final float BLOOD_REV_DAMAGE_RATIO = 0.50f;
     /** e3 蚀力：诅咒态全伤害 -10% / 反转态加算 +10% */
     private static final float EROSION = 0.10f;
-    /** e4 枯井：扣血间隔（5 秒 = 100 tick） */
-    private static final long DRAIN_INTERVAL_TICKS = 100L;
-    /** e4 枯井 诅咒态：周围 32 格内没有掉落物 → 持续扣血 */
-    private static final double CURSE_DRAIN_RADIUS = 32.0;
-    /** e2 血偿 反转 / e4 枯井 反转 共用的「周围 4 格」检索半径 */
+    /** e4 力竭：**每造成一次伤害**固定消耗的精力值（Paraglider 默认一管 1000 ⇒ 约 6 次命中耗尽） */
+    private static final double STAMINA_PER_HIT = 180.0;
+    /** e4 力竭 诅咒态：精力比例低于此值时，造成伤害 -30% */
+    private static final double LOW_STAMINA_RATIO = 0.10;
+    /** e4 力竭 诅咒态：低精力时的伤害损失 */
+    private static final float LOW_STAMINA_LOSS = 0.30f;
+    /** e4 力竭 反转条件：精力比例低于此值时，一次打出 5000 点伤害即达成 */
+    private static final double ONESHOT_STAMINA_RATIO = 0.50;
+    /** e4 力竭 反转条件：单次造成伤害门槛 */
+    private static final float ONESHOT_DAMAGE = 5000.0f;
+    /** e4 力竭 反转：精力比例高于此值时，造成伤害 +15% */
+    private static final double HIGH_STAMINA_RATIO = 0.50;
+    /** e4 力竭 反转：高精力时的伤害加成 */
+    private static final float HIGH_STAMINA_BONUS = 0.15f;
+    /** e2 血偿 反转：对 4 格内敌人生效的检索半径 */
     private static final double NEARBY_RADIUS = 4.0;
-    /** e4 枯井 反转：每 1 个掉落物增加 1% 伤害，上限 +20% */
-    private static final int DROP_BONUS_CAP = 20;
     /** e5 篡命：每装备一件护甲，最大生命上限 ×90% */
     private static final double HEALTH_PER_ARMOR = 0.9;
     /** e6 献祭：满血时受到伤害 +70% */
@@ -94,11 +106,19 @@ public final class FinalriteCurse {
      * ⚠ 传奇怪物那只的注册名是 {@code legendary_monsters:posessed_paladin}
      * （模组自身拼写如此，只有一个 s；已按 jar 内 {@code ModEntities} 实测核对）。
      */
+    /**
+     * 反转条件（击杀指定 BOSS）：实体 ID → 条目序号（0 基）。
+     * <p>
+     * ⚠ **e4 力竭 不在这里**：它的反转条件是「精力低于 50% 时一次打出 5000 点伤害」，
+     * 由 {@link #onDealDamagePost} 直判，所以这条表只剩 6 只 boss。
+     * <p>
+     * ⚠ 传奇怪物那只的注册名是 {@code legendary_monsters:posessed_paladin}
+     * （模组自身拼写如此，只有一个 s；已按 jar 内 {@code ModEntities} 实测核对）。
+     */
     private static final Map<String, Integer> BOSS_ENTRY = Map.of(
             "minecraft:warden", 0,                                // e1 竭泉 · 监守者
             "legendary_monsters:posessed_paladin", 1,              // e2 血偿 · 堕落圣骑
             "cataclysm:ignis", 2,                                  // e3 蚀力 · 炎魔 Ignis
-            "block_factorys_bosses:infernal_dragon", 3,           // e4 枯井 · 炼狱飞龙
             "cataclysm:scylla", 4,                                  // e5 篡命 · 斯库拉 Scylla
             "cataclysm:ender_guardian", 5,                          // e6 献祭 · 末影守卫
             "cataclysm:the_harbinger", 6                            // e7 穿甲 · 先驱者
@@ -137,15 +157,8 @@ public final class FinalriteCurse {
             }
         }
 
-        // e4 枯井：周围 32 格没有掉落物 → 持续扣血，每 5 秒 1 点
-        if (CurseManager.on(player, D, 3)
-                && !player.isCreative() && !player.isSpectator()
-                && now % DRAIN_INTERVAL_TICKS == 0L
-                && nearbyDrops(player, CURSE_DRAIN_RADIUS) == 0) {
-            // 与 ④ 自闭同口径：先清无敌帧，保证这 1 点必中，不被上一次受击吞掉
-            ((EntityInvulnerableTimeAccessor) (Object) player).lensouls$setInvulnerableTime(0);
-            player.hurt(player.damageSources().magic(), 1.0f);
-        }
+        // e4 力竭 不再有「持续扣血」的 tick 结算：诅咒态改成「造成伤害消耗精力值 + 低精力掉伤害」，
+        // 全部在 onDealDamage / onDealDamagePost 里，见下方「造成伤害」段。
 
         // e2 血偿：禁疗窗口过期即清理
         Long at = LAST_DEALT.get(player.getUUID());
@@ -163,18 +176,6 @@ public final class FinalriteCurse {
             }
         }
         return n;
-    }
-
-    /**
-     * 玩家周围 {@code radius} 格内的掉落物数量（AABB，含上下）。
-     * <p>
-     * 两个口径**必须分别传常量**：诅咒态 {@link #CURSE_DRAIN_RADIUS}（32），
-     * 反转态 {@link #NEARBY_RADIUS}（4）。这里不接受「默认半径」，
-     * 免得再出现「只改了诅咒态文案、代码还在按 4 格判定」。
-     */
-    private static int nearbyDrops(ServerPlayer player, double radius) {
-        AABB box = player.getBoundingBox().inflate(radius);
-        return player.level().getEntitiesOfClass(ItemEntity.class, box).size();
     }
 
     // ==================== 治疗 ====================
@@ -288,30 +289,54 @@ public final class FinalriteCurse {
 
     @SubscribeEvent
     public static void onDealDamage(LivingDamageEvent.Pre event) {
-        if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         LivingEntity target = event.getEntity();
-        if (target == player) return;
+        // 两个口径分开：
+        //   direct = 本体直接挥出的伤害（e2 血偿 / e3 蚀力 只认这个，维持原有语义）；
+        //   owner  = 这次伤害「算谁打的」——本体 / 弹幕 / 召唤物 / 第三方构造体（gytrinket）
+        //            都沿归属链回退到这个玩家；e4 力竭按这个更宽的口径扣精力。
+        ServerPlayer direct = event.getSource().getEntity() instanceof ServerPlayer sp ? sp : null;
+        ServerPlayer owner = direct != null ? direct : damageOwner(event.getSource());
+        if (owner == null) return;
         try {
             float d = event.getNewDamage();
             if (d <= 0.0f) return;
 
-            // e2 血偿：记录「造成伤害」的时刻（诅咒态的 5 秒禁疗窗口从这一刻起算）
-            LAST_DEALT.put(player.getUUID(), player.level().getGameTime());
+            boolean byDirect = direct != null && target != direct;
 
-            // e3 蚀力：全伤害 -10%——输出侧乘算
-            if (CurseManager.on(player, D, 2)) {
+            // e2 血偿：记录「造成伤害」的时刻（诅咒态的 5 秒禁疗窗口从这一刻起算）
+            if (byDirect) {
+                LAST_DEALT.put(direct.getUUID(), direct.level().getGameTime());
+            }
+
+            // e3 蚀力：全伤害 -10%——输出侧乘算（只认本体直伤）
+            if (byDirect && CurseManager.on(direct, D, 2)) {
                 d *= 1.0f - EROSION;
+            }
+
+            // e4 力竭 诅咒态：**每造成一次伤害**固定 -60 精力，来源只要是这个玩家（本体 / 弹幕 /
+            // 召唤物 / 构造体）都算；**出手时**精力低于 10% ⇒ 这一击伤害 -30%
+            // （用消耗前的比例判定：挥出时状态如何就如何结算，避免这一击自己把精力打空又反过来罚自己）
+            boolean byOwner = target != owner && CurseManager.on(owner, D, 3);
+            if (byOwner) {
+                double ratio = ParagliderStamina.ratio(owner);
+                ParagliderStamina.consume(owner, STAMINA_PER_HIT);
+                if (!Double.isNaN(ratio) && ratio < LOW_STAMINA_RATIO) {
+                    d *= 1.0f - LOW_STAMINA_LOSS;
+                }
             }
 
             // ---- 反转态加算统一收口（§2：d × (1 + Σ 反转修正)）----
             float bonus = 0.0f;
-            // e3 蚀力 反转：全伤害 +10%
-            if (CurseManager.rev(player, D, 2)) {
+            // e3 蚀力 反转：全伤害 +10%（只认本体直伤）
+            if (byDirect && CurseManager.rev(direct, D, 2)) {
                 bonus += EROSION;
             }
-            // e4 枯井 反转：周围 4 格内每有 1 个掉落物，造成伤害 +1%（上限 +20%）
-            if (CurseManager.rev(player, D, 3)) {
-                bonus += 0.01f * Math.min(DROP_BONUS_CAP, nearbyDrops(player, NEARBY_RADIUS));
+            // e4 力竭 反转：精力高于 50% 时，造成伤害 +15%（并入 Σ 加算；同样按归属玩家算）
+            if (target != owner && CurseManager.rev(owner, D, 3)) {
+                double ratio = ParagliderStamina.ratio(owner);
+                if (!Double.isNaN(ratio) && ratio > HIGH_STAMINA_RATIO) {
+                    bonus += HIGH_STAMINA_BONUS;
+                }
             }
             if (bonus != 0.0f) {
                 d *= 1.0f + bonus;
@@ -320,6 +345,47 @@ public final class FinalriteCurse {
             event.setNewDamage(d);
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ⑥ 造成伤害结算异常", t);
+        }
+    }
+
+    /**
+     * 这次伤害「算谁打的」：先看 causing entity，再沿归属链回退一层。
+     * <p>
+     * 覆盖范围（按 {@link com.plumejade.lensouls.util.AllyFilter#playerOwner}）：玩家本体 /
+     * 玩家射出的弹幕（{@code Projectile#getOwner}）/ 实现 {@code OwnableEntity} 或
+     * {@code TraceableEntity} 的召唤物与第三方构造体（gytrinket 的
+     * {@code AbstractConstructEntity} 就实现 {@code OwnableEntity}，无人机/僚机打的都回落到玩家）。
+     * <p>
+     * 找不到玩家（野生怪、别人的构造体）返回 {@code null}，调用方直接跳过。
+     */
+    private static ServerPlayer damageOwner(DamageSource src) {
+        if (src == null) return null;
+        Entity causing = src.getEntity();
+        Player p = AllyFilter.playerOwner(causing);
+        if (p instanceof ServerPlayer sp) return sp;
+        Entity direct = src.getDirectEntity();
+        p = AllyFilter.playerOwner(direct);
+        return p instanceof ServerPlayer sp ? sp : null;
+    }
+
+    /**
+     * e4 力竭 的反转条件：**精力低于 50% 时，一次打出 5000 点伤害**。
+     * <p>
+     * 用 {@code LivingDamageEvent.Post} 的最终伤害判（护甲 / 减伤 / 我们的乘区都算完），
+     * 不是面板值 —— 与 ⑤ 的统计口径保持一致；单次命中即达标，不做累计。
+     */
+    @SubscribeEvent
+    public static void onDealDamagePost(LivingDamageEvent.Post event) {
+        ServerPlayer owner = damageOwner(event.getSource());
+        if (owner == null || event.getEntity() == owner) return;
+        try {
+            if (!CurseManager.on(owner, D, 3)) return;
+            if (event.getNewDamage() < ONESHOT_DAMAGE) return;
+            double ratio = ParagliderStamina.ratio(owner);
+            if (Double.isNaN(ratio) || ratio >= ONESHOT_STAMINA_RATIO) return;
+            CurseManager.tick(owner, D, 3, 1L, 1L);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ⑥ e4 反转条件结算异常", t);
         }
     }
 

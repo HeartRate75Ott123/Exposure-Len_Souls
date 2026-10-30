@@ -26,7 +26,9 @@ import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -53,6 +55,8 @@ public final class PhantomRemnantData {
     private static final String TAG_LEVEL = "lensouls:remnant_level";
     private static final String TAG_PROGRESS = "lensouls:remnant_progress";
     private static final String TAG_SLOTS = "lensouls:remnant_slots";
+    /** 死亡瞬间各 Curios 容器的实际槽位数（identifier → slots） */
+    private static final String TAG_SIZES = "lensouls:remnant_sizes";
     private static final String TAG_OWNER = "lensouls:remnant_owner";
     private static final String TAG_PRESENT = "lensouls:remnant_present";
 
@@ -101,7 +105,9 @@ public final class PhantomRemnantData {
      * 所以「槽位还有的」与「掉落列表里有的」不可能同时命中同一个物品）：
      * <ol>
      *   <li>玩家 Inventory（1.21 的 {@code Inventory} 已包含主背包 0-35、盔甲 36-39、副手 40）；</li>
-     *   <li>Curios 全部槽位（记录槽位标识符 + 下标，用于归位）；</li>
+     *   <li>Curios 全部槽位（记录槽位标识符 + 下标，用于归位；并记录<b>各容器当时的尺寸</b>
+     *       —— 那些「按已装备内容推导」的加成（如照片栏位 +8）在死亡后会随之归零，
+     *       只有尺寸能当归还时的凭据）；</li>
      *   <li>{@code LivingDropsEvent} 的掉落列表（Curios 已先行丢出的饰品等）。</li>
      * </ol>
      *
@@ -110,6 +116,7 @@ public final class PhantomRemnantData {
     public static ItemStack capture(ServerPlayer player, Collection<ItemEntity> extraDrops) {
         List<ItemStack> items = new ArrayList<>();
         List<String> slots = new ArrayList<>();
+        CompoundTag sizes = new CompoundTag();
 
         Inventory inv = player.getInventory();
         for (int i = 0; i < inv.getContainerSize(); i++) {
@@ -123,7 +130,11 @@ public final class PhantomRemnantData {
         CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
             for (var entry : handler.getCurios().entrySet()) {
                 var stacks = entry.getValue().getStacks();
-                for (int i = 0; i < stacks.getSlots(); i++) {
+                // 记下此刻的容器尺寸（含「按内容/状态推导」的那部分加成，例如照片栏位 +8）：
+                // 归还时这些加成可能已经不在（照片被搬空 ⇒ 推导值归零），只有尺寸能当凭据
+                int slotsNow = stacks.getSlots();
+                if (slotsNow > 0) sizes.putInt(entry.getKey(), slotsNow);
+                for (int i = 0; i < slotsNow; i++) {
                     ItemStack stack = stacks.getStackInSlot(i);
                     if (stack.isEmpty()) continue;
                     // 虚影核心自身「死亡不掉落」（ALWAYS_KEEP）：不搬进容器、也不清空该槽位，
@@ -153,6 +164,7 @@ public final class PhantomRemnantData {
         ListTag slotList = new ListTag();
         for (String slot : slots) slotList.add(StringTag.valueOf(slot));
         tag.put(TAG_SLOTS, slotList);
+        if (!sizes.isEmpty()) tag.put(TAG_SIZES, sizes);
         // 经验：以「等级 + 当前级进度」为权威（玩家看到的就是等级），总额备用
         tag.putInt(TAG_LEVEL, player.experienceLevel);
         tag.putFloat(TAG_PROGRESS, player.experienceProgress);
@@ -180,6 +192,10 @@ public final class PhantomRemnantData {
      * <p>
      * <b>归还分轮（顺序就是这次修复的核心，别随手改回单轮）：</b>
      * <ol>
+     *   <li><b>槽位准备</b>（{@link #reserveCurioCapacity}）：先让「推导型」槽位加成回来
+     *       （照片栏位按已装备照片推导、⑦e12 首饰栏按诅咒状态推导），再把容器临时顶到
+     *       死亡时的尺寸 —— 死亡会把容器搬空，推导值随之归零、容器缩回基础尺寸，
+     *       不做这一步「记忆槽位」就是空的。</li>
      *   <li><b>先装「会加饰品栏位」的饰品</b>（Curios 的 {@link SlotAttribute} 加成 &gt; 0，
      *       例如「+1 戒指栏」的戒指）。这类饰品的栏位加成是
      *       <b>「写进槽位 → 下一个玩家刻由 CuriosEventHandler 结算」</b>的：
@@ -192,6 +208,7 @@ public final class PhantomRemnantData {
      *   <li>再装<b>其余饰品</b>（原槽 → 同组空位 → 跨容器兜底），然后放<b>原版槽位</b>的物品。</li>
      *   <li><b>重试轮</b>：前几轮没落位的饰品再试一次（万一某件扩栏饰品是在第 3 轮才装上的）。</li>
      *   <li>最后才塞背包，背包也塞不下才掉在原地 —— 绝不会因为顺序问题丢东西。</li>
+     *   <li><b>槽位收尾</b>：物品就位后重算推导型加成，再撤掉临时顶开的尺寸（顺序不可颠倒）。</li>
      * </ol>
      *
      * @return 是否确实归还了一次（false = 这是个空容器/已被领取过）
@@ -225,6 +242,22 @@ public final class PhantomRemnantData {
         int failed = 0;
         int expanders = 0;
         boolean[] placed = new boolean[items.size()];
+
+        // 2.0 槽位准备（本批修复的核心，别删）——
+        // Curios 里有一类槽位加成**不是饰品物品给出的**，而是「按玩家当前状态/已装备内容推导」的
+        // （照片栏位按已装备照片推导，⑦e12 首饰栏按诅咒状态推导）。死亡瞬间容器被搬空 ⇒
+        // 推导值归零 ⇒ 容器缩回基础尺寸（照片栏 11 → 3），几秒后拾取归还时按记忆槽位放就装不下，
+        // 越界的照片被挤回背包（实测症状）。所以先把尺寸还原成「死亡那一刻的样子」：
+        //   ① refresh：让与内容无关的推导加成先回来（e12 首饰栏、e14 照片栏偏移）；
+        //   ② growTo：仍不够的容器用临时槽位修饰符顶到记忆尺寸，让物品先进得去。
+        int capacityFilled = 0;
+        try {
+            CurioSlotBonuses.refresh(player);
+            capacityFilled = reserveCurioCapacity(player, tag, items, slots);
+        } catch (Exception e) {
+            failed++;
+            LenSouls.LOGGER.warn("[PhantomRemnant] 槽位准备失败，按当前尺寸继续归还", e);
+        }
 
         // 2.1 扩栏饰品优先（每装上一件就立刻把栏位加成结算掉）
         for (int i = 0; i < items.size(); i++) {
@@ -313,18 +346,30 @@ public final class PhantomRemnantData {
             }
         }
 
+        // 2.6 收尾：物品已就位 → 让推导型加成按「新的内容」重算一遍，再撤掉临时顶开的尺寸。
+        // 顺序不能颠倒：先撤再 refresh 会让容器瞬间缩回基础尺寸，越界的饰品被 Curios 的
+        // loseStacks 甩进背包（正是 2.0 要修的症状）。撤完之后尺寸应停在「按内容推导」的真实值上。
+        int released = 0;
+        try {
+            CurioSlotBonuses.refresh(player);
+            released = CurioSlotBonuses.releaseTemporary(player);
+        } catch (Exception e) {
+            LenSouls.LOGGER.warn("[PhantomRemnant] 槽位收尾失败（临时扩栏可能残留，下次重算会清）", e);
+        }
+
         // ── 3) 清空载荷，避免二次领取 ──
         CompoundTag cleared = tag.copy();
         cleared.putBoolean(TAG_PRESENT, false);
         cleared.remove(TAG_SLOTS);
+        cleared.remove(TAG_SIZES);
         cleared.putInt(TAG_XP, 0);
         cleared.putInt(TAG_LEVEL, 0);
         cleared.putFloat(TAG_PROGRESS, 0.0F);
         remnant.set(DataComponents.CUSTOM_DATA, CustomData.of(cleared));
         remnant.remove(DataComponents.CONTAINER);
 
-        LenSouls.LOGGER.info("[PhantomRemnant] 归还 {} 件物品（扩栏优先 {} 件 / 失败 {}）/ {} 点经验（缓存等级 {}+{}%）",
-                items.size(), expanders, failed, xp, level, progress);
+        LenSouls.LOGGER.info("[PhantomRemnant] 归还 {} 件物品（扩栏优先 {} 件 / 临时顶开 {} 个容器 / 失败 {}）/ {} 点经验（缓存等级 {}+{}%）",
+                items.size(), expanders, capacityFilled, failed, xp, level, progress);
         return true;
     }
 
@@ -374,6 +419,55 @@ public final class PhantomRemnantData {
 
     private static boolean isInventorySlot(String slot) {
         return slot != null && slot.startsWith("inv:");
+    }
+
+    /**
+     * 把各 Curios 容器<b>临时顶到「死亡那一刻的尺寸」</b>，让物品装得进原槽位。
+     * <p>
+     * 需要的尺寸 = max（死亡时记录的尺寸, 该容器里最靠后的记忆下标 + 1）。
+     * 旧版本产出的容器没有尺寸记录（{@link #TAG_SIZES}），靠下标也能兜住 ——
+     * 推导型加成的容器尺寸一定 ≥ 其中任何一件物品的下标 + 1。
+     * <p>
+     * <b>这里只顶不撤</b>：必须等物品装完、{@link CurioSlotBonuses#refresh} 让推导值按新内容
+     * 重算之后，再由 {@link CurioSlotBonuses#releaseTemporary} 收掉（见 {@link #restore} 的 2.0 / 2.6）。
+     *
+     * @return 实际被顶开的容器数量（供日志）
+     */
+    private static int reserveCurioCapacity(ServerPlayer player, CompoundTag tag,
+                                           List<ItemStack> items, List<String> slots) {
+        Map<String, Integer> need = new HashMap<>();
+        if (tag.contains(TAG_SIZES, Tag.TAG_COMPOUND)) {
+            CompoundTag sizes = tag.getCompound(TAG_SIZES);
+            for (String identifier : sizes.getAllKeys()) {
+                int size = sizes.getInt(identifier);
+                if (size > 0) need.merge(identifier, size, Math::max);
+            }
+        }
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).isEmpty()) continue;
+            String slot = slotOf(slots, i);
+            if (!isCurioSlot(slot)) continue;
+            String identifier = curioIdentifier(slot);
+            int idx = curioIndex(slot);
+            if (identifier == null || idx < 0) continue;
+            need.merge(identifier, idx + 1, Math::max);
+        }
+
+        int grown = 0;
+        for (Map.Entry<String, Integer> entry : need.entrySet()) {
+            try {
+                if (CurioSlotBonuses.growTo(player, entry.getKey(), entry.getValue())) {
+                    grown++;
+                    LenSouls.LOGGER.debug("[PhantomRemnant] 容器 {} 临时顶到 {} 格（归还用）",
+                            entry.getKey(), entry.getValue());
+                }
+            } catch (Exception e) {
+                // 扩不出来也只是退回「进背包」，不能连累其余容器
+                LenSouls.LOGGER.warn("[PhantomRemnant] 容器 {} 扩容失败，其中的越界物品会进背包",
+                        entry.getKey(), e);
+            }
+        }
+        return grown;
     }
 
     /**

@@ -145,6 +145,13 @@ public class ModItems {
     public static final DeferredItem<LensItem> LENS_TIER_4 = ITEMS.register("lens_tier_4",
             () -> new LensItem(4, new Item.Properties().stacksTo(1)));
 
+    /**
+     * 机械眼：Exposure 相机配件，装在<b>闪光灯槽</b>（靠 {@code data/exposure/tags/item/flashes.json} 登记）。
+     * 唯一效果 = 白霸体挡下削韧时，把默认那枚 18px 原版虚弱小图标换成原本的赛博朋克故障叉号。
+     */
+    public static final DeferredItem<MechanicalEyeItem> MECHANICAL_EYE = ITEMS.register("mechanical_eye",
+            () -> new MechanicalEyeItem(new Item.Properties().stacksTo(1)));
+
     // ---- 实体照片饰品 ----
     public static final DeferredItem<EntityPhotographItem> ENTITY_PHOTOGRAPH =
             ITEMS.register("entity_photograph", () -> new EntityPhotographItem(new Item.Properties().stacksTo(1)));

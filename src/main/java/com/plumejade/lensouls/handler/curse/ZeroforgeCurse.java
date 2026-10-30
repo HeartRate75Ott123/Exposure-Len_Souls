@@ -1323,6 +1323,17 @@ public final class ZeroforgeCurse {
 
     // ==================== e12 零号·天卷 ====================
 
+    /**
+     * 强制重算首饰（head）栏位加成 —— 供「需要立刻拿到正确槽位数」的场景用
+     * （{@code CurioSlotBonuses.refresh} → 虚影残像归还）。
+     * <p>
+     * {@link #maintainHeadSlots} 本身就是按「玩家身上该修饰符的现值」自愈的
+     * （不是看 persistentData 标记位），所以这里直接复用，不需要额外绕路子。
+     */
+    public static void refreshHeadSlots(ServerPlayer player) {
+        maintainHeadSlots(player);
+    }
+
     /** e12 天卷：首饰（head）栏位 +2（未解锁）/ +3（已解锁） */
     private static void maintainHeadSlots(ServerPlayer player) {
         final double want;

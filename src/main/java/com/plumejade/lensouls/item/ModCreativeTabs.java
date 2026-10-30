@@ -60,6 +60,8 @@ public class ModCreativeTabs {
                         output.accept(ModItems.LENS_TIER_2.get());
                         output.accept(ModItems.LENS_TIER_3.get());
                         output.accept(ModItems.LENS_TIER_4.get());
+                        // 机械眼（闪光灯槽配件）
+                        output.accept(ModItems.MECHANICAL_EYE.get());
 
                         // BOSS 专属镜魂
                         output.accept(ModItems.IGNIS_SOUL.get());

@@ -44,6 +44,8 @@ public class GameRendererFrameEndMixin {
         com.plumejade.lensouls.client.hud.ViewfinderOverlay.render();
         // 要害打击白霸体失败的故障叉号：同一注入点，但它是独立叠加层，不依赖取景器状态
         com.plumejade.lensouls.client.hud.VitalDenyOverlay.render();
+        // 同一件事的默认形态（没装机械眼时）：屏幕上方正中一枚原版虚弱小图标，0.3s
+        com.plumejade.lensouls.client.hud.HyperArmorDenyIcon.render();
     }
 
     /**

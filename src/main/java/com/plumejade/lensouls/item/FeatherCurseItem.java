@@ -19,12 +19,14 @@ import java.util.List;
  * <p>
  * <b>7 槽全开、7 款可同时佩戴</b>，所以这里**不做互斥判定**（旧四根羽毛之间的互斥是它们自己的历史行为）。
  * <p>
- * tooltip 严格按 {@code docs/诅咒系统-重设计方案.md} §4.2：
+ * tooltip 严格按 {@code docs/诅咒系统-重设计方案.md} §4.2，且**两个键语义分开**：
  * <ul>
- *   <li><b>常显</b>：逐条显示「该条当前实际生效的效果」——未反转用 {@code .curse}（红），
- *       已反转用 {@code .after}（绿）；标〔保留〕的条目用 {@code .merged}（红绿合并）</li>
+ *   <li><b>常显</b>：逐条显示「该条当前实际生效的效果」——未反转用 {@code .curse}（红）；
+ *       已反转用 <b>{@code .merged}</b>（红绿合并的**完整**效果），该条没写 {@code .merged} 时回退 {@code .after}
+ *       （纯取消类条目没有保留部分，两者等价，省一份文案）</li>
  *   <li><b>按住 Shift</b>：未反转条目两行（条件+「当前 / 目标」进度 / 反转后效果），已反转条目只剩一行「原条件」；
- *       ①②③ 的整款共用条件在顶部显示一次；全铺开、不折叠</li>
+ *       这里的「反转后效果」用 <b>{@code .after}</b>，只写<b>改动部分</b>（取消了什么 / 改了什么数值 / 新增什么），
+ *       不重复保留部分；①②③ 的整款共用条件在顶部显示一次；全铺开、不折叠</li>
  * </ul>
  */
 public class FeatherCurseItem extends Item {
@@ -78,7 +80,7 @@ public class FeatherCurseItem extends Item {
             boolean blessing = i >= curseCount;
             boolean on = CurseClientCache.isReversed(def, i);
             String name = Component.translatable(def.entryKey(i) + ".name").getString();
-            String bodyKey = on ? (def.retained(i) ? ".merged" : ".after") : ".curse";
+            String bodyKey = on ? (hasMerged(def, i) ? ".merged" : ".after") : ".curse";
 
             if (blessing) {
                 // 祝福：未解锁 ⇒ 基础效果压暗 + 标注；已解锁 ⇒ 直接显示升级后效果
@@ -148,6 +150,17 @@ public class FeatherCurseItem extends Item {
         long current = CurseClientCache.progress(def.maskOffset() + entry);
         String text = CurseGoals.format(current, CurseGoals.unitKey(def, entry), goal);
         return Component.literal(" §8[" + text + "]");
+    }
+
+    /**
+     * 该条是否写了 {@code .merged}（反转后常显用的**完整合并效果**）。
+     * <p>
+     * 用语言表存在性判断，而不是维护一张「保留条目」名单：纯取消类条目（反转后原诅咒全没了）
+     * 的完整效果就等于 {@code .after} 本身，不写 {@code .merged}、自动回退；只有「保留部分仍在生效」
+     * 或「原数值被改动」的条目才需要一份红绿合并的完整文案。
+     */
+    private static boolean hasMerged(CurseDef def, int entry) {
+        return net.minecraft.locale.Language.getInstance().has(def.entryKey(entry) + ".merged");
     }
 
     /** ⑦ 第 8 条起是祝福，插一行小标题 */

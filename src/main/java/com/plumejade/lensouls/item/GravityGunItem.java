@@ -3,6 +3,7 @@ package com.plumejade.lensouls.item;
 import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.entity.GravityBulletEntity;
+import com.plumejade.lensouls.handler.GravityTetherManager;
 import com.plumejade.lensouls.sound.ModSounds;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
@@ -12,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -50,15 +52,17 @@ public class GravityGunItem extends Item {
         CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 
         // ── 牵引模式：右键取消牵引 ──
-        if (tag.contains(KEY_ACTIVE_BULLET) && tag.getInt(KEY_ACTIVE_BULLET) != 0) {
-            int bulletId = tag.getInt(KEY_ACTIVE_BULLET);
-            Entity bullet = level.getEntity(bulletId);
-            if (bullet instanceof GravityBulletEntity) {
-                bullet.discard();
-            }
+        // 2026-10-31 重构：牵引已经是「服务端关系」（GravityTetherManager），不再靠子弹实体存在，
+        // 所以取消也走管理器；旧的 ActiveBulletId 标记只作残留清理。
+        if (player instanceof ServerPlayer sp && GravityTetherManager.isPulling(sp)) {
+            GravityTetherManager.stopByOwner(sp);
             tag.remove(KEY_ACTIVE_BULLET);
             stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
             return InteractionResultHolder.consume(stack);
+        }
+        if (tag.contains(KEY_ACTIVE_BULLET)) {
+            tag.remove(KEY_ACTIVE_BULLET);          // 旧存档残留，清掉后照常发射
+            stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
         }
 
         // ── 发射模式：直射引力弹 ──

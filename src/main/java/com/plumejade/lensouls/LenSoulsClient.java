@@ -82,6 +82,7 @@ public class LenSoulsClient {
             com.plumejade.lensouls.client.feather.FeatherToast.clear();
             com.plumejade.lensouls.client.fx.WorldFxPass.reset();
             com.plumejade.lensouls.client.fx.TemporalRecallScreenFx.reset();
+            com.plumejade.lensouls.ability.client.ClientTetherCache.clear();
         });
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.SanBarOverlay.class);
         // ⑦ e5「誓约·封库」：检测到精妙背包 / 维度网络界面就自动关闭（ScreenEvent + ClientTick）

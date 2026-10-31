@@ -118,12 +118,15 @@ public final class WorldFx {
                                 float halfWidth, int r, int g, int bl, int a, float[] alphaFactors) {
         int n = points.length;
         if (n < 2) return;
+        Vector3f[] frames = rights != null ? rights : cameraFacingFrames(points);
+        emitRibbon(b, pose, points, frames, halfWidth, r, g, bl, a, alphaFactors);
+    }
 
-        Vector3f[] frames = rights;
-        if (frames == null) {
-            // 没有显式带宽方向 = 自由发光带（磁力线 / 魂丝 / 光柱）→ 一律朝相机
-            frames = cameraFacingFrames(points);
-        }
+    /** 用给定的截面方向把折线画成一串四边形。 */
+    private static void emitRibbon(BufferBuilder b, Matrix4f pose, Vector3f[] points, Vector3f[] frames,
+                                   float halfWidth, int r, int g, int bl, int a, float[] alphaFactors) {
+        int n = points.length;
+        if (frames == null) return;
 
         Vector3f[] left = new Vector3f[n];
         Vector3f[] right = new Vector3f[n];

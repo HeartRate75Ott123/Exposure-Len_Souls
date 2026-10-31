@@ -39,6 +39,10 @@ public class PacketHandler {
     private static void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
 
+        registrar.playToClient(
+                com.plumejade.lensouls.ability.network.GravityTetherSyncPacket.TYPE,
+                com.plumejade.lensouls.ability.network.GravityTetherSyncPacket.STREAM_CODEC,
+                com.plumejade.lensouls.ability.network.GravityTetherSyncPacket::handle);
         registrar.playToServer(
                 ConverterTriggerPacket.TYPE,
                 ConverterTriggerPacket.STREAM_CODEC,

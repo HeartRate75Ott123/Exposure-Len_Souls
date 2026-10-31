@@ -48,6 +48,10 @@ public final class WorldFxPass {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.screen != null) return;
 
+        // 拍照抓帧那一趟是画进抓帧 FBO 的：不能画（否则照片里会有特效），也不能吃掉本帧的绘制机会
+        // 抓帧那一趟是画进抓帧 FBO 的：不能画（否则照片里会有特效）
+        if (io.github.mortuusars.exposure.client.capture.task.BackgroundScreenshotCaptureTask.isCapturing()) return;
+
         long now = System.nanoTime();
         float dt = lastNanos == 0L ? 0.0F : Math.min((now - lastNanos) / 1.0E9F, 0.1F);
         lastNanos = now;

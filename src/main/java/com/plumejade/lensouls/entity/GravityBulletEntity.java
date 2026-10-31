@@ -3,6 +3,7 @@ package com.plumejade.lensouls.entity;
 import com.plumejade.lensouls.Config;
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.item.GravityGunItem;
+import com.plumejade.lensouls.handler.GravityTetherManager;
 import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -49,16 +50,6 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
 
     /** 客户端获取被牵引目标 */
     @javax.annotation.Nullable
-    public LivingEntity getClientHitTarget() {
-        int id = entityData.get(DATA_HIT_TARGET_ID);
-        if (id == -1) return null;
-        Entity e = level().getEntity(id);
-        return e instanceof LivingEntity le ? le : null;
-    }
-
-    private LivingEntity hitTarget;
-    private int hitTick;
-    private int pullPhase;
 
     public GravityBulletEntity(EntityType<? extends GravityBulletEntity> type, Level level) {
         super(type, level);
@@ -99,9 +90,17 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
         Vec3 oldPos = position();
         Vec3 vel = getDeltaMovement();
 
+        // ── 位移**两端都做**，与同项目的次元枪 `GunBulletEntity.tick` 完全一致 ──
+        // 这是能正常工作的参照实现：客户端每 tick 自己前进一格（服务端的每 3 tick 位置包只当校正，
+        // 因为两端算的是同一套等速直线，校正包里就是同一个坐标，不会跳）。
+        // 反面教材：只在服务端移动 + 靠 hasImpulse 补包，实测仍顿挫（服务端发包/客户端补间
+        // 之间的相位差无法消除）；而"客户端单方面预测、服务端另行移动"会在命中判定上产生分歧。
+        setPos(getX() + vel.x, getY() + vel.y, getZ() + vel.z);
+
+        if (level().isClientSide) return;
+
         if (!level().isClientSide) {
             if (!hasHit) {
-                setPos(getX() + vel.x, getY() + vel.y, getZ() + vel.z);
                 Vec3 newPos = position();
 
                 // 方块碰撞
@@ -129,177 +128,39 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
 
                 // 超时
                 if (tickCount > TIMEOUT_TICKS) { discard(); }
-                return;
-            }
-
-            // ── 已命中：牵引逻辑（带碰撞箱相交检测）──
-            if (hasHit && hitTarget != null) {
-                if (!hitTarget.isAlive()) { discard(); return; }
-                if (!(getOwner() instanceof Player player) || !player.isAlive()) { discard(); return; }
-                if (!isActivePull(player)) { discard(); return; }
-
-                // 计算牵引方向和距离
-                Vec3 toPlayer = player.position().subtract(hitTarget.position());
-                double dist = toPlayer.length();
-
-                if (dist > 1.5) {
-                    // ── 距离较远：主动牵引，带多段碰撞检测 ──
-                    Vec3 pullDir = toPlayer.normalize();
-                    double strength = Math.min(1.5, dist * 0.3) * Config.GG_PULL_FORCE.get();
-                    Vec3 pull = pullDir.scale(strength);
-
-                    // 多段碰撞检测：牵引轨迹上是否进入玩家缓冲区域
-                    AABB safePlayerBox = player.getBoundingBox().inflate(1.0);
-                    AABB targetBox = hitTarget.getBoundingBox();
-                    int segments = 5;
-                    Vec3 step = pull.scale(1.0 / segments);
-                    boolean blocked = false;
-
-                    for (int s = 0; s < segments; s++) {
-                        if (targetBox.move(step.scale(s + 1)).intersects(safePlayerBox)) {
-                            // 将在第 s 段进入玩家 1 格缓冲区内 → 提前停止
-                            if (s > 0) {
-                                hitTarget.setDeltaMovement(step.scale(s));
-                            } else {
-                                hitTarget.setDeltaMovement(Vec3.ZERO);
-                            }
-                            pullPhase = 2;
-                            blocked = true;
-                            break;
-                        }
-                    }
-
-                    if (!blocked) {
-                        // 全程安全，应用完整牵引
-                        hitTarget.setDeltaMovement(pull);
-                    }
-                    hitTarget.hurtMarked = true;
-                } else {
-                    // ── 已在玩家 1.5 格内 → 停止牵引 ──
-                    pullPhase = 2;
-                    hitTarget.setDeltaMovement(Vec3.ZERO);
-                    hitTarget.hurtMarked = true;
-                }
-                return;
             }
         }
     }
 
-    /**
-     * 检查这次牵引是否仍然有效。
-     * <p>
-     * <b>牵引不要求引力枪一直拿在手上</b>：枪只要还在身上（任意背包槽 / 副手）且
-     * {@code ActiveBulletId} 仍指向这颗子弹就继续；<b>找不到枪也继续</b>
-     * （切物品、把枪收进背包/饰品、丢在地上都不该中断），
-     * 结束方式只有三种：再次右键取消（枪里清 ActiveBulletId 并 discard）、目标死亡、
-     * 拥有者死亡/实体被移除 —— <b>牵引阶段没有超时</b>
-     * （{@code TIMEOUT_TICKS} 只管"发射后还没命中"的飞行段，见 tick 内的未命中分支）。
-     */
-    private boolean isActivePull(Player player) {
-        if (gunUuid == null) return true;
-        if (!(player instanceof ServerPlayer sp)) return true;
-        for (ItemStack stack : sp.getInventory().items) {
-            if (stack.getItem() instanceof GravityGunItem) {
-                CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-                if (gunUuid.equals(tag.getString("GravityGunItemId"))) {
-                    return tag.getInt("ActiveBulletId") == getId();
-                }
-            }
-        }
-        ItemStack offhand = sp.getInventory().offhand.get(0);
-        if (offhand.getItem() instanceof GravityGunItem) {
-            CompoundTag tag = offhand.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-            if (gunUuid.equals(tag.getString("GravityGunItemId"))) {
-                return tag.getInt("ActiveBulletId") == getId();
-            }
-        }
-        // 枪不在快捷栏/背包主格/副手（切物品后枪被收进容器、扔地上、或暂时找不到）：
-        // 不当作"取消"，继续牵引，交给超时/目标死亡/再次右键来收尾。
-        return true;
-    }
-
-    // ======================== 命中 ========================
+    // ======================== 命中 =========================
 
     @Override
     protected void onHitEntity(EntityHitResult result) {
         Entity target = result.getEntity();
         if (target.equals(getOwner()) || level().isClientSide) return;
 
-        // PartEntity 命中 - 委托到父实体
+        LivingEntity living = null;
         if (target instanceof PartEntity<?> part) {
-            Entity parent = part.getParent();
-            if (parent instanceof LivingEntity living) {
-                parent.invulnerableTime = 0;
-                part.invulnerableTime = 0;
-                hasHit = true;
-                entityData.set(DATA_HAS_HIT, true);
-                entityData.set(DATA_HIT_TARGET_ID, living.getId());
-                hitTarget = living;
-                hitTick = tickCount;
-                pullPhase = 1;
-                // 写 ActiveBulletId 到引力枪物品
-                if (getOwner() instanceof ServerPlayer sp) {
-                    for (ItemStack s : sp.getInventory().items) {
-                        if (s.getItem() instanceof com.plumejade.lensouls.item.GravityGunItem) {
-                            net.minecraft.nbt.CompoundTag st = s.getOrDefault(DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.EMPTY).copyTag();
-                            if (gunUuid.equals(st.getString("GravityGunItemId"))) {
-                                st.putInt("ActiveBulletId", getId());
-                                s.set(DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(st));
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            discard();
-            return;
+            // 多部件 BOSS：命中部件的碰撞盒，牵引挂到父实体
+            if (part.getParent() instanceof LivingEntity parent) living = parent;
+            part.invulnerableTime = 0;
+        } else if (target instanceof LivingEntity le) {
+            living = le;
         }
+        if (living == null) { discard(); return; }
 
-        if (!(target instanceof LivingEntity living)) { discard(); return; }
-
-        Entity owner = getOwner();
-        if (owner == null) { discard(); return; }
-
-
-        // 伤害
-        if (owner instanceof LivingEntity lo) {
+        // 1 点伤害保持原样（结算口径不变）
+        if (getOwner() instanceof LivingEntity lo) {
             living.invulnerableTime = 0;
             living.hurt(damageSources().playerAttack((Player) lo), 1.0f);
         }
 
-        // 标记命中 + 同步到客户端（隐藏弹射物 + 目标 ID）
-        hasHit = true;
-        entityData.set(DATA_HAS_HIT, true);
-        entityData.set(DATA_HIT_TARGET_ID, living.getId());
-        hitTarget = living;
-        hitTick = tickCount;
-        pullPhase = 1;
-
-        // 写入 ActiveBulletId
-        if (owner instanceof ServerPlayer sp) {
-            boolean found = false;
-            for (ItemStack s : sp.getInventory().items) {
-                if (s.getItem() instanceof GravityGunItem) {
-                    CompoundTag st = s.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-                    if (gunUuid.equals(st.getString("GravityGunItemId"))) {
-                        st.putInt("ActiveBulletId", getId());
-                        s.set(DataComponents.CUSTOM_DATA, CustomData.of(st));
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if (!found) {
-                ItemStack offhand = sp.getInventory().offhand.get(0);
-                if (offhand.getItem() instanceof GravityGunItem) {
-                    CompoundTag st = offhand.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-                    if (gunUuid.equals(st.getString("GravityGunItemId"))) {
-                        st.putInt("ActiveBulletId", getId());
-                        offhand.set(DataComponents.CUSTOM_DATA, CustomData.of(st));
-                    }
-                }
-            }
+        // 牵引关系交给服务端管理器（2026-10-31 重构：不再靠这颗子弹支撑整条牵引）。
+        // 登记完立即 discard —— 子弹只负责"把牵引挂上去"，之后它的存在与否与本功能无关。
+        if (getOwner() instanceof ServerPlayer sp) {
+            GravityTetherManager.start(sp, living);
         }
+        discard();
     }
 
     // ======================== 物理 ========================
@@ -314,31 +175,56 @@ public class GravityBulletEntity extends ThrowableItemProjectile {
         if (target instanceof PartEntity<?>) return true;
         return target instanceof LivingEntity;
     }
-    /** PartEntity 优先检测，有 Parts 绝不回退父 AABB */
+    /**
+     * 单实体碰撞检测。
+     * <p>
+     * <b>前半段与次元枪 {@code GunBulletEntity.checkEntity} 同口径</b>：有部件先查部件盒、
+     * 细小部件（最小维度 &lt; 0.6）补 0.3、起点在盒内直接算命中。
+     * <p>
+     * <b>但引力枪比次元枪多一条"父实体兜底"</b>（2026-10-31 实测：原版雪球能打中九头蛇/娜迦，
+     * 次元枪能，引力枪不能 —— 说明这两只本体的大 AABB 本来就是可命中的，
+     * 而"有部件就绝不回退父 AABB"是次元枪为了不被 {@code hurtServer} 吞伤害才定的规矩）。
+     * 引力枪的语义是<b>抓取</b>：哪怕这 1 点伤害被吞，只要牵引挂上就算成功，
+     * 所以部件一个都没中时再试一次本体大 AABB（补 0.4）—— 与雪球完全一致的可命中面。
+     * 顺序仍是"部件优先、本体兜底"，所以打头部/体节依然精确挂到父实体身上。
+     *
+     * @return 可能是部件本身（{@link PartEntity}），由 {@link #onHitEntity} 归一到父实体做牵引
+     */
     @Nullable
     private EntityHitResult findClosestHit(Entity target, Vec3 origin, Vec3 vel) {
         Vec3 end = origin.add(vel);
+
+        // 1) 本体大 AABB：先算出来备用（兜底用），同时也覆盖"没有部件"的绝大多数实体
+        AABB mainBox = target.getBoundingBox();
+        double mainMinDim = Math.min(Math.min(mainBox.getXsize(), mainBox.getYsize()), mainBox.getZsize());
+        if (mainMinDim < 0.6) mainBox = mainBox.inflate(0.4);
+
+        // 2) 部件优先（精确命中：头、体节、翅膀…）
         PartEntity<?>[] parts = target.getParts();
-        if (parts != null) {
+        if (parts != null && parts.length > 0) {
             EntityHitResult best = null;
             double bestD = Double.MAX_VALUE;
             for (PartEntity<?> part : parts) {
                 if (part == null || !part.isAlive()) continue;
-                var clip = part.getBoundingBox().clip(origin, end);
+                AABB box = part.getBoundingBox();
+                double minDim = Math.min(Math.min(box.getXsize(), box.getYsize()), box.getZsize());
+                if (minDim < 0.6) box = box.inflate(0.3);
+                var clip = box.clip(origin, end);
                 if (clip.isPresent()) {
                     double d = clip.get().distanceToSqr(origin);
                     if (d < bestD) { bestD = d; best = new EntityHitResult(part, clip.get()); }
+                } else if (box.contains(origin)) {
+                    return new EntityHitResult(part, origin);
                 }
-                if (part.getBoundingBox().contains(origin)) return new EntityHitResult(part, origin);
             }
-            return best;
+            if (best != null) return best;
+            // 部件都没中 → 落到下面的本体兜底（次元枪在这里 return null，引力枪要抓取所以继续）
         }
-        AABB box = target.getBoundingBox();
-        double minDim = Math.min(Math.min(box.getXsize(), box.getYsize()), box.getZsize());
-        if (minDim < 0.6) box = box.inflate(0.4);
-        var clip = box.clip(origin, end);
+
+        // 3) 本体兜底
+        var clip = mainBox.clip(origin, end);
         if (clip.isPresent()) return new EntityHitResult(target, clip.get());
-        if (box.contains(origin)) return new EntityHitResult(target, origin);
+        if (mainBox.contains(origin)) return new EntityHitResult(target, origin);
         return null;
     }
 

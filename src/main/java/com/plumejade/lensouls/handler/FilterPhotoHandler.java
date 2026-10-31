@@ -5,6 +5,7 @@ import com.plumejade.lensouls.ability.handler.CameraInputHandler;
 import com.plumejade.lensouls.component.ModDataComponents;
 import com.plumejade.lensouls.component.PotionFilterData;
 import com.plumejade.lensouls.effect.ModEffects;
+import com.plumejade.lensouls.network.FilterItemPopupPacket;
 import io.github.mortuusars.exposure.Exposure;
 import io.github.mortuusars.exposure.server.CameraInstances;
 import io.github.mortuusars.exposure.data.Filters;
@@ -37,6 +38,10 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 相机滤镜触发：手持已挂滤镜的相机自拍（或拍敌人）→ 施加对应滤镜效果 2 分钟，相机进入 30s 冷却。
  * 不要求摄魂术附魔，与既有照片注入能力系统解耦。
+ * <p>
+ * 特效分工（用户口径）：<b>特殊滤镜</b>（{@code exposure_expanded} 那 16 款）施加成功时走
+ * "图腾式物品弹出"（{@link FilterItemPopupPacket} + 原版 {@code displayItemActivation}）；
+ * <b>药水玻璃板滤镜</b>才走世界特效"对焦收束"（{@link FilterAppliedFx} → {@code WorldFxBursts.FilterAppliedBurst}）。
  */
 public class FilterPhotoHandler {
 
@@ -117,9 +122,14 @@ public class FilterPhotoHandler {
 
             long now = player.level().getGameTime();
 
+            // 相机上装着的**滤镜物品本体**：特殊滤镜施加成功后拿它当"图腾式"弹窗的贴图。
+            // 取实际物品而不是"效果 → 物品 id"映射表，换一款滤镜/滤镜来自别的模组都自动对。
+            var stored = hand.get(Exposure.DataComponents.FILTER);
+            ItemStack filterIcon = (stored != null && !stored.isEmpty())
+                    ? stored.getForReading() : ItemStack.EMPTY;
+
             // 药水玻璃板：玻璃板本身已是相机滤镜，若其携带 POTION_FILTER_DATA 组件，
             // 则对自拍目标或入镜生物施加对应原版药水效果；独立 3s（60 刻）冷却，区别于 16 特殊滤镜
-            var stored = hand.get(Exposure.DataComponents.FILTER);
             if (stored != null && !stored.isEmpty()) {
                 var pdata = stored.getForReading().get(ModDataComponents.POTION_FILTER_DATA);
                 if (pdata != null) {
@@ -140,6 +150,8 @@ public class FilterPhotoHandler {
                     for (LivingEntity e : targets) {
                         e.addEffect(new MobEffectInstance(ModEffects.FILTER_SPIDER, SPECIAL_FILTER_DURATION));
                     }
+                    // 打的是怪物，只有施加者的屏幕能弹 ⇒ 弹给他；按"一次施加"弹一次，不按目标数量重复
+                    FilterItemPopupPacket.send(player, filterIcon);
                     scheduleCooldown(hand, 120);
                     lastFilterShot.put(player.getUUID(), now);
                 }
@@ -153,12 +165,11 @@ public class FilterPhotoHandler {
                 // 自拍：仅对自己生效
                 if (effect == ModEffects.FILTER_ART) {
                     applyRandomBuffs(player);
-                    // 万象加持不再逐个原版 buff 播特效（那些不是 FilterEffect，事件不会替我们触发），
-                    // 按滤镜本身补一次即可
-                    FilterAppliedFx.broadcast(player, effect.value().getColor());
                 } else {
                     player.addEffect(new MobEffectInstance(effect, SPECIAL_FILTER_DURATION));
                 }
+                // 特殊滤镜的反馈是"图腾式"物品弹出（法印那套只留给药水玻璃板）
+                FilterItemPopupPacket.send(player, filterIcon);
                 scheduleCooldown(hand, 120);
                 lastFilterShot.put(player.getUUID(), now);
             } else {
@@ -171,14 +182,17 @@ public class FilterPhotoHandler {
                     if (ent instanceof ServerPlayer sp) {
                         if (effect == ModEffects.FILTER_ART) {
                             applyRandomBuffs(sp);
-                            FilterAppliedFx.broadcast(sp, effect.value().getColor());
                         } else {
                             sp.addEffect(new MobEffectInstance(effect, SPECIAL_FILTER_DURATION));
                         }
+                        // 被上滤镜的那位也弹一次（图腾式反馈属于"得到效果的人"）
+                        FilterItemPopupPacket.send(sp, filterIcon);
                         applied = true;
                     }
                 }
                 if (!applied) return;
+                // 施加者自己也弹一次：他没被上滤镜，但"这一枪生效了"的反馈要给他
+                FilterItemPopupPacket.send(player, filterIcon);
                 scheduleCooldown(hand, 120);
                 lastFilterShot.put(player.getUUID(), now);
             }

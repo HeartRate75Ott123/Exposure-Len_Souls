@@ -14,6 +14,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -64,6 +65,21 @@ public class ClientPacketHandlers {
         if (target == null) return;
         com.plumejade.lensouls.client.fx.WorldFxBursts.filterApplied(
                 clientLevel, target, packet.getR(), packet.getG(), packet.getB());
+    }
+
+    /**
+     * 特殊滤镜施加成功：屏幕中央弹出该滤镜的物品图标。
+     * <p>
+     * 直接借原版不死图腾那条路 {@code GameRenderer.displayItemActivation(ItemStack)}——
+     * 40 刻的物品激活动画（缩放进场 → 悬浮 → 淡出），贴图取物品模型，不需要自己画。
+     * 它在 {@code GameRenderer.render} 里与 HUD 同段绘制，取景器关掉/还开着都能看见。
+     */
+    public static void handleFilterItemPopup(com.plumejade.lensouls.network.FilterItemPopupPacket packet) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null) return;
+        ItemStack icon = packet.icon();
+        if (icon == null || icon.isEmpty()) return;
+        mc.gameRenderer.displayItemActivation(icon);
     }
 
     /**

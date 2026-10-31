@@ -261,7 +261,9 @@ public class SoulDotEffect extends MobEffect {
     @Override
     public boolean applyEffectTick(LivingEntity entity, int amplifier) {
         if (entity.level().isClientSide) {
-            // 客户端：环绕玩家缓慢漂浮的元素粒子（与元素灌注同款；效果实例 visible=false，不跑原版发射器）
+            // 客户端：环绕玩家缓慢漂浮的元素粒子（效果实例 visible=false，原版发射器不跑，只能自己补）。
+            // 初速按 ElementParticle 的原版口径给：**横向传 0**（provider 会把横向初速再收 10 倍＝温和漂移），
+            // 纵向给 0.1~0.25 是因为 ElementParticle 内部会 ×0.2，算回去正好是旧的 0.02~0.05。
             if (entity.level().random.nextInt(3) == 0) {
                 double x = entity.getX() + (entity.level().random.nextDouble() - 0.5) * 2.0;
                 double z = entity.getZ() + (entity.level().random.nextDouble() - 0.5) * 2.0;
@@ -269,9 +271,9 @@ public class SoulDotEffect extends MobEffect {
                         + entity.level().random.nextDouble() * entity.getBbHeight() * 0.6;
                 entity.level().addParticle(getElementParticleType(),
                         x, y, z,
-                        (entity.level().random.nextDouble() - 0.5) * 0.02,
-                        0.02 + entity.level().random.nextDouble() * 0.03,
-                        (entity.level().random.nextDouble() - 0.5) * 0.02);
+                        0.0,
+                        0.1 + entity.level().random.nextDouble() * 0.15,
+                        0.0);
             }
             return true;
         }

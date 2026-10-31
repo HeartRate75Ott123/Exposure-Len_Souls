@@ -253,11 +253,18 @@ public class PacketHandler {
                 HudHintPacket::handle
         );
 
-        // ---- 滤镜施加成功的世界特效（对焦收束）S2C ----
+        // ---- 滤镜施加成功的世界特效（对焦收束，药水玻璃板用）S2C ----
         registrar.playToClient(
                 FilterAppliedFxPacket.TYPE,
                 FilterAppliedFxPacket.STREAM_CODEC,
                 FilterAppliedFxPacket::handle
+        );
+
+        // ---- 特殊滤镜施加成功：屏幕中央弹出该滤镜物品图标（图腾式）S2C ----
+        registrar.playToClient(
+                FilterItemPopupPacket.TYPE,
+                FilterItemPopupPacket.STREAM_CODEC,
+                FilterItemPopupPacket::handle
         );
 
         // ---- 冻结状态同步 S2C ----

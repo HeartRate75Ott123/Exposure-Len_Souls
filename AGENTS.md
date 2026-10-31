@@ -3511,13 +3511,17 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
 
 ### 69. 滤镜施加成功 → 世界特效「对焦收束」（`1.8.8`）
 
+> **`1.8.74` 起分工改了**：特殊滤镜（16 款）不再走这套法印，改「图腾式物品弹出」——
+> 见本节末尾「69.4」与文末「滤镜反馈分工（1.8.74）」。下面 ①②③ 里的特殊滤镜那条已随
+> `FilterAppliedFxHandler` 一起删除，只有 ②（药水玻璃板）还在这条链上。
+
 - 触发点两条，**都在"确实施加成功"之后**：
-  ① 特殊滤镜（16 个 `FilterEffect`）：`handler/FilterAppliedFxHandler` 监听
-     `MobEffectEvent.Added`，**只认 `instanceof FilterEffect`** —— 玩家喝药水/别的模组上 buff 不该算滤镜；
+  ① ~~特殊滤镜（16 个 `FilterEffect`）~~：`handler/FilterAppliedFxHandler` 监听
+     `MobEffectEvent.Added` —— **1.8.74 已删除**（特殊滤镜改物品弹出，见 69.4）；
   ② 药水滤镜（药水玻璃板）：在 `FilterPhotoHandler.applyPotionFilter` 自己的施加循环里
      `FilterAppliedFx.broadcast(...)`，颜色取第一条药水效果。**不能**让 `MobEffectEvent` 代劳，
      否则"喝药水"也会触发滤镜特效。
-  ③ 万象加持（`FILTER_ART`）走的是原版 buff，不是 `FilterEffect`，事件不会替我们触发 → 两处调用点手动补发。
+  ③ 万象加持（`FILTER_ART`）~~手动补发~~：1.8.74 起改走物品弹出，不再补法印。
 - 网络：`FilterAppliedFxPacket`（S2C: entityId + rgb），
   `PacketDistributor.sendToPlayersTrackingEntityAndSelf`（世界事件，旁观者与自拍本人都要看见）。
   **只传 entityId 不传坐标**——位置由客户端每帧现取。
@@ -3603,3 +3607,114 @@ MD5 `DFC6A011EB6F2C7C5D72B8CD1C6B5402`）；字节码核实 AllyFilter 只剩
   通用削韧粒子走 `ToughnessParticlePacket`，红色特效只画世界空间缎带 + 红色魂尘
   （新增 `SOUL_WISP_RED`，复用 `lensouls:soul_wisp` 贴图做逐粒子染色，不新增贴图）。
   三套资源互不占用，所以要害打击同时削韧/破韧时不会互相顶掉。
+
+## 首领清单（唯一事实源）与 5 张平行硬编码表
+
+> 2026-10-31 按 src/main 逐处核实。**这一节是给"新增/调整一只 BOSS"用的登记地图**，
+> 漏登记不会报错，表现只是「它没进系统」——这是本项目最容易踩的一类静默失败。
+
+### 唯一事实源
+
+`src/main/resources/data/lensouls/boss_entities/bosses.json`（**JSON 数组**，每项 `{"id": "modid:entity"}`；
+在 jar 内、随数据包走 `--reload` / `/reload` 生效）。
+
+- 加载器：`config/BossEntityLoader`（`ReloadListener`，注册在 `LenSouls.java:216`）
+- 双端：服务端解析后经 `network/DatapackSyncPacket` 全量同步（`BossEntityLoader.setClientCache`）
+- API：`BossEntityLoader.isBoss(LivingEntity)` / `isBoss(String)` / `allBosses()`
+
+### 消费面（谁在用它）
+
+| 消费点 | 用途 |
+|---|---|
+| `handler/CopySoulDropHandler` | 血量 < 200 的实体**只有**在本清单内才掉「复制之魂」（`the_gatekeeper` 这类低血 BOSS 靠这条豁免） |
+| `handler/FeatherHardmanHandler` | 诅咒判定走「击杀首领」路径（两处） |
+| `ability/handler/PhotoInjectionHandler` | 拍照时给照片打 `lensouls:is_boss` 标记（按 exposureId 缓存） |
+| `photogallery/PhotoGallerySettlement`、`client/photogallery/PhotoGalleryCatalog` | 图鉴/相册的首领分组、首次拍摄时间统计 |
+| `integration/PhotographEffectRegistry.isBossPhoto` | 判断「首领照片」（无 `is_boss` 标记时回落查本清单） |
+| `network/DatapackSyncPacket` | S2C 全量同步（客户端缓存，渲染/图鉴用） |
+
+### 5 张平行硬编码表（**不跟随** bosses.json，必须逐处登记）
+
+| # | 位置 | 内容 | 谁读 | 不登记的后果 |
+|---|---|---|---|---|
+| 1 | `boss/BossTierLoader` | `Map<String,Integer>` 实体 → 阶层 1~4；`0`/缺省 = 无阶层 | `VitalStrikeHandler:77`（要害打击/拍照前的镜头等级校验） | 无阶层 = 任何镜头都能对它削韧（`bossTier > 0` 才做等级校验） |
+| 2 | `boss/BossToughnessAttributes` | `Map<String,ToughnessConfig(requiredHits, stunDurationTicks, invincibleTicks)>` | `BossToughnessManager:129/187`、`VitalStrikeHandler:109`；命令 `/lensouls toughness ...` 可运行时改（`LensoulsCommand:237`） | 走 `Config` 的默认值（`toughnessDefaultHits` 等） |
+| 3 | `Config.TOUGHNESS_BLACKLIST` / `TOUGHNESS_WHITELIST` | TOML `toughnessFilter.*`，`List<String>`，支持 `"all"` | `ToughnessDamageHandler.isBoss`（现行判定链见下） | 默认按 `maxHealth ≥ 200` 兜底，可能把非 BOSS 高血实体纳入 |
+| 4 | `integration/PhotographEffectRegistry`（+ `PhotoSpecialEffects` 派发） | 实体 ID → 照片效果文案（**硬编码中文，不在 lang、不是数据包**）；`add(...)` 带药水重载可注入效果 | 照片 tooltip / 窃取能力系统 | 该 BOSS 照片没有任何专属效果与文案 |
+| 5 | `entity/BossPhantomType` | 枚举：BOSS 镜魂 → 幻灵（所属模组、实体注册名、元素、倍率、主色、技能 tick、模型体量） | `BossPhantomManager`（幻灵表演）、模组加载检测、渲染风格 | 该镜魂没有幻灵表演 / `isModLoaded` 检测不到 |
+
+#### `ToughnessDamageHandler.isBoss` 现行判定链（2026-10-31 核对，别照抄旧文档的五级链）
+
+```
+幻灵排除（PhantomDamageHandler.isPhantomEntity）
+→ 实体类型未注册 → false
+→ 基准：白名单含 all（且黑名单不含 all）→ 全包含；黑名单含 all → 全排除（两者都含 all 时黑名单优先）
+        ；否则 maxHealth >= GENERIC_BOSS_HP_THRESHOLD(=200.0)
+→ 具体条目覆盖：先 wl.contains(id) → true，再 bl.contains(id) → false（黑名单优先）
+```
+
+### 新增一只 BOSS 的登记清单（按顺序）
+
+1. **`bosses.json` 加 `{"id": "..."}`** —— 唯一事实源，先做这一步（复制之魂/图鉴/首领照片标记都靠它）
+2. 需要镜头等级门槛 → `BossTierLoader`
+3. 需要专属削韧参数 → `BossToughnessAttributes`（或运行时 `/lensouls toughness`，但不持久）
+4. 需要排除/强行纳入韧性系统 → `Config` 黑白名单（部署侧改 `run/config/lensouls-common.toml`；
+   **NeoForge 不更新已存在配置的默认值**，改了 `Config.java` 默认值要删配置文件重生成）
+5. 需要专属照片效果 → `PhotographEffectRegistry.add(...)`；若还要特殊弹幕/技能，另在 `PhotoSpecialEffects` 派发分支里接
+6. 需要做镜魂/幻灵 → `BossPhantomType` 加枚举项（**追加在末尾**，ordinal 参与网络同步）
+
+> 反面案例：给「N公司2级员工」补登记时只做了 `bosses.json`，另外三处（Tier / ToughnessAttributes /
+> PhotographEffectRegistry）一直空着，表现为"阶层 0 / 削韧走默认 / 照片无效果"——不报错，只是没生效。
+
+---
+
+## 滤镜反馈分工 + 药水粒子运动模型（`1.8.74`）
+
+### 1. 特殊滤镜改为「图腾式物品弹出」（用户口径）
+
+- 需求原话：「蜘蛛滤镜等一众特殊滤镜，施加时，弹出类不死图腾触发时的物品效果，贴图用该滤镜对应的物品贴图」
+  + 「普通玻璃板滤镜用法印的特效管线，这些特殊滤镜，用我要求的这种」。
+- **分工**：16 款 `exposure_expanded` 特殊滤镜 → 屏幕中央弹该滤镜物品图标；
+  **药水玻璃板滤镜** → 继续走 `FilterAppliedFx` 的「对焦收束」法印（`WorldFxBursts.FilterAppliedBurst`）。
+  ⇒ `handler/FilterAppliedFxHandler`（监听 `MobEffectEvent.Added` 给特殊滤镜播法印）**已删除**，
+  `LenSouls` 里的注册同步移除；`FilterAppliedFx` 只服务药水玻璃板。
+- 新包 `network/FilterItemPopupPacket`（S2C，载荷就是一份 `ItemStack`，数量归一为 1）。
+  客户端 `ClientPacketHandlers.handleFilterItemPopup` 直接调
+  原版 `Minecraft.gameRenderer.displayItemActivation(stack)` —— **不死图腾用的就是这一条**
+  （反编译 `ClientPacketListener` case 35：`createTrackingEmitter` + `TOTEM_USE` + 本人 `displayItemActivation`），
+  40 刻缩放进场 → 悬浮 → 淡出，贴图取物品模型，**不需要自己画**。
+- **物品取自相机上实际装着的那片滤镜**（`Exposure.DataComponents.FILTER` → `getForReading()`），
+  不做「效果 → 物品 id」映射表：换滤镜、滤镜来自别的模组都自动对。
+- 收件人（`FilterPhotoHandler` 里发）：
+  ① 蜘蛛滤镜打怪 → 只发**施加者**（怪没有屏幕），按"一次施加"弹一次，不按目标数量重复；
+  ② 自拍 → 发自己；
+  ③ 拍队友 → 每位被上滤镜的玩家各弹一次 + 施加者再弹一次（他自己没被上滤镜，但"这一枪生效了"要给反馈）。
+  旁观者不发——屏幕中央弹窗是个人反馈，不该满场闪。
+- 万象加持（`FILTER_ART`）给的是原版 buff、不是 `FilterEffect`，原先靠手动补法印；现在统一走物品弹出。
+
+### 2. 药水 effect 粒子「飞速飘向高空」根因（`element_particle`）
+
+- 现象：给生物上 infusion 效果后，`assets/lensouls/textures/particle/element_particle.png` 那种粒子
+  以诡异速度直冲高空。
+- 根因（反编译 `LivingEntity.tickEffects` 第 795~803 行）：原版每 tick 按
+  `DATA_EFFECT_PARTICLES`（= 效果 `createParticleOptions` 的返回值）以 1/(4·ambient) 概率撒粒子，
+  **出生速度传的是哨兵值 `(1.0, 1.0, 1.0)`**；原版 provider（`SpellParticle`）根本不读它。
+  我们的 `ElementParticle` 却 `this.yd = ySpeed` 直接用 ⇒ 纵向初速 1.0 格/tick，
+  再叠 `gravity = -0.005`（负重力＝向上加速）与 `friction = 0.98`，稳态 ≈ 0.25 格/tick 一路往上。
+- 修法：`client/particle/ElementParticle` 构造函数**照抄原版 `SpellParticle`**：
+  `super(..., 0.5-RANDOM.nextDouble(), ySpeed, 0.5-RANDOM.nextDouble())`、
+  `yd *= 0.2`、`friction = 0.96`、`gravity = -0.1`、`speedUpWhenYMotionIsBlocked = true`、
+  `hasPhysics = false`、`lifetime = (int)(8/(rand*0.8+0.2))`（8~40 刻）、
+  并且 `xSpeed == 0 && zSpeed == 0` 时横向再 ×0.1（原版「无横向初速」的温和分支）。
+- 同时删掉 `ElementInfusionEffect.applyEffectTick` 里手工补发的那一发粒子（与上面原版发射器重复）
+  ⇒ 灌注粒子的**唯一来源就是原版发射器**，观感自然与药水圈圈一致。
+- `SoulDotEffect`（`*_dot` 镜魂效果，实例 `visible=false`、不跑原版发射器）继续手工撒粒子，
+  但初速改成「横向 0、纵向 0.1~0.25」——按新 provider 的口径换算回去正好等于原来的 0.02~0.05，
+  观感不变、也不会变成原版那种向外铺开。
+
+### 3. 验收要点（用户自己跑，我事后读日志）
+
+- 装上 `exposure_expanded` 任一款特殊滤镜 → 拍照施加成功 → 屏幕中央弹出该滤镜**物品图标**（图腾式）；
+  玻璃板药水滤镜仍是身上的法印环。
+- 给任意生物 `/effect give @e lensouls:fire_infusion ...`（或随手打一张照片套装）→
+  身上冒 `element_particle`，只在身边慢慢上浮一两格、约 1~2 秒消失，不再窜天。

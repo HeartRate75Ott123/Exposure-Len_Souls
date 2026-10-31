@@ -5,7 +5,6 @@ import com.plumejade.lensouls.particle.ModParticleTypes;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.entity.LivingEntity;
 
 /**
  * 元素活性标记效果（照片饰品 / 照片套装提供的「元素活性」）。
@@ -73,28 +72,9 @@ public class ElementInfusionEffect extends MobEffect {
         return getElementParticleType();
     }
 
-    @Override
-    public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
-        // 仅每 8 tick 漂浮一次粒子（到期提示已移交 SoulDotEffect，这里不再登记 60/40/20）
-        return duration % 8 == 0;
-    }
-
-    @Override
-    public boolean applyEffectTick(LivingEntity entity, int amplifier) {
-        // 客户端：环绕玩家缓慢漂浮的元素粒子（照片饰品的活性视觉反馈）
-        if (entity.level().isClientSide) {
-            if (entity.level().random.nextInt(3) == 0) {
-                double x = entity.getX() + (entity.level().random.nextDouble() - 0.5) * 2.0;
-                double z = entity.getZ() + (entity.level().random.nextDouble() - 0.5) * 2.0;
-                double y = entity.getY() + entity.getBbHeight() * 0.3
-                        + entity.level().random.nextDouble() * entity.getBbHeight() * 0.6;
-                entity.level().addParticle(getElementParticleType(),
-                        x, y, z,
-                        (entity.level().random.nextDouble() - 0.5) * 0.02,
-                        0.02 + entity.level().random.nextDouble() * 0.03,
-                        (entity.level().random.nextDouble() - 0.5) * 0.02);
-            }
-        }
-        return true;
-    }
+    // 注意：这里**不要**再自己 addParticle。
+    // 原版 LivingEntity.tickEffects 已经按 DATA_EFFECT_PARTICLES（＝本效果 createParticleOptions 的返回值）
+    // 每 tick 以 1/4 概率在身体范围内撒一次，出生速度传的是哨兵值 (1,1,1)——由
+    // client/particle/ElementParticle 照原版药水粒子的运动模型处理。旧版在这里额外补一发
+    // 带 (0.02, 0.02, 0.02) 初速的粒子，既与上面那条重复，又是"粒子乱飞"的第二来源，已删。
 }

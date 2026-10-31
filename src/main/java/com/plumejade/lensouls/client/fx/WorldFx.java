@@ -14,16 +14,28 @@ import org.joml.Vector3f;
 /**
  * 世界空间发光带 / 圆环（自定义着色器版）。
  *
- * <h3>为什么是 TRIANGLE_STRIP 而不是一段一个四边形</h3>
+ * <h3>为什么是 TRIANGLES（每段两个三角形）而不是 TRIANGLE_STRIP</h3>
  * 一段一个 QUAD 时，相邻两段在接缝处各自的宽度方向略有差异，会互相重叠出一个小楔形；
  * 加色混合下重叠区亮度翻倍 —— 视觉上就是"线上一颗颗亮斑 / 衔接不自然"。
- * 改成三角带后，接缝处的两个顶点是<b>共用</b>的，既没有缝隙也没有重叠，
- * 整条线亮度连续。多条带之间用"重复首对顶点"制造退化三角形来断开。
+ * 解法是<b>相邻截面共用同一份 left/right</b>（{@link #polyline} 先算好整条线的截面，
+ * 再逐段补两个三角形），这样既没有缝隙也没有重叠。
+ * <p>
+ * 不再用 TRIANGLE_STRIP：一次 draw 里要画好几条互不相连的缎带（磁力线三股、磁笼三环、
+ * 多目标并存…），strip 只能靠"退化三角形"把它们缝起来，而桥接只要顶点选得不对就会
+ * 产生<b>真实的三角形</b>，把上一条的末尾和新一条的开头连成一张斜跨薄片
+ * （2026-10-31「光束里一道硬边」就是这么来的）。TRIANGLES 模式下各段互不依赖。
  */
 public final class WorldFx {
 
     /** 世界特效着色器（RegisterShadersEvent 注册）。 */
     public static ShaderInstance shader;
+
+    /**
+     * 带宽方向的沿程平滑轮数（每轮 = 与左右邻居各取一半权重再归一化）。
+     * 3 轮足以把"顺着光束看"时的 37°~63° 突转摊到与固有扭转同量级（约 12°~22°/段）。
+     */
+
+    /** 相邻截面之间允许的最大扭转角（弧度）：24°。超过就压回来，避免出现"宽平行四边形"色块。 */
 
     /** 一次 draw 的着色器参数。 */
     public static final class Params {
@@ -50,7 +62,17 @@ public final class WorldFx {
     //  draw
     // =====================================================================
 
-    /** 设好 uniform，返回可写顶点的 BufferBuilder（TRIANGLE_STRIP；多条带用退化三角形断开）。 */
+    /**
+     * 设好 uniform，返回可写顶点的 BufferBuilder（TRIANGLES；每段两个三角形）。
+     * <p>
+     * <b>为什么不再用 TRIANGLE_STRIP</b>（2026-10-31 修「光束里一道斜跨的硬边薄片」）：
+     * 一次 draw 里要画好几条互不相连的缎带（磁力线 3 股、磁笼 3 环、多目标 …），
+     * strip 只能用"退化三角形"把前一条的末尾与新一条的开头缝起来。旧实现只重复了<b>新条带</b>
+     * 的首对顶点，于是接缝处 T1=(上条末 L, 上条末 R, 新条首 L)、T2=(上条末 R, 新条首 L, 新条首 R)
+     * 是<b>两个真实三角形</b>——把上一条的终点和新一条的起点连成一张薄片（磁力线首尾各在天线两端，
+     * 于是斜跨整条光束），加色混合下就是一道硬边。TRIANGLES 模式下各段互不依赖，无需任何桥接，
+     * 段与段之间仍共用同一帧（同一条 left/right），既无缝隙也无重叠亮斑。
+     */
     public static BufferBuilder begin(Params p) {
         if (shader != null) {
             set("FxTime", p.time);
@@ -64,7 +86,7 @@ public final class WorldFx {
             set("FxTaper", p.taper);
             set("FxAlpha", p.alpha);
         }
-        return Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLE_STRIP,
+        return Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES,
                 DefaultVertexFormat.POSITION_TEX_COLOR);
     }
 
@@ -86,7 +108,7 @@ public final class WorldFx {
     //  几何
     // =====================================================================
 
-    /** 折线 → 三角带（UV0.x 沿线，UV0.y 横向，接缝顶点共用 → 无重叠亮斑）。 */
+    /** 折线 → 独立四边形（UV0.x 沿线，UV0.y 横向，相邻截面共用边 → 无重叠亮斑也无桥接薄片）。 */
     public static void polyline(BufferBuilder b, Matrix4f pose, Vector3f[] points, Vector3f[] rights,
                                 float halfWidth, int r, int g, int bl, int a) {
         polyline(b, pose, points, rights, halfWidth, r, g, bl, a, null);
@@ -105,34 +127,25 @@ public final class WorldFx {
 
         Vector3f[] left = new Vector3f[n];
         Vector3f[] right = new Vector3f[n];
-        int valid = 0;
         for (int i = 0; i < n; i++) {
             Vector3f f = frames[i];
             if (f == null || !finite(f) || !finite(points[i])) continue;
             Vector3f offset = new Vector3f(f).mul(halfWidth);
             left[i] = new Vector3f(points[i]).sub(offset);
             right[i] = new Vector3f(points[i]).add(offset);
-            valid++;
         }
-        if (valid < 2) return;
 
-        // 退化三角形断开上一条带
-        int first = -1;
+        int prev = -1;
         for (int i = 0; i < n; i++) {
-            if (left[i] != null) { first = i; break; }
-        }
-        if (first < 0) return;
-        emitPair(b, pose, left[first], right[first], 0F, r, g, bl, alphaOf(a, alphaFactors, first));
-        emitPair(b, pose, left[first], right[first], 0F, r, g, bl, alphaOf(a, alphaFactors, first));
-
-        int emitted = 0;
-        for (int i = first; i < n; i++) {
             if (left[i] == null) continue;
-            float u = n <= 1 ? 0F : (float) i / (n - 1);
-            emitPair(b, pose, left[i], right[i], u, r, g, bl, alphaOf(a, alphaFactors, i));
-            emitted++;
+            if (prev >= 0) {
+                float u0 = (float) prev / (n - 1);
+                float u1 = (float) i / (n - 1);
+                quad(b, pose, left[prev], right[prev], left[i], right[i], u0, u1,
+                        r, g, bl, alphaOf(a, alphaFactors, prev), alphaOf(a, alphaFactors, i));
+            }
+            prev = i;
         }
-        if (emitted < 2) return;
     }
 
     /** 圆环（UV.x 沿圆周 → 脉冲绕圈跑）。 */
@@ -140,26 +153,21 @@ public final class WorldFx {
                             Vector3f axisA, Vector3f axisB, float radius, float halfWidth,
                             int r, int g, int bl, int a, int segments) {
         int count = Math.max(8, segments);
-        Vector3f firstInner = null;
-        Vector3f firstOuter = null;
-
-        for (int i = 0; i <= count; i++) {
-            int idx = i % count;                       // 末点重复首点 → 闭合
-            double t = Math.PI * 2.0 * idx / count;
+        Vector3f[] inner = new Vector3f[count];
+        Vector3f[] outer = new Vector3f[count];
+        for (int i = 0; i < count; i++) {
+            double t = Math.PI * 2.0 * i / count;
             Vector3f dir = new Vector3f(axisA).mul((float) Math.cos(t))
                     .add(new Vector3f(axisB).mul((float) Math.sin(t)));
-            Vector3f inner = new Vector3f(center).add(new Vector3f(dir).mul(radius - halfWidth));
-            Vector3f outer = new Vector3f(center).add(new Vector3f(dir).mul(radius + halfWidth));
-            if (i == 0) {
-                firstInner = inner;
-                firstOuter = outer;
-                emitPair(b, pose, inner, outer, 0F, r, g, bl, a);
-                emitPair(b, pose, inner, outer, 0F, r, g, bl, a);
-                continue;
-            }
-            emitPair(b, pose, inner, outer, (float) idx / count, r, g, bl, a);
+            inner[i] = new Vector3f(center).add(new Vector3f(dir).mul(radius - halfWidth));
+            outer[i] = new Vector3f(center).add(new Vector3f(dir).mul(radius + halfWidth));
         }
-        if (firstInner == null) return;
+        for (int i = 0; i < count; i++) {
+            int j = (i + 1) % count;                    // 末段接回首点 → 闭合
+            // 收尾那段的 u 走到 1.0（而不是跳回 0），否则脉冲会在接缝处被拉成一道长拖尾
+            float u1 = (i + 1 == count) ? 1.0F : (float) (i + 1) / count;
+            quad(b, pose, inner[i], outer[i], inner[j], outer[j], (float) i / count, u1, r, g, bl, a, a);
+        }
     }
 
     /** 单段发光带。 */
@@ -172,11 +180,27 @@ public final class WorldFx {
     //  内部
     // =====================================================================
 
-    private static void emitPair(BufferBuilder b, Matrix4f pose, Vector3f left, Vector3f right,
-                                 float u, int r, int g, int bl, int a) {
-        if (!finite(left) || !finite(right)) return;
-        b.addVertex(pose, left.x, left.y, left.z).setUv(u, 0F).setColor(r, g, bl, a);
-        b.addVertex(pose, right.x, right.y, right.z).setUv(u, 1F).setColor(r, g, bl, a);
+    /**
+     * 一段缎带 = 两个三角形。相邻截面共用同一条 left/right，所以逐段拼出来既没有缝隙，
+     * 也不会在接缝处重叠（加色混合下重叠区会亮一截）。
+     */
+    private static void quad(BufferBuilder b, Matrix4f pose,
+                             Vector3f l0, Vector3f r0, Vector3f l1, Vector3f r1,
+                             float u0, float u1, int r, int g, int bl, int a0, int a1) {
+        if (!finite(l0) || !finite(r0) || !finite(l1) || !finite(r1)) return;
+        // 三角形 1：(L0, R0, L1)
+        vertex(b, pose, l0, u0, 0F, r, g, bl, a0);
+        vertex(b, pose, r0, u0, 1F, r, g, bl, a0);
+        vertex(b, pose, l1, u1, 0F, r, g, bl, a1);
+        // 三角形 2：(R0, L1, R1)
+        vertex(b, pose, r0, u0, 1F, r, g, bl, a0);
+        vertex(b, pose, l1, u1, 0F, r, g, bl, a1);
+        vertex(b, pose, r1, u1, 1F, r, g, bl, a1);
+    }
+
+    private static void vertex(BufferBuilder b, Matrix4f pose, Vector3f p,
+                               float u, float v, int r, int g, int bl, int a) {
+        b.addVertex(pose, p.x, p.y, p.z).setUv(u, v).setColor(r, g, bl, a);
     }
 
     private static int alphaOf(int base, float[] factors, int index) {
@@ -186,16 +210,28 @@ public final class WorldFx {
     }
 
     /**
-     * 求每点的带宽方向：<b>朝相机</b>（billboard）。
+     * 求每点的带宽方向：<b>严格 billboard</b>。
      * <p>
-     * 几何都是相机相对坐标（相机在原点），所以带宽方向取 {@code normalize(cross(tangent, -point))}：
-     * 这样无论从哪个角度看，缎带都正对镜头 —— 第一人称"顺着光束方向往下看"时不会因为
-     * 侧面朝向而变成一条看不见的细线（第三人称侧看反而一直是满宽）。
-     * 退化情况（切线平行视线）回退到平行传输。
+     * 相机在原点（几何都是相机相对坐标），带宽方向取 {@code normalize(cross(tangent, view))}：
+     * 它同时垂直于切线与视线，因此缎带永远正对镜头、<b>投影宽度恒为满宽</b>，
+     * 第一人称顺着光束看也不会缩成细线。
+     * <p>
+     * <b>为什么没有平滑/扭转上限</b>（2026-10-31 走过一次弯路，务必别再试）：
+     * "垂直切线" + "垂直视线"两个约束<b>已经把方向定死（只差正负号）</b>，不存在可平滑的自由度；
+     * 任何沿程平滑、向邻居插值、"扭转速率上限"都会把缎带转出视线平面 —— 实测偏离 13°~21°，
+     * 投影宽度损失 2.6%~6.9%，表现就是光束中间被"捏细/咬掉一块"的缺口。严格 billboard 实测偏离 0.00°。
+     * <p>
+     * 这里只做两件必要的事：
+     * <ol>
+     *   <li><b>退化回退</b>：正顺着光束看时 {@code |cross| ≈ 0}，方向无定义 → 沿用上一点；</li>
+     *   <li><b>符号连续性</b>：与上一点点积为负就取反。缎带剖面对称，取反不改变外观，
+     *       但能避免相邻截面的 left/right 错位 —— 那是"四边形自穿成蝴蝶结、中间豁出一个楔形洞"的成因。</li>
+     * </ol>
      */
     private static Vector3f[] cameraFacingFrames(Vector3f[] points) {
         int n = points.length;
         Vector3f[] frames = new Vector3f[n];
+        Vector3f prev = null;
         for (int i = 0; i < n; i++) {
             Vector3f tangent = new Vector3f();
             if (i == 0) tangent.set(points[1]).sub(points[0]);
@@ -208,12 +244,21 @@ public final class WorldFx {
             if (view.lengthSquared() < 1.0E-8F) continue;
             view.normalize();
 
-            Vector3f right = tangent.cross(view);
-            if (right.lengthSquared() < 1.0E-8F) {
+            Vector3f right;
+            Vector3f raw = tangent.cross(view);
+            if (raw.lengthSquared() > 1.0E-10F) {
+                right = raw.normalize();
+            } else if (prev != null) {
+                right = new Vector3f(prev);      // 退化：沿用上一点（≈仍在视线平面内）
+            } else {
                 right = tangent.cross(leastParallelAxis(tangent));
+                if (right.lengthSquared() < 1.0E-8F) continue;
+                right.normalize();
             }
-            if (right.lengthSquared() < 1.0E-8F) continue;
-            frames[i] = right.normalize();
+
+            if (prev != null && right.dot(prev) < 0.0F) right.negate();
+            frames[i] = right;
+            prev = right;
         }
         // 个别点算不出来时，用相邻点补
         for (int i = 0; i < n; i++) {

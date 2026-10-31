@@ -75,8 +75,13 @@ void main() {
     float taperMix = clamp(FxTaper, 0.0, 1.0);
     float thin = mix(1.0, 1.0 - along * 0.85, taperMix);
 
+    // 横向剖面：中心最亮、两侧平滑收到 0。
+    // 再乘一道"内侧归零带"（最外 6% 恒为 0）：可见的羽化必须完全发生在四边形**内部**，
+    // 这样几何边界 / 光栅化永远切不到可见像素 —— 两侧都是羽化，不会出现"一侧硬边"。
     float edge = 1.0 - abs(across * 2.0 - 1.0);
-    edge = pow(clamp(edge, 0.0, 1.0), FxEdgeSoft) * thin;
+    edge = pow(clamp(edge, 0.0, 1.0), FxEdgeSoft);
+    edge *= smoothstep(0.0, 0.06, across) * smoothstep(1.0, 0.94, across);
+    edge *= thin;
 
     float core = pow(clamp(edge * 1.55 - 0.55, 0.0, 1.0), 2.2) * FxCoreBoost;
 
@@ -84,10 +89,18 @@ void main() {
     float sharp = max(0.008, FxPulseSharp);
     float p0 = fract(along * count - FxTime * FxPulseSpeed);
     float p1 = fract(along * count - FxTime * FxPulseSpeed + 0.5);
-    float pulse = exp(-pow(p0 / sharp, 2.0)) + exp(-pow(p1 / sharp, 2.0)) * 0.55;
+    // 注意：fract 在回绕处是 1 → 0 的<b>跳变</b>，直接拿它做高斯，脉冲带就会变成
+    // "一侧陡壁（0→满亮）、一侧缓落"的锯齿条 —— 用户反复报的"它的一侧是硬边缘、另一侧有淡化"
+    // 就是这个，不是几何问题。改成"周期内的最短距离" min(p, 1-p)：回绕处两侧都连续，
+    // 每条脉冲带左右对称羽化。
+    float d0 = min(p0, 1.0 - p0);
+    float d1 = min(p1, 1.0 - p1);
+    float pulse = exp(-pow(d0 / sharp, 2.0)) + exp(-pow(d1 / sharp, 2.0)) * 0.55;
 
-    // 闪烁频率刻意压低：along 高频噪声在浅视角下会转成锯齿
-    float flick = 1.0 + FxFlicker * (vnoise(vec3(along * 9.0, FxTime * 7.0, across * 2.0)) - 0.5);
+    // 闪烁频率刻意压低：along 高频噪声在浅视角下会转成锯齿。
+    // 第三维取 |across - 0.5|（镜像），保证左右两半拿到的闪烁完全一致 —— 否则两侧淡出不等，
+    // 观感就是"一边硬一边软"。
+    float flick = 1.0 + FxFlicker * (vnoise(vec3(along * 9.0, FxTime * 7.0, abs(across - 0.5) * 4.0)) - 0.5);
 
     vec3 tint = vColor.rgb;
     vec3 col = tint * (0.42 + 0.58 * edge);

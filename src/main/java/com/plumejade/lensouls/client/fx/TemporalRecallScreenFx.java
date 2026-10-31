@@ -32,9 +32,19 @@ public final class TemporalRecallScreenFx implements ScreenFxEffect {
     /** 前沿两端：FAR = 整屏都是原画面（没盖住任何东西），NEAR = 整屏都是特效 */
     private static final float MASK_FAR = 1.28F;
     private static final float MASK_NEAR = -0.24F;
-    /** 进入：前沿 FAR→NEAR 的时间窗（秒）；必须收在白闪（t≈0.35）之前 */
-    private static final float MASK_ENTER_START = 0.02F;
-    private static final float MASK_ENTER_END = 0.34F;
+    /**
+     * 进入：前沿 FAR→NEAR 的时间窗（秒）。
+     * 铺满整个前摇（白闪 t≈0.35 起），不再用前半段一口气收完——那样推进太快、看不出"从四周覆盖"。
+     */
+    private static final float MASK_ENTER_START = 0.00F;
+    private static final float MASK_ENTER_END = 0.40F;
+    /**
+     * 进入：整层特效的**不透明度**淡入窗口（秒）。与上面的前沿推进叠加：
+     * 前沿负责"从四周往中间盖"，这一层负责"盖到的地方由淡到实"，两件事同时走才不会突兀。
+     * 比前沿稍晚收满（0.42 > 0.40），让最后一圈也带着一点淡入。
+     */
+    private static final float MASK_FADE_START = 0.00F;
+    private static final float MASK_FADE_END = 0.42F;
     /** 退出：前沿 NEAR→FAR 的窗口（占 ARRIVE 的比例）：中心先褪，逐圈推到边缘 */
     private static final float MASK_EXIT_START = 0.00F;
     private static final float MASK_EXIT_END = 0.95F;
@@ -117,11 +127,13 @@ public final class TemporalRecallScreenFx implements ScreenFxEffect {
             s.streak = 0.26F * ease * easeIn * tail;
             s.flash = smoothstep(0.70F, 1.0F, k) * tail;   // 末段拉到全白
 
-            // 椭圆蒙版：前沿从 FAR 收到 NEAR —— 画面四角先被特效盖住，再逐圈漫向屏心，
-            // 收在白闪之前完成，所以白场那一帧仍然是整屏全白（传送瞬间不会露缝）。
+            // 椭圆蒙版：前沿从 FAR 收到 NEAR —— 画面四角先被特效盖住，再逐圈漫向屏心。
+            // 再叠一层整层不透明度淡入（0 → 1）：前沿只是"盖到哪"，这一层决定"盖到的地方有多实"，
+            // 两者窗口都铺满前摇，所以是缓慢的由外向内、由淡到浓，不会在某一帧突然出现。
             float enter = smoothstep(MASK_ENTER_START, MASK_ENTER_END, t);
             s.mask = 1.0F;
             s.maskEdge = MASK_FAR + (MASK_NEAR - MASK_FAR) * enter;
+            s.maskAlpha = smoothstep(MASK_FADE_START, MASK_FADE_END, t);
             return;
         }
 
@@ -131,9 +143,11 @@ public final class TemporalRecallScreenFx implements ScreenFxEffect {
 
         // 0) 椭圆蒙版：前沿从 NEAR 推到 FAR —— 屏心先褪回原画面，再逐圈把碎镜推到画面边缘。
         //    这一层负责"退出"的形态，下面的 shard/拉伸淡出只负责让残余碎块自身变弱。
+        //    退出阶段整层不透明度保持 1（形态交给前沿，不再二次淡入淡出）。
         float exit = smoothstep(MASK_EXIT_START, MASK_EXIT_END, u);
         s.mask = 1.0F;
         s.maskEdge = MASK_NEAR + (MASK_FAR - MASK_NEAR) * exit;
+        s.maskAlpha = 1.0F;
 
         // 1) 白闪：传送那一帧是全白，0.22 内揭开新场景
         s.flash = 1.0F - smoothstep(0.0F, 0.22F, u);

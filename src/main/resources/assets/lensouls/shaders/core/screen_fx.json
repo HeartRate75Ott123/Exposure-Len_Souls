@@ -199,6 +199,14 @@
             ]
         },
         {
+            "name": "FxMaskAlpha",
+            "type": "float",
+            "count": 1,
+            "values": [
+                1.0
+            ]
+        },
+        {
             "name": "FxMaskRadius",
             "type": "float",
             "count": 2,

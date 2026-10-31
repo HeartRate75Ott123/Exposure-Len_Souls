@@ -27,24 +27,59 @@ import java.util.Map;
  * <p>
  * 绘制时机见 {@link com.plumejade.lensouls.client.fx.WorldFxPass}（AFTER_LEVEL，Iris 兼容）。
  * 不再发射末地烛粒子——电弧本身已足够表达牵引。
+ * <p>
+ * <b>延迟跟随</b>（2026-10-31，用户反馈「移动时位置刷新顿挫」）：与韧性条
+ * {@code ToughnessBarRenderer.POS_SMOOTH}（每帧 0.06 ≈ 时间常数 0.27s）对齐，
+ * 端点位置用 dt 校正的指数平滑（{@link #POS_TAU}），帧率高低于延迟量无影响。
+ * 早先的 0.075s 几乎是硬跟随，移动时看起来就是"每 tick 跳一下"。
  */
 public class GravityTetherRenderer {
 
     private static final int ARC_SEGMENTS = 40;
-    /** 平滑时间常数（秒）：越大越"黏"，延迟跟随的观感越明显 */
-    private static final float POS_TAU = 0.075f;
+
+    /**
+     * 起点（枪口，绑在自己身上）的平滑时间常数：延迟太大会"脱枪"，所以保守取小值。
+     */
+    private static final float FROM_TAU = 0.10f;
+    /**
+     * 终点（被牵引目标）的平滑时间常数，对齐韧性条 {@code POS_SMOOTH = 0.06/帧}
+     * （60fps 下等效 ≈0.27s，这里取 0.22s 稍跟手）。受伤时两者都减半，打击反馈更跟手。
+     */
+    private static final float TO_TAU = 0.22f;
 
     private static final Map<Integer, Vec3> smoothFromMap = new HashMap<>();
     private static final Map<Integer, Vec3> smoothToMap = new HashMap<>();
 
-    public static boolean wantsRender() {
-        Minecraft mc = Minecraft.getInstance();
+    // ── 每 tick 一次的实体查询缓存 ────────────────────────────────────────
+    // wantsRender() 与 render() 每帧各查一次 100³ 的 AABB，而实体只会在 tick 边界进出这个范围：
+    // 移动时 AABB 反复扫过不同区块，是全模组最贵的一处每帧查询（用户反馈的"卡帧"）。
+    private static Level cachedLevel;
+    private static long cachedGameTime = Long.MIN_VALUE;
+    private static List<GravityBulletEntity> cachedBullets = List.of();
+    /** 玩家离上次查询点超过这个距离（格）才提前重查，避免快速位移时紧不到 */
+    private static final double CACHE_REQUERY_DIST_Sq = 16.0 * 16.0;
+    private static Vec3 cachedAt = Vec3.ZERO;
+
+    private static List<GravityBulletEntity> bullets(Minecraft mc) {
         LocalPlayer player = mc.player;
         Level level = mc.level;
-        if (player == null || level == null) return false;
-        return !level.getEntitiesOfClass(GravityBulletEntity.class,
+        if (player == null || level == null) return List.of();
+        long now = level.getGameTime();
+        boolean sameTick = level == cachedLevel && now == cachedGameTime;
+        boolean near = player.position().distanceToSqr(cachedAt) < CACHE_REQUERY_DIST_Sq;
+        if (sameTick && near) return cachedBullets;
+
+        cachedLevel = level;
+        cachedGameTime = now;
+        cachedAt = player.position();
+        cachedBullets = level.getEntitiesOfClass(GravityBulletEntity.class,
                 AABB.ofSize(player.position(), 100, 100, 100),
-                b -> b.getClientHitTarget() != null).isEmpty();
+                b -> b.getClientHitTarget() != null);
+        return cachedBullets;
+    }
+
+    public static boolean wantsRender() {
+        return !bullets(Minecraft.getInstance()).isEmpty();
     }
 
     public static void render(Minecraft mc, Vec3 camPos, Matrix4f identity, float time,
@@ -53,10 +88,7 @@ public class GravityTetherRenderer {
         Level level = mc.level;
         if (player == null || level == null) return;
 
-        List<GravityBulletEntity> bullets = level.getEntitiesOfClass(
-                GravityBulletEntity.class,
-                AABB.ofSize(player.position(), 100, 100, 100),
-                b -> b.getClientHitTarget() != null);
+        List<GravityBulletEntity> bullets = bullets(mc);
         if (bullets.isEmpty()) return;
 
         smoothFromMap.keySet().removeIf(id -> level.getEntity(id) == null);
@@ -98,12 +130,14 @@ public class GravityTetherRenderer {
             int bid = bullet.getId();
 
             boolean hurt = shooter.hurtTime > 0 || target.hurtTime > 0;
-            float tau = hurt ? POS_TAU * 0.5F : POS_TAU;
-            float smooth = dt <= 0.0F ? 1.0F : (1.0F - (float) Math.exp(-dt / tau));
-            smoothFromMap.put(bid, smoothFromMap.getOrDefault(bid, rawFrom)
-                    .add(rawFrom.subtract(smoothFromMap.getOrDefault(bid, rawFrom)).scale(smooth)));
-            smoothToMap.put(bid, smoothToMap.getOrDefault(bid, rawTo)
-                    .add(rawTo.subtract(smoothToMap.getOrDefault(bid, rawTo)).scale(smooth)));
+            // 两个端点各自平滑：枪口跟手、目标明显延迟跟随（韧性条同款量级）。
+            // 用 dt 校正的指数平滑，帧率高低于延迟量无影响。
+            float fromTau = hurt ? FROM_TAU * 0.5F : FROM_TAU;
+            float toTau = hurt ? TO_TAU * 0.5F : TO_TAU;
+            float fromK = dt <= 0.0F ? 1.0F : (1.0F - (float) Math.exp(-dt / fromTau));
+            float toK = dt <= 0.0F ? 1.0F : (1.0F - (float) Math.exp(-dt / toTau));
+            smoothFromMap.put(bid, approach(smoothFromMap.get(bid), rawFrom, fromK));
+            smoothToMap.put(bid, approach(smoothToMap.get(bid), rawTo, toK));
 
             Vec3 from = smoothFromMap.get(bid);
             Vec3 to = smoothToMap.get(bid);
@@ -158,6 +192,12 @@ public class GravityTetherRenderer {
     private static float smoothstep(float e0, float e1, float x) {
         float t = Math.max(0.0F, Math.min(1.0F, (x - e0) / (e1 - e0)));
         return t * t * (3.0F - 2.0F * t);
+    }
+
+    /** 指数趋近一步：prev 为空时直接落到目标点（首次出现不甩尾）。 */
+    private static Vec3 approach(Vec3 prev, Vec3 target, float k) {
+        if (prev == null) return target;
+        return prev.add(target.subtract(prev).scale(k));
     }
 
     /**

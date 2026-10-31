@@ -53,13 +53,16 @@ uniform vec3  FxRippleColor;
 //  FxMask       0..1  蒙版强度（0 = 不裁切，整屏都是特效；1 = 完全按椭圆裁切）
 //  FxMaskEdge         羽化带中心处的"椭圆归一化半径"：0 = 屏幕中心，1 = 椭圆边界
 //  FxMaskSoft         羽化带半宽（以椭圆归一化半径为单位）
+//  FxMaskAlpha  0..1  蒙版内特效的整体不透明度（0 = 只剩原画面，1 = 全实）
 //  FxMaskRadius       椭圆半轴（uv 归一化：0.5 = 半屏）
 //  FxMaskCenter       椭圆中心（uv）
 //  前沿(FxMaskEdge)小 → 只剩外圈有特效；前沿大 → 圈外也退干净，整屏回到原画面。
 //  因此同一个公式，前沿从大到小收 = 从四周向中心覆盖；从小到大推 = 中心先褪、逐圈向外退。
+//  FxMaskAlpha 与前沿正交：前沿管"盖到哪"，它管"盖到的地方有多实"，入场两者一起走才不突兀。
 uniform float FxMask;
 uniform float FxMaskEdge;
 uniform float FxMaskSoft;
+uniform float FxMaskAlpha;
 uniform vec2  FxMaskRadius;
 uniform vec2  FxMaskCenter;
 
@@ -360,6 +363,8 @@ void main() {
         float msoft = max(FxMaskSoft, 1.0e-3);
         float keep = smoothstep(FxMaskEdge - msoft, FxMaskEdge + msoft, me);
         keep = mix(1.0, keep, saturate(FxMask));
+        // 再乘一层整体不透明度：入场时前沿推进 + 由淡到浓同时进行（退出时恒为 1）
+        keep *= saturate(FxMaskAlpha);
         col = mix(sceneAt(vUV), col, keep);
     }
 

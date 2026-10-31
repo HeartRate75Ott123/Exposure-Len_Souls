@@ -189,6 +189,7 @@ public final class ScreenFxManager {
         set1f("FxMask", state.mask);
         set1f("FxMaskEdge", state.maskEdge);
         set1f("FxMaskSoft", state.maskSoft);
+        set1f("FxMaskAlpha", state.maskAlpha);
         set2f("FxMaskRadius", state.maskRadiusU, state.maskRadiusV);
         set2f("FxMaskCenter", state.maskCenterX, state.maskCenterY);
 
@@ -285,6 +286,12 @@ public final class ScreenFxManager {
          * 闪光画在蒙版之后，白场始终整屏（负责盖住传送那一帧）。
          */
         public float mask;
+        /**
+         * 蒙版内特效的整体不透明度（0 = 全透明、只剩原画面；1 = 全实）。
+         * 与前沿是两件事：前沿管"盖到哪一圈"，这个管"盖到的地方有多实"，
+         * 叠起来才是「由外向内 + 由淡到浓」的慢入场。默认 1（不启用蒙版的旧路径完全不受影响）。
+         */
+        public float maskAlpha = 1.0F;
         /** 羽化带中心处的椭圆归一化半径（0 = 屏心，1 = 椭圆边界） */
         public float maskEdge = 1.28F;
         /** 羽化带半宽（以椭圆归一化半径为单位） */

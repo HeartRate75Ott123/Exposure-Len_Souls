@@ -40,6 +40,11 @@ public class ModSounds {
             SOUNDS.register("heal.use", () -> SoundEvent.createVariableRangeEvent(
                     ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "heal.use")));
 
+    /** 经验罐头开罐音（素材：桌面给的罐头音，0.97s） */
+    public static final DeferredHolder<SoundEvent, SoundEvent> EXPERIENCE_CAN_OPEN =
+            SOUNDS.register("experience_can.open", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "experience_can.open")));
+
     // ========== N公司2级员工 Boss 音效 ==========
 
     public static final DeferredHolder<SoundEvent, SoundEvent> LEVEL2_STAFF_HIT1 =

@@ -160,6 +160,10 @@ public class ModItems {
     public static final DeferredItem<HealPotionItem> HEAL_POTION = ITEMS.register("heal_potion",
             () -> new HealPotionItem(new Item.Properties()));
 
+    // ---- 经验罐头（右键消耗 1 个，召唤 N公司2级员工；不可堆叠，一罐一召） ----
+    public static final DeferredItem<ExperienceCanItem> EXPERIENCE_CAN = ITEMS.register("experience_can",
+            () -> new ExperienceCanItem(new Item.Properties().stacksTo(1)));
+
     // ---- 复制之魂 ----
     public static final DeferredItem<CopySoulItem> COPY_SOUL = ITEMS.register("copy_soul",
             () -> new CopySoulItem(new Item.Properties()));

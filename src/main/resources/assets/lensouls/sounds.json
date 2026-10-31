@@ -75,6 +75,14 @@
       }
     ]
   },
+  "experience_can.open": {
+    "sounds": [
+      {
+        "name": "lensouls:experience_can/open",
+        "stream": false
+      }
+    ]
+  },
   "level2_staff.hit1": {
     "sounds": [
       {

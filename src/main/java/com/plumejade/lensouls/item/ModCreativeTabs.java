@@ -98,6 +98,9 @@ public class ModCreativeTabs {
                         // ---- 回复药水 ----
                         output.accept(ModItems.HEAL_POTION.get());
 
+                        // ---- 经验罐头 ----
+                        output.accept(ModItems.EXPERIENCE_CAN.get());
+
                         // ---- 复制之魂 ----
                         output.accept(ModItems.COPY_SOUL.get());
 

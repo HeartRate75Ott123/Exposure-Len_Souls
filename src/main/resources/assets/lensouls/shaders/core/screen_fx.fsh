@@ -12,7 +12,9 @@
 //    · 扩散圆环（RIPPLE，可走彩虹棱镜色）
 //    · 暗角染色（TINT，带呼吸脉冲）
 //    · RGB 脉冲（RGB，三通道错拍呼吸 + 朝外推的彩色脉冲环，边缘最强）
-//    · 全屏闪光（FLASH）
+//    · 椭圆羽化蒙版（MASK，把上面这些子效果裁进一个边缘羽化的椭圆里，
+//      前沿可推进/后退 —— 时空回溯"四周覆盖 / 中心褪去"用的就是这一层）
+//    · 全屏闪光（FLASH，画在蒙版之后：白场始终整屏，负责盖住传送那一帧）
 // ============================================================================
 
 in vec2 vUV;
@@ -46,6 +48,20 @@ uniform vec3  FxFlashColor;
 uniform vec4  FxTint;
 uniform vec4  FxRipple;      // xy=中心，z=半径，w=强度
 uniform vec3  FxRippleColor;
+
+// ── 椭圆羽化蒙版 ────────────────────────────────────────────────────────────
+//  FxMask       0..1  蒙版强度（0 = 不裁切，整屏都是特效；1 = 完全按椭圆裁切）
+//  FxMaskEdge         羽化带中心处的"椭圆归一化半径"：0 = 屏幕中心，1 = 椭圆边界
+//  FxMaskSoft         羽化带半宽（以椭圆归一化半径为单位）
+//  FxMaskRadius       椭圆半轴（uv 归一化：0.5 = 半屏）
+//  FxMaskCenter       椭圆中心（uv）
+//  前沿(FxMaskEdge)小 → 只剩外圈有特效；前沿大 → 圈外也退干净，整屏回到原画面。
+//  因此同一个公式，前沿从大到小收 = 从四周向中心覆盖；从小到大推 = 中心先褪、逐圈向外退。
+uniform float FxMask;
+uniform float FxMaskEdge;
+uniform float FxMaskSoft;
+uniform vec2  FxMaskRadius;
+uniform vec2  FxMaskCenter;
 
 float saturate(float x) { return clamp(x, 0.0, 1.0); }
 
@@ -330,6 +346,21 @@ void main() {
         vec3 silver = vec3(0.86, 0.91, 1.00);
         float breathe = 0.90 + 0.10 * sin(FxTime * 3.4);
         col += silver * lines * FxViewfinder * 1.05 * breathe;
+    }
+
+    // ---- 椭圆羽化蒙版（时空回溯：进入从四周覆盖、退出从中心向四周褪去） ----
+    //  做法：算一个"椭圆归一化半径" me（me=0 屏心、me=1 椭圆边界、>1 椭圆外），
+    //  再用 smoothstep(前沿-羽化, 前沿+羽化, me) 得到"特效保留量"，
+    //  羽化带以内的部分退回"未处理"的原画面（sceneAt(vUV)，即拷贝纹理的原始像素）。
+    //  前沿由 Java 侧推进：进入时从大到小收（外圈先盖、逐圈漫向中心），
+    //  退出时从小到大推（中心先褪、逐圈向外退干净），两端都不会出现硬边。
+    if (FxMask > 0.001) {
+        vec2 mq = (vUV - FxMaskCenter) / max(FxMaskRadius, vec2(1.0e-3));
+        float me = length(mq);
+        float msoft = max(FxMaskSoft, 1.0e-3);
+        float keep = smoothstep(FxMaskEdge - msoft, FxMaskEdge + msoft, me);
+        keep = mix(1.0, keep, saturate(FxMask));
+        col = mix(sceneAt(vUV), col, keep);
     }
 
     // ---- 全屏闪光 ----

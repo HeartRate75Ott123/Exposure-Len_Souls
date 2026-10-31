@@ -186,6 +186,11 @@ public final class ScreenFxManager {
         set4f("FxTint", state.tintR, state.tintG, state.tintB, state.tintA);
         set4f("FxRipple", state.rippleX, state.rippleY, state.rippleRadius, state.rippleStrength);
         set3f("FxRippleColor", state.rippleR, state.rippleG, state.rippleB);
+        set1f("FxMask", state.mask);
+        set1f("FxMaskEdge", state.maskEdge);
+        set1f("FxMaskSoft", state.maskSoft);
+        set2f("FxMaskRadius", state.maskRadiusU, state.maskRadiusV);
+        set2f("FxMaskCenter", state.maskCenterX, state.maskCenterY);
 
         BufferBuilder buffer = Tesselator.getInstance()
                 .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
@@ -269,6 +274,26 @@ public final class ScreenFxManager {
         public float tintR, tintG, tintB, tintA;
         public float rippleX = 0.5F, rippleY = 0.5F, rippleRadius, rippleStrength;
         public float rippleR = 1.0F, rippleG = 1.0F, rippleB = 1.0F;
+
+        /**
+         * 椭圆羽化蒙版：0 = 不加蒙版（整屏都吃特效，与旧行为一致）；1 = 按椭圆区域裁切特效。
+         * <p>
+         * 蒙版把上面所有子效果的输出与<b>未处理的原画面</b>按羽化权重混合，
+         * 权重 = {@code smoothstep(edge - soft, edge + soft, 椭圆归一化半径)}：
+         * 前沿 {@link #maskEdge} 小 → 只剩外圈有特效；前沿大 → 连外圈也退干净。
+         * 所以「前沿由大到小」= 从四周向中心覆盖，「前沿由小到大」= 中心先褪、逐圈向外退。
+         * 闪光画在蒙版之后，白场始终整屏（负责盖住传送那一帧）。
+         */
+        public float mask;
+        /** 羽化带中心处的椭圆归一化半径（0 = 屏心，1 = 椭圆边界） */
+        public float maskEdge = 1.28F;
+        /** 羽化带半宽（以椭圆归一化半径为单位） */
+        public float maskSoft = 0.16F;
+        /** 椭圆半轴（uv 归一化，0.5 = 半屏） */
+        public float maskRadiusU = 0.62F;
+        public float maskRadiusV = 0.74F;
+        public float maskCenterX = 0.5F;
+        public float maskCenterY = 0.5F;
 
         public boolean isEmpty() {
             return warp <= 0.001F && chroma <= 0.001F && streak <= 0.001F && shard <= 0.001F

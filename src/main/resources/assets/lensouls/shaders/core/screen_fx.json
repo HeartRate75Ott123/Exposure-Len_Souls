@@ -173,6 +173,48 @@
                 1.0,
                 1.0
             ]
+        },
+        {
+            "name": "FxMask",
+            "type": "float",
+            "count": 1,
+            "values": [
+                0.0
+            ]
+        },
+        {
+            "name": "FxMaskEdge",
+            "type": "float",
+            "count": 1,
+            "values": [
+                1.28
+            ]
+        },
+        {
+            "name": "FxMaskSoft",
+            "type": "float",
+            "count": 1,
+            "values": [
+                0.16
+            ]
+        },
+        {
+            "name": "FxMaskRadius",
+            "type": "float",
+            "count": 2,
+            "values": [
+                0.62,
+                0.74
+            ]
+        },
+        {
+            "name": "FxMaskCenter",
+            "type": "float",
+            "count": 2,
+            "values": [
+                0.5,
+                0.5
+            ]
         }
     ]
 }

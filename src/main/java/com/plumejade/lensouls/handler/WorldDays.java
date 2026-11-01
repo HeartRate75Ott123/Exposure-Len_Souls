@@ -58,6 +58,12 @@ public final class WorldDays {
      */
     public static final int ABYSS_REVERSE_WINDOW_DAYS = 5;
 
+    /**
+     * 折翼沉渊 e10 失忆的反转窗口（天）：同样是**自己的**已过天数，≥ 该值即过期，
+     * 过期后击杀末影龙也不再反转（与 e3 共用同一套天数口径，见 {@link #ABYSS_REVERSE_WINDOW_DAYS}）。
+     */
+    public static final int ABYSS_AMNESIA_WINDOW_DAYS = 30;
+
     private WorldDays() {
     }
 

@@ -318,7 +318,7 @@
           },
           "noReverse": true,
           "refs": [
-            "handler/FeatherAbyssHandler.java:352 on"
+            "handler/FeatherAbyssHandler.java:358 on"
           ]
         },
         {
@@ -341,9 +341,9 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:634 on",
-            "handler/FeatherAbyssHandler.java:794 on",
-            "handler/FeatherAbyssHandler.java:795 tick"
+            "handler/FeatherAbyssHandler.java:640 on",
+            "handler/FeatherAbyssHandler.java:800 on",
+            "handler/FeatherAbyssHandler.java:801 tick"
           ]
         },
         {
@@ -353,13 +353,13 @@
           "curse": "§c每过一天，最大生命上限 -1（最低 1）；受到的伤害 +13%/天",
           "cond": "游戏天数小于 5 天时，把生命上限提升到 20 以上，之后无法再达成",
           "after": "§a改为：每过一天最大生命 +1、受到伤害 -13%",
-          "merged": "§a每过一天，最大生命上限 +1；§a受到的伤害 -13%/天",
+          "merged": "§a每过一天，最大生命上限 +1；§a受到的伤害 -13%",
           "en": {
             "name": "Requiem",
             "curse": "§cEach day: max health -1 (min 1), damage taken +13% per day",
             "cond": "Before day 5, push max health above 20; cannot be achieved afterwards",
-            "after": "§aNow: +1 max HP and -13% damage taken per day",
-            "merged": "§a+1 max HP per day; §a-13% damage taken per day"
+            "after": "§aNow: +1 max HP per day, -13% damage taken",
+            "merged": "§a+1 max HP per day; §a-13% damage taken"
           },
           "target": {
             "goal": 0,
@@ -367,12 +367,12 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:355 rev",
-            "handler/FeatherAbyssHandler.java:376 on",
-            "handler/FeatherAbyssHandler.java:379 reach",
-            "handler/FeatherAbyssHandler.java:610 on",
-            "handler/FeatherAbyssHandler.java:612 rev",
-            "handler/FeatherAbyssHandler.java:1365 rev"
+            "handler/FeatherAbyssHandler.java:361 rev",
+            "handler/FeatherAbyssHandler.java:382 on",
+            "handler/FeatherAbyssHandler.java:385 reach",
+            "handler/FeatherAbyssHandler.java:616 on",
+            "handler/FeatherAbyssHandler.java:618 rev",
+            "handler/FeatherAbyssHandler.java:1377 rev"
           ]
         },
         {
@@ -396,9 +396,9 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:811 on",
-            "handler/FeatherAbyssHandler.java:812 rev",
-            "handler/FeatherAbyssHandler.java:819 reach"
+            "handler/FeatherAbyssHandler.java:817 on",
+            "handler/FeatherAbyssHandler.java:818 rev",
+            "handler/FeatherAbyssHandler.java:825 reach"
           ]
         },
         {
@@ -422,9 +422,9 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:516 rev",
-            "handler/FeatherAbyssHandler.java:884 on",
-            "handler/FeatherAbyssHandler.java:885 rev"
+            "handler/FeatherAbyssHandler.java:522 rev",
+            "handler/FeatherAbyssHandler.java:890 on",
+            "handler/FeatherAbyssHandler.java:891 rev"
           ]
         },
         {
@@ -447,10 +447,10 @@
             "unitText": "%s 格 / %s 格"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:947 on",
-            "handler/FeatherAbyssHandler.java:948 tick",
-            "handler/FeatherAbyssHandler.java:951 on",
-            "handler/FeatherAbyssHandler.java:1211 rev"
+            "handler/FeatherAbyssHandler.java:953 on",
+            "handler/FeatherAbyssHandler.java:954 tick",
+            "handler/FeatherAbyssHandler.java:957 on",
+            "handler/FeatherAbyssHandler.java:1217 rev"
           ]
         },
         {
@@ -474,9 +474,9 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:1037 rev",
-            "handler/FeatherAbyssHandler.java:1325 on",
-            "handler/FeatherAbyssHandler.java:1326 tick"
+            "handler/FeatherAbyssHandler.java:1043 rev",
+            "handler/FeatherAbyssHandler.java:1337 on",
+            "handler/FeatherAbyssHandler.java:1338 tick"
           ]
         },
         {
@@ -500,11 +500,11 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:522 rev",
-            "handler/FeatherAbyssHandler.java:638 on",
-            "handler/FeatherAbyssHandler.java:638 rev",
-            "handler/FeatherAbyssHandler.java:1329 on",
-            "handler/FeatherAbyssHandler.java:1332 reach"
+            "handler/FeatherAbyssHandler.java:528 rev",
+            "handler/FeatherAbyssHandler.java:644 on",
+            "handler/FeatherAbyssHandler.java:644 rev",
+            "handler/FeatherAbyssHandler.java:1341 on",
+            "handler/FeatherAbyssHandler.java:1344 reach"
           ]
         },
         {
@@ -527,9 +527,9 @@
             "unitText": "%s 种 / %s 种"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:844 on",
-            "handler/FeatherAbyssHandler.java:867 setProgress",
-            "handler/FeatherAbyssHandler.java:869 reach"
+            "handler/FeatherAbyssHandler.java:850 on",
+            "handler/FeatherAbyssHandler.java:873 setProgress",
+            "handler/FeatherAbyssHandler.java:875 reach"
           ]
         },
         {
@@ -537,13 +537,13 @@
           "maskBit": 17,
           "name": "失忆",
           "curse": "§c无法使用复制之魂，但仍会正常掉落",
-          "cond": "空手击杀湮灭构造体",
+          "cond": "游戏天数小于 30 天时，击杀末影龙，之后无法再达成",
           "after": "§a复制之魂解禁（可正常使用，且仍正常掉落）",
           "merged": null,
           "en": {
             "name": "Amnesia",
             "curse": "§cCannot use Copy Souls, but they still drop normally",
-            "cond": "Kill the Obliterator with empty hands",
+            "cond": "Before day 30, kill the Ender Dragon; cannot be achieved afterwards",
             "after": "§aCopy Souls unlocked (usable again, still drop normally)"
           },
           "target": {
@@ -552,8 +552,8 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:1335 on",
-            "handler/FeatherAbyssHandler.java:1339 reach"
+            "handler/FeatherAbyssHandler.java:1349 on",
+            "handler/FeatherAbyssHandler.java:1352 reach"
           ]
         },
         {
@@ -577,12 +577,12 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:618 on",
-            "handler/FeatherAbyssHandler.java:620 rev",
-            "handler/FeatherAbyssHandler.java:660 on",
-            "handler/FeatherAbyssHandler.java:687 on",
-            "handler/FeatherAbyssHandler.java:1315 on",
-            "handler/FeatherAbyssHandler.java:1318 tick"
+            "handler/FeatherAbyssHandler.java:624 on",
+            "handler/FeatherAbyssHandler.java:626 rev",
+            "handler/FeatherAbyssHandler.java:666 on",
+            "handler/FeatherAbyssHandler.java:693 on",
+            "handler/FeatherAbyssHandler.java:1327 on",
+            "handler/FeatherAbyssHandler.java:1330 tick"
           ]
         },
         {
@@ -606,8 +606,8 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:727 on",
-            "handler/FeatherAbyssHandler.java:728 rev"
+            "handler/FeatherAbyssHandler.java:733 on",
+            "handler/FeatherAbyssHandler.java:734 rev"
           ]
         }
       ],
@@ -618,7 +618,7 @@
       ],
       "extraLang": {},
       "loopRefs": [
-        "handler/FeatherAbyssHandler.java:1432 reach(entry)"
+        "handler/FeatherAbyssHandler.java:1444 reach(entry)"
       ]
     },
     {
@@ -1499,8 +1499,8 @@
           "refs": [
             "handler/curse/ZeroforgeCurse.java:421 on",
             "handler/curse/ZeroforgeCurse.java:426 rev",
-            "handler/curse/ZeroforgeCurse.java:1591 on",
-            "handler/curse/ZeroforgeCurse.java:1593 tick"
+            "handler/curse/ZeroforgeCurse.java:1599 on",
+            "handler/curse/ZeroforgeCurse.java:1601 tick"
           ]
         },
         {
@@ -1553,8 +1553,8 @@
             "handler/curse/ZeroforgeCurse.java:586 on",
             "handler/curse/ZeroforgeCurse.java:594 rev",
             "handler/curse/ZeroforgeCurse.java:623 on",
-            "handler/curse/ZeroforgeCurse.java:1601 tick",
-            "handler/curse/ZeroforgeCurse.java:1623 rev"
+            "handler/curse/ZeroforgeCurse.java:1609 tick",
+            "handler/curse/ZeroforgeCurse.java:1631 rev"
           ]
         },
         {
@@ -1582,7 +1582,7 @@
             "handler/curse/ZeroforgeCurse.java:713 on",
             "handler/curse/ZeroforgeCurse.java:739 on",
             "handler/curse/ZeroforgeCurse.java:754 rev",
-            "handler/curse/ZeroforgeCurse.java:1604 tick"
+            "handler/curse/ZeroforgeCurse.java:1612 tick"
           ]
         },
         {
@@ -1635,8 +1635,8 @@
           "refs": [
             "handler/curse/ZeroforgeCurse.java:1003 on",
             "handler/curse/ZeroforgeCurse.java:1044 rev",
-            "handler/curse/ZeroforgeCurse.java:1608 on",
-            "handler/curse/ZeroforgeCurse.java:1609 tick"
+            "handler/curse/ZeroforgeCurse.java:1616 on",
+            "handler/curse/ZeroforgeCurse.java:1617 tick"
           ]
         },
         {
@@ -1797,10 +1797,10 @@
           },
           "isBlessing": true,
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:1417 on",
-            "handler/curse/ZeroforgeCurse.java:1418 tick",
-            "handler/curse/ZeroforgeCurse.java:1420 rev",
-            "handler/curse/ZeroforgeCurse.java:1421 on"
+            "handler/curse/ZeroforgeCurse.java:1425 on",
+            "handler/curse/ZeroforgeCurse.java:1426 tick",
+            "handler/curse/ZeroforgeCurse.java:1428 rev",
+            "handler/curse/ZeroforgeCurse.java:1429 on"
           ]
         },
         {
@@ -1824,11 +1824,11 @@
           },
           "isBlessing": true,
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:1435 on",
-            "handler/curse/ZeroforgeCurse.java:1436 rev",
-            "handler/curse/ZeroforgeCurse.java:1455 on",
-            "handler/curse/ZeroforgeCurse.java:1459 setProgress",
-            "handler/curse/ZeroforgeCurse.java:1462 reach"
+            "handler/curse/ZeroforgeCurse.java:1443 on",
+            "handler/curse/ZeroforgeCurse.java:1444 rev",
+            "handler/curse/ZeroforgeCurse.java:1463 on",
+            "handler/curse/ZeroforgeCurse.java:1467 setProgress",
+            "handler/curse/ZeroforgeCurse.java:1470 reach"
           ]
         }
       ],

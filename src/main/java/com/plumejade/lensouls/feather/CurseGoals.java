@@ -88,7 +88,8 @@ public final class CurseGoals {
         put(CurseDefs.ABYSS, 5, 200L, BLOCKS);
         // e7 祸之可能性：FeatherAbyssHandler:1261  tick(..., 1L, E7_SUMMON_KILL_GOAL[205]=100)
         put(CurseDefs.ABYSS, 6, 100L, KILLS);
-        // e8 挫败 / e10 失忆 / e12 恶意：reach（:1267 / :1274 / :1281 / markPendingReverse :689）直判 → 留空。
+        // e8 挫败 / e10 失忆（30 天内击杀末影龙）/ e12 恶意：reach 直判（见 FeatherAbyssHandler.onMobKilled /
+        // markPendingReverse）→ 留空。
         // e11 疯狂：FeatherAbyssHandler:1318 一次「移速>2 一击致死」即 tick(..., E11_MADNESS, 1L, 1L) ⇒ 目标 1
         put(CurseDefs.ABYSS, 10, 1L, TIMES);
         // e9 食之无味：FeatherAbyssHandler:812 setProgress(n) + :814 reach，目标 E9_FOOD_KIND_GOAL[209]=50

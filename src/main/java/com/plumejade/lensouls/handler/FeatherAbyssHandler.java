@@ -35,6 +35,7 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
@@ -79,7 +80,7 @@ import java.util.UUID;
  * <ul>
  *   <li>虚无的承诺：手持终末立方体（legendary_monsters:the_tesseract）时强制切创造，松开/登出恢复原模式</li>
  *   <li>神秘雪球：怪物伤你时环形发射 8 个雪球（3 点魔法伤害）</li>
- *   <li>安魂曲：实时按游玩天数 maxHealth -1（最低 1），全局受伤 +13%/天（反转后 +1/天、-13%/天）</li>
+ *   <li>安魂曲：实时按游玩天数 maxHealth -1（最低 1），全局受伤 +13%/天（反转后 +1/天、固定 -13%）</li>
  *   <li>愚钝：经验减半</li>
  *   <li>自闭：16 格内生物加入世界 → 0.5 魔法伤害 + 护甲层(×0.75/层, 3s)</li>
  *   <li>厄运：挖方块 0.8% 生成 15 蠹虫；每分钟 2 个不重复 debuff（20s, 等级3-20）</li>
@@ -101,14 +102,14 @@ import java.util.UUID;
  * e1  虚无的承诺(0)  无反转
  * e2  神秘雪球(1)    反转条件=累计受到 100 次敌对雪球伤害 → 不再发射任何敌对雪球
  * e3  安魂曲(2)      条件=天数&lt;5（**该玩家自己的已过天数**，见 {@link WorldDays}）且生命上限&gt;20
- *                    → 每天最大生命 +1、受伤 −13%/天
+ *                    → 每天最大生命 +1、受伤固定 −13%（不随天数增长）
  * e4  愚钝(3)        条件=单次**实际到手** 2000 点经验（本条减半/翻倍后的最终值） → 经验 ×2
  * e5  自闭(4)        条件=16 格内 10 tick 窗口内加入 50 只生物且非旁观、存活 → 护甲每层 +5%
  * e6  厄运(5)        条件=累计挖掘 200 个方块 → 不再生蠹虫、每分钟改给 2 个正面效果
  * e7  祸之可能性(6)  条件=累计击杀召唤物 100 只 → 不再召唤，改为 7 格落雷 15 点魔法伤害
  * e8  挫败(7)        条件=挫败层数 ≥3 时击杀 1 只 BOSS → 每层 ×1.06
  * e9  食之无味(8)    条件=累计食用 50 种不同食物 → 进食回血 ×2
- * e10 失忆(9)        条件=空手击杀湮灭构造体 → 复制之魂解禁
+ * e10 失忆(9)        条件=天数&lt;30（**该玩家自己的已过天数**，见 {@link WorldDays}）时击杀末影龙 → 复制之魂解禁
  * e11 疯狂(10)       条件=移速属性值 &gt;2 时一击杀死 ≥6 万血生物 → 每点受伤 −0.2%
  * e12 恶意(11)       条件=承受一次 ≥50 点元素附加伤害并存活 → 受到的元素附加伤害 −12%
  * </pre>
@@ -130,7 +131,10 @@ public class FeatherAbyssHandler {
 
     /** 疯狂：扭曲值上限 200 */
     public static final int MAX_TWIST = 200;
-    /** 安魂曲：每过一天受到的伤害 +13%（按天累加） */
+    /**
+     * 安魂曲受伤侧：诅咒态 <b>+13%/天（按天累加）</b>；反转态是 <b>固定 -13%</b>（不随天数增长，
+     * 否则每天线性往下扣，第 8 天就归零 ⇒ 无敌）。
+     */
     public static final float REQUIEM_TAKEN_PER_DAY = 0.13f;
     /** 厄运：挖方块触发概率（0.8%） */
     public static final float DOOM_CHANCE = 0.008f;
@@ -213,8 +217,10 @@ public class FeatherAbyssHandler {
     private static final int E8_STACK_GOAL = 3;
     /** e9：累计食用 50 种不同食物 */
     private static final int E9_FOOD_KIND_GOAL = 50;
-    /** e10：湮灭构造体实体 id（空手击杀即可反转） */
-    private static final String E10_OBLITERATOR = "legendary_monsters:the_obliterator";
+    /**
+     * e10：反转窗口（天）——**自己的**已过天数 ≥ 该值即过期，过期后击杀末影龙也不再反转。
+     */
+    private static final int E10_DAY_LIMIT = WorldDays.ABYSS_AMNESIA_WINDOW_DAYS;
     /** e11：目标最大生命 ≥6 万 */
     private static final float E11_TARGET_MAX_HEALTH = 60000.0f;
     /** e11：移速**属性值** &gt; 2（直接比属性值，与旧判定同一口径） */
@@ -605,12 +611,12 @@ public class FeatherAbyssHandler {
 
         // ── 受伤侧一律乘算（§2），逐条先按诅咒态 / 反转态取符号，最后合成一个倍率 ──
         float factor = 1.0f;
-        // e3 安魂曲：受到的伤害 +13%/天（诅咒态）/ −13%/天（反转态）
+        // e3 安魂曲：受到的伤害 +13%/天（诅咒态，按天累加）/ 固定 −13%（反转态，不随天数增长）
         int saveDays = getSaveDays(player);
         if (CurseManager.on(player, DEF, E3_REQUIEM)) {
             factor *= 1.0f + REQUIEM_TAKEN_PER_DAY * saveDays;
         } else if (CurseManager.rev(player, DEF, E3_REQUIEM)) {
-            factor *= Math.max(0.0f, 1.0f - REQUIEM_TAKEN_PER_DAY * saveDays);
+            factor *= 1.0f - REQUIEM_TAKEN_PER_DAY;
         }
         // e11 疯狂：每点扭曲值受到伤害 +0.2%（诅咒态）/ −0.2%（反转态）
         int twist = getTwist(player);
@@ -1300,6 +1306,12 @@ public class FeatherAbyssHandler {
         if (dead instanceof Player) return;
         try {
             ServerPlayer player = killerOf(event);
+            // e10：末影龙可以被「没有实体归属」的伤害补刀（床/末地水晶爆炸走 ALWAYS_HURTS_ENDER_DRAGONS
+            // 那条判定，DamageSource 里没有玩家）⇒ 只对末影龙退回原版击杀者记录，别污染其它条目。
+            if (player == null && dead instanceof EnderDragon
+                    && dead.getKillCredit() instanceof ServerPlayer credit) {
+                player = credit;
+            }
             if (player == null || !hasAbyss(player)) {
                 ONESHOT_KILL.remove(dead.getId());
                 E11_CONFIRM.remove(dead.getId());
@@ -1331,13 +1343,13 @@ public class FeatherAbyssHandler {
                     && com.plumejade.lensouls.boss.ToughnessDamageHandler.isBoss(dead)) {
                 CurseManager.reach(player, DEF, E8_FRUSTRATION);
             }
-            // e10 条件：空手击杀湮灭构造体（主副手均为空即可——不必最终击杀的那一击来自空手）
+            // e10 条件：**自己的已过天数 &lt; 30** 时击杀末影龙（不限武器/手部）。
+            // 末影龙的致死一击由 reallyHurt → super.hurt 派发本事件，此刻它还没走完 DYING 阶段
+            // （血被压到 1 并切阶段），但击杀事实已经成立；过期后不再反转。
             if (CurseManager.on(player, DEF, E10_AMNESIA)
-                    && player.getMainHandItem().isEmpty() && player.getOffhandItem().isEmpty()) {
-                ResourceLocation deadId = BuiltInRegistries.ENTITY_TYPE.getKey(dead.getType());
-                if (deadId != null && E10_OBLITERATOR.equals(deadId.toString())) {
-                    CurseManager.reach(player, DEF, E10_AMNESIA);
-                }
+                    && getSaveDays(player) < E10_DAY_LIMIT
+                    && dead instanceof EnderDragon) {
+                CurseManager.reach(player, DEF, E10_AMNESIA);
             }
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ④ 击杀结算异常", t);

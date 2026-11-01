@@ -105,19 +105,24 @@ public class LensoulsCommand {
                                                     : "§7[Atk] 攻击诊断已关闭"), false);
                                     return 1;
                                 })))
-                // 天数自检：地图口径的绝对天 / 该玩家自己的天（折翼 e3 的窗口按后者算）
+                // 天数自检：地图口径的绝对天 / 该玩家自己的天（折翼 e3、e10 的窗口都按后者算）
                 .then(Commands.literal("days").requires(OP)
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                             long mapDay = com.plumejade.lensouls.handler.WorldDays.absoluteDay(player.getServer());
                             int elapsed = com.plumejade.lensouls.handler.WorldDays.elapsedDays(player);
                             int window = com.plumejade.lensouls.handler.WorldDays.ABYSS_REVERSE_WINDOW_DAYS;
-                            String state = elapsed >= window
+                            int amnesiaWindow = com.plumejade.lensouls.handler.WorldDays.ABYSS_AMNESIA_WINDOW_DAYS;
+                            String requiemState = elapsed >= window
                                     ? "§c已过期（无法反转）"
                                     : "§a窗口内（剩余 " + (window - elapsed) + " 天）";
+                            String amnesiaState = elapsed >= amnesiaWindow
+                                    ? "§c已过期（无法反转）"
+                                    : "§a窗口内（剩余 " + (amnesiaWindow - elapsed) + " 天）";
                             ctx.getSource().sendSuccess(() -> Component.literal(
                                     "§e地图第 " + mapDay + " 天 §7| §a你自己第 " + (elapsed + 1)
-                                            + " 天§7（已过 " + elapsed + " 天）§7| §b安魂曲反转窗口：" + state), false);
+                                            + " 天§7（已过 " + elapsed + " 天）§7| §b安魂曲窗口：" + requiemState
+                                            + "§7| §b失忆窗口：" + amnesiaState), false);
                             return 1;
                         }))
                 .then(Commands.literal("skill").requires(OP)

@@ -82,6 +82,7 @@ public class LenSoulsClient {
             com.plumejade.lensouls.client.feather.FeatherToast.clear();
             com.plumejade.lensouls.client.fx.WorldFxPass.reset();
             com.plumejade.lensouls.client.fx.TemporalRecallScreenFx.reset();
+            com.plumejade.lensouls.client.fx.AbilityViewfinderFx.reset();
             com.plumejade.lensouls.ability.client.ClientTetherCache.clear();
         });
         NeoForge.EVENT_BUS.register(com.plumejade.lensouls.client.SanBarOverlay.class);
@@ -342,6 +343,21 @@ public class LenSoulsClient {
             );
         } catch (java.io.IOException e) {
             LenSouls.LOGGER.error("[ScreenFx] 屏幕特效着色器加载失败", e);
+        }
+
+        // 能力取景框色晕（椭圆羽化蒙版；画在 GuiGraphics.flush() 之后 ⇒ 盖在 Exposure 取景框之上）
+        try {
+            event.registerShader(
+                    new ShaderInstance(provider,
+                            ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "ability_viewfinder"),
+                            com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION),
+                    instance -> {
+                        com.plumejade.lensouls.client.fx.AbilityViewfinderFx.shader = instance;
+                        LenSouls.LOGGER.info("[AbilityFx] 取景框色晕着色器已加载");
+                    }
+            );
+        } catch (java.io.IOException e) {
+            LenSouls.LOGGER.error("[AbilityFx] 取景框色晕着色器加载失败", e);
         }
 
     }

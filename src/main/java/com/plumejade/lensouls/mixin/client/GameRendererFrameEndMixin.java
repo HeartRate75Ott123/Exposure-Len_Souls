@@ -41,6 +41,8 @@ public class GameRendererFrameEndMixin {
                     shift = At.Shift.AFTER),
             require = 1)
     private void lensouls$hudTopOverlay(DeltaTracker deltaTracker, boolean renderLevel, CallbackInfo ci) {
+        // 能力取景框色晕：同一注入点里最先画 —— 压住 Exposure 取景框，但不压后面的提示文字/禁止符
+        com.plumejade.lensouls.client.fx.AbilityViewfinderFx.render();
         com.plumejade.lensouls.client.hud.ViewfinderOverlay.render();
         // 要害打击白霸体失败的故障叉号：同一注入点，但它是独立叠加层，不依赖取景器状态
         com.plumejade.lensouls.client.hud.VitalDenyOverlay.render();

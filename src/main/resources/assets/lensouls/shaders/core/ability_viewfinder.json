@@ -1,0 +1,62 @@
+{
+    "vertex": "lensouls:ability_viewfinder",
+    "fragment": "lensouls:ability_viewfinder",
+    "samplers": [],
+    "attributes": [
+        "Position"
+    ],
+    "uniforms": [
+        {
+            "name": "FxScreenSize",
+            "type": "float",
+            "count": 2,
+            "values": [
+                1920.0,
+                1080.0
+            ]
+        },
+        {
+            "name": "FxTime",
+            "type": "float",
+            "count": 1,
+            "values": [
+                0.0
+            ]
+        },
+        {
+            "name": "FxColor",
+            "type": "float",
+            "count": 3,
+            "values": [
+                0.88,
+                0.19,
+                0.72
+            ]
+        },
+        {
+            "name": "FxAlpha",
+            "type": "float",
+            "count": 1,
+            "values": [
+                0.0
+            ]
+        },
+        {
+            "name": "FxReach",
+            "type": "float",
+            "count": 1,
+            "values": [
+                0.0
+            ]
+        },
+        {
+            "name": "FxEllipse",
+            "type": "float",
+            "count": 2,
+            "values": [
+                0.62,
+                0.74
+            ]
+        }
+    ]
+}

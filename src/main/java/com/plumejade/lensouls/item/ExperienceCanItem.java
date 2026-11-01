@@ -30,6 +30,10 @@ import java.util.List;
  * <p>
  * 开罐音走客户端本地播放：自定义音效在服务端 {@code playSound} 不可靠是既有踩坑，
  * 项目惯例（次元瓶等）都是在 {@code use} 的客户端分支里播。
+ * <p>
+ * 同一分支里再调 {@link com.plumejade.lensouls.client.fx.CameraShake#trigger(boolean)
+ * CameraShake.trigger(false)}：与<b>普通削韧命中</b>那一档手感一致（抖相机角度 0.26s、
+ * 幅度 1.0/0.7/0.45 度），不带任何全屏后处理——正是削韧普通档的原样反馈。
  */
 public class ExperienceCanItem extends Item {
 
@@ -47,6 +51,9 @@ public class ExperienceCanItem extends Item {
         if (level.isClientSide) {
             // 开罐音（客户端本地，避免服务端播自定义音效丢音）
             player.playSound(ModSounds.EXPERIENCE_CAN_OPEN.get(), 1.0F, 1.0F);
+            // 屏幕抖动：与「普通削韧命中」同一档（0.26s、幅度 1.0/0.7/0.45 度），
+            // 只抖相机角度、不加任何全屏后处理（普通削韧的后处理本来就是空的）
+            com.plumejade.lensouls.client.fx.CameraShake.trigger(false);
             return InteractionResultHolder.success(stack);
         }
 

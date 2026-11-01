@@ -40,10 +40,20 @@ public class ModSounds {
             SOUNDS.register("heal.use", () -> SoundEvent.createVariableRangeEvent(
                     ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "heal.use")));
 
-    /** 经验罐头开罐音（素材：桌面给的罐头音，0.97s） */
+    /** 经验罐头开罐音（素材：用户裁好的开罐片段，1.59s） */
     public static final DeferredHolder<SoundEvent, SoundEvent> EXPERIENCE_CAN_OPEN =
             SOUNDS.register("experience_can.open", () -> SoundEvent.createVariableRangeEvent(
                     ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "experience_can.open")));
+
+    /** 时空回溯音效（前摇开始时在触发者客户端本地播，1.65s） */
+    public static final DeferredHolder<SoundEvent, SoundEvent> TEMPORAL_RECALL =
+            SOUNDS.register("temporal_recall", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "temporal_recall")));
+
+    /** 时间定格成功冻住目标时的音效（只给触发者本地播，3.45s） */
+    public static final DeferredHolder<SoundEvent, SoundEvent> TIME_FREEZE =
+            SOUNDS.register("time_freeze", () -> SoundEvent.createVariableRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "time_freeze")));
 
     // ========== N公司2级员工 Boss 音效 ==========
 

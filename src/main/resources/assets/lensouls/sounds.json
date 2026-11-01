@@ -83,6 +83,22 @@
       }
     ]
   },
+  "temporal_recall": {
+    "sounds": [
+      {
+        "name": "lensouls:temporal_recall",
+        "stream": false
+      }
+    ]
+  },
+  "time_freeze": {
+    "sounds": [
+      {
+        "name": "lensouls:time_freeze",
+        "stream": false
+      }
+    ]
+  },
   "level2_staff.hit1": {
     "sounds": [
       {

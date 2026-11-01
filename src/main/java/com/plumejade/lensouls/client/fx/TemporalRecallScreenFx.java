@@ -58,8 +58,18 @@ public final class TemporalRecallScreenFx implements ScreenFxEffect {
     private TemporalRecallScreenFx() {
     }
 
-    /** 前摇开始 */
+    /**
+     * 前摇开始。
+     * <p>
+     * 时空回溯音效在这里播：{@code TemporalRecallFxPacket.PHASE_CHARGE} 只发给<b>触发者本人</b>
+     * （服务端 {@code sendToPlayer}），所以这里 playSound 天然只有触发者听得到，
+     * 其他玩家既看不到回溯特效、也不该听到回溯音。
+     */
     public static void charge() {
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.player.playSound(com.plumejade.lensouls.sound.ModSounds.TEMPORAL_RECALL.get(), 1.0F, 1.0F);
+        }
         current = new TemporalRecallScreenFx();
         ScreenFxManager.push(current);
     }

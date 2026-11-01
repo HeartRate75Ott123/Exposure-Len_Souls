@@ -38,6 +38,16 @@ public class ClientFreezeCache {
                 frozenEntities.add(id);
             }
         }
+        // 时停音效：只有「真的冻到目标」（定身集非空）且本地玩家是触发者时播；
+        // 触发者 UUID 由服务端随包下发，所以别人听不到，判定也全以服务端定身集为准——
+        // 韧性目标 30% 掷骰全失败 / 破刹中全被拒 ⇒ 定身集为空 ⇒ 不播。
+        // 用 isFreezeSource() 复刻「冻结天穹」的可见性口径（含 testMode）。
+        if (frozen && ids != null && ids.length > 0 && isFreezeSource()) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null) {
+                mc.player.playSound(com.plumejade.lensouls.sound.ModSounds.TIME_FREEZE.get(), 1.0F, 1.0F);
+            }
+        }
     }
 
     /** 实体是否处于冻结（定身集包含）。 */

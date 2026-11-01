@@ -1414,6 +1414,14 @@ public final class ZeroforgeCurse {
             if (inst == null) return;
             if (inst.getEffect().value().getCategory() != MobEffectCategory.HARMFUL) return;
 
+            // 只认「从无到有」的一次获得。NeoForge 的 MobEffectEvent.Added **在实体已经带着同一条效果、
+            // 本次只是时长变长或等级变高时也会派发**（见 MobEffectEvent.Added 的 javadoc），
+            // 于是「续期/刷新」全被算成了「获得」：本模组 CurseEffects.keep 每 2~3 秒续一次饥饿/虚弱，
+            // 受击 25% 概率反复施加缓慢/失明，第三方 mod 的持续效果与药水云同理。
+            // 实测「全咒」状态下 20 秒就刷满 500 次（≈25 次/秒），与「负面效果从无到有」的语义完全不符。
+            // 旧实例非空 = 身上本来就有这一条，不是新获得，既不计次也不掷回血。
+            if (event.getOldEffectInstance() != null) return;
+
             if (CurseManager.on(player, D, 12)) {
                 CurseManager.tick(player, D, 12, 1L, DEBUFF_GOAL);
             }

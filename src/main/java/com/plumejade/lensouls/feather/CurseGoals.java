@@ -83,13 +83,16 @@ public final class CurseGoals {
         // e1「虚无的承诺」无反转条件（CurseDefs.ABYSS noReverse）→ 留空。
         // e2 神秘雪球：FeatherAbyssHandler:795  tick(..., E2_SNOWBALL, 1L, E2_HIT_GOAL[191]=100)
         put(CurseDefs.ABYSS, 1, 100L, TIMES);
+        // e3 安魂曲 / e10 失忆：**限天数类**条件 —— 目标不是累计值而是「x 天内」，
+        // 窗口由 CurseDayLimit 现算（e3 固定 5 天；e10 随佩戴的诅咒款数 30→90 天动态变化），
+        // tooltip 那边走 .cond 里的占位符 + 「已过 X 天」，因此这里留空（goal = 0，不显示方括号目标）。
         // e3 安魂曲 / e4 愚钝 / e5 自闭：条件由 reach（:356 / :764 / :866）直判，无进度计数 → 留空。
         // e6 厄运：FeatherAbyssHandler:893  tick(..., E6_DOOM, 1L, E6_BLOCK_GOAL[203]=200)
         put(CurseDefs.ABYSS, 5, 200L, BLOCKS);
         // e7 祸之可能性：FeatherAbyssHandler:1261  tick(..., 1L, E7_SUMMON_KILL_GOAL[205]=100)
         put(CurseDefs.ABYSS, 6, 100L, KILLS);
-        // e8 挫败 / e10 失忆（30 天内击杀末影龙）/ e12 恶意：reach 直判（见 FeatherAbyssHandler.onMobKilled /
-        // markPendingReverse）→ 留空。
+        // e8 挫败 / e10 失忆（**动态天数窗口**内击杀末影龙，窗口见 CurseDayLimit）/ e12 恶意：
+        // reach 直判（见 FeatherAbyssHandler.onMobKilled / markPendingReverse）→ 留空。
         // e11 疯狂：FeatherAbyssHandler:1318 一次「移速>2 一击致死」即 tick(..., E11_MADNESS, 1L, 1L) ⇒ 目标 1
         put(CurseDefs.ABYSS, 10, 1L, TIMES);
         // e9 食之无味：FeatherAbyssHandler:812 setProgress(n) + :814 reach，目标 E9_FOOD_KIND_GOAL[209]=50
@@ -101,7 +104,7 @@ public final class CurseGoals {
         put(CurseDefs.TIMECORE, 1, 12000L, TIME);    // e2 饥禁   :114 每 tick +1 → 12000 tick = 10 分钟
         put(CurseDefs.TIMECORE, 2, 1000L, BLOCKS);   // e3 迟凿   :293 挖 1000 个方块
         put(CurseDefs.TIMECORE, 3, 150L, TIMES);     // e4 徒劳   :302 被吞掉落 150 次
-        put(CurseDefs.TIMECORE, 4, 3000L, POINTS);   // e5 盈伤   DamageIntake→:539 打前满血时按**真实扣血**累加（不看来源，含自伤；死亡清零）
+        put(CurseDefs.TIMECORE, 4, 3000L, POINTS);   // e5 盈伤   DamageIntake→:539 打前满血时按**真实扣血**累加（不看来源，含自伤与**黄心**；死亡清零）
         put(CurseDefs.TIMECORE, 5, 1L, TIMES);       // e6 坠渊   :436 单次摔落真实扣血 ≥15 点并存活 → 1 次
         put(CurseDefs.TIMECORE, 6, 10000L, POINTS);  // e7 钝锋   :512 累计造成 10000 点
         put(CurseDefs.TIMECORE, 7, 6000L, TIME);     // e8 止息   :127 每 tick +1 → 6000 tick = 5 分钟
@@ -112,7 +115,7 @@ public final class CurseGoals {
         put(CurseDefs.TIMECORE, 12, 30L, TIMES);     // e13 余悸  DamageIntake 真实扣血 >40% 最大生命累计 30 次
         put(CurseDefs.TIMECORE, 13, 50L, KINDS);     // e14 裁影  :881 setProgress(n)，目标 STOLEN_KIND_GOAL[785]=50 种
         put(CurseDefs.TIMECORE, 14, 500L, KILLS);    // e15 厄运  :629 击杀 500 只
-        put(CurseDefs.TIMECORE, 15, 200L, TIMES);    // e16 释刃  :543 主手脱手 200 次
+        put(CurseDefs.TIMECORE, 15, 50L, TIMES);     // e16 释刃  :543 主手脱手 50 次（1.8.88 由 200 降到 50）
         put(CurseDefs.TIMECORE, 16, 3000L, CELLS);   // e17 重负  :209 移动速度值 <0.02 时累计移动 3000 格（真格累加）
         put(CurseDefs.TIMECORE, 17, 10000L, CELLS);  // e18 滞步  :224 缓慢下走地 10000 格（真格累加）
         put(CurseDefs.TIMECORE, 18, 50L, KILLS);     // e19 障目  :633 失明下击杀 50 只

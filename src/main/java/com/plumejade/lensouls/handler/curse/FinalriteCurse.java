@@ -41,7 +41,9 @@ import java.util.UUID;
  * 命中即 {@link CurseManager#tick} 一次（{@code goal = 1}）→ 达标自动反转。
  * <p>
  * <b>叠加口径</b>（见设计文档 §2「叠加口径（定稿）」）：诅咒态**乘算**（{@code d * k}）、
- * 反转态**加算**（{@code d * (1 + Σ 加算值)}）；**受伤侧一律乘算**、**治疗侧一律乘算**。
+ * 反转态**加算**（{@code d * (1 + Σ 加算值)}）；**治疗侧一律乘算**。
+ * <b>受伤侧</b>的百分比不在这里乘 —— 统一进 {@link CurseTakenDamage}（易伤加算、减伤连乘），
+ * 本类只经 {@link #collectTaken} 报数。
  * 本类 输出侧的 e3（+10%）与 e4（+1%/掉落物）两条反转加算在同一个事件里**统一收口一次**。
  * <p>
  * 条目序号（0 基）与 lang 的 {@code eN} 一致：e1=竭泉 e2=血偿 e3=蚀力 e4=力竭
@@ -87,9 +89,9 @@ public final class FinalriteCurse {
     /** e5 篡命：每装备一件护甲，最大生命上限 ×90% */
     private static final double HEALTH_PER_ARMOR = 0.9;
     /** e6 献祭：满血时受到伤害 +70% */
-    private static final float FULL_HEALTH_TAKEN = 1.7f;
+    public static final float FULL_HEALTH_TAKEN_BONUS = 0.70f;
     /** e6 献祭 反转：每损失 1% 最大生命，受到伤害 -0.5% */
-    private static final float LOST_HEALTH_REDUCTION = 0.005f;
+    public static final float LOST_HEALTH_REDUCTION = 0.005f;
     /** e7 穿甲：每次受伤有 50% 伤害无法吃到护甲值 */
     private static final float ARMOR_PIERCE_RATIO = 0.50f;
     /** e7 穿甲 反转：每次受伤有 10% 概率无视这次伤害 */
@@ -245,23 +247,28 @@ public final class FinalriteCurse {
                 return;
             }
 
-            // e6 献祭：满血时受到伤害 +70%——受伤侧乘算
-            if (CurseManager.on(player, D, 5)) {
-                if (player.getHealth() >= player.getMaxHealth() - EPS) {
-                    d *= FULL_HEALTH_TAKEN;
-                }
-            }
-            // e6 献祭 反转：每损失 1% 最大生命，受到伤害 -0.5%——受伤侧乘算
-            else if (CurseManager.rev(player, D, 5)) {
-                float lostRatio = 1.0f - player.getHealth() / player.getMaxHealth();
-                if (lostRatio > 0.0f) {
-                    d *= Math.max(0.0f, 1.0f - LOST_HEALTH_REDUCTION * lostRatio * 100.0f);
-                }
-            }
-
+            // e6 献祭的百分比在统一乘区里结算（见 {@link #collectTaken}），这里不改数值。
             event.setAmount(d);
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ⑥ 受伤结算异常", t);
+        }
+    }
+
+    /**
+     * 受伤侧统一乘区（{@link CurseTakenDamage}）：本款只报 e6 献祭的加数 / 减伤系数。
+     */
+    public static void collectTaken(ServerPlayer player, CurseTakenDamage.Pool pool) {
+        if (CurseManager.on(player, D, 5)) {
+            // e6 献祭 诅咒态：满血时受到伤害 +70%
+            if (player.getHealth() >= player.getMaxHealth() - EPS) {
+                pool.add(FULL_HEALTH_TAKEN_BONUS);
+            }
+        } else if (CurseManager.rev(player, D, 5)) {
+            // e6 献祭 反转态：每损失 1% 最大生命，受到伤害 -0.5%（最多 -50%）
+            float lostRatio = 1.0f - player.getHealth() / player.getMaxHealth();
+            if (lostRatio > 0.0f) {
+                pool.multiply(Math.max(0.0f, 1.0f - LOST_HEALTH_REDUCTION * lostRatio * 100.0f));
+            }
         }
     }
 

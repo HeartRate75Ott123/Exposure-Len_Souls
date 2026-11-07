@@ -15,19 +15,25 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
  * 所以单独发一个 {@code int}。有了它客户端才能做 {@link #on} / {@link #rev} ——
  * 即 {@code CurseManager#on} / {@code CurseManager#rev} 的等价判断
  * （<b>不要</b>去读服务端附件：羽毛槽附件刻意不同步到客户端）。
+ * <p>
+ * <b>{@code ownDays}（1.8.88 追加）</b>：该玩家自己的已过天数（服务端世界时钟口径）。
+ * 「限天数类」条件（④ e3 安魂曲 / ④ e10 失忆）的 tooltip 用它算「已过 X 天」与是否逾期；
+ * 窗口天数不在这里 —— 由 {@link #activeCurseCount()} 现算，见 {@code CurseDayLimit}。
  */
 public final class CurseClientCache {
 
     private static long mask;
     private static long[] progress = new long[CurseDefs.MASK_BITS];
     private static int activeMask;
+    private static int ownDays;
 
     private CurseClientCache() {
     }
 
-    public static void set(long newMask, long[] newProgress, int newActiveMask) {
+    public static void set(long newMask, long[] newProgress, int newActiveMask, int newOwnDays) {
         mask = newMask;
         activeMask = newActiveMask;
+        ownDays = newOwnDays;
         progress = (newProgress != null && newProgress.length == CurseDefs.MASK_BITS)
                 ? newProgress
                 : new long[CurseDefs.MASK_BITS];
@@ -37,6 +43,7 @@ public final class CurseClientCache {
     public static void clear() {
         mask = 0L;
         activeMask = 0;
+        ownDays = 0;
         progress = new long[CurseDefs.MASK_BITS];
     }
 
@@ -69,6 +76,21 @@ public final class CurseClientCache {
 
     public static long progress(int index) {
         return (index >= 0 && index < progress.length) ? progress[index] : 0L;
+    }
+
+    /**
+     * 该玩家当前佩戴了几款诅咒（{@code activeMask} 的位数，0~7）。
+     * <p>
+     * ④ e10 失忆的反转窗口按「戴了几款」动态变（30 天 + 每多 1 款 10 天），
+     * 所以 tooltip 必须用**当前**这个值现算窗口 —— 创造模式随时能卸下/装上。
+     */
+    public static int activeCurseCount() {
+        return Integer.bitCount(activeMask);
+    }
+
+    /** 该玩家自己的已过天数（服务端同步；未收到同步时为 0） */
+    public static int ownDays() {
+        return ownDays;
     }
 
     public static int reversedCount(CurseDef def) {

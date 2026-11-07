@@ -112,7 +112,11 @@ public class LensoulsCommand {
                             long mapDay = com.plumejade.lensouls.handler.WorldDays.absoluteDay(player.getServer());
                             int elapsed = com.plumejade.lensouls.handler.WorldDays.elapsedDays(player);
                             int window = com.plumejade.lensouls.handler.WorldDays.ABYSS_REVERSE_WINDOW_DAYS;
-                            int amnesiaWindow = com.plumejade.lensouls.handler.WorldDays.ABYSS_AMNESIA_WINDOW_DAYS;
+                            // e10 的窗口是动态的：按**当前佩戴了几款诅咒**现算（1 款 30 天，每多 1 款 +10 天）
+                            int curses = Integer.bitCount(
+                                    com.plumejade.lensouls.feather.CurseManager.activeMask(player));
+                            int amnesiaWindow =
+                                    com.plumejade.lensouls.feather.CurseDayLimit.amnesiaWindowDays(curses);
                             String requiemState = elapsed >= window
                                     ? "§c已过期（无法反转）"
                                     : "§a窗口内（剩余 " + (window - elapsed) + " 天）";
@@ -122,7 +126,8 @@ public class LensoulsCommand {
                             ctx.getSource().sendSuccess(() -> Component.literal(
                                     "§e地图第 " + mapDay + " 天 §7| §a你自己第 " + (elapsed + 1)
                                             + " 天§7（已过 " + elapsed + " 天）§7| §b安魂曲窗口：" + requiemState
-                                            + "§7| §b失忆窗口：" + amnesiaState), false);
+                                            + "§7| §b失忆窗口：" + amnesiaState
+                                            + "§7（佩戴 " + curses + " 款，窗口 " + amnesiaWindow + " 天）"), false);
                             return 1;
                         }))
                 .then(Commands.literal("skill").requires(OP)

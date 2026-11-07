@@ -1,11 +1,16 @@
 package com.plumejade.lensouls.photogallery;
 
+import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.config.BossEntityLoader;
 import com.plumejade.lensouls.config.PhotoSetDefs;
 import com.plumejade.lensouls.integration.PhotoSetRegistry;
 import com.plumejade.lensouls.item.EntityPhotographItem;
+import com.plumejade.lensouls.item.PhotoAlbumItem;
+import net.minecraft.core.NonNullList;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemContainerContents;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
@@ -43,6 +48,9 @@ public final class PhotoGallerySettlement {
     private static final String TOAST_ALREADY_SET = "gui.lensouls.photos.toast.already.set";
     /** 成套：一个成员都还没窃取过 */
     private static final String TOAST_LOCKED_SET = "gui.lensouls.photos.toast.locked.set";
+
+    /** 饰品相册的格数（`AlbumMenu` / `AlbumScreen` 的 3×3 发射器界面）；相册数据超出时按实际格数读 */
+    private static final int ALBUM_SLOTS = 9;
 
     private PhotoGallerySettlement() {
     }
@@ -241,56 +249,119 @@ public final class PhotoGallerySettlement {
     }
 
     /**
-     * 剔除重复的照片饰品：同一 {@code lensouls:stolen_entity} 只保留一件。
+     * 剔除重复的照片饰品：同一 {@code lensouls:stolen_entity} 只保留<b>一处</b>。
      * <p>
-     * 保留顺序：**相册内容物优先**（相册里的照片不动）→ 照片槽按槽位靠前者优先。
-     * 多余的一律退回物品栏（满则丢在脚下）。
+     * 判重范围（三条都要覆盖，口径见 {@link PhotoSetRegistry#collectInstalledEntities}）：
+     * <ol>
+     *   <li><b>同一个相册内部</b>：两个格子塞了同一只生物 → 只留靠前那格，另一格整格搬出；</li>
+     *   <li><b>相册与相册之间</b>：两个相册各有同一只 → 只留槽位靠前的那个相册里那份；</li>
+     *   <li><b>相册 ↔ 相册外的散装照片槽</b>：相册里那份优先保留，散装槽位里的搬回物品栏
+     *       （相册在照片槽里时其内容等效已装备，故与「已装」口径一致）。</li>
+     * </ol>
+     * 保留顺序：**相册优先（按 Curios 容器 + 槽位顺序）→ 相册内部按格位先到先得 → 散装照片槽按槽位靠前者优先**。
+     * 多余的一律退回物品栏（满则丢在脚下）——与「只搬不删」铁律一致。
      * <p>
-     * 开发口径（**不要写进任何用户可见文案**）：照片本身可堆叠、加上相册会整箱生效，
+     * 相册内容改写走 {@code setStackInSlot} <b>整栈替换</b>，不是就地改组件：Curios 在玩家刻里比对
+     * {@code previousStacks} 才会把槽内内容同步到客户端并补发 onUnequip/onEquip，就地改组件不会触发。
+     * <p>
+     * 开发口径（<b>不要写进任何用户可见文案</b>）：照片本身可堆叠、加上相册会整箱生效，
      * 所以同种生物完全可能同时存在多张 —— 这是既有数据结构的结果，不是玩家操作失误。
      *
      * @return 实际剔除的件数（用于提示）
      */
     public static int dedupe(ServerPlayer player) {
         Set<String> seen = new HashSet<>();
+        // 只搬不删：先收集，最后统一退回。中途任何一步炸掉都要把已收集的退回去
+        //（相册内容已经被改写，不退回就是凭空销毁）。
+        List<ItemStack> removed = new ArrayList<>();
 
-        // ① 相册内容物里的 id 先登记：相册里那几张保留
-        for (PhotoGalleryRules.SlotRef ref : PhotoGalleryRules.photoCurioSlots(player)) {
-            if (ref.stack().getItem() instanceof com.plumejade.lensouls.item.PhotoAlbumItem) {
-                seen.addAll(PhotoGalleryRules.albumPhotoIds(ref.stack()));
+        try {
+            // ① 相册：内部去重 + 跨相册去重（按槽位顺序，靠前者优先）
+            for (PhotoGalleryRules.SlotRef ref : PhotoGalleryRules.photoCurioSlots(player)) {
+                if (!(ref.stack().getItem() instanceof PhotoAlbumItem)) continue;
+                dedupeAlbumContent(player, ref, seen, removed);
             }
+
+            // ② 照片槽里的散装照片：first-wins，重复的取出来
+            IDynamicStackHandler stacks = liveStacks(player, PhotoGalleryRules.PHOTO_SLOT);
+            if (stacks != null) {
+                List<PhotoGalleryRules.SlotRef> duplicates = new ArrayList<>();
+                for (int i = 0; i < stacks.getSlots(); i++) {
+                    ItemStack stack = stacks.getStackInSlot(i);
+                    if (stack.isEmpty()) continue;
+                    if (stack.getItem() instanceof PhotoAlbumItem) continue;
+                    String id = PhotoGalleryRules.photoEntityId(stack);
+                    if (id == null || id.isEmpty()) continue;
+                    if (seen.add(id)) continue;
+                    duplicates.add(new PhotoGalleryRules.SlotRef(PhotoGalleryRules.PHOTO_SLOT, i, stack.copy()));
+                }
+                for (PhotoGalleryRules.SlotRef ref : duplicates) {
+                    ItemStack taken = extract(player, ref.identifier(), ref.index());
+                    if (!taken.isEmpty()) removed.add(taken);
+                }
+            }
+        } catch (Throwable t) {
+            LenSouls.LOGGER.warn("[PhotoGallery] 剔除重复中途失败，已剔除的 {} 件照常退回", removed.size(), t);
         }
 
-        // ② 逐个照片槽：先登记第一个，重复的取出来
-        List<PhotoGalleryRules.SlotRef> duplicates = new ArrayList<>();
+        int count = 0;
+        for (ItemStack stack : removed) {
+            if (stack.isEmpty()) continue;
+            int c = stack.getCount();      // 务必在 give() 之前读：Inventory.add 会把入参原地清成 0
+            give(player, stack);
+            count += c;
+        }
+        return count;
+    }
+
+    /**
+     * 相册内容判重：命中的格子清空、整格搬进 {@code removed}；有改动才把相册整栈写回槽位。
+     * <p>
+     * 读改写全程不碰「非能力窃取照片」（{@code lensouls:stolen_entity} 缺失的那些，例如普通
+     * Exposure 照片）：它们不参与判重，也不会被 {@code fromItems} 的重排影响——{@code copyInto}
+     * 逐格复制、{@code fromItems} 保留内部空槽（只截掉尾部空位），所以格位不会错位。
+     */
+    private static void dedupeAlbumContent(ServerPlayer player, PhotoGalleryRules.SlotRef ref,
+                                           Set<String> seen, List<ItemStack> removed) {
+        IDynamicStackHandler stacks = liveStacks(player, ref.identifier());
+        if (stacks == null || ref.index() < 0 || ref.index() >= stacks.getSlots()) return;
+        // SlotRef.stack() 是副本，改它没用：这里必须拿槽位里的活栈
+        ItemStack album = stacks.getStackInSlot(ref.index());
+        if (!(album.getItem() instanceof PhotoAlbumItem)) return;
+
+        ItemContainerContents contents = album.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
+        NonNullList<ItemStack> slots =
+                NonNullList.withSize(Math.max(contents.getSlots(), ALBUM_SLOTS), ItemStack.EMPTY);
+        contents.copyInto(slots);       // copyInto 逐格 copy()，取到的是独立实例
+
+        boolean changed = false;
+        for (int i = 0; i < slots.size(); i++) {
+            ItemStack inner = slots.get(i);
+            if (inner.isEmpty()) continue;
+            String id = PhotoGalleryRules.photoEntityId(inner);
+            if (id == null || id.isEmpty()) continue;   // 非能力窃取照片不参与判重（与照片槽同口径）
+            if (seen.add(id)) continue;                 // 首次出现 → 留在这格
+            slots.set(i, ItemStack.EMPTY);
+            removed.add(inner);
+            changed = true;
+        }
+        if (!changed) return;
+
+        ItemStack updated = album.copy();
+        updated.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(slots));
+        stacks.setStackInSlot(ref.index(), updated);
+    }
+
+    /** 取某个 Curios 容器的活 stack handler（不存在 / 异常 → null） */
+    private static IDynamicStackHandler liveStacks(ServerPlayer player, String identifier) {
         try {
             var opt = CuriosApi.getCuriosInventory(player);
-            if (opt.isEmpty()) return 0;
-            var handler = opt.get().getStacksHandler(PhotoGalleryRules.PHOTO_SLOT);
-            if (handler.isEmpty()) return 0;
-            IDynamicStackHandler stacks = handler.get().getStacks();
-            for (int i = 0; i < stacks.getSlots(); i++) {
-                ItemStack stack = stacks.getStackInSlot(i);
-                if (stack.isEmpty()) continue;
-                if (stack.getItem() instanceof com.plumejade.lensouls.item.PhotoAlbumItem) continue;
-                String id = PhotoGalleryRules.photoEntityId(stack);
-                if (id == null || id.isEmpty()) continue;
-                if (seen.add(id)) continue;
-                duplicates.add(new PhotoGalleryRules.SlotRef(PhotoGalleryRules.PHOTO_SLOT, i, stack.copy()));
-            }
+            if (opt.isEmpty()) return null;
+            var handler = opt.get().getStacksHandler(identifier);
+            return handler.isPresent() ? handler.get().getStacks() : null;
         } catch (Throwable ignored) {
-            return 0;
+            return null;
         }
-
-        int removed = 0;
-        for (PhotoGalleryRules.SlotRef ref : duplicates) {
-            ItemStack taken = extract(player, ref.identifier(), ref.index());
-            if (taken.isEmpty()) continue;
-            int count = taken.getCount();      // 同上：务必在 give() 之前读
-            give(player, taken);
-            removed += count;
-        }
-        return removed;
     }
 
     // ========== 搬运原语 ==========

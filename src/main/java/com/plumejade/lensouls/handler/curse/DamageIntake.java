@@ -28,15 +28,23 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <h2>这里用的是什么</h2>
  * {@code LivingDamageEvent.Post}：它在 {@code actuallyHurt} 的**末尾**派发
- * （{@code CommonHooks.onLivingDamagePost}，在 {@code setHealth} 与伤害吸收扣减都跑完之后）。
- * {@code Post.getNewDamage()} 就是「算完那么多之后真正落到身上的那一下」——
- * 护甲/附魔/抗性/免伤/本模组全部倍率都算进去了，**含**被伤害吸收吃掉的那部分
- * （伤害吸收的扣减不回写 {@code DamageContainer.newDamage}，故 Post 里仍是含吸收的完整量）。
+ * （NeoForge 注入点 {@code CommonHooks.onLivingDamagePost}，在 {@code setHealth} 与伤害吸收扣减都跑完之后）。
+ * <p>
+ * <b>但 {@code Post.getNewDamage()} 只有「落到生命的那部分」</b>：1.21.1 的
+ * {@code DamageContainer.setReduction(...)} 会把每一档 reduction（含 {@link DamageContainer.Reduction#ABSORPTION}）
+ * 从 {@code newDamage} 里扣掉，所以黄心（伤害吸收）吃掉的量不在其中。用户 2026-11-06 定案
+ * 「累积受伤类的统计要让伤害吸收的黄心也计入」，因此这里把 ABSORPTION 这一档**加回来**：
+ * {@code dealt = Post.getNewDamage() + getReduction(ABSORPTION)} = 这一下真正打掉的量。
+ * （只被黄心吃掉、生命没动的攻击也照样计入 —— {@code onLivingDamagePost} 在
+ * {@code if (damage != 0)} 之外无条件派发，全额吸收时 Post 依然会到。）
  *
  * <h2>满血 / 打前状态</h2>
  * 满血这类「打之前」的状态，必须在伤害生效前取：所以在 Incoming 阶段（{@code HIGHEST}，
  * 比谁都早）快照一次血量，Post 里跟这一击配对使用。这样即使同 tick 里血量被别的东西改过，
  * 也不会把「打之前是否满血」判错。
+ * <p>
+ * <b>黄心不影响「满血」判定</b>：伤害吸收是叠在生命之上的另一条条，生命本身仍是满的 ⇒
+ * 「满血 + 有黄心」被完全吸收的一击照样算「在满血状态下承受伤害」（⑤ e5 盈伤）。
  *
  * <h2>计数裁剪</h2>
  * 单次不超过「10 倍最大生命」（{@code /kill} 的 {@code genericKill} 是 {@code Float.MAX_VALUE}，
@@ -73,21 +81,26 @@ public final class DamageIntake {
         }
     }
 
-    /** 伤害结算**后**：取真实扣血，统一派发给所有受伤类条件。 */
+    /** 伤害结算**后**：取真实扣血（含黄心），统一派发给所有受伤类条件。 */
     @SubscribeEvent
     public static void afterSettled(LivingDamageEvent.Post event) {
         try {
             if (!(event.getEntity() instanceof ServerPlayer player)) return;
             float[] pre = PRE.remove(player.getUUID());
-            float dealt = event.getNewDamage();
+            // 掉到生命上的那部分（Post 的 newDamage 已经扣掉 ABSORPTION 那一档）+ 黄心吃掉的量 = 这一下真正打掉的量。
+            // 注意 Post 只快照了各项 reduction（getReduction），没有 getContainer()
+            float absorbed = event.getReduction(
+                    net.neoforged.neoforge.common.damagesource.DamageContainer.Reduction.ABSORPTION);
+            float dealt = event.getNewDamage() + Math.max(0.0f, absorbed);
             if (!Float.isFinite(dealt) || dealt <= 0.0f) return;
 
             DamageSource src = event.getSource();
             // 必死级来源（/kill 的 genericKill、虚空）不算「承受的伤害」
             if (src != null && src.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) return;
 
-            // 没配上快照（伤害不是从 hurt 进来、或嵌套结算打乱了配对）时按「当前血量 + 这一下」反推
-            float preHealth = pre != null ? pre[0] : player.getHealth() + dealt;
+            // 没配上快照（伤害不是从 hurt 进来、或嵌套结算打乱了配对）时按「当前血量 + 落到生命的那部分」反推：
+            // 黄心那部分不动血量，不能加进血量里，否则会算出「打前血量 > 上限」把满血判错
+            float preHealth = pre != null ? pre[0] : player.getHealth() + Math.max(0.0f, event.getNewDamage());
             float maxHealth = pre != null ? pre[1] : player.getMaxHealth();
             if (!Float.isFinite(preHealth) || maxHealth <= 0.0f) return;
 
@@ -96,7 +109,8 @@ public final class DamageIntake {
             if (points <= 0L) return;
 
             boolean wasFull = preHealth >= maxHealth - FULL_EPS;
-            AttackDiag.log("⑤真实扣血 {} 打前={}/{} 满血={} 计入={}", dealt, preHealth, maxHealth, wasFull, points);
+            AttackDiag.log("⑤真实扣血 {}（其中黄心 {}）打前={}/{} 满血={} 计入={}",
+                    dealt, absorbed, preHealth, maxHealth, wasFull, points);
 
             TimecoreCurse.onDamageTaken(player, src, dealt, points, wasFull);
         } catch (Throwable t) {

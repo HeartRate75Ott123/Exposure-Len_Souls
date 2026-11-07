@@ -59,8 +59,11 @@ public final class WorldDays {
     public static final int ABYSS_REVERSE_WINDOW_DAYS = 5;
 
     /**
-     * 折翼沉渊 e10 失忆的反转窗口（天）：同样是**自己的**已过天数，≥ 该值即过期，
-     * 过期后击杀末影龙也不再反转（与 e3 共用同一套天数口径，见 {@link #ABYSS_REVERSE_WINDOW_DAYS}）。
+     * 折翼沉渊 e10 失忆反转窗口的<b>基准值</b>（天）：佩戴 1 款诅咒时的窗口，每多 1 款 +10 天
+     * （满 7 款 90 天）。实际窗口一律现算：{@code CurseDayLimit.amnesiaWindowDays(佩戴款数)}。
+     * <p>
+     * 之所以只留一个基准值：玩家可以在创造模式随时卸下/装上羽毛，窗口跟着变，
+     * 缓存或写死任何「当前窗口」都会说错话（tooltip 与判定都必须是同一个现算结果）。
      */
     public static final int ABYSS_AMNESIA_WINDOW_DAYS = 30;
 

@@ -6,10 +6,12 @@ import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.CurseSideQuery;
 import com.plumejade.lensouls.handler.CurioSlotBonuses;
+import com.plumejade.lensouls.integration.SuperDogCounterCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
@@ -40,8 +42,9 @@ import java.util.UUID;
  * （= 该款被选进槽位 ∧ 该条未反转 / 已反转），条件进度用
  * {@link CurseManager#tick} 累加，达标即自动反转。
  * <p>
- * <b>叠加口径</b>：诅咒态**乘算**、反转态**加算**（见设计文档 §2「叠加口径（定稿）」）。
- * 本类里的诅咒态一律用 {@code d * k}，反转态用 {@code d * (1 + 加算值)}。
+ * <b>叠加口径</b>（见设计文档 §2「叠加口径（定稿）」）：输出侧诅咒态**乘算**、反转态**加算**
+ * （{@code d * (1 + Σ 加算值)}）；<b>受伤侧</b>的百分比一律进统一乘区
+ * {@link CurseTakenDamage}（易伤加算、减伤连乘），本类不再自己乘受伤倍率。
  * <p>
  * 条目序号（0 基）与 lang 的 {@code eN} 一致：e1=绝疗 e2=饥禁 e3=迟凿 e4=徒劳 e5=盈伤 e6=坠渊
  * e7=钝锋 e8=止息 e9=断粮 e10=夺佑 e11=锈甲 e12=缚己 e13=余悸 e14=裁影 e15=厄运 e16=释刃
@@ -84,12 +87,27 @@ public final class TimecoreCurse {
     private static final Map<UUID, Long> FEAR_UNTIL = new HashMap<>();
     /** e23 平势：本 tick 已经反击过（多段/范围伤害同一 tick 只反击一次） */
     private static final Map<UUID, Long> LAST_FIELD_TICK = new HashMap<>();
+    /**
+     * e23 平势 诅咒态的「字面反击」待结算队列（superdog 没有对应档案时的兜底）。
+     * <p>
+     * <b>为什么要排队</b>：这条反击是在**目标的伤害事件内部**触发的（{@link #levelFieldCounter} 由
+     * {@link #onDealDamage} 调用），当场再对玩家 {@code hurt()} 属于「伤害事件里重入伤害」——
+     * 多层监听器（别的模组的受击处理、远程/范围伤害、死亡结算）会在同一刻被套进第二份伤害里，
+     * 实测表现为卡顿甚至崩溃。改成记下来、下一 tick 由 {@link #runPendingFieldRevenge} 结算。
+     */
+    private static final Map<UUID, PendingRevenge> PENDING_FIELD_REVENGE = new HashMap<>();
+    /** 字面反击的寿命（tick）：超过就作废（玩家换维度/目标已死等） */
+    private static final int REVENGE_EXPIRE_TICKS = 40;
+
+    /** 一次待结算的平势字面反击：目标是「谁反击我」，数值是那次反击的伤害 */
+    private record PendingRevenge(int targetId, float amount, long expireTick) {
+    }
 
     /**
      * 「我们自己造成的伤害」重入深度（线程内）。
      * <p>
-     * 本类有三处在**伤害结算内部**再造成伤害：e23 平势 诅咒态（它被你打就反击你）、
-     * e11 锈甲 反转态（反弹 25% 给攻击者）、e23 反转态（20% 反制）。
+     * 本类有三处在**伤害结算内部**再造成伤害：e23 平势 诅咒态（它被你打就反击你，字面兜底已改为下一 tick 结算）、
+     * e11 锈甲 反转态（反弹 25% 给攻击者）、e23 反转态（20% 反击）。
      * 这些伤害会重新派发 {@code LivingIncomingDamageEvent} / {@code LivingDamageEvent.Pre}，
      * 于是形成闭环：{@code 玩家打 BOSS → levelFieldCounter 让玩家受伤 → onReflect 反弹给 BOSS
      * → BOSS 受伤（来源是玩家）→ onDealDamage → levelFieldCounter → …}，
@@ -117,6 +135,9 @@ public final class TimecoreCurse {
     }
 
     private static void tick(ServerPlayer player) {
+        // e23 平势 诅咒态：上一刻排队的字面反击（刻意不在伤害事件里当场重入 hurt，见 PENDING_FIELD_REVENGE）
+        runPendingFieldRevenge(player);
+
         boolean active = CurseManager.isActive(player, D);
 
         // e10 夺佑：抗性提升无效（持续清除）
@@ -275,22 +296,32 @@ public final class TimecoreCurse {
         // ⑤ e8 反转的文案承诺「再生类效果正常生效」⇒ **生命恢复效果带来的治疗**不被 ⑤ 自己的
         // 恢复量拦截削减（e1 绝疗 −80% / e2 饥禁禁疗 / e8 自身都不动它）。
         // 作用域仅限 ⑤：⑥ 竭泉/血偿、④ 食之无味各自照旧按自己的诅咒态生效。
+        //
+        // 次元瓶（HealPotionItem）是用户点名**豁免**的第二个来源：它一用就该「回满生命」，
+        // 不能被任何一条 ⑤ 的恢复量拦截打折/清零（文案上也不单独说明）。
         boolean regenExempt = CurseManager.rev(player, D, 7) && HealSource.isRegenerationHeal();
+        boolean bottleExempt = HealSource.isDimensionalBottleHeal();
 
-        // e1 绝疗：受到治疗 -80%
-        if (!regenExempt && CurseManager.on(player, D, 0)) {
-            event.setAmount(amount * 0.2f);
-        }
-        // e2 饥禁：饱食度 <5 时禁疗（再生带来的治疗按 e8 反转承诺放行）
-        if (!regenExempt && CurseManager.on(player, D, 1)
-                && player.getFoodData().getFoodLevel() < 5) {
-            event.setAmount(0.0f);
-            return;
-        }
-        // e8 止息：生命自然恢复与再生类效果无效（已反转则本条本就不生效）
-        if (CurseManager.on(player, D, 7)) {
-            event.setAmount(0.0f);
-            return;
+        if (!regenExempt && !bottleExempt) {
+            // e1 绝疗：受到治疗 -80%
+            if (CurseManager.on(player, D, 0)) {
+                event.setAmount(amount * 0.2f);
+            }
+            // e2 饥禁：**饱食度 <5 时**禁疗（拦截口径是「任何走 LivingHealEvent 的治疗」——
+            // 食物、原版自然恢复、药水/再生、其它模组都算，所以文案不写「食物回血」而是「禁疗」）。
+            // 2026-11-07 用户定案：诅咒态**保留饱食度 <5 这道门槛**，不要做成无条件全拦
+            // （曾一度去掉门槛，用户要求回退到编辑前的样子）。
+            // 例外：次元瓶由上面的 bottleExempt 豁免（用户点名「让次元瓶的回血正常，文案不特别说明」）。
+            if (CurseManager.on(player, D, 1)
+                    && player.getFoodData().getFoodLevel() < 5) {
+                event.setAmount(0.0f);
+                return;
+            }
+            // e8 止息：生命自然恢复与再生类效果无效（已反转则本条本就不生效）
+            if (CurseManager.on(player, D, 7)) {
+                event.setAmount(0.0f);
+                return;
+            }
         }
 
         float healed = event.getAmount();
@@ -478,9 +509,9 @@ public final class TimecoreCurse {
         if (inSelfDamage()) return;   // 我们安排的那份伤害：不再被自己的倍率/反弹加工（见 SELF_DAMAGE_DEPTH）
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         float d = event.getAmount();
-        // /kill 的 genericKill 是 Float.MAX_VALUE（3.4028235E38）：只要本处理器再乘一个倍率
-        // （e5 盈伤 ×1.5、e13 余悸 ×1.2…）就会变成 **Infinity**，后续任何一处
-        // `Infinity − Infinity` / `Infinity × 0` 都会把伤害写成 **NaN**，而 NaN 血量的
+        // /kill 的 genericKill 是 Float.MAX_VALUE（3.4028235E38）：后续任何一处再乘一个倍率
+        // （诅咒的受伤乘区、别的模组的减伤/增伤…）都会变成 **Infinity**，然后
+        // `Infinity − Infinity` / `Infinity × 0` 会把伤害写成 **NaN**，而 NaN 血量的
         // `getHealth() <= 0` 恒为 false ⇒ 原版永不判死、`hurt` 也被 isDeadOrDying 挡掉 ——
         // 实机表现正是「/kill 与普通攻击都杀不死 + 血量条 NaN 导致屏幕抖动/卡死」。
         // 所以入口先夹到有限值，再进任何倍率。
@@ -496,33 +527,12 @@ public final class TimecoreCurse {
                 CurseManager.on(player, D, 9), CurseManager.on(player, D, 10),
                 player.getArmorValue());
 
-        // e5 盈伤：生命 >50% 时受到伤害 +50%（乘算）/ 反转 -25%（加算）
-        if (player.getHealth() > player.getMaxHealth() * 0.5f) {
-            if (CurseManager.on(player, D, 4)) {
-                d *= 1.5f;
-            } else if (CurseManager.rev(player, D, 4)) {
-                d *= 0.75f;
-            }
-        }
-
-        // e6 坠渊：摔落伤害 +500%（乘算）/ 反转免疫
-        if (event.getSource().is(net.minecraft.tags.DamageTypeTags.IS_FALL)) {
-            if (CurseManager.on(player, D, 5)) {
-                d *= 6.0f;
-            } else if (CurseManager.rev(player, D, 5)) {
-                event.setCanceled(true);
-                return;
-            }
-        }
-
-        // e13 余悸：上一击是「大击」时，5 秒内受伤 +20%（乘算）/ 反转 -70%（加算）
-        // 「大击」的判定（真实扣血 > 40% 最大生命）与 30 次计数都在 DamageIntake 结算后做
-        if (FEAR_UNTIL.containsKey(player.getUUID())) {
-            if (CurseManager.on(player, D, 12)) {
-                d *= 1.2f;
-            } else if (CurseManager.rev(player, D, 12)) {
-                d *= 0.3f;
-            }
+        // e5 盈伤 / e6 坠渊 / e13 余悸 的**百分比**统一交给 {@link CurseTakenDamage} 结算
+        // （受伤侧只有一个加算池，见 {@link #collectTaken}）；这里只剩 e6 反转的「摔落免疫」——
+        // 免疫不是倍率，仍在入口直接取消。
+        if (event.getSource().is(DamageTypeTags.IS_FALL) && CurseManager.rev(player, D, 5)) {
+            event.setCanceled(true);
+            return;
         }
 
         // e18/e19 受击概率施加负面（仅诅咒态）
@@ -537,22 +547,107 @@ public final class TimecoreCurse {
         // 一律由 {@link DamageIntake} 在 {@code LivingDamageEvent.Post} 用「真实扣血」派发到
         // {@link #onDamageTaken}。这里只负责改伤害（倍率/取消/反弹）。
 
-        // e23 平势 反转：目标最大生命高于你 50% 时，你受伤有 20% 概率**反制**（并清掉对方无敌帧）
-        if (CurseManager.rev(player, D, 22)
-                && event.getSource().getDirectEntity() instanceof LivingEntity counter
-                && counter != player
-                && counter.getMaxHealth() >= player.getMaxHealth() * 1.5f
-                && player.getRandom().nextFloat() < 0.20f) {
-            counter.invulnerableTime = 0;                 // 清无敌帧（Entity 上的公开字段）
-            hurtGuarded(counter, player.damageSources().playerAttack(player), Math.max(1.0f, d * 0.5f));
-        }
-
-        // ⑤ 大成：受到伤害 -25%（乘算；受伤侧一律乘算 §2）
-        if (grandActive(player)) {
-            d *= 0.75f;
-        }
+        // e23 平势 反转的「反击」不在这里做：它在 {@link #onDamagedPost}（Post）里结算 ——
+        // 这里（Incoming）当场对攻击者 hurt() 属于「伤害事件里重入伤害」，实测会卡顿/崩溃。
 
         event.setAmount(d);
+    }
+
+    /**
+     * e23 平势 反转：「目标生命每高于你 50% 时，你受伤有 20% 概率反击（清除对方无敌帧）」。
+     * <p>
+     * <b>玩家侧只放特效、不跑 superdog 的技能引擎</b>：引擎会设 {@code noPhysics / noGravity} 并整段位移，
+     * 对怪物是冲刺，对玩家就是强制瞬移、抢操作，完全不实用。这里只发「目标胸口爆炸 + 自身朝目标的冲刺粒子」
+     * 两份表现包（{@link SuperDogCounterCompat#playCounterFx}），实体位置不动。
+     * <p>
+     * <b>为什么放在 {@code LivingDamageEvent.Post}</b>：玩家这一击已经扣完血，此时再对攻击者造成伤害
+     * 不会形成「伤害事件里套伤害」的重入（法师胸针的追加伤害也是这么做的）。
+     * 之前写在 Incoming 里当场 {@code counter.hurt(...)}，叠上别的模组的受击处理会互相套娃 ——
+     * 实测表现为卡顿、甚至崩溃。
+     * <p>
+     * <b>攻击者判定</b>：优先 {@code getEntity()}（法杖/法术/召唤物的归属实体），再退回
+     * {@code getDirectEntity()}。原来只认直接实体，导致「弹幕/范围伤害打来的」几乎永远不触发（实测「没有触发」）。
+     */
+    @SubscribeEvent
+    public static void onDamagedPost(LivingDamageEvent.Post event) {
+        try {
+            if (!(event.getEntity() instanceof ServerPlayer player)) return;
+            if (!CurseManager.rev(player, D, 22)) return;
+            if (player.isDeadOrDying() || player.getHealth() <= 0.0f) return;
+            LivingEntity counter = fieldRevengeTarget(event.getSource(), player);
+            if (counter == null || !counter.isAlive()) return;
+            if (counter.getMaxHealth() < player.getMaxHealth() * 1.5f) return;
+            if (player.getRandom().nextFloat() >= 0.20f) return;
+            float dealt = event.getNewDamage();
+            if (!Float.isFinite(dealt) || dealt <= 0.0f) return;
+            counter.invulnerableTime = 0;   // 清无敌帧（Entity 上的公开字段），让这一下真的打进去
+            AttackDiag.log("⑤e23 反转反击 target={} dmg={}", counter.getType(), dealt * 0.5f);
+            // 只放特效、不跑技能引擎（引擎会设 noPhysics/noGravity 并位移，等于强制瞬移玩家）
+            SuperDogCounterCompat.playCounterFx(player, counter);
+            hurtGuarded(counter, player.damageSources().playerAttack(player), Math.max(1.0f, dealt * 0.5f));
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ⑤ e23 反转反击结算异常", t);
+        }
+    }
+
+    /** 这一击「算谁打的」：优先归属实体（法术/召唤物/弹幕），再退回直接实体；排除玩家自己 */
+    private static LivingEntity fieldRevengeTarget(net.minecraft.world.damagesource.DamageSource src,
+                                                   ServerPlayer self) {
+        if (src.getEntity() instanceof LivingEntity causing && causing != self) return causing;
+        if (src.getDirectEntity() instanceof LivingEntity direct && direct != self) return direct;
+        return null;
+    }
+
+    // ---- 受伤侧统一乘区（{@link CurseTakenDamage}）的加数 ----
+
+    /** e5 盈伤 诅咒态：生命 &gt;50% 时受到伤害 +50% */
+    public static final float E5_TAKEN_BONUS = 0.50f;
+    /** e5 盈伤 反转态：生命 &gt;50% 时受到伤害 -25% */
+    public static final float E5_TAKEN_REDUCTION = 0.25f;
+    /** e6 坠渊 诅咒态：摔落伤害 +500%（反转态的「免疫」在 {@link #onIncoming} 直接取消，不进池） */
+    public static final float E6_FALL_TAKEN_BONUS = 5.0f;
+    /** e13 余悸 诅咒态：大击窗口内受到伤害 +20% */
+    public static final float E13_TAKEN_BONUS = 0.20f;
+    /** e13 余悸 反转态：大击窗口内受到伤害 -70% */
+    public static final float E13_TAKEN_REDUCTION = 0.70f;
+    /** ⑤ 大成：受到伤害 -25% */
+    public static final float GRAND_TAKEN_REDUCTION = 0.25f;
+
+    /**
+     * 受伤侧统一乘区（{@link CurseTakenDamage}）：本款只**报数**，不自己乘。
+     * <p>
+     * 易伤（+X%）进加算池，减伤（−X%）进连乘链 —— 两者分开的理由见 {@link CurseTakenDamage} 类注释。
+     */
+    public static void collectTaken(ServerPlayer player, CurseTakenDamage.Pool pool) {
+        // e5 盈伤：生命 >50% 时 +50%（诅咒）/ -25%（反转）
+        if (player.getHealth() > player.getMaxHealth() * 0.5f) {
+            if (CurseManager.on(player, D, 4)) {
+                pool.add(E5_TAKEN_BONUS);
+            } else if (CurseManager.rev(player, D, 4)) {
+                pool.multiply(1.0f - E5_TAKEN_REDUCTION);
+            }
+        }
+
+        // e6 坠渊：摔落 +500%（诅咒）；反转态的免疫由 onIncoming 直接取消，这里不加不减
+        if (pool.source().is(DamageTypeTags.IS_FALL) && CurseManager.on(player, D, 5)) {
+            pool.add(E6_FALL_TAKEN_BONUS);
+        }
+
+        // e13 余悸：大击窗口内 +20%（诅咒）/ -70%（反转）
+        // 「大击」的判定（真实扣血 > 40% 最大生命）与 30 次计数都在 DamageIntake 结算后做
+        Long fearUntil = FEAR_UNTIL.get(player.getUUID());
+        if (fearUntil != null && player.level().getGameTime() <= fearUntil) {
+            if (CurseManager.on(player, D, 12)) {
+                pool.add(E13_TAKEN_BONUS);
+            } else if (CurseManager.rev(player, D, 12)) {
+                pool.multiply(1.0f - E13_TAKEN_REDUCTION);
+            }
+        }
+
+        // ⑤ 大成：23 条全部反转 → 受到伤害 -25%
+        if (grandActive(player)) {
+            pool.multiply(1.0f - GRAND_TAKEN_REDUCTION);
+        }
     }
 
     // ==================== 受伤结算后（统一口径） ====================
@@ -648,10 +743,10 @@ public final class TimecoreCurse {
         }
 
         // e16 释刃：造成伤害时 2% 概率把主手武器丢出去（统一走 CurseHandDrop：
-        // 先清槽、回读校验、只生成一份掉落物，且 1 秒内最多一次）
+        // 先清槽、回读校验、只生成一份掉落物，且 1 秒内最多一次）。反转条件 = 累计脱手 50 次（1.8.88 由 200 降到 50）
         if (CurseManager.on(player, D, 15) && player.getRandom().nextFloat() < 0.02f
                 && CurseHandDrop.dropHeld(player, net.minecraft.world.InteractionHand.MAIN_HAND, true, "timecore-e16")) {
-            CurseManager.tick(player, D, 15, 1L, 200L);
+            CurseManager.tick(player, D, 15, 1L, 50L);
         }
 
         // e20 垂翅：飞行/腾空时造成伤害 -50%（乘算）
@@ -847,12 +942,32 @@ public final class TimecoreCurse {
         }
     }
 
+    // ---- e23 平势 反击（superdog 的技能引擎 + 我们自己的数值） ----
+
+    /** 反击冲刺段数 */
+    public static final int FIELD_COUNTER_DASHES = 2;
+    /** 每段冲刺伤害 = 目标 ATTACK_DAMAGE × 该系数 */
+    public static final float FIELD_COUNTER_DASH_FRACTION = 0.35f;
+    /** 冲刺路径群伤 = 目标 ATTACK_DAMAGE × 该系数 */
+    public static final float FIELD_COUNTER_PATH_FRACTION = 0.10f;
+    /** 反击冷却（tick，60 = 3 秒）：冷却中目标受击不再触发 */
+    public static final int FIELD_COUNTER_COOLDOWN_TICKS = 60;
+
     /**
-     * e23 平势：目标最大生命比你高一倍时，它被你打就反击你（诅咒态）。
+     * e23 平势 诅咒态：目标最大生命比你高一倍时，它被你打就反击你。
+     * <p>
+     * <b>反击 = superdog 的球面突击技能引擎</b>（{@link SuperDogCounterCompat}）：冲刺位移、拖尾、
+     * 爆炸、路径群伤全用它那一套，但**数值是我们自己的**（{@link #FIELD_COUNTER_DASHES} 等），
+     * 也不要求目标生物在 superdog 的登记表里 —— 任意 Mob 都能触发。
+     * 伤害公式见 {@link SuperDogCounterCompat} 类注释（{@code ATTACK_DAMAGE × 系数}，清无敌帧、自带穿甲标签）。
+     * <p>
+     * 模组缺失 / 反射失败 / 它正在技能中或冷却中 ⇒ 退回字面反击（2 点）。
      * <p>
      * 同 tick 只反击一次：范围/多段伤害（横扫、弹幕、连续命中）会在同一刻派发多次
      * {@code LivingDamageEvent.Pre}，逐次反击等于把「挨一下」放大成十几下。
-     * 造成伤害走 {@link #hurtGuarded}，绝不允许这条链再被 {@link #onDealDamage} 处理回来。
+     * <p>
+     * <b>字面反击不在这里当场结算</b>：本方法由目标的 {@code LivingDamageEvent.Pre} 调进来，
+     * 当场 {@code player.hurt()} 属于「伤害事件里重入伤害」→ 排队到下一 tick（{@link #runPendingFieldRevenge}）。
      */
     public static void levelFieldCounter(ServerPlayer player, LivingEntity target) {
         if (inSelfDamage()) return;
@@ -861,7 +976,30 @@ public final class TimecoreCurse {
         long now = player.level().getGameTime();
         Long last = LAST_FIELD_TICK.put(player.getUUID(), now);
         if (last != null && last.longValue() == now) return;
-        hurtGuarded(player, player.damageSources().mobAttack(target), 2.0f);
+
+        // ① superdog 球面突击引擎（带特效；数值与复制体由我们指定，复制体恒 0）
+        if (SuperDogCounterCompat.tryCounter(target, player,
+                FIELD_COUNTER_DASHES, FIELD_COUNTER_DASH_FRACTION, FIELD_COUNTER_PATH_FRACTION,
+                FIELD_COUNTER_COOLDOWN_TICKS)) {
+            AttackDiag.log("⑤e23 诅咒反击 superdog target={}", target.getType());
+            PENDING_FIELD_REVENGE.remove(player.getUUID());
+            return;
+        }
+        // ② 兜底字面反击：2 点，下一 tick 结算（不在目标的伤害事件里重入 hurt）
+        PENDING_FIELD_REVENGE.put(player.getUUID(),
+                new PendingRevenge(target.getId(), 2.0f, now + REVENGE_EXPIRE_TICKS));
+    }
+
+    /** e23 平势 诅咒态：结算上一刻排队的字面反击（目标已死 / 过期 / 期间已反转 ⇒ 作废） */
+    private static void runPendingFieldRevenge(ServerPlayer player) {
+        PendingRevenge revenge = PENDING_FIELD_REVENGE.remove(player.getUUID());
+        if (revenge == null) return;
+        if (player.level().getGameTime() > revenge.expireTick()) return;
+        if (!CurseManager.on(player, D, 22)) return;
+        net.minecraft.world.entity.Entity entity = player.level().getEntity(revenge.targetId());
+        if (!(entity instanceof LivingEntity target) || !target.isAlive()) return;
+        AttackDiag.log("⑤e23 诅咒反击 字面 target={} amount={}", target.getType(), revenge.amount());
+        hurtGuarded(player, player.damageSources().mobAttack(target), revenge.amount());
     }
 
     /** 自己在伤害结算内部再造成的伤害：打上重入标记，期间本类的伤害回调全部跳过 */

@@ -5,6 +5,7 @@ import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.FeatherEquip;
+import com.plumejade.lensouls.handler.curse.CurseTakenDamage;
 import com.plumejade.lensouls.item.ModItems;
 import com.plumejade.lensouls.mixin.EntityInvulnerableTimeAccessor;
 import com.plumejade.lensouls.network.AbyssCountdownPacket;
@@ -50,7 +51,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
@@ -109,7 +109,8 @@ import java.util.UUID;
  * e7  祸之可能性(6)  条件=累计击杀召唤物 100 只 → 不再召唤，改为 7 格落雷 15 点魔法伤害
  * e8  挫败(7)        条件=挫败层数 ≥3 时击杀 1 只 BOSS → 每层 ×1.06
  * e9  食之无味(8)    条件=累计食用 50 种不同食物 → 进食回血 ×2
- * e10 失忆(9)        条件=天数&lt;30（**该玩家自己的已过天数**，见 {@link WorldDays}）时击杀末影龙 → 复制之魂解禁
+ * e10 失忆(9)        条件=天数&lt;**当前窗口**（动态：1 款诅咒 30 天，每多 1 款 +10 天，见
+ *                    {@link com.plumejade.lensouls.feather.CurseDayLimit}）时击杀末影龙 → 复制之魂解禁
  * e11 疯狂(10)       条件=移速属性值 &gt;2 时一击杀死 ≥6 万血生物 → 每点受伤 −0.2%
  * e12 恶意(11)       条件=承受一次 ≥50 点元素附加伤害并存活 → 受到的元素附加伤害 −12%
  * </pre>
@@ -217,10 +218,6 @@ public class FeatherAbyssHandler {
     private static final int E8_STACK_GOAL = 3;
     /** e9：累计食用 50 种不同食物 */
     private static final int E9_FOOD_KIND_GOAL = 50;
-    /**
-     * e10：反转窗口（天）——**自己的**已过天数 ≥ 该值即过期，过期后击杀末影龙也不再反转。
-     */
-    private static final int E10_DAY_LIMIT = WorldDays.ABYSS_AMNESIA_WINDOW_DAYS;
     /** e11：目标最大生命 ≥6 万 */
     private static final float E11_TARGET_MAX_HEALTH = 60000.0f;
     /** e11：移速**属性值** &gt; 2（直接比属性值，与旧判定同一口径） */
@@ -285,8 +282,6 @@ public class FeatherAbyssHandler {
     private static final Map<Integer, E11Confirm> E11_CONFIRM = new HashMap<>();
     /** e5：加入批次（UUID → {批次起点 gameTime, 计数}） */
     private static final Map<UUID, long[]> JOIN_BATCH = new HashMap<>();
-    /** e12：本次受伤我们施加的倍率（玩家实体 id → 倍率），供 LOWEST 阶段还原元素附加伤害 */
-    private static final Map<Integer, Float> TAKEN_FACTOR = new HashMap<>();
 
     /** e6 厄运 反转：每分钟改给的正面效果池（轮流抽 2 个不重复） */
     private static final Holder<MobEffect>[] DOOM_BOONS = new Holder[]{
@@ -428,6 +423,37 @@ public class FeatherAbyssHandler {
      */
     private static int getSaveDays(ServerPlayer player) {
         return WorldDays.elapsedDays(player);
+    }
+
+    /**
+     * 当前佩戴了几款诅咒（0~7）—— ④ e10 失忆的动态窗口按这个数算
+     * （1 款 30 天，每多 1 款 +10 天），与客户端 tooltip 用的
+     * {@code CurseClientCache.activeCurseCount()} 是同一口径（都是 {@code activeMask} 的位计数）。
+     */
+    private static int curseFeatherCount(ServerPlayer player) {
+        return Integer.bitCount(CurseManager.activeMask(player));
+    }
+
+    /**
+     * ④ e10 失忆：击杀末影龙时判定是否还在窗口内。
+     * <p>
+     * 窗口是**动态**的（佩戴 1 款诅咒 30 天、每多 1 款 +10 天、满 7 款 90 天），玩家能在创造模式
+     * 卸下/装上羽毛，所以每次击杀都用**键当时**的佩戴款数现算，不缓存任何窗口值。
+     * 复盘用日志前缀 {@code [AbyssAmnesia]}：击杀时打一行，说明「是否反转 / 已过几天 / 当前窗口几天」。
+     */
+    private static void checkAmnesia(ServerPlayer player) {
+        if (!CurseManager.on(player, DEF, E10_AMNESIA)) return;
+        int curses = curseFeatherCount(player);
+        int window = com.plumejade.lensouls.feather.CurseDayLimit.amnesiaWindowDays(curses);
+        int days = getSaveDays(player);
+        if (days < window) {
+            CurseManager.reach(player, DEF, E10_AMNESIA);
+            LOGGER.info("[AbyssAmnesia] 击杀末影龙反转：已过 {} 天 < 窗口 {} 天（佩戴 {} 款）",
+                    days, window, curses);
+        } else {
+            LOGGER.info("[AbyssAmnesia] 击杀末影龙但已过期：已过 {} 天 ≥ 窗口 {} 天（佩戴 {} 款），不反转",
+                    days, window, curses);
+        }
     }
 
     /** 每 tick 推进祸之可能性收束队列（天数不再需要 tick 推进：直接由世界时钟算出） */
@@ -605,33 +631,9 @@ public class FeatherAbyssHandler {
         }
     }
 
-    /** 玩家受击：e3 安魂曲 / e2 神秘雪球 / e8 挫败 / e11 疯狂（扭曲值） */
+    /** 玩家受击：e2 神秘雪球 / e8 挫败（e3 安魂曲 / e11 疯狂 的百分比已移入统一乘区 {@link #collectTaken}） */
     private static void damageTaken(LivingDamageEvent.Pre event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !hasAbyss(player)) return;
-
-        // ── 受伤侧一律乘算（§2），逐条先按诅咒态 / 反转态取符号，最后合成一个倍率 ──
-        float factor = 1.0f;
-        // e3 安魂曲：受到的伤害 +13%/天（诅咒态，按天累加）/ 固定 −13%（反转态，不随天数增长）
-        int saveDays = getSaveDays(player);
-        if (CurseManager.on(player, DEF, E3_REQUIEM)) {
-            factor *= 1.0f + REQUIEM_TAKEN_PER_DAY * saveDays;
-        } else if (CurseManager.rev(player, DEF, E3_REQUIEM)) {
-            factor *= 1.0f - REQUIEM_TAKEN_PER_DAY;
-        }
-        // e11 疯狂：每点扭曲值受到伤害 +0.2%（诅咒态）/ −0.2%（反转态）
-        int twist = getTwist(player);
-        if (twist > 0) {
-            if (CurseManager.on(player, DEF, E11_MADNESS)) {
-                factor *= 1.0f + twist * TWIST_TAKEN_PER_POINT;
-            } else if (CurseManager.rev(player, DEF, E11_MADNESS)) {
-                factor *= Math.max(0.0f, 1.0f - twist * TWIST_TAKEN_PER_POINT);
-            }
-        }
-        if (factor != 1.0f) {
-            event.setNewDamage(event.getNewDamage() * factor);
-        }
-        // e12 需要在 LOWEST 阶段把这个倍率还原掉，才能反推出「元素附加伤害」本身
-        TAKEN_FACTOR.put(player.getId(), factor);
 
         // e2 神秘雪球：以攻击佩戴者的怪物为中心，环形发射 8 个敌对雪球。
         // 反转态是**完全反转**——不再发射任何雪球，所以这里只判诅咒态。
@@ -705,7 +707,35 @@ public class FeatherAbyssHandler {
     }
 
     /**
-     * e12 恶意（LOWEST）：诅咒态「受到的元素附加伤害 +12%」由 {@code DamageHandler}
+     * 受伤侧统一乘区（{@link CurseTakenDamage}）：
+     * 只报 e3 安魂曲 / e11 疯狂的加数或减伤系数，不自己乘。
+     */
+    public static void collectTaken(ServerPlayer player, CurseTakenDamage.Pool pool) {
+        if (!hasAbyss(player)) return;
+
+        // e3 安魂曲：受到的伤害 +13%/天（诅咒态，按天累加）/ 固定 −13%（反转态，不随天数增长）
+        int saveDays = getSaveDays(player);
+        if (CurseManager.on(player, DEF, E3_REQUIEM)) {
+            pool.add(REQUIEM_TAKEN_PER_DAY * saveDays);
+        } else if (CurseManager.rev(player, DEF, E3_REQUIEM)) {
+            pool.multiply(1.0f - REQUIEM_TAKEN_PER_DAY);
+        }
+
+        // e11 疯狂：每点扭曲值受到伤害 +0.2%（诅咒态）/ −0.2%（反转态）
+        int twist = getTwist(player);
+        if (twist > 0) {
+            if (CurseManager.on(player, DEF, E11_MADNESS)) {
+                pool.add(twist * TWIST_TAKEN_PER_POINT);
+            } else if (CurseManager.rev(player, DEF, E11_MADNESS)) {
+                pool.multiply(Math.max(0.0f, 1.0f - twist * TWIST_TAKEN_PER_POINT));
+            }
+        }
+    }
+
+    /**
+     * e12 恶意：元素附加伤害的 ±12% 修正。
+     * <p>
+     * 诅咒态「受到的元素附加伤害 +12%」由 {@code DamageHandler}
      * （{@code totalBonusMultiplier *= 1.12f}，本任务范围外）直接加进 {@code newDamage}，
      * 反转态要变成 −12%，只能在元素附加已经计入之后把多出来的那部分扣回去。
      * <p>
@@ -720,16 +750,15 @@ public class FeatherAbyssHandler {
      * </pre>
      * 只对差值做减法（不重写 newDamage），其它处理器的加减仍然保留。
      * <p>
+     * <b>factor 由 {@code CurseTakenDamage} 传入</b>：它必须等于本次受伤的**诅咒总倍率**
+     * （易伤加算池 × 减伤连乘链），才能从 newDamage 反推出元素附加伤害本身。
+     * 这也正是把受伤乘区收口到一处带来的额外好处 —— 多款诅咒同戴时反推仍然准确。
+     * <p>
      * 条件（诅咒态）：「承受一次 ≥50 点的元素附加伤害并存活」——存活交给
      * {@link #markPendingReverse} 在 2 tick 后与死亡清除一并判定。
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onDamagedLast(LivingDamageEvent.Pre event) {
-        if (event.getEntity().level().isClientSide) return;
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+    public static void correctElementBonusAfterTaken(LivingDamageEvent.Pre event, ServerPlayer player, float factor) {
         try {
-            Float recorded = TAKEN_FACTOR.remove(player.getId());
-            float factor = recorded == null ? 1.0f : recorded;
             boolean curse = CurseManager.on(player, DEF, E12_MALICE);
             boolean reversed = CurseManager.rev(player, DEF, E12_MALICE);
             if (!curse && !reversed) return;
@@ -1343,13 +1372,11 @@ public class FeatherAbyssHandler {
                     && com.plumejade.lensouls.boss.ToughnessDamageHandler.isBoss(dead)) {
                 CurseManager.reach(player, DEF, E8_FRUSTRATION);
             }
-            // e10 条件：**自己的已过天数 &lt; 30** 时击杀末影龙（不限武器/手部）。
+            // e10 条件：**自己的已过天数 &lt; 当前窗口** 时击杀末影龙（不限武器/手部）。
             // 末影龙的致死一击由 reallyHurt → super.hurt 派发本事件，此刻它还没走完 DYING 阶段
-            // （血被压到 1 并切阶段），但击杀事实已经成立；过期后不再反转。
-            if (CurseManager.on(player, DEF, E10_AMNESIA)
-                    && getSaveDays(player) < E10_DAY_LIMIT
-                    && dead instanceof EnderDragon) {
-                CurseManager.reach(player, DEF, E10_AMNESIA);
+            // （血被压到 1 并切阶段），但击杀事实已经成立。
+            if (dead instanceof EnderDragon) {
+                checkAmnesia(player);
             }
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ④ 击杀结算异常", t);

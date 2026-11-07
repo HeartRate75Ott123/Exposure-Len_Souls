@@ -163,7 +163,7 @@ public final class ZeroforgeCurse {
     /** e9 条件：经验等级达到 30 级 */
     private static final int XP_LEVEL_GOAL = 30;
 
-    /** e10 灵通：发光目标受到伤害 +7%（乘算） */
+    /** e10 灵通：发光目标受到伤害 +7%（并入输出侧 Σ 加算） */
     private static final float GLOW_DAMAGE_BONUS = 0.07f;
     /** e10 条件：用「见微知著」解锁 10 种生物图鉴 */
     private static final long GLIMPSE_GOAL = 10L;

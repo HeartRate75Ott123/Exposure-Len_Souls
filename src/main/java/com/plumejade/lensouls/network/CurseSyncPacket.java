@@ -26,6 +26,12 @@ import org.jetbrains.annotations.NotNull;
  * <b>{@code activeMask}（1.5.28 追加）</b>：一位一款诅咒 = 「该款此刻被装进槽位」。
  * 反转掩码已经占满 64 位，塞不下「是否选中」，所以单独一个 {@code int} 跟着发；
  * 客户端据此才能做 {@code on} / {@code rev} 的等价判断（⑦ e5 封库的客户端拦截要用）。
+ * <p>
+ * <b>{@code ownDays}（1.8.88 追加）</b>：该玩家<b>自己的已过天数</b>
+ * （{@code WorldDays.elapsedDays}）。「限天数类」条件（④ e3 安魂曲 / ④ e10 失忆）的 tooltip 要
+ * 显示「已过 X 天」并在逾期时改口，而天数是服务端按世界时钟算的，客户端只拿得到这一份。
+ * 窗口天数本身<b>不发</b>：它由「佩戴了几款诅咒」（{@code activeMask} 的位数）现算，
+ * 见 {@code CurseDayLimit}（创造模式随时能卸下/装上，发过来的固定值会立刻过时）。
  */
 public class CurseSyncPacket implements CustomPacketPayload {
 
@@ -39,11 +45,13 @@ public class CurseSyncPacket implements CustomPacketPayload {
     private final long mask;
     private final long[] progress;
     private final int activeMask;
+    private final int ownDays;
 
-    public CurseSyncPacket(long mask, long[] progress, int activeMask) {
+    public CurseSyncPacket(long mask, long[] progress, int activeMask, int ownDays) {
         this.mask = mask;
         this.progress = progress;
         this.activeMask = activeMask;
+        this.ownDays = ownDays;
     }
 
     public long mask() {
@@ -59,9 +67,15 @@ public class CurseSyncPacket implements CustomPacketPayload {
         return activeMask;
     }
 
+    /** 该玩家自己的已过天数（0 起，服务端按世界时钟算，见 {@code WorldDays}） */
+    public int ownDays() {
+        return ownDays;
+    }
+
     private static void encode(RegistryFriendlyByteBuf buf, CurseSyncPacket packet) {
         buf.writeLong(packet.mask);
         buf.writeVarInt(packet.activeMask);
+        buf.writeVarInt(packet.ownDays);
         int nonZero = 0;
         for (long value : packet.progress) {
             if (value != 0L) nonZero++;
@@ -77,6 +91,7 @@ public class CurseSyncPacket implements CustomPacketPayload {
     private static CurseSyncPacket decode(RegistryFriendlyByteBuf buf) {
         long mask = buf.readLong();
         int activeMask = buf.readVarInt();
+        int ownDays = buf.readVarInt();
         int nonZero = buf.readVarInt();
         long[] progress = new long[CurseDefs.MASK_BITS];
         for (int k = 0; k < nonZero; k++) {
@@ -84,14 +99,15 @@ public class CurseSyncPacket implements CustomPacketPayload {
             long value = buf.readLong();
             if (index >= 0 && index < progress.length) progress[index] = value;
         }
-        return new CurseSyncPacket(mask, progress, activeMask);
+        return new CurseSyncPacket(mask, progress, activeMask, ownDays);
     }
 
     /** 服务端把该玩家的当前状态推给本人 */
     public static void send(ServerPlayer player) {
         CurseStateData data = CurseManager.state(player);
         PacketDistributor.sendToPlayer(player,
-                new CurseSyncPacket(data.mask(), data.progressCopy(), CurseManager.activeMask(player)));
+                new CurseSyncPacket(data.mask(), data.progressCopy(), CurseManager.activeMask(player),
+                        com.plumejade.lensouls.handler.WorldDays.elapsedDays(player)));
     }
 
     @Override
@@ -101,6 +117,7 @@ public class CurseSyncPacket implements CustomPacketPayload {
     }
 
     public static void handle(CurseSyncPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> CurseClientCache.set(packet.mask, packet.progress, packet.activeMask));
+        context.enqueueWork(() -> CurseClientCache.set(packet.mask, packet.progress, packet.activeMask,
+                packet.ownDays));
     }
 }

@@ -7,6 +7,7 @@ import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.FeatherEquip;
+import com.plumejade.lensouls.handler.curse.CurseTakenDamage;
 import com.plumejade.lensouls.item.ModItems;
 import com.plumejade.lensouls.mixin.EntityInvulnerableTimeAccessor;
 import com.plumejade.lensouls.network.TwistSyncPacket;
@@ -33,7 +34,7 @@ import java.util.UUID;
  * ② 羽·扭曲之人（新改案 · 3 条 · 整款共用反转条件）。
  *
  * <pre>
- * e1 外伤(0)：诅咒 = 受到伤害 +100%；反转 = 受到伤害 -25%（受伤侧乘算）
+ * e1 外伤(0)：诅咒 = 受到伤害 +100%；反转 = 受到伤害 -25%（受伤侧进统一乘区 {@link CurseTakenDamage}）
  * e2 苦楚(1)：诅咒 = 每点扭曲值：造成伤害 +1%、受到伤害 +1%；扭曲值上限 100；反转 = 扭曲值获取 ×1.2
  * e3 狂喜(2)：诅咒 = 受击时每 1 点伤害 +0.1 扭曲值；扭曲值满 100 时死亡 → 强制掉落（无视 keepInventory，
  *                  有虚影核心则由它托管）+ 生成扭曲者
@@ -67,10 +68,10 @@ public class FeatherTwitcherHandler {
     public static final int BOSS_RANGE = 64;
 
     // ── e1 外伤 ──
-    /** 诅咒态受到伤害 +100%（乘算） */
-    public static final float E1_TAKEN_MULT_CURSE = 2.0f;
-    /** 反转态受到伤害 -25%（受伤侧乘算） */
-    public static final float E1_TAKEN_MULT_REVERSED = 0.75f;
+    /** e1 外伤 诅咒态：受到伤害 +100%（进统一乘区的加算池） */
+    public static final float E1_TAKEN_BONUS = 1.0f;
+    /** e1 外伤 反转态：受到伤害 -25%（进统一乘区的连乘链） */
+    public static final float E1_TAKEN_REDUCTION = 0.25f;
 
     // ── e2 苦楚 ──
     /** 每点扭曲值的造成伤害增幅（+1%） */
@@ -228,28 +229,21 @@ public class FeatherTwitcherHandler {
 
     // ==================== 受到伤害 ====================
 
-    @SubscribeEvent
-    public static void onDamaged(LivingDamageEvent.Pre event) {
-        try {
-            if (!(event.getEntity() instanceof ServerPlayer player)) return;
-            float d = event.getNewDamage();
-            if (d <= 0f) return;
+    /**
+     * 受伤侧统一乘区（{@link CurseTakenDamage}）：本款只报 e1 / e2 的加数，不自己乘。
+     */
+    public static void collectTaken(ServerPlayer player, CurseTakenDamage.Pool pool) {
+        // e1 外伤：+100%（诅咒）/ -25%（反转）
+        if (CurseManager.on(player, D, 0)) {
+            pool.add(E1_TAKEN_BONUS);
+        } else if (CurseManager.rev(player, D, 0)) {
+            pool.multiply(1.0f - E1_TAKEN_REDUCTION);
+        }
 
-            // e1 外伤：+100%（诅咒，乘算）/ -25%（反转，受伤侧乘算）
-            if (CurseManager.on(player, D, 0)) {
-                d *= E1_TAKEN_MULT_CURSE;
-            } else if (CurseManager.rev(player, D, 0)) {
-                d *= E1_TAKEN_MULT_REVERSED;
-            }
-
-            // e2 苦楚：每点扭曲值受到伤害 +1%（乘算）
-            if (CurseManager.on(player, D, 1)) {
-                d *= 1.0f + E2_TAKEN_PER_TWIST * getTwist(player);
-            }
-
-            event.setNewDamage(d);
-        } catch (Throwable t) {
-            LenSouls.LOGGER.error("[Curse] ② 受伤结算异常", t);
+        // e2 苦楚：每点扭曲值受到伤害 +1%（诅咒态；反转态本条只改扭曲值获取，不再加易伤）
+        int twist = getTwist(player);
+        if (twist > 0 && CurseManager.on(player, D, 1)) {
+            pool.add(E2_TAKEN_PER_TWIST * twist);
         }
     }
 

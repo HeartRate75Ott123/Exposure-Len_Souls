@@ -2,6 +2,7 @@ package com.plumejade.lensouls.item;
 
 import com.plumejade.lensouls.client.CurseClientCache;
 import com.plumejade.lensouls.client.CurseProgress;
+import com.plumejade.lensouls.feather.CurseDayLimit;
 import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseGoals;
 import net.minecraft.network.chat.Component;
@@ -27,6 +28,9 @@ import java.util.List;
  *   <li><b>按住 Shift</b>：未反转条目两行（条件+「当前 / 目标」进度 / 反转后效果），已反转条目只剩一行「原条件」；
  *       这里的「反转后效果」用 <b>{@code .after}</b>，只写<b>改动部分</b>（取消了什么 / 改了什么数值 / 新增什么），
  *       不重复保留部分；①②③ 的整款共用条件在顶部显示一次；全铺开、不折叠</li>
+ *   <li><b>限天数类</b>（④ e3 安魂曲 / ④ e10 失忆）：条件里的天数<b>每次渲染现算</b>（e10 随佩戴款数变），
+ *       并且<b>不按 Shift 也会多一行</b>「条件 + 已过 X 天」；过了窗口就显示「已过期，无法达成」。
+ *       见 {@link CurseDayLimit}。</li>
  * </ul>
  */
 public class FeatherCurseItem extends Item {
@@ -81,6 +85,12 @@ public class FeatherCurseItem extends Item {
             boolean on = CurseClientCache.isReversed(def, i);
             String name = Component.translatable(def.entryKey(i) + ".name").getString();
             String bodyKey = on ? (hasMerged(def, i) ? ".merged" : ".after") : ".curse";
+            // 限天数类（④ e3 安魂曲 / ④ e10 失忆）：窗口随「佩戴了几款诅咒」实时变，
+            // 逾期也要能随佩戴款数变化**自动恢复/再次逾期**，所以两个值都每次现算，不缓存。
+            boolean dayLimited = CurseDayLimit.isDayWindow(def, i);
+            boolean expired = dayLimited && !on && CurseDayLimit.isExpired(def, i,
+                    CurseClientCache.activeCurseCount(), CurseClientCache.ownDays());
+            Component cond = conditionText(def, i);
 
             if (blessing) {
                 // 祝福：未解锁 ⇒ 基础效果压暗 + 标注；已解锁 ⇒ 直接显示升级后效果
@@ -98,16 +108,24 @@ public class FeatherCurseItem extends Item {
                         .append(Component.translatable(def.entryKey(i) + bodyKey)));
             }
 
+            // 限天数类：**不按 Shift** 也把「当前条件 + 已过天数」直接画出来，逾期时前面挂红字。
+            // 只有这两条会命中，常显多一行不影响其余 62 条的排版。
+            if (dayLimited && !on && !shift) {
+                tooltip.add(Component.literal("§8    └ "
+                                + (expired ? "§c" + expiredLabel() + " §8· §7" : "§7")
+                                + condLabel(blessing) + "：")
+                        .append(cond)
+                        .append(progressSuffix(def, i)));
+            }
+
             if (!shift || def.noReverse(i)) continue;
 
-            Component cond = def.sharedCond()
-                    ? Component.translatable(key + ".cond_shared")
-                    : Component.translatable(def.entryKey(i) + ".cond");
-            String stateLabel = Component.translatable(on
-                    ? (blessing ? "gui.lensouls.curse.on_blessing" : "gui.lensouls.curse.on_curse")
-                    : (blessing ? "gui.lensouls.curse.off_blessing" : "gui.lensouls.curse.off_curse")).getString();
-            String condLabel = Component.translatable(blessing
-                    ? "gui.lensouls.curse.cond_blessing" : "gui.lensouls.curse.cond_curse").getString();
+            String stateLabel = expired
+                    ? "§c" + expiredLabel()
+                    : Component.translatable(on
+                            ? (blessing ? "gui.lensouls.curse.on_blessing" : "gui.lensouls.curse.on_curse")
+                            : (blessing ? "gui.lensouls.curse.off_blessing" : "gui.lensouls.curse.off_curse")).getString();
+            String condLabel = condLabel(blessing);
             String afterLabel = Component.translatable(blessing
                     ? "gui.lensouls.curse.after_blessing" : "gui.lensouls.curse.after_curse").getString();
 
@@ -125,7 +143,8 @@ public class FeatherCurseItem extends Item {
             if (on) {
                 tooltip.add(Component.literal("§8    └ §a" + stateLabel + " §8· " + condLabel + "：").append(cond));
             } else {
-                tooltip.add(Component.literal("§8    ├ §7" + stateLabel + " §8· §7" + condLabel + "：").append(cond)
+                tooltip.add(Component.literal("§8    ├ " + (expired ? stateLabel : "§7" + stateLabel)
+                        + " §8· §7" + condLabel + "：").append(cond)
                         .append(progressSuffix(def, i)));
                 tooltip.add(Component.literal("§8    └ §7" + afterLabel + "：")
                         .append(Component.translatable(def.entryKey(i) + ".after")));
@@ -143,13 +162,48 @@ public class FeatherCurseItem extends Item {
      * <b>无目标的条目（条件由 {@code reach} 直判、进度恒为 0）不加方括号</b>，避免显示一个永远不动的 0。
      * <p>
      * 当前值读的是客户端镜像 {@link CurseClientCache}（服务端 {@code CurseStateData} 按 20 tick 心跳同步）。
+     * <p>
+     * <b>限天数类（④ e3/e10）</b>例外：它们的「进度」不是累计值而是**已过天数**，窗口天数写在条件文案里
+     * （见 {@link #conditionText}），这里只补 {@code §8[已过 X 天]}；未佩戴时不画（拿旧镜像说事没意义）。
      */
     private static Component progressSuffix(CurseDef def, int entry) {
+        if (CurseDayLimit.isDayWindow(def, entry)) {
+            if (!CurseClientCache.isActive(def)) return Component.empty();
+            return Component.literal(" §8[" + Component.translatable("gui.lensouls.curse.day_elapsed",
+                    CurseClientCache.ownDays()).getString() + "]");
+        }
         long goal = CurseGoals.goal(def, entry);
         if (goal <= 0L) return Component.empty();
         long current = CurseClientCache.progress(def.maskOffset() + entry);
         String text = CurseGoals.format(current, CurseGoals.unitKey(def, entry), goal);
         return Component.literal(" §8[" + text + "]");
+    }
+
+    /**
+     * 该条的反转条件文本。
+     * <p>
+     * <b>限天数类（④ e3 安魂曲 / ④ e10 失忆）</b>的条件里带一个占位符：窗口天数随
+     * 「当前佩戴了几款诅咒」**实时变化**（e10：1 款 30 天，每多 1 款 +10 天，最多 7 款 90 天），
+     * 玩家在创造模式随时能卸下/装上，所以这里每次渲染都现算（见 {@link CurseDayLimit}）。
+     */
+    private static Component conditionText(CurseDef def, int entry) {
+        if (def.sharedCond()) return Component.translatable(def.key() + ".cond_shared");
+        if (CurseDayLimit.isDayWindow(def, entry)) {
+            return Component.translatable(def.entryKey(entry) + ".cond",
+                    CurseDayLimit.windowDays(def, entry, CurseClientCache.activeCurseCount()));
+        }
+        return Component.translatable(def.entryKey(entry) + ".cond");
+    }
+
+    /** 「已过期，无法达成」——限天类条件过了窗口后的统一说法 */
+    private static String expiredLabel() {
+        return Component.translatable("gui.lensouls.curse.expired").getString();
+    }
+
+    /** 「反转条件 / 解锁条件」标签 */
+    private static String condLabel(boolean blessing) {
+        return Component.translatable(blessing
+                ? "gui.lensouls.curse.cond_blessing" : "gui.lensouls.curse.cond_curse").getString();
     }
 
     /**

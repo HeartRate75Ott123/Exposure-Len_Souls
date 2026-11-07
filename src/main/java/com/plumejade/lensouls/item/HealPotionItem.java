@@ -1,5 +1,6 @@
 package com.plumejade.lensouls.item;
 
+import com.plumejade.lensouls.handler.curse.HealSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -70,7 +71,9 @@ public class HealPotionItem extends Item {
             return InteractionResultHolder.fail(stack);
         }
         stack.setDamageValue(stack.getDamageValue() + 1);
-        player.heal(player.getMaxHealth());
+        // 走带来源标记的 heal：⑤ 的恢复量拦截（e1 绝疗 −80% / e2 饥禁 / e8 止息）对次元瓶一律放行，
+        // 「回满生命」就是回满生命（用户定案：赦免次元瓶，文案上不单独说明）。
+        HealSource.healAsDimensionalBottle(player, player.getMaxHealth());
         // 使用后重置恢复计时（下次从当前时刻起 30 秒回复 1 点）
         setLastRegen(stack, level.getGameTime());
         return InteractionResultHolder.success(stack);

@@ -7,6 +7,7 @@ import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.FeatherEquip;
+import com.plumejade.lensouls.handler.curse.CurseTakenDamage;
 import com.plumejade.lensouls.item.ModItems;
 import com.plumejade.lensouls.util.AllyFilter;
 import net.minecraft.core.Holder;
@@ -49,8 +50,9 @@ import java.util.UUID;
  * 反转条件（整款共用）：击杀 4 只不同 BOSS（bosslist）
  * </pre>
  *
- * <b>叠加口径</b>（设计文档 §2）：受伤侧一律乘算；e3 的附加伤害与「每级活性 +1 点」属点数类、直接加算，
- * 且因为是「真伤」所以在 {@link EventPriority#LOWEST} 才并入（此时韧性减伤与武器匹配惩罚都已结算完）。
+ * <b>叠加口径</b>（设计文档 §2）：受伤侧的 +35% 进统一乘区 {@link CurseTakenDamage}（易伤加算）；
+ * e3 的附加伤害与「每级活性 +1 点」属点数类、直接加算，且因为是「真伤」所以在
+ * {@link EventPriority#LOWEST} 才并入（此时韧性减伤与武器匹配惩罚都已结算完）。
  * <p>
  * 佩戴判定统一走 {@link FeatherEquip#has}；条目门控走 {@link CurseManager#on} / {@link CurseManager#rev}，
  * 进度走 {@link CurseManager#tick}（逐条累加，达标即该条反转）。
@@ -86,8 +88,8 @@ public class FeatherHardmanHandler {
 
     /** 造成伤害 -35%（诅咒态与反转态都保留） */
     public static final float E3_DEALT_MULTIPLIER = 0.65f;
-    /** 受到伤害 +35%（诅咒态与反转态都保留；受伤侧乘算） */
-    public static final float E3_TAKEN_MULTIPLIER = 1.35f;
+    /** 受到伤害 +35%（诅咒态与反转态都保留；进统一乘区的加算池） */
+    public static final float E3_TAKEN_BONUS = 0.35f;
     /** 反转后护甲 +5（点数加算） */
     public static final int E3_REVERSED_ARMOR = 5;
     /** 附加伤害公式系数（诅咒态 5%） */
@@ -207,17 +209,13 @@ public class FeatherHardmanHandler {
 
     // ==================== 受到伤害（e3 保留项） ====================
 
-    @SubscribeEvent
-    public static void onDamaged(LivingDamageEvent.Pre event) {
-        try {
-            if (!(event.getEntity() instanceof ServerPlayer player)) return;
-            if (!CurseManager.on(player, D, 2) && !CurseManager.rev(player, D, 2)) return;
-            float d = event.getNewDamage();
-            if (d <= 0f) return;
-            // 受伤侧一律乘算（§2）
-            event.setNewDamage(d * E3_TAKEN_MULTIPLIER);
-        } catch (Throwable t) {
-            LenSouls.LOGGER.error("[Curse] ① e3 受伤结算异常", t);
+    /**
+     * 受伤侧统一乘区（{@link CurseTakenDamage}）：
+     * e3 的 +35% 诅咒态与反转态都保留，所以只判「选中」不判反转。
+     */
+    public static void collectTaken(ServerPlayer player, CurseTakenDamage.Pool pool) {
+        if (CurseManager.on(player, D, 2) || CurseManager.rev(player, D, 2)) {
+            pool.add(E3_TAKEN_BONUS);
         }
     }
 

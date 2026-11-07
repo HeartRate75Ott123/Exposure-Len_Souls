@@ -57,8 +57,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherHardmanHandler.java:142 on",
-            "handler/FeatherHardmanHandler.java:199 rev"
+            "handler/FeatherHardmanHandler.java:144 on",
+            "handler/FeatherHardmanHandler.java:201 rev"
           ]
         },
         {
@@ -80,9 +80,9 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherHardmanHandler.java:410 rev",
-            "handler/FeatherHardmanHandler.java:415 on",
-            "handler/FeatherHardmanHandler.java:420 rev"
+            "handler/FeatherHardmanHandler.java:408 rev",
+            "handler/FeatherHardmanHandler.java:413 on",
+            "handler/FeatherHardmanHandler.java:418 rev"
           ]
         },
         {
@@ -105,12 +105,12 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherHardmanHandler.java:175 rev",
-            "handler/FeatherHardmanHandler.java:214 on",
-            "handler/FeatherHardmanHandler.java:214 rev",
-            "handler/FeatherHardmanHandler.java:239 on",
-            "handler/FeatherHardmanHandler.java:239 rev",
-            "handler/FeatherHardmanHandler.java:244 rev"
+            "handler/FeatherHardmanHandler.java:177 rev",
+            "handler/FeatherHardmanHandler.java:217 on",
+            "handler/FeatherHardmanHandler.java:217 rev",
+            "handler/FeatherHardmanHandler.java:237 on",
+            "handler/FeatherHardmanHandler.java:237 rev",
+            "handler/FeatherHardmanHandler.java:242 rev"
           ]
         }
       ],
@@ -119,7 +119,7 @@
       "noReverse": null,
       "extraLang": {},
       "loopRefs": [
-        "handler/FeatherHardmanHandler.java:345 tick(i)"
+        "handler/FeatherHardmanHandler.java:343 tick(i)"
       ]
     },
     {
@@ -153,8 +153,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherTwitcherHandler.java:239 on",
-            "handler/FeatherTwitcherHandler.java:241 rev"
+            "handler/FeatherTwitcherHandler.java:237 on",
+            "handler/FeatherTwitcherHandler.java:239 rev"
           ]
         },
         {
@@ -177,10 +177,10 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherTwitcherHandler.java:196 rev",
-            "handler/FeatherTwitcherHandler.java:205 rev",
-            "handler/FeatherTwitcherHandler.java:246 on",
-            "handler/FeatherTwitcherHandler.java:292 on"
+            "handler/FeatherTwitcherHandler.java:197 rev",
+            "handler/FeatherTwitcherHandler.java:206 rev",
+            "handler/FeatherTwitcherHandler.java:245 on",
+            "handler/FeatherTwitcherHandler.java:286 on"
           ]
         },
         {
@@ -203,10 +203,10 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherTwitcherHandler.java:276 on",
-            "handler/FeatherTwitcherHandler.java:276 rev",
-            "handler/FeatherTwitcherHandler.java:383 rev",
-            "handler/FeatherTwitcherHandler.java:394 on"
+            "handler/FeatherTwitcherHandler.java:270 on",
+            "handler/FeatherTwitcherHandler.java:270 rev",
+            "handler/FeatherTwitcherHandler.java:377 rev",
+            "handler/FeatherTwitcherHandler.java:388 on"
           ]
         }
       ],
@@ -215,7 +215,7 @@
       "noReverse": null,
       "extraLang": {},
       "loopRefs": [
-        "handler/FeatherTwitcherHandler.java:481 tick(i)"
+        "handler/FeatherTwitcherHandler.java:475 tick(i)"
       ]
     },
     {
@@ -249,8 +249,8 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/FeatherElementRiseHandler.java:110 on",
-            "handler/FeatherElementRiseHandler.java:112 rev"
+            "handler/FeatherElementRiseHandler.java:107 on",
+            "handler/FeatherElementRiseHandler.java:109 rev"
           ]
         },
         {
@@ -273,8 +273,8 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/FeatherElementRiseHandler.java:234 on",
-            "handler/FeatherElementRiseHandler.java:235 rev"
+            "handler/FeatherElementRiseHandler.java:227 on",
+            "handler/FeatherElementRiseHandler.java:228 rev"
           ]
         }
       ],
@@ -283,7 +283,7 @@
       "noReverse": null,
       "extraLang": {},
       "loopRefs": [
-        "handler/FeatherElementRiseHandler.java:267 tick(i)"
+        "handler/FeatherElementRiseHandler.java:260 tick(i)"
       ]
     },
     {
@@ -318,7 +318,7 @@
           },
           "noReverse": true,
           "refs": [
-            "handler/FeatherAbyssHandler.java:358 on"
+            "handler/FeatherAbyssHandler.java:353 on"
           ]
         },
         {
@@ -341,9 +341,9 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:640 on",
-            "handler/FeatherAbyssHandler.java:800 on",
-            "handler/FeatherAbyssHandler.java:801 tick"
+            "handler/FeatherAbyssHandler.java:642 on",
+            "handler/FeatherAbyssHandler.java:829 on",
+            "handler/FeatherAbyssHandler.java:830 tick"
           ]
         },
         {
@@ -351,13 +351,13 @@
           "maskBit": 10,
           "name": "安魂曲",
           "curse": "§c每过一天，最大生命上限 -1（最低 1）；受到的伤害 +13%/天",
-          "cond": "游戏天数小于 5 天时，把生命上限提升到 20 以上，之后无法再达成",
+          "cond": "游戏天数小于 %s 天时，把生命上限提升到 20 以上，之后无法再达成",
           "after": "§a改为：每过一天最大生命 +1、受到伤害 -13%",
           "merged": "§a每过一天，最大生命上限 +1；§a受到的伤害 -13%",
           "en": {
             "name": "Requiem",
             "curse": "§cEach day: max health -1 (min 1), damage taken +13% per day",
-            "cond": "Before day 5, push max health above 20; cannot be achieved afterwards",
+            "cond": "While your day count is below %s, push max health above 20; cannot be achieved afterwards",
             "after": "§aNow: +1 max HP per day, -13% damage taken",
             "merged": "§a+1 max HP per day; §a-13% damage taken"
           },
@@ -367,12 +367,12 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:361 rev",
-            "handler/FeatherAbyssHandler.java:382 on",
-            "handler/FeatherAbyssHandler.java:385 reach",
-            "handler/FeatherAbyssHandler.java:616 on",
-            "handler/FeatherAbyssHandler.java:618 rev",
-            "handler/FeatherAbyssHandler.java:1377 rev"
+            "handler/FeatherAbyssHandler.java:356 rev",
+            "handler/FeatherAbyssHandler.java:377 on",
+            "handler/FeatherAbyssHandler.java:380 reach",
+            "handler/FeatherAbyssHandler.java:718 on",
+            "handler/FeatherAbyssHandler.java:720 rev",
+            "handler/FeatherAbyssHandler.java:1404 rev"
           ]
         },
         {
@@ -396,9 +396,9 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:817 on",
-            "handler/FeatherAbyssHandler.java:818 rev",
-            "handler/FeatherAbyssHandler.java:825 reach"
+            "handler/FeatherAbyssHandler.java:846 on",
+            "handler/FeatherAbyssHandler.java:847 rev",
+            "handler/FeatherAbyssHandler.java:854 reach"
           ]
         },
         {
@@ -422,9 +422,9 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:522 rev",
-            "handler/FeatherAbyssHandler.java:890 on",
-            "handler/FeatherAbyssHandler.java:891 rev"
+            "handler/FeatherAbyssHandler.java:548 rev",
+            "handler/FeatherAbyssHandler.java:919 on",
+            "handler/FeatherAbyssHandler.java:920 rev"
           ]
         },
         {
@@ -447,10 +447,10 @@
             "unitText": "%s 格 / %s 格"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:953 on",
-            "handler/FeatherAbyssHandler.java:954 tick",
-            "handler/FeatherAbyssHandler.java:957 on",
-            "handler/FeatherAbyssHandler.java:1217 rev"
+            "handler/FeatherAbyssHandler.java:982 on",
+            "handler/FeatherAbyssHandler.java:983 tick",
+            "handler/FeatherAbyssHandler.java:986 on",
+            "handler/FeatherAbyssHandler.java:1246 rev"
           ]
         },
         {
@@ -474,9 +474,9 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:1043 rev",
-            "handler/FeatherAbyssHandler.java:1337 on",
-            "handler/FeatherAbyssHandler.java:1338 tick"
+            "handler/FeatherAbyssHandler.java:1072 rev",
+            "handler/FeatherAbyssHandler.java:1366 on",
+            "handler/FeatherAbyssHandler.java:1367 tick"
           ]
         },
         {
@@ -500,11 +500,11 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:528 rev",
-            "handler/FeatherAbyssHandler.java:644 on",
-            "handler/FeatherAbyssHandler.java:644 rev",
-            "handler/FeatherAbyssHandler.java:1341 on",
-            "handler/FeatherAbyssHandler.java:1344 reach"
+            "handler/FeatherAbyssHandler.java:554 rev",
+            "handler/FeatherAbyssHandler.java:646 on",
+            "handler/FeatherAbyssHandler.java:646 rev",
+            "handler/FeatherAbyssHandler.java:1370 on",
+            "handler/FeatherAbyssHandler.java:1373 reach"
           ]
         },
         {
@@ -527,9 +527,9 @@
             "unitText": "%s 种 / %s 种"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:850 on",
-            "handler/FeatherAbyssHandler.java:873 setProgress",
-            "handler/FeatherAbyssHandler.java:875 reach"
+            "handler/FeatherAbyssHandler.java:879 on",
+            "handler/FeatherAbyssHandler.java:902 setProgress",
+            "handler/FeatherAbyssHandler.java:904 reach"
           ]
         },
         {
@@ -537,13 +537,13 @@
           "maskBit": 17,
           "name": "失忆",
           "curse": "§c无法使用复制之魂，但仍会正常掉落",
-          "cond": "游戏天数小于 30 天时，击杀末影龙，之后无法再达成",
+          "cond": "游戏天数小于 %s 天时，击杀末影龙，之后无法再达成",
           "after": "§a复制之魂解禁（可正常使用，且仍正常掉落）",
           "merged": null,
           "en": {
             "name": "Amnesia",
             "curse": "§cCannot use Copy Souls, but they still drop normally",
-            "cond": "Before day 30, kill the Ender Dragon; cannot be achieved afterwards",
+            "cond": "While your day count is below %s, kill the Ender Dragon; cannot be achieved afterwards",
             "after": "§aCopy Souls unlocked (usable again, still drop normally)"
           },
           "target": {
@@ -552,8 +552,8 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:1349 on",
-            "handler/FeatherAbyssHandler.java:1352 reach"
+            "handler/FeatherAbyssHandler.java:445 on",
+            "handler/FeatherAbyssHandler.java:450 reach"
           ]
         },
         {
@@ -577,12 +577,12 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:624 on",
-            "handler/FeatherAbyssHandler.java:626 rev",
-            "handler/FeatherAbyssHandler.java:666 on",
-            "handler/FeatherAbyssHandler.java:693 on",
-            "handler/FeatherAbyssHandler.java:1327 on",
-            "handler/FeatherAbyssHandler.java:1330 tick"
+            "handler/FeatherAbyssHandler.java:668 on",
+            "handler/FeatherAbyssHandler.java:695 on",
+            "handler/FeatherAbyssHandler.java:727 on",
+            "handler/FeatherAbyssHandler.java:729 rev",
+            "handler/FeatherAbyssHandler.java:1356 on",
+            "handler/FeatherAbyssHandler.java:1359 tick"
           ]
         },
         {
@@ -606,8 +606,8 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:733 on",
-            "handler/FeatherAbyssHandler.java:734 rev"
+            "handler/FeatherAbyssHandler.java:762 on",
+            "handler/FeatherAbyssHandler.java:763 rev"
           ]
         }
       ],
@@ -618,7 +618,7 @@
       ],
       "extraLang": {},
       "loopRefs": [
-        "handler/FeatherAbyssHandler.java:1444 reach(entry)"
+        "handler/FeatherAbyssHandler.java:1471 reach(entry)"
       ]
     },
     {
@@ -652,10 +652,10 @@
             "unitText": "%s 点 / %s 点"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:281 on",
-            "handler/curse/TimecoreCurse.java:306 on",
-            "handler/curse/TimecoreCurse.java:307 tick",
-            "handler/curse/TimecoreCurse.java:311 rev"
+            "handler/curse/TimecoreCurse.java:307 on",
+            "handler/curse/TimecoreCurse.java:337 on",
+            "handler/curse/TimecoreCurse.java:338 tick",
+            "handler/curse/TimecoreCurse.java:342 rev"
           ]
         },
         {
@@ -678,11 +678,11 @@
             "unitText": "%s / %s"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:143 rev",
-            "handler/curse/TimecoreCurse.java:148 on",
-            "handler/curse/TimecoreCurse.java:150 tick",
-            "handler/curse/TimecoreCurse.java:156 setProgress",
-            "handler/curse/TimecoreCurse.java:285 on"
+            "handler/curse/TimecoreCurse.java:164 rev",
+            "handler/curse/TimecoreCurse.java:169 on",
+            "handler/curse/TimecoreCurse.java:171 tick",
+            "handler/curse/TimecoreCurse.java:177 setProgress",
+            "handler/curse/TimecoreCurse.java:315 on"
           ]
         },
         {
@@ -706,8 +706,8 @@
             "unitText": "%s 格 / %s 格"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:375 on",
-            "handler/curse/TimecoreCurse.java:376 tick"
+            "handler/curse/TimecoreCurse.java:406 on",
+            "handler/curse/TimecoreCurse.java:407 tick"
           ]
         },
         {
@@ -730,9 +730,9 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:380 on",
-            "handler/curse/TimecoreCurse.java:385 tick",
-            "handler/curse/TimecoreCurse.java:416 on"
+            "handler/curse/TimecoreCurse.java:411 on",
+            "handler/curse/TimecoreCurse.java:416 tick",
+            "handler/curse/TimecoreCurse.java:447 on"
           ]
         },
         {
@@ -756,12 +756,12 @@
             "unitText": "%s 点 / %s 点"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:495 on",
-            "handler/curse/TimecoreCurse.java:495 rev",
-            "handler/curse/TimecoreCurse.java:501 on",
-            "handler/curse/TimecoreCurse.java:503 rev",
-            "handler/curse/TimecoreCurse.java:572 on",
-            "handler/curse/TimecoreCurse.java:573 tick"
+            "handler/curse/TimecoreCurse.java:526 on",
+            "handler/curse/TimecoreCurse.java:526 rev",
+            "handler/curse/TimecoreCurse.java:624 on",
+            "handler/curse/TimecoreCurse.java:626 rev",
+            "handler/curse/TimecoreCurse.java:667 on",
+            "handler/curse/TimecoreCurse.java:668 tick"
           ]
         },
         {
@@ -784,10 +784,10 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:510 on",
-            "handler/curse/TimecoreCurse.java:512 rev",
-            "handler/curse/TimecoreCurse.java:597 on",
-            "handler/curse/TimecoreCurse.java:600 tick"
+            "handler/curse/TimecoreCurse.java:533 rev",
+            "handler/curse/TimecoreCurse.java:632 on",
+            "handler/curse/TimecoreCurse.java:692 on",
+            "handler/curse/TimecoreCurse.java:695 tick"
           ]
         },
         {
@@ -810,9 +810,9 @@
             "unitText": "%s 点 / %s 点"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:624 on",
-            "handler/curse/TimecoreCurse.java:626 tick",
-            "handler/curse/TimecoreCurse.java:627 rev"
+            "handler/curse/TimecoreCurse.java:719 on",
+            "handler/curse/TimecoreCurse.java:721 tick",
+            "handler/curse/TimecoreCurse.java:722 rev"
           ]
         },
         {
@@ -835,11 +835,11 @@
             "unitText": "%s / %s"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:161 on",
-            "handler/curse/TimecoreCurse.java:163 tick",
-            "handler/curse/TimecoreCurse.java:278 rev",
-            "handler/curse/TimecoreCurse.java:291 on",
-            "handler/curse/TimecoreCurse.java:302 setProgress"
+            "handler/curse/TimecoreCurse.java:182 on",
+            "handler/curse/TimecoreCurse.java:184 tick",
+            "handler/curse/TimecoreCurse.java:302 rev",
+            "handler/curse/TimecoreCurse.java:321 on",
+            "handler/curse/TimecoreCurse.java:333 setProgress"
           ]
         },
         {
@@ -862,10 +862,10 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:128 on",
-            "handler/curse/TimecoreCurse.java:138 rev",
-            "handler/curse/TimecoreCurse.java:731 on",
-            "handler/curse/TimecoreCurse.java:734 tick"
+            "handler/curse/TimecoreCurse.java:149 on",
+            "handler/curse/TimecoreCurse.java:159 rev",
+            "handler/curse/TimecoreCurse.java:826 on",
+            "handler/curse/TimecoreCurse.java:829 tick"
           ]
         },
         {
@@ -888,11 +888,11 @@
             "unitText": "%s 点 / %s 点"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:123 on",
-            "handler/curse/TimecoreCurse.java:496 on",
-            "handler/curse/TimecoreCurse.java:580 on",
-            "handler/curse/TimecoreCurse.java:581 tick",
-            "handler/curse/TimecoreCurse.java:667 rev"
+            "handler/curse/TimecoreCurse.java:144 on",
+            "handler/curse/TimecoreCurse.java:527 on",
+            "handler/curse/TimecoreCurse.java:675 on",
+            "handler/curse/TimecoreCurse.java:676 tick",
+            "handler/curse/TimecoreCurse.java:762 rev"
           ]
         },
         {
@@ -915,11 +915,11 @@
             "unitText": "%s 点 / %s 点"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:172 on",
-            "handler/curse/TimecoreCurse.java:496 on",
-            "handler/curse/TimecoreCurse.java:585 on",
-            "handler/curse/TimecoreCurse.java:590 tick",
-            "handler/curse/TimecoreCurse.java:758 rev"
+            "handler/curse/TimecoreCurse.java:193 on",
+            "handler/curse/TimecoreCurse.java:527 on",
+            "handler/curse/TimecoreCurse.java:680 on",
+            "handler/curse/TimecoreCurse.java:685 tick",
+            "handler/curse/TimecoreCurse.java:853 rev"
           ]
         },
         {
@@ -942,10 +942,10 @@
             "unitText": "%s 点 / %s 点"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:636 on",
-            "handler/curse/TimecoreCurse.java:638 rev",
-            "handler/curse/TimecoreCurse.java:901 on",
-            "handler/curse/TimecoreCurse.java:902 tick"
+            "handler/curse/TimecoreCurse.java:731 on",
+            "handler/curse/TimecoreCurse.java:733 rev",
+            "handler/curse/TimecoreCurse.java:1039 on",
+            "handler/curse/TimecoreCurse.java:1040 tick"
           ]
         },
         {
@@ -969,10 +969,10 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:521 on",
-            "handler/curse/TimecoreCurse.java:523 rev",
-            "handler/curse/TimecoreCurse.java:606 on",
-            "handler/curse/TimecoreCurse.java:607 tick"
+            "handler/curse/TimecoreCurse.java:640 on",
+            "handler/curse/TimecoreCurse.java:642 rev",
+            "handler/curse/TimecoreCurse.java:701 on",
+            "handler/curse/TimecoreCurse.java:702 tick"
           ]
         },
         {
@@ -996,11 +996,11 @@
             "unitText": "%s 种 / %s 种"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:933 on",
-            "handler/curse/TimecoreCurse.java:934 rev",
-            "handler/curse/TimecoreCurse.java:1066 on",
-            "handler/curse/TimecoreCurse.java:1079 setProgress",
-            "handler/curse/TimecoreCurse.java:1081 reach"
+            "handler/curse/TimecoreCurse.java:1071 on",
+            "handler/curse/TimecoreCurse.java:1072 rev",
+            "handler/curse/TimecoreCurse.java:1204 on",
+            "handler/curse/TimecoreCurse.java:1217 setProgress",
+            "handler/curse/TimecoreCurse.java:1219 reach"
           ]
         },
         {
@@ -1024,10 +1024,10 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:425 on",
-            "handler/curse/TimecoreCurse.java:457 on",
-            "handler/curse/TimecoreCurse.java:739 on",
-            "handler/curse/TimecoreCurse.java:740 tick"
+            "handler/curse/TimecoreCurse.java:456 on",
+            "handler/curse/TimecoreCurse.java:488 on",
+            "handler/curse/TimecoreCurse.java:834 on",
+            "handler/curse/TimecoreCurse.java:835 tick"
           ]
         },
         {
@@ -1035,23 +1035,23 @@
           "maskBit": 35,
           "name": "铁序·释刃",
           "curse": "§c造成伤害时 2% 概率把主手武器丢出去",
-          "cond": "累计触发 200 次主手武器脱手",
+          "cond": "累计触发 50 次主手武器脱手",
           "after": "§a造成伤害时不再有概率丢出武器",
           "merged": null,
           "en": {
             "name": "Order·Slip Grip",
             "curse": "§c2% chance when dealing damage to fling your main-hand weapon away",
-            "cond": "Drop your main-hand weapon 200 times",
+            "cond": "Drop your main-hand weapon 50 times",
             "after": "§aNo longer drops your weapon on hit"
           },
           "target": {
-            "goal": 200,
+            "goal": 50,
             "unit": "times",
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:652 on",
-            "handler/curse/TimecoreCurse.java:654 tick"
+            "handler/curse/TimecoreCurse.java:747 on",
+            "handler/curse/TimecoreCurse.java:749 tick"
           ]
         },
         {
@@ -1074,10 +1074,10 @@
             "unitText": "%s 格 / %s 格"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:185 on",
-            "handler/curse/TimecoreCurse.java:225 on",
-            "handler/curse/TimecoreCurse.java:228 tick",
-            "handler/curse/TimecoreCurse.java:695 rev"
+            "handler/curse/TimecoreCurse.java:206 on",
+            "handler/curse/TimecoreCurse.java:246 on",
+            "handler/curse/TimecoreCurse.java:249 tick",
+            "handler/curse/TimecoreCurse.java:790 rev"
           ]
         },
         {
@@ -1100,10 +1100,10 @@
             "unitText": "%s 格 / %s 格"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:230 on",
-            "handler/curse/TimecoreCurse.java:233 tick",
-            "handler/curse/TimecoreCurse.java:240 rev",
-            "handler/curse/TimecoreCurse.java:529 on"
+            "handler/curse/TimecoreCurse.java:251 on",
+            "handler/curse/TimecoreCurse.java:254 tick",
+            "handler/curse/TimecoreCurse.java:261 rev",
+            "handler/curse/TimecoreCurse.java:539 on"
           ]
         },
         {
@@ -1126,10 +1126,10 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:244 rev",
-            "handler/curse/TimecoreCurse.java:532 on",
-            "handler/curse/TimecoreCurse.java:743 on",
-            "handler/curse/TimecoreCurse.java:744 tick"
+            "handler/curse/TimecoreCurse.java:265 rev",
+            "handler/curse/TimecoreCurse.java:542 on",
+            "handler/curse/TimecoreCurse.java:838 on",
+            "handler/curse/TimecoreCurse.java:839 tick"
           ]
         },
         {
@@ -1152,9 +1152,9 @@
             "unitText": "%s 点 / %s 点"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:658 on",
-            "handler/curse/TimecoreCurse.java:660 tick",
-            "handler/curse/TimecoreCurse.java:690 rev"
+            "handler/curse/TimecoreCurse.java:753 on",
+            "handler/curse/TimecoreCurse.java:755 tick",
+            "handler/curse/TimecoreCurse.java:785 rev"
           ]
         },
         {
@@ -1177,13 +1177,13 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:252 rev",
-            "handler/curse/TimecoreCurse.java:778 on",
-            "handler/curse/TimecoreCurse.java:804 on",
-            "handler/curse/TimecoreCurse.java:808 rev",
-            "handler/curse/TimecoreCurse.java:817 on",
-            "handler/curse/TimecoreCurse.java:819 tick",
-            "handler/curse/TimecoreCurse.java:1006 rev"
+            "handler/curse/TimecoreCurse.java:273 rev",
+            "handler/curse/TimecoreCurse.java:873 on",
+            "handler/curse/TimecoreCurse.java:899 on",
+            "handler/curse/TimecoreCurse.java:903 rev",
+            "handler/curse/TimecoreCurse.java:912 on",
+            "handler/curse/TimecoreCurse.java:914 tick",
+            "handler/curse/TimecoreCurse.java:1144 rev"
           ]
         },
         {
@@ -1206,9 +1206,9 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:678 rev",
-            "handler/curse/TimecoreCurse.java:971 on",
-            "handler/curse/TimecoreCurse.java:973 tick"
+            "handler/curse/TimecoreCurse.java:773 rev",
+            "handler/curse/TimecoreCurse.java:1109 on",
+            "handler/curse/TimecoreCurse.java:1111 tick"
           ]
         },
         {
@@ -1217,13 +1217,13 @@
           "name": "铁序·平势",
           "curse": "§c目标生命每高于你 100%，对方受伤时对你触发一次反击",
           "cond": "击杀巫妖",
-          "after": "§a不再被对方反击；目标生命每高于你 50% 时，你受伤有 20% 概率反制（清除对方无敌帧）",
+          "after": "§a不再被对方反击；目标生命每高于你 50% 时，你受伤有 20% 概率反击（清除对方无敌帧）",
           "merged": null,
           "en": {
             "name": "Order·Level Field",
             "curse": "§cEach time a target’s HP is 100% above yours, it counterattacks you",
             "cond": "Kill the Twilight Lich",
-            "after": "§aNo longer counterattacked; when target health exceeds yours by 50%, 20% chance to counter when hit (clears their invulnerability frames)"
+            "after": "§aNo longer counterattacked; when target health exceeds yours by 50%, 20% chance to counterattack when hit (clears their invulnerability frames)"
           },
           "target": {
             "goal": 1,
@@ -1231,9 +1231,10 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/TimecoreCurse.java:541 rev",
-            "handler/curse/TimecoreCurse.java:749 tick",
-            "handler/curse/TimecoreCurse.java:859 on"
+            "handler/curse/TimecoreCurse.java:575 rev",
+            "handler/curse/TimecoreCurse.java:844 tick",
+            "handler/curse/TimecoreCurse.java:974 on",
+            "handler/curse/TimecoreCurse.java:998 on"
           ]
         }
       ],
@@ -1244,8 +1245,8 @@
         "grand": "§6【大成】23 条全部反转后：全属性 +50%、受到伤害 -25%、免疫一切负面效果"
       },
       "loopRefs": [
-        "handler/curse/TimecoreCurse.java:359 on(entry)",
-        "handler/curse/TimecoreCurse.java:365 rev(entry)"
+        "handler/curse/TimecoreCurse.java:390 on(entry)",
+        "handler/curse/TimecoreCurse.java:396 rev(entry)"
       ]
     },
     {
@@ -1280,8 +1281,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:191 on",
-            "handler/curse/FinalriteCurse.java:212 rev"
+            "handler/curse/FinalriteCurse.java:193 on",
+            "handler/curse/FinalriteCurse.java:214 rev"
           ]
         },
         {
@@ -1304,8 +1305,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:201 on",
-            "handler/curse/FinalriteCurse.java:218 rev"
+            "handler/curse/FinalriteCurse.java:203 on",
+            "handler/curse/FinalriteCurse.java:220 rev"
           ]
         },
         {
@@ -1329,8 +1330,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:312 on",
-            "handler/curse/FinalriteCurse.java:331 rev"
+            "handler/curse/FinalriteCurse.java:319 on",
+            "handler/curse/FinalriteCurse.java:338 rev"
           ]
         },
         {
@@ -1354,10 +1355,10 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:319 on",
-            "handler/curse/FinalriteCurse.java:335 rev",
-            "handler/curse/FinalriteCurse.java:382 on",
-            "handler/curse/FinalriteCurse.java:386 tick"
+            "handler/curse/FinalriteCurse.java:326 on",
+            "handler/curse/FinalriteCurse.java:342 rev",
+            "handler/curse/FinalriteCurse.java:389 on",
+            "handler/curse/FinalriteCurse.java:393 tick"
           ]
         },
         {
@@ -1380,7 +1381,7 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:148 on"
+            "handler/curse/FinalriteCurse.java:150 on"
           ]
         },
         {
@@ -1403,8 +1404,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:249 on",
-            "handler/curse/FinalriteCurse.java:255 rev"
+            "handler/curse/FinalriteCurse.java:261 on",
+            "handler/curse/FinalriteCurse.java:266 rev"
           ]
         },
         {
@@ -1427,8 +1428,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/FinalriteCurse.java:243 rev",
-            "handler/curse/FinalriteCurse.java:279 on"
+            "handler/curse/FinalriteCurse.java:245 rev",
+            "handler/curse/FinalriteCurse.java:286 on"
           ]
         }
       ],
@@ -1437,7 +1438,7 @@
       "noReverse": null,
       "extraLang": {},
       "loopRefs": [
-        "handler/curse/FinalriteCurse.java:418 tick(entry)"
+        "handler/curse/FinalriteCurse.java:425 tick(entry)"
       ]
     },
     {

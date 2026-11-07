@@ -6,6 +6,7 @@ import com.plumejade.lensouls.feather.CurseDef;
 import com.plumejade.lensouls.feather.CurseDefs;
 import com.plumejade.lensouls.feather.CurseManager;
 import com.plumejade.lensouls.feather.FeatherEquip;
+import com.plumejade.lensouls.handler.curse.CurseTakenDamage;
 import com.plumejade.lensouls.item.ModItems;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
@@ -15,7 +16,6 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 import java.util.HashMap;
@@ -26,7 +26,7 @@ import java.util.UUID;
  * ③ 羽·元素觉醒者（新改案 · 2 条 · 整款共用反转条件）。
  *
  * <pre>
- * e1 躁动(0)：诅咒 = 每 (4 × 活性等级²) 秒，所有活性等级 +1；每个活性等级使受到伤害 +5%
+ * e1 躁动(0)：诅咒 = 每 (4 × 活性等级²) 秒，所有活性等级 +1；每个活性等级使受到伤害 +2.6%
  *             反转 = 每个活性等级使受到伤害改为 +2%（等级成长照旧）
  * e2 余灰(1)：诅咒 = DoT 伤害随目标剩余血量百分比变化（最高 +100%、最低 -50%）
  *             反转 = DoT 伤害下限改为 -20%
@@ -95,26 +95,19 @@ public class FeatherElementRiseHandler {
         player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
     }
 
-    // ==================== 受到伤害（e1 的每级 +5% / +2%） ====================
+    // ==================== 受到伤害（e1 的每级 +2.6% / +2%） ====================
 
-    @SubscribeEvent
-    public static void onDamaged(LivingDamageEvent.Pre event) {
-        try {
-            if (!(event.getEntity() instanceof ServerPlayer player)) return;
-            float d = event.getNewDamage();
-            if (d <= 0f) return;
-            int level = activityLevel(player);
-            if (level <= 0) return;
-
-            // 受伤侧乘算（§2）
-            if (CurseManager.on(player, D, 0)) {
-                d *= 1.0f + E1_TAKEN_PER_LEVEL_CURSE * level;
-            } else if (CurseManager.rev(player, D, 0)) {
-                d *= 1.0f + E1_TAKEN_PER_LEVEL_REVERSED * level;
-            }
-            event.setNewDamage(d);
-        } catch (Throwable t) {
-            LenSouls.LOGGER.error("[Curse] ③ e1 受伤结算异常", t);
+    /**
+     * 受伤侧统一乘区（{@link CurseTakenDamage}）：
+     * e1 两态都是「易伤」，只是每级系数不同（2.6% / 2%），所以都进加算池。
+     */
+    public static void collectTaken(ServerPlayer player, CurseTakenDamage.Pool pool) {
+        int level = activityLevel(player);
+        if (level <= 0) return;
+        if (CurseManager.on(player, D, 0)) {
+            pool.add(E1_TAKEN_PER_LEVEL_CURSE * level);
+        } else if (CurseManager.rev(player, D, 0)) {
+            pool.add(E1_TAKEN_PER_LEVEL_REVERSED * level);
         }
     }
 

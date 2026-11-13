@@ -36,7 +36,7 @@ import java.util.UUID;
  * <pre>
  * e1 外伤(0)：诅咒 = 受到伤害 +100%；反转 = 受到伤害 -25%（受伤侧进统一乘区 {@link CurseTakenDamage}）
  * e2 苦楚(1)：诅咒 = 每点扭曲值：造成伤害 +1%、受到伤害 +1%；扭曲值上限 100；反转 = 扭曲值获取 ×1.2
- * e3 狂喜(2)：诅咒 = 受击时每 1 点伤害 +0.1 扭曲值；扭曲值满 100 时死亡 → 强制掉落（无视 keepInventory，
+ * e3 狂喜(2)：诅咒 = 受击时每 1 点伤害 +0.5 扭曲值；扭曲值满 100 时死亡 → 强制掉落（无视 keepInventory，
  *                  有虚影核心则由它托管）+ 生成扭曲者
  *             反转 = 〔保留〕原机制照旧（阻死结束后若仍死亡，原满值死亡效果照常触发）；
  *                    另有：死亡时若扭曲值 ≥100 → 消耗 100 阻死 3 秒（仅阻止死亡；时间到受 999 点真伤）；
@@ -82,8 +82,8 @@ public class FeatherTwitcherHandler {
     public static final float E2_REVERSED_GAIN_MULT = 1.2f;
 
     // ── e3 狂喜 ──
-    /** 受击驱动：每 1 点伤害提升 0.1 扭曲值 */
-    public static final float E3_TWIST_PER_DAMAGE = 0.1f;
+    /** 受击驱动：每 1 点伤害提升 0.5 扭曲值（1.8.92 由 0.1 上调） */
+    public static final float E3_TWIST_PER_DAMAGE = 0.5f;
     /** 反转：阻死基础时长 3 秒（60 tick） */
     public static final int DEFY_BASE_TICKS = 60;
     /** 反转：每刻消耗 1 + 3% 当前扭曲值 */
@@ -101,7 +101,7 @@ public class FeatherTwitcherHandler {
     private static final Map<UUID, DefyState> DEFY = new HashMap<>();
     /** 阻死计时到点、正由我们施加 999 点真伤（死亡后要触发原满值死亡机制） */
     private static final Map<UUID, Boolean> DEFY_ENDING = new HashMap<>();
-    /** 扭曲值的小数部分（受击驱动是 0.1/点，整数 NBT 存不下） */
+    /** 扭曲值的小数部分（受击驱动是 0.5/点，整数 NBT 存不下） */
     private static final Map<UUID, Float> TWIST_FRAC = new HashMap<>();
     /** 本次伤害是我们自己施加的阻死 999 点（不参与受击驱动的扭曲值增长） */
     private static boolean applyingDefyDeath = false;
@@ -170,9 +170,16 @@ public class FeatherTwitcherHandler {
      * 早先两份各自独立 ⇒ 同时佩戴时"合成加的是 ④ 的值、条显示的是 ② 的值"，
      * 表现为 UI 永远不动、而 ② 的反转条件却永远判不到满值（实测）。
      */
+    /**
+     * 扭曲值（0–100 单刻度）。
+     * <p>
+     * <b>与 ④ 折翼沉渊共用同一份存储</b>，且 2026-11-13 起两边刻度已统一为 0–100
+     * （旧实现 ④ 内部存 0–200、这里 ÷2，导致「显示与判定不同源」和「满值收益翻倍」两处漂移）。
+     * 现在直接读同一个数，不再做任何换算。
+     */
     public static int rawTwist(Player player) {
         if (player == null) return 0;
-        return Math.max(0, com.plumejade.lensouls.handler.FeatherAbyssHandler.getTwist(player)) / 2;
+        return Math.max(0, com.plumejade.lensouls.handler.FeatherAbyssHandler.getTwist(player));
     }
 
     /** 读取扭曲值（阻死期间不封顶，其余时间 0..100） */
@@ -182,12 +189,13 @@ public class FeatherTwitcherHandler {
         return DEFY.containsKey(player.getUUID()) ? raw : Math.min(raw, MAX_TWIST);
     }
 
-    /** 设置扭曲值：常规封顶 100，阻死期间不封顶；同步客户端（客户端 bar 只认 0..100） */
+    /** 设置扭曲值：常规封顶 100，阻死期间不封顶；同步客户端（单刻度，两边同一个数） */
     public static void setTwist(ServerPlayer player, int value) {
         boolean defy = DEFY.containsKey(player.getUUID());
         int clamped = defy ? Math.max(0, value) : Math.max(0, Math.min(MAX_TWIST, value));
-        // 共用存储：写进 ④ 的那一份（0–200 刻度），这里 ×2 映射；不再单独写 KEY_TWIST。
-        com.plumejade.lensouls.handler.FeatherAbyssHandler.setTwist(player, clamped * 2);
+        // 共用存储：直接写 0–100 那一个刻度（不再 ×2 换算）
+        com.plumejade.lensouls.handler.FeatherAbyssHandler.setTwist(player, clamped);
+
         TwistSyncPacket.send(player, clamped);
     }
 
@@ -200,7 +208,7 @@ public class FeatherTwitcherHandler {
         setTwist(player, getTwist(player) + delta);
     }
 
-    /** 受击驱动的小数累加（每 1 点伤害 +0.1 扭曲值，攒够 1 点才写入） */
+    /** 受击驱动的小数累加（每 1 点伤害 +0.5 扭曲值，攒够 1 点才写入） */
     private static void addTwistFraction(ServerPlayer player, float amount) {
         if (player == null || amount <= 0f) return;
         if (CurseManager.rev(player, D, 1)) amount *= E2_REVERSED_GAIN_MULT;
@@ -268,6 +276,11 @@ public class FeatherTwitcherHandler {
             if (applyingDefyDeath) return;
             if (!(event.getEntity() instanceof ServerPlayer player)) return;
             if (!CurseManager.on(player, D, 2) && !CurseManager.rev(player, D, 2)) return;
+            // `/kill` 的 genericKill、虚空这类 BYPASSES_INVULNERABILITY 来源不算"挨打"：
+            // 它们是 Float.MAX_VALUE 级别的名义伤害，被上层裁到 10×最大生命后依旧一记就灌满扭曲值
+            // （用户实测：/kill 会把槽直接顶满、连锁触发满值死亡）。未反转时同样忽略。
+            var src = event.getSource();
+            if (src != null && src.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) return;
             float dealt = event.getNewDamage();
             if (dealt <= 0f) return;
             addTwistFraction(player, dealt * E3_TWIST_PER_DAMAGE);
@@ -363,6 +376,14 @@ public class FeatherTwitcherHandler {
         try {
             if (!hasTwitcher(player)) return;
 
+            // 复盘用：把「死亡这一刻 ②看到的扭曲值 + 三态」打出来。
+            // 与 ④ 折翼「疯狂」共用一份存储，④ 的死亡清零点在默认优先级（本方法之后跑），
+            // 所以这行若是 0，就说明它确实在更早的地方被清掉了（那就是真 bug，得改顺序/改存储）。
+            LenSouls.LOGGER.info("[Twitcher] 死亡结算 twist={} 满值={} 诅咒态={} 反转态={} 阻死中={}",
+                    rawTwist(player), rawTwist(player) >= MAX_TWIST,
+                    CurseManager.on(player, D, 2), CurseManager.rev(player, D, 2),
+                    DEFY.containsKey(player.getUUID()));
+
             // ① 阻死进行中：继续阻止死亡（计时到点那一击由 tickDefy 自己施加）
             if (DEFY.containsKey(player.getUUID())) {
                 player.setHealth(1.0f);
@@ -383,7 +404,10 @@ public class FeatherTwitcherHandler {
                 return;
             }
 
-            // ③ 原「满值死亡」机制：诅咒态直接触发；反转态在阻死结束后（999 真伤致死）触发
+            // ③ 原「满值死亡」机制：诅咒态直接触发；反转态在阻死结束后（999 真伤致死）触发。
+            // 注意这里只记「本次是满值死亡」并写掉落/托管标记；**生成扭曲者延后到 LOWEST 再做**，
+            // 好让别的模组的复活手段（更好的图腾 inventorytotem 等在 LivingDeathEvent 里复活）先表态 ——
+            // 否则被图腾救回来也会凭空刷一只扭曲者（玩家实测报告）。
             boolean ending = DEFY_ENDING.remove(player.getUUID()) != null;
             if ((full && CurseManager.on(player, D, 2)) || ending) {
                 triggerFullTwistDeath(player);
@@ -393,22 +417,66 @@ public class FeatherTwitcherHandler {
         }
     }
 
-    /** 满值死亡三件套：生成扭曲者 + 写强制掉落标记 + 写托管标记 */
+    /** 本次死亡已按「满值死亡」处理、等 LOWEST 决定是否生成扭曲者（UUID 集合，下一次死亡会覆盖） */
+    private static final java.util.Set<UUID> FULL_DEATH = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+
+    /**
+     * 满值死亡三件套：写强制掉落标记 + 写托管标记 + 登记待生成。
+     * <p>
+     * <b>口径（用户 2026-11-13 定案）</b>：**只要死亡瞬间槽是满的，就该爆、就该生成扭曲者**，
+     * 不做"每段满值只罚一次"的限制 —— 单佩戴②时槽在死亡后不会清零，所以重生后仍是满的，
+     * 再死一次照旧要爆（1.8.100 加过一次性的 twist_punished 标记，正是它让第二次死亡静默跳过，已撤）。
+     */
     private static void triggerFullTwistDeath(ServerPlayer player) {
-        if (canSpawnTwitcher(player)) {
-            spawnTwitcher(player);
-        }
+        FULL_DEATH.add(player.getUUID());
         player.getPersistentData().putBoolean(KEY_FORCE_DROP, true);
         player.getPersistentData().putBoolean(KEY_FORCE_HOST, true);
     }
 
-    /** 生成条件：死亡点 32 格内无存活归属扭曲者，且 64 格内无 BOSS */
-    private static boolean canSpawnTwitcher(ServerPlayer player) {
+    /**
+     * 满值死亡的第二段（{@link EventPriority#LOWEST}，且 {@code receiveCanceled = true} 以便自己判断）：
+     * 到这里别的模组的复活逻辑已经跑完 —— 事件被取消、或血量已被救回来，就**不生成扭曲者**；
+     * 只有真的死了才生成。日志前缀 {@code [Twitcher]}。
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public static void onDeathLate(LivingDeathEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!FULL_DEATH.remove(player.getUUID())) return;
+        try {
+            boolean revived = event.isCanceled() || player.getHealth() > 0.0f || player.isAlive();
+            if (revived) {
+                LenSouls.LOGGER.info("[Twitcher] 满值死亡后被复活拦截（canceled={} 血量={}）⇒ 不生成扭曲者",
+                        event.isCanceled(), player.getHealth());
+                return;
+            }
+            String block = spawnBlockReason(player);
+            if (block == null) {
+                spawnTwitcher(player);
+            }
+            // 复盘用：没生成时把「为什么」写清楚（老旧实现是静默跳过，只能靠猜）
+            LenSouls.LOGGER.info("[Twitcher] 满值死亡 twist={} 生成={} 原因={}",
+                    rawTwist(player), block == null ? "是" : "否", block == null ? "-" : block);
+        } catch (Throwable t) {
+            LenSouls.LOGGER.error("[Curse] ② 满值死亡生成结算异常", t);
+        }
+    }
+
+    /**
+     * 生成条件（返回 {@code null} = 可以生成，否则返回被拒原因，供日志使用）：
+     * 死亡点 32 格内无存活归属扭曲者，且 64 格内无 BOSS。
+     */
+    private static String spawnBlockReason(ServerPlayer player) {
         List<TwitcherEntity> near = player.serverLevel().getEntitiesOfClass(TwitcherEntity.class,
                 player.getBoundingBox().inflate(SPAWN_RANGE),
                 e -> e.isAlive() && e.isOwnedBy(player.getUUID()));
-        if (!near.isEmpty()) return false;
-        return !hasBossNearby(player, BOSS_RANGE);
+        if (!near.isEmpty()) {
+            return SPAWN_RANGE + " 格内已有存活的归属扭曲者（" + near.size() + " 只）";
+        }
+        if (hasBossNearby(player, BOSS_RANGE)) {
+            return BOSS_RANGE + " 格内有 BOSS";
+        }
+        return null;
     }
 
     /** 反射检测死亡点半径内是否存在持有可见 BOSS 血条的实体（复用 CopySoulDropHandler 判定） */
@@ -429,11 +497,16 @@ public class FeatherTwitcherHandler {
         Vec3 pos = player.position().add(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
         TwitcherEntity twitcher = ModEntities.TWITCHER.get().create(level);
-        if (twitcher == null) return;
+        if (twitcher == null) {
+            LenSouls.LOGGER.warn("[Twitcher] 生成失败：EntityType.create 返回 null（level={}）", level.dimension().location());
+            return;
+        }
         twitcher.moveTo(pos.x, pos.y, pos.z, player.getYRot(), 0.0F);
         twitcher.setOwner(player.getUUID());
         twitcher.initFromPlayer(player);
-        level.addFreshEntity(twitcher);
+        boolean added = level.addFreshEntity(twitcher);
+        LenSouls.LOGGER.info("[Twitcher] 生成于 {} {} {} 加入世界={}",
+                (int) pos.x, (int) pos.y, (int) pos.z, added);
     }
 
     /**

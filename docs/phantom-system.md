@@ -1,5 +1,17 @@
 # 镜魂幻灵系统 — 借真身驱动技术路线
 
+> **现行事实（2026-11 按代码核对；下面正文的表格/数字有多处已过期）**
+> - 幻灵共 **13** 只（`entity/BossPhantomType`）：IGNIS / CLOUD_GOLEM / POSSESSED_PALADIN / ENDER_GUARDIAN / OBLITERATOR /
+>   NETHERITE_MONSTROSITY / HYDRA / KNIGHT_PHANTOM / ALPHA_YETI / NAGA / LAVA_EATER / THE_LEVIATHAN / SCYLLA。
+> - 表演时长 **`BossPhantomManager.PHANTOM_TOTAL_TICKS = 600`（30 秒）**；旁观者锁定只有 `SPECTATOR_TICKS = 40`（2 秒），
+>   不是「全程旁观 200 tick」。
+> - 伤害口径已换成**固定穿透**：`entity/PhantomDamageHandler.PEN_DAMAGE = {20, 36, 42, 70, 74}`（按 `lensouls:phantom_level` 1–5）；
+>   `BossPhantomType.getDamageMultiplier()` 已无调用方 ⇒ 正文的倍率表与「倍率 ×1.25 补偿」作废。
+> - 渲染实现已改名：`mixin/client/EntityRenderDispatcherMixin` 用 `PhantomBufferSource`（包装 `MultiBufferSource`）+
+>   `PhantomAlphaConsumer`（只改 alpha、保留原色）。正文文件表里的 `LivingEntityPhantomMixin` / `PhantomVertexConsumer` 已不存在。
+> - **仍然有效**：15 参构造器签名、新增 BOSS 只改枚举的 5 步流程、`ModEntities` 字段命名风格，
+>   以及「部分模型 `renderToBuffer` 会丢 color 参数，所以必须在 VertexConsumer 层改 alpha」这条技术原因（只是类名换了）。
+
 ## 概述
 
 镜魂幻灵系统（简称**借真身驱动**）的核心思想：不手写幻灵实体、不手写粒子、不配音效帧。直接借用灾变/传奇怪物的**真实 BOSS 实体**，保持其 AI 运行，让 `tick()` 自然驱动动画/粒子/音效。我们在渲染层叠加半透明元素色覆盖。

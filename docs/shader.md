@@ -2,6 +2,10 @@
 
 > 基于 7 个模组源码深度研究，覆盖从 CoreShader 到后处理全管线。
 > 持续更新，最后更新: 2026-07-19
+>
+> **本项目自引用提示（2026-11）**：文中提到的 `WireframeRenderTypes.java`、`SoulOutlineRenderer.java`、`SoulOutlineCompat`
+> 已不在 `src/main`（旧描边管线归档在 `outline-system/` 与 `docs/档案/描边系统-旧方案/`）。
+> 现行落点见 `docs/机制与坑位.md`「渲染系统」一节。**本文主体是跨模组通用知识（外部参考），仍然有效。**
 
 ---
 

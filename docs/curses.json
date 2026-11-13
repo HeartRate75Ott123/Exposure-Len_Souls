@@ -67,12 +67,12 @@
           "name": "荒厄·封器",
           "curse": "§c无法发动相机能力，但仍可拍普通照片",
           "cond": "击杀 4 只不同 BOSS",
-          "after": "§a相机能力解禁（所有能力可正常发动）；§c被拍生物的韧性伤害 -2；§a被拍摄的敌对生物受到「韧性伤害 × 你当前近战伤害」的伤害",
+          "after": "§a相机能力解禁（所有能力可正常发动）；§c你造成的韧性伤害 -2；§a被拍摄的敌对生物受到「韧性伤害 × 你当前近战伤害」的伤害",
           "merged": null,
           "en": {
             "name": "Blight·Sealed Lens",
             "curse": "§cCannot use camera abilities, but plain photos still work",
-            "after": "§aCamera unlocked; §ctoughness damage -2§a; photographed hostiles take toughness damage × your melee damage"
+            "after": "§aCamera unlocked; §cyou deal 2 less toughness damage§a; photographed hostiles take toughness damage × your melee damage"
           },
           "target": {
             "goal": 4,
@@ -153,8 +153,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherTwitcherHandler.java:237 on",
-            "handler/FeatherTwitcherHandler.java:239 rev"
+            "handler/FeatherTwitcherHandler.java:244 on",
+            "handler/FeatherTwitcherHandler.java:246 rev"
           ]
         },
         {
@@ -177,25 +177,25 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherTwitcherHandler.java:197 rev",
-            "handler/FeatherTwitcherHandler.java:206 rev",
-            "handler/FeatherTwitcherHandler.java:245 on",
-            "handler/FeatherTwitcherHandler.java:286 on"
+            "handler/FeatherTwitcherHandler.java:204 rev",
+            "handler/FeatherTwitcherHandler.java:213 rev",
+            "handler/FeatherTwitcherHandler.java:252 on",
+            "handler/FeatherTwitcherHandler.java:293 on"
           ]
         },
         {
           "n": 3,
           "maskBit": 5,
           "name": "扭曲·狂喜",
-          "curse": "§c受到伤害时，每 1 点伤害提升 0.1 扭曲值；扭曲值满 100 时死亡 → 强制掉落全部物品（无视死亡不掉落；有虚影核心则由它收纳），并生成扭曲者",
+          "curse": "§c受到伤害时，每 1 点伤害提升 0.5 扭曲值；扭曲值满 100 时死亡 → 强制掉落全部物品（无视死亡不掉落；有虚影核心则由它收纳），并生成扭曲者",
           "cond": "在扭曲值 100、护甲值为 0 时，击杀 6 万血以上的生物",
           "after": "§a扭曲值 ≥100 时，消耗 100 阻止死亡 3 秒（期间每刻额外消耗 1 点 + 当前值 3%，每点延长 0.1 秒，可突破上限）",
-          "merged": "§c受到伤害时，每 1 点伤害提升 0.1 扭曲值；§a扭曲值 ≥100 时，消耗 100 阻止死亡 3 秒（期间每刻额外消耗 1 点 + 当前值 3%，每点延长 0.1 秒，可突破上限）；§c若 3 秒后仍死亡，依旧强制掉落全部物品并生成扭曲者",
+          "merged": "§c受到伤害时，每 1 点伤害提升 0.5 扭曲值；§a扭曲值 ≥100 时，消耗 100 阻止死亡 3 秒（期间每刻额外消耗 1 点 + 当前值 3%，每点延长 0.1 秒，可突破上限）；§c若 3 秒后仍死亡，依旧强制掉落全部物品并生成扭曲者",
           "en": {
             "name": "Twist·Ecstasy",
-            "curse": "§cWhen damaged, each 1 damage adds 0.1 distortion; dying at 100 distortion forces a full item drop (even with keepInventory on; a Phantom Core stores them instead) and spawns a Twisted",
+            "curse": "§cWhen damaged, each 1 damage adds 0.5 distortion; dying at 100 distortion forces a full item drop (even with keepInventory on; a Phantom Core stores them instead) and spawns a Twisted",
             "after": "§aAt 100+ Twist, spend 100 to deny death for 3s (drains 1 + 3% of current value per tick, each point extends it 0.1s, may exceed cap)",
-            "merged": "§cTaking damage adds 0.1 Twist per damage point; §aat 100+ Twist, spend 100 to deny death for 3s (drains 1 + 3% per tick, +0.1s per point, may exceed cap); §cif you still die after 3s, the forced drop and Twisted spawn still happen"
+            "merged": "§cTaking damage adds 0.5 Twist per damage point; §aat 100+ Twist, spend 100 to deny death for 3s (drains 1 + 3% per tick, +0.1s per point, may exceed cap); §cif you still die after 3s, the forced drop and Twisted spawn still happen"
           },
           "target": {
             "goal": 1,
@@ -203,10 +203,12 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherTwitcherHandler.java:270 on",
-            "handler/FeatherTwitcherHandler.java:270 rev",
-            "handler/FeatherTwitcherHandler.java:377 rev",
-            "handler/FeatherTwitcherHandler.java:388 on"
+            "handler/FeatherTwitcherHandler.java:277 on",
+            "handler/FeatherTwitcherHandler.java:277 rev",
+            "handler/FeatherTwitcherHandler.java:378 on",
+            "handler/FeatherTwitcherHandler.java:378 rev",
+            "handler/FeatherTwitcherHandler.java:392 rev",
+            "handler/FeatherTwitcherHandler.java:406 on"
           ]
         }
       ],
@@ -215,7 +217,7 @@
       "noReverse": null,
       "extraLang": {},
       "loopRefs": [
-        "handler/FeatherTwitcherHandler.java:475 tick(i)"
+        "handler/FeatherTwitcherHandler.java:535 tick(i)"
       ]
     },
     {
@@ -318,7 +320,7 @@
           },
           "noReverse": true,
           "refs": [
-            "handler/FeatherAbyssHandler.java:353 on"
+            "handler/FeatherAbyssHandler.java:373 on"
           ]
         },
         {
@@ -341,9 +343,9 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:642 on",
-            "handler/FeatherAbyssHandler.java:829 on",
-            "handler/FeatherAbyssHandler.java:830 tick"
+            "handler/FeatherAbyssHandler.java:662 on",
+            "handler/FeatherAbyssHandler.java:849 on",
+            "handler/FeatherAbyssHandler.java:850 tick"
           ]
         },
         {
@@ -367,12 +369,12 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:356 rev",
-            "handler/FeatherAbyssHandler.java:377 on",
-            "handler/FeatherAbyssHandler.java:380 reach",
-            "handler/FeatherAbyssHandler.java:718 on",
-            "handler/FeatherAbyssHandler.java:720 rev",
-            "handler/FeatherAbyssHandler.java:1404 rev"
+            "handler/FeatherAbyssHandler.java:376 rev",
+            "handler/FeatherAbyssHandler.java:397 on",
+            "handler/FeatherAbyssHandler.java:400 reach",
+            "handler/FeatherAbyssHandler.java:738 on",
+            "handler/FeatherAbyssHandler.java:740 rev",
+            "handler/FeatherAbyssHandler.java:1424 rev"
           ]
         },
         {
@@ -396,9 +398,9 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:846 on",
-            "handler/FeatherAbyssHandler.java:847 rev",
-            "handler/FeatherAbyssHandler.java:854 reach"
+            "handler/FeatherAbyssHandler.java:866 on",
+            "handler/FeatherAbyssHandler.java:867 rev",
+            "handler/FeatherAbyssHandler.java:874 reach"
           ]
         },
         {
@@ -422,9 +424,9 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:548 rev",
-            "handler/FeatherAbyssHandler.java:919 on",
-            "handler/FeatherAbyssHandler.java:920 rev"
+            "handler/FeatherAbyssHandler.java:568 rev",
+            "handler/FeatherAbyssHandler.java:939 on",
+            "handler/FeatherAbyssHandler.java:940 rev"
           ]
         },
         {
@@ -447,10 +449,10 @@
             "unitText": "%s 格 / %s 格"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:982 on",
-            "handler/FeatherAbyssHandler.java:983 tick",
-            "handler/FeatherAbyssHandler.java:986 on",
-            "handler/FeatherAbyssHandler.java:1246 rev"
+            "handler/FeatherAbyssHandler.java:1002 on",
+            "handler/FeatherAbyssHandler.java:1003 tick",
+            "handler/FeatherAbyssHandler.java:1006 on",
+            "handler/FeatherAbyssHandler.java:1266 rev"
           ]
         },
         {
@@ -474,9 +476,9 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:1072 rev",
-            "handler/FeatherAbyssHandler.java:1366 on",
-            "handler/FeatherAbyssHandler.java:1367 tick"
+            "handler/FeatherAbyssHandler.java:1092 rev",
+            "handler/FeatherAbyssHandler.java:1386 on",
+            "handler/FeatherAbyssHandler.java:1387 tick"
           ]
         },
         {
@@ -500,11 +502,11 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:554 rev",
-            "handler/FeatherAbyssHandler.java:646 on",
-            "handler/FeatherAbyssHandler.java:646 rev",
-            "handler/FeatherAbyssHandler.java:1370 on",
-            "handler/FeatherAbyssHandler.java:1373 reach"
+            "handler/FeatherAbyssHandler.java:574 rev",
+            "handler/FeatherAbyssHandler.java:666 on",
+            "handler/FeatherAbyssHandler.java:666 rev",
+            "handler/FeatherAbyssHandler.java:1390 on",
+            "handler/FeatherAbyssHandler.java:1393 reach"
           ]
         },
         {
@@ -527,9 +529,9 @@
             "unitText": "%s 种 / %s 种"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:879 on",
-            "handler/FeatherAbyssHandler.java:902 setProgress",
-            "handler/FeatherAbyssHandler.java:904 reach"
+            "handler/FeatherAbyssHandler.java:899 on",
+            "handler/FeatherAbyssHandler.java:922 setProgress",
+            "handler/FeatherAbyssHandler.java:924 reach"
           ]
         },
         {
@@ -552,8 +554,8 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:445 on",
-            "handler/FeatherAbyssHandler.java:450 reach"
+            "handler/FeatherAbyssHandler.java:465 on",
+            "handler/FeatherAbyssHandler.java:470 reach"
           ]
         },
         {
@@ -577,12 +579,12 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:668 on",
-            "handler/FeatherAbyssHandler.java:695 on",
-            "handler/FeatherAbyssHandler.java:727 on",
-            "handler/FeatherAbyssHandler.java:729 rev",
-            "handler/FeatherAbyssHandler.java:1356 on",
-            "handler/FeatherAbyssHandler.java:1359 tick"
+            "handler/FeatherAbyssHandler.java:688 on",
+            "handler/FeatherAbyssHandler.java:715 on",
+            "handler/FeatherAbyssHandler.java:747 on",
+            "handler/FeatherAbyssHandler.java:749 rev",
+            "handler/FeatherAbyssHandler.java:1376 on",
+            "handler/FeatherAbyssHandler.java:1379 tick"
           ]
         },
         {
@@ -606,8 +608,8 @@
             "unitText": "%s"
           },
           "refs": [
-            "handler/FeatherAbyssHandler.java:762 on",
-            "handler/FeatherAbyssHandler.java:763 rev"
+            "handler/FeatherAbyssHandler.java:782 on",
+            "handler/FeatherAbyssHandler.java:783 rev"
           ]
         }
       ],
@@ -618,7 +620,7 @@
       ],
       "extraLang": {},
       "loopRefs": [
-        "handler/FeatherAbyssHandler.java:1471 reach(entry)"
+        "handler/FeatherAbyssHandler.java:1491 reach(entry)"
       ]
     },
     {

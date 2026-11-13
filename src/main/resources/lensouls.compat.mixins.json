@@ -25,6 +25,9 @@
     "GatekeeperSoulDropMixin",
     "EternalStarlightBossStunMixin",
     "TwilightLichStunMixin",
+    "TFKnightKnockbackNaNGuardMixin",
+    "CataclysmDeathLaserHitboxMixin",
+    "CataclysmDeathLaserRenderAimMixin",
     "BlockFactorysBossStunMixin",
     "UnderworldKnightStunPassiveMixin",
     "KrakenStunPassiveMixin",
@@ -80,10 +83,10 @@
     "GytrinketCameraChargeMixin",
     "CameraNoFilmHintMixin",
     "AnnihilationBeamCrossRenderMixin",
-    "DeathLaserCrossRenderMixin",
     "AnnihilationExplosionRoundMixin"
   ],
   "injectors": {
     "defaultRequire": 0
   }
 }
+

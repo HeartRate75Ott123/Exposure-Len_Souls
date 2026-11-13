@@ -89,7 +89,7 @@ import java.util.UUID;
  *   <li>食之无味：由 FoodDataMixin 阻断食物回血；e9 反转后放行并按营养值 ×2 回血</li>
  *   <li>失忆：佩戴期间由 CopySoulSealHandler 封印禁复制之魂（配方层拦截，掉落保留）；
  *       e10 反转后由 {@code CopySoulSealHandler.wearsForbiddenFeather} 直接放行（含容器内容物与超越维度网络）</li>
- *   <li>疯狂：合成 +1 扭曲值（上限 200），受击 +0.2%/点、造成 +1%/点，死亡归零，击杀怪物 3% 降 1</li>
+ *   <li>疯狂：合成 +1 扭曲值（上限 100，0–100 单刻度与 ② 共用），受击 +0.2%/点、造成 +1%/点，死亡归零，击杀怪物 3% 降 1</li>
  *   <li>恶意：元素附加伤害 +12%（DamageHandler 内应用）</li>
  * </ul>
  * <p>
@@ -130,8 +130,16 @@ public class FeatherAbyssHandler {
     private static final String KEY_COUNTDOWN_NEXT = "lensouls:abyss_countdown_next";
     private static final String SNOWBALL_TAG = "lensouls:feather_snowball";
 
-    /** 疯狂：扭曲值上限 200 */
-    public static final int MAX_TWIST = 200;
+    /**
+     * 疯狂：扭曲值上限 <b>100</b>（与 ② 扭曲之人同一把刻度，2026-11-13 由内部 200 双倍刻度统一过来）。
+     * <p>
+     * 旧实现内部存 0–200、HUD 显示时 ÷2，导致两个后果：①消费点按内部点算 ⇒ 满值的收益是文案的两倍；
+     * ②「每合成 +1」只涨半格。现在单刻度：换算不再需要 ÷2，读旧存档时按
+     * {@link #KEY_TWIST_SCALE} 标记做一次性迁移（旧值 ÷2）。
+     */
+    public static final int MAX_TWIST = 100;
+    /** 单刻度迁移标记：存在 = 该玩家的扭曲值已是 0–100 刻度（旧存档首次读取时半值迁移并写上） */
+    private static final String KEY_TWIST_SCALE = "lensouls:abyss_twist_scale100";
     /**
      * 安魂曲受伤侧：诅咒态 <b>+13%/天（按天累加）</b>；反转态是 <b>固定 -13%</b>（不随天数增长，
      * 否则每天线性往下扣，第 8 天就归零 ⇒ 无敌）。
@@ -312,16 +320,28 @@ public class FeatherAbyssHandler {
 
     public static int getTwist(Player player) {
         if (player == null) return 0;
-        return Math.max(0, Math.min(MAX_TWIST, persisted(player).getInt(KEY_TWIST)));
+        CompoundTag tag = persisted(player);
+        int raw = tag.getInt(KEY_TWIST);
+        if (!tag.getBoolean(KEY_TWIST_SCALE)) {
+            // 一次性迁移：旧存档是 0–200 双倍刻度 ⇒ 折半成 0–100（四舍五入），并写标记
+            int migrated = Math.max(0, Math.min(MAX_TWIST, Math.round(raw / 2.0f)));
+            tag.putInt(KEY_TWIST, migrated);
+            tag.putBoolean(KEY_TWIST_SCALE, true);
+            player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
+            LOGGER.info("[AbyssTwist] 刻度迁移 旧值 {} → 新值 {}（0–100 单刻度）", raw, migrated);
+            return migrated;
+        }
+        return Math.max(0, Math.min(MAX_TWIST, raw));
     }
 
     public static void setTwist(ServerPlayer player, int value) {
         int clamped = Math.max(0, Math.min(MAX_TWIST, value));
         CompoundTag tag = persisted(player);
         tag.putInt(KEY_TWIST, clamped);
+        tag.putBoolean(KEY_TWIST_SCALE, true);
         player.getPersistentData().put(Player.PERSISTED_NBT_TAG, tag);
-        // 复用现有扭曲值 HUD：按上限 200 等比例换算为 0-100 显示值
-        TwistSyncPacket.send(player, Math.round(clamped / 2.0f));
+        // 单刻度：HUD 直接显示同一个数（不再 ÷2）
+        TwistSyncPacket.send(player, clamped);
     }
 
     public static void addTwist(ServerPlayer player, int delta) {
@@ -1412,7 +1432,7 @@ public class FeatherAbyssHandler {
         clearStackState(player.getUUID());
         clearTransient(player.getUUID());
         if (hasAbyss(player)) {
-            TwistSyncPacket.send(player, Math.round(getTwist(player) / 2.0f));
+            TwistSyncPacket.send(player, getTwist(player));
         }
         // 卡创造兜底：下一 tick 的 updateAutoCreative 会按当前手持状态自愈
     }

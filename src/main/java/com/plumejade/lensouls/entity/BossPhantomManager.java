@@ -81,6 +81,14 @@ public class BossPhantomManager {
         double ox = player.getX(), oy = player.getY(), oz = player.getZ();
         float oyaw = player.getYRot(), opitch = player.getXRot();
 
+        // 唯一路径：借真身。**没有真身就不开幕**（旧的「模组未加载 ⇒ BossPhantomEntity 纯表演」
+        // 降级路径已于 2026-11-13 按用户要求删除：假表演会让人以为机制生效，比不开更糟）。
+        if (type.getClassName().isEmpty() || !type.isModLoaded()) {
+            LenSouls.LOGGER.warn("[幻灵] {} 无法启动：模组未加载或类型未登记（降级路径已移除）", type.name());
+            player.displayClientMessage(Component.translatable("message.lensouls.phantom_unavailable"), true);
+            return;
+        }
+
         // 立即刷新元素效果（使用物品实际等级，而非 type 硬编码）
         player.removeEffect(type.getEffectHolder());
         player.addEffect(new MobEffectInstance(type.getEffectHolder(),
@@ -97,35 +105,9 @@ public class BossPhantomManager {
             player.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
         }
 
-        // 借真身驱动（模组加载 + className 非空时借用真实 BOSS 实体）
-        if (!type.getClassName().isEmpty() && type.isModLoaded()) {
-            startBorrowedEntity(player, type, descId, amplifier, ox, oy, oz, oyaw, opitch);
-            return;
-        }
-
-        // 降级：BossPhantomEntity 旧路径（模组未加载时备用）
-        // 无需施加迟缓/抗性，旁观者模式已防止被攻击
-
-        // 生成幻灵
-        BossPhantomEntity phantom = new BossPhantomEntity(
-                player.level(), type, pid, ox, oy + 1.5, oz, oyaw);
-        phantom.setCustomName(Component.translatable("entity.lensouls.boss_phantom." + type.name().toLowerCase()));
-        phantom.setCustomNameVisible(false);
-        Object lionAnim = getLionfishAnimation(type);
-        if (lionAnim != null) phantom.startAnimation(lionAnim);
-        player.level().addFreshEntity(phantom);
-
-        double py = oy + 1.5; // 虚影生成Y
-        PacketDistributor.sendToPlayer(player,
-                new PhantomStartPacket(pid, type, PHANTOM_TOTAL_TICKS, phantom.getId(), ox, py, oz, oyaw));
-
-        // 入场：传送门浮现粒子（灾变系：END_PORTAL 椭圆传送门）
-        spawnEntryPortal(player.serverLevel(), type, ox, py, oz);
-
-        activePhantoms.put(phantom.getId(), new BossPhantomData(
-                type, pid, PHANTOM_TOTAL_TICKS, PHANTOM_TOTAL_TICKS, descId,
-                phantom.getId(), amplifier, ox, oy, oz, oyaw, opitch, ox, oy, oz, false));
-
+        // 借真身驱动（这一条是唯一路径，见方法开头的门禁）
+        startBorrowedEntity(player, type, descId, amplifier, ox, oy, oz, oyaw, opitch);
+        return;
     }
 
     public void cancelPhantom(ServerPlayer player) {
@@ -216,7 +198,7 @@ public class BossPhantomManager {
             // 5. 优先以主人最近攻击的目标为目标，否则找最近敌对生物作为 target
             LivingEntity target = findPlayerLastAttackTarget(player, level);
             if (target == null) {
-                target = findNearestEnemy(level, ox, py, oz);
+                target = findNearestEnemy(player, level, ox, py, oz);
             }
             if (target != null && entity instanceof Mob mob) {
                 mob.setTarget(target);
@@ -254,6 +236,13 @@ public class BossPhantomManager {
                     type, player.getUUID(), PHANTOM_TOTAL_TICKS, PHANTOM_TOTAL_TICKS, descId,
                     entity.getId(), amplifier, ox, oy, oz, oyaw, opitch, ox, oy, oz, false));
 
+            // 幻影骑士是**编队** BOSS：TF 的 AI 靠 0..4 号同伴互相配合（`getNearbyKnights` 圈 64 格、
+            // `nextInt(nearbyKnights.size())`、`isThisTheLeader` 按编号选领袖）。只造一只虽然能跑
+            // （它自己也在列表里），但编队/冲锋/领袖逻辑全是残的、看着不像那场仗 —— 所以按用户要求
+            // **真的补一支队伍**，演出结束再和本体一起清掉。
+            if (type == BossPhantomType.KNIGHT_PHANTOM) {
+                spawnKnightSquad(player, level, target, ox, py, oz, entity.getId());
+            }
 
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[幻灵] {} 启动失败", type.name(), t);
@@ -309,19 +298,23 @@ public class BossPhantomManager {
         }
     }
 
-    /** 20 格内优先找 BOSS 级目标（血量 > 200 或有 BossBar），没有才找最近普通敌对 */
-    private static LivingEntity findNearestEnemy(ServerLevel level, double x, double y, double z) {
+    /**
+     * 20 格内优先找 BOSS 级目标（血量 > 200 或有 BossBar），没有才找最近普通敌对。
+     * <p>
+     * <b>「谁不是敌人」全交给 {@link com.plumejade.lensouls.util.AllyFilter}</b>（项目里「友方阵营」的唯一事实源）：
+     * 玩家、任意驯服宠物、自家召唤物（幻灵/幻翼）、第三方辅助作战单位、同乘关系一律跳过。
+     * 以前这里手写了「玩家 + 驯宠 + 幻灵」三条，等于只排除了玩家的老口径 —— 会去咬别人的无人机/队友宠物。
+     *
+     * @param viewer 以谁为视角判友方（幻灵本体/兄弟骑士/召唤物自己）
+     */
+    private static LivingEntity findNearestEnemy(Entity viewer, ServerLevel level, double x, double y, double z) {
         AABB box = new AABB(x - 20, y - 10, z - 20, x + 20, y + 10, z + 20);
         List<LivingEntity> candidates = level.getEntitiesOfClass(LivingEntity.class, box);
         // 第一轮：找 BOSS 级目标（血量 > 200）
         LivingEntity boss = null;
         double bossDist = Double.MAX_VALUE;
         for (LivingEntity e : candidates) {
-            if (e instanceof Player || !e.isAlive()) continue;
-            // 幻灵之间不互殴：排除其他幻灵及其召唤物
-            if (PhantomDamageHandler.isPhantomEntity(e)) continue;
-            // 驯服生物是玩家宠物，不是敌人（否则幻灵开演会主动去咬主人身边的狗）
-            if (PhantomDamageHandler.isTamedPet(e)) continue;
+            if (isNotEnemyOf(viewer, e)) continue;
             if (e.getMaxHealth() > 200) {
                 double d = e.distanceToSqr(x, y, z);
                 if (d < bossDist) { bossDist = d; boss = e; }
@@ -330,18 +323,25 @@ public class BossPhantomManager {
 
         if (boss != null) return boss;
 
-        // 第二轮：普通敌对（无玩家）
+        // 第二轮：普通敌对
         LivingEntity nearest = null;
         double nearestDist = Double.MAX_VALUE;
         for (LivingEntity e : candidates) {
-            if (e instanceof Player || !e.isAlive()) continue;
-            // 幻灵之间不互殴：排除其他幻灵及其召唤物
-            if (PhantomDamageHandler.isPhantomEntity(e)) continue;
-            if (PhantomDamageHandler.isTamedPet(e)) continue;
+            if (isNotEnemyOf(viewer, e)) continue;
             double d = e.distanceToSqr(x, y, z);
             if (d < nearestDist) { nearestDist = d; nearest = e; }
         }
         return nearest;
+    }
+
+    /** 该目标对幻灵阵营而言「不是敌人」（死掉 / 自己 / 友方 / 其他幻灵） */
+    private static boolean isNotEnemyOf(Entity viewer, LivingEntity candidate) {
+        if (candidate == null || !candidate.isAlive()) return true;
+        if (candidate == viewer) return true;
+        // 幻灵之间（含幻翼/召唤物）不互殴
+        if (PhantomDamageHandler.isPhantomEntity(candidate)) return true;
+        // 统一友方口径（玩家 ‖ 驯宠 ‖ 自家召唤物 ‖ 第三方辅助单位 ‖ 同乘）
+        return viewer != null && com.plumejade.lensouls.util.AllyFilter.isFriendly(viewer, candidate);
     }
 
     /** 玩家对生物造成实际伤害时，记录其最近攻击目标（供幻灵优先锁定；覆盖近战/弹射物/枪/照片） */
@@ -350,25 +350,20 @@ public class BossPhantomManager {
         if (event.getEntity().level().isClientSide) return;
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         LivingEntity victim = event.getEntity();
-        if (victim instanceof Player) return;
-        // 幻灵及其召唤物不记录（幻灵不互殴，也不该被主人引去打自家召唤物）
-        if (PhantomDamageHandler.isPhantomEntity(victim)) return;
-        if (victim.getPersistentData().getBoolean(PhantomDamageHandler.PHANTOM_MINION_TAG)) return;
-        // 玩家误伤自家宠物（拿剑砍狗/打狗驱赶）不记录，否则幻灵会跟着去咬它
-        if (PhantomDamageHandler.isTamedPet(victim)) return;
+        // 打自己人（玩家/驯宠/自家召唤物/幻灵/辅助单位/同乘）不记录 —— 否则幻灵会跟着去咬它。
+        // 统一口径见 AllyFilter（此前这里手写了三条，漏掉第三方辅助单位等类别）。
+        if (com.plumejade.lensouls.util.AllyFilter.isFriendly(player, victim)) return;
         PLAYER_LAST_ATTACK_TARGET.put(player.getUUID(), new java.lang.ref.WeakReference<>(victim));
     }
 
-    /** 取玩家最近攻击且仍合法存活（同维度、非玩家/幻灵/召唤物/驯服生物）的目标，无则 null */
+    /** 取玩家最近攻击且仍合法存活（同维度、非友方）的目标，无则 null */
     @javax.annotation.Nullable
     private static LivingEntity findPlayerLastAttackTarget(ServerPlayer player, Level level) {
         var ref = PLAYER_LAST_ATTACK_TARGET.get(player.getUUID());
         if (ref == null) return null;
         LivingEntity t = ref.get();
-        if (t == null || !t.isAlive() || t instanceof Player) return null;
-        if (PhantomDamageHandler.isPhantomEntity(t)) return null;
-        if (t.getPersistentData().getBoolean(PhantomDamageHandler.PHANTOM_MINION_TAG)) return null;
-        if (PhantomDamageHandler.isTamedPet(t)) return null;
+        if (t == null || !t.isAlive()) return null;
+        if (com.plumejade.lensouls.util.AllyFilter.isFriendly(player, t)) return null;
         if (t.level() != level) return null;
         return t;
     }
@@ -381,11 +376,12 @@ public class BossPhantomManager {
         // 借体 boss 本体（当前 target 是玩家时清空，避免“虚灵打我”）
         if (boss instanceof Mob bossMob) {
             LivingEntity target = bossMob.getTarget();
-            if (target != null && target instanceof Player) {
+            // 锁到「自己人」就清掉：玩家 ‖ 驯宠 ‖ 自家召唤物/幻灵 ‖ 第三方辅助单位 ‖ 同乘（口径见 AllyFilter）
+            if (target != null && target != boss && com.plumejade.lensouls.util.AllyFilter.isFriendly(boss, target)) {
                 bossMob.setTarget(null);
             }
             if (bossMob.getTarget() == null || !bossMob.getTarget().isAlive()) {
-                bossMob.setTarget(findNearestEnemy((ServerLevel) boss.level(), boss.getX(), boss.getY(), boss.getZ()));
+                bossMob.setTarget(findNearestEnemy(boss, (ServerLevel) boss.level(), boss.getX(), boss.getY(), boss.getZ()));
             }
         }
         // 召唤物
@@ -396,12 +392,29 @@ public class BossPhantomManager {
             if (!(e instanceof Mob mob)) continue;
             if (!mob.getPersistentData().getBoolean(PhantomDamageHandler.PHANTOM_MINION_TAG)) continue;
             LivingEntity mt = mob.getTarget();
-            if (mt != null && mt instanceof Player) {
+            if (mt != null && mt != mob && com.plumejade.lensouls.util.AllyFilter.isFriendly(mob, mt)) {
                 mob.setTarget(null);
             }
             if (mob.getTarget() == null || !mob.getTarget().isAlive()) {
-                mob.setTarget(findNearestEnemy((ServerLevel) boss.level(), mob.getX(), mob.getY(), mob.getZ()));
+                mob.setTarget(findNearestEnemy(mob, (ServerLevel) boss.level(), mob.getX(), mob.getY(), mob.getZ()));
             }
+        }
+    }
+
+    /**
+     * 把本场幻灵的兄弟骑士也纳入「盟友瞄准」。
+     * <p>
+     * 只设初始目标是不够的：幻灵期间玩家只有开头 {@code SPECTATOR_TICKS}=40（2 秒）是旁观，
+     * 之后会恢复游戏模式、**与幻灵并肩作战**到演出结束——这段时间里骑士若锁了玩家就会一直追砍
+     * （伤害已被 {@code PhantomDamageHandler} 拦掉，但表现出来就是"打自己人"）。
+     * 这里每 tick 复刻本体的口径：清掉锁玩家的目标、无目标时改打最近敌人。
+     */
+    private static void applySquadAlly(int leaderId, ServerPlayer caster) {
+        java.util.List<Integer> ids = KNIGHT_SQUAD.get(leaderId);
+        if (ids == null || ids.isEmpty()) return;
+        for (int id : ids) {
+            Entity e = caster.level().getEntity(id);
+            if (e != null) applyPhantomAlly(e, caster);
         }
     }
 
@@ -444,6 +457,81 @@ public class BossPhantomManager {
         }
     }
 
+    /** 幻影骑士队伍：leaderId → 兄弟骑士实体 id 列表（演出结束/丢失时一并清理） */
+    private static final java.util.Map<Integer, java.util.List<Integer>> KNIGHT_SQUAD =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * 给幻影骑士补建 4 名兄弟（合计 5 人一队，编号 0=领袖 + 1..4）。
+     * <p>
+     * 走和本体同一条反射构造；都在出生点周围 2.5 格环形站好，编号 / 幻灵标记 / 无敌 / 清血条
+     * 全都照本体来。TF 的编队 AI 靠 `getNearbyKnights()`（64 格内所有 KnightPhantom，含自己）
+     * 互相同步，队伍齐了它才会正常摆阵、指定某人冲锋。
+     */
+    private void spawnKnightSquad(ServerPlayer player, ServerLevel level, LivingEntity target,
+                                  double ox, double py, double oz, int leaderId) {
+        java.util.List<Integer> ids = new java.util.ArrayList<>();
+        for (int number = 1; number <= 4; number++) {
+            double ang = Math.PI * 0.5 * number;
+            Entity knight = spawnOneKnightPhantom(player, level, target,
+                    ox + Math.cos(ang) * 2.5, py, oz + Math.sin(ang) * 2.5, number);
+            if (knight != null) ids.add(knight.getId());
+        }
+        if (!ids.isEmpty()) KNIGHT_SQUAD.put(leaderId, ids);
+        LenSouls.LOGGER.info("[幻灵] 幻影骑士队伍：本体 {} + 兄弟 {} 只", leaderId, ids.size());
+    }
+
+    /** 反射造一只幻影骑士并加入世界（本体之外的兄弟用；标记与本体一致） */
+    private Entity spawnOneKnightPhantom(ServerPlayer player, ServerLevel level, LivingEntity target,
+                                         double x, double y, double z, int number) {
+        try {
+            BossPhantomType type = BossPhantomType.KNIGHT_PHANTOM;
+            Class<?> modEntitiesClass = Class.forName(type.getModEntitiesClass());
+            var field = modEntitiesClass.getDeclaredField(type.getEntityTypeFieldName());
+            Object entityType = ((java.util.function.Supplier<?>) field.get(null)).get();
+            Class<?> entityClass = Class.forName(type.getClassName());
+            Entity e = (Entity) entityClass
+                    .getDeclaredConstructor(net.minecraft.world.entity.EntityType.class, Level.class)
+                    .newInstance(entityType, level);
+            e.setPos(x, y, z);
+            e.setYRot(player.getYRot());
+            e.setOldPosAndRot();
+            e.getPersistentData().putBoolean(PhantomDamageHandler.PHANTOM_TAG, true);
+            e.getPersistentData().putInt(PhantomDamageHandler.PHANTOM_LEVEL_TAG, 1);
+            e.getPersistentData().putUUID(PhantomDamageHandler.PHANTOM_OWNER_TAG, player.getUUID());
+            e.setCustomName(Component.translatable("entity.lensouls.boss_phantom.knight_phantom"));
+            e.setCustomNameVisible(false);
+            // setNumber 决定手持武器（0/3 剑、1 斧、2 镐）并处理领袖血条，必须在入世前后都行
+            entityClass.getMethod("setNumber", int.class).invoke(e, number);
+            level.addFreshEntity(e);
+            if (e instanceof LivingEntity le) {
+                le.setInvulnerable(true);
+                if (target != null) {
+                    if (e instanceof net.minecraft.world.entity.Mob mob) mob.setTarget(target);
+                }
+            }
+            com.plumejade.lensouls.boss.BossBarCache.clearBossBar(e);
+            return e;
+        } catch (Throwable t) {
+            LenSouls.LOGGER.warn("[幻灵] 幻影骑士兄弟 number={} 生成失败", number, t);
+            return null;
+        }
+    }
+
+    /** 演出结束/本体丢失：把兄弟骑士一起清掉（避免队伍留在世界里没人管） */
+    private void discardKnightSquad(ServerPlayer player, int leaderId) {
+        java.util.List<Integer> ids = KNIGHT_SQUAD.remove(leaderId);
+        if (ids == null || ids.isEmpty()) return;
+        for (int id : ids) {
+            Entity e = player.level().getEntity(id);
+            if (e != null) {
+                com.plumejade.lensouls.boss.BossBarCache.unmarkBossBar(e);
+                e.discard();
+            }
+        }
+        LenSouls.LOGGER.info("[幻灵] 清理幻影骑士兄弟 {} 只（本体 {}）", ids.size(), leaderId);
+    }
+
     /** 幻影骑士：维持可见+攻击力加成，阻止 HOVER 回退，自动选敌 */
     private static void forceKnightPhantomAttackMode(Entity entity) {
         try {
@@ -467,7 +555,7 @@ public class BossPhantomManager {
             }
             // 无目标时自动选敌（仅非玩家实体）
             if (entity instanceof net.minecraft.world.entity.Mob mob && mob.getTarget() == null) {
-                net.minecraft.world.entity.LivingEntity t = findNearestEnemy(
+                net.minecraft.world.entity.LivingEntity t = findNearestEnemy(entity,
                         (net.minecraft.server.level.ServerLevel) entity.level(),
                         entity.getX(), entity.getY(), entity.getZ());
                 if (t != null) mob.setTarget(t);
@@ -583,7 +671,7 @@ public class BossPhantomManager {
                         }
                     } else if (mob.getTarget() == null || !mob.getTarget().isAlive()) {
                         // 丢失 target 时重新指派（解决下界合金巨兽等实体 AI 清除目标的问题）
-                        LivingEntity t = findNearestEnemy(p.serverLevel(), mob.getX(), mob.getY(), mob.getZ());
+                        LivingEntity t = findNearestEnemy(mob, p.serverLevel(), mob.getX(), mob.getY(), mob.getZ());
                         if (t != null) mob.setTarget(t);
                     }
                     if (mob.getTarget() != null) {
@@ -623,6 +711,9 @@ public class BossPhantomManager {
                 }
                 // 召唤物 + 本体重定向：锁定主人敌人、绝不瞄准玩家（Goety 式）
                 applyPhantomAlly(ie, p);
+                // 兄弟骑士同样逐 tick 重定向：玩家只在幻灵开头 2 秒（SPECTATOR_TICKS=40）是旁观，
+                // 之后会**和幻灵并肩作战**到演出结束，所以"不瞄准玩家"必须每 tick 兜，不能只设一次。
+                applySquadAlly(ie.getId(), p);
                 // 兜底：第三方自研血条若绕过了 addPlayer 拦截（理论上不会），每 10 tick 清一次
                 if (elapsed % 10 == 0 && ie != null) {
                     com.plumejade.lensouls.boss.BossBarCache.clearIfPlayers(ie);
@@ -782,10 +873,11 @@ public class BossPhantomManager {
             com.plumejade.lensouls.boss.BossBarCache.unmarkBossBar(phantom);
             phantom.discard();
         } else {
-            // 不在任何已加载维度 → 在未加载区块中 → EntityJoinLevelEvent 兜底
             LenSouls.LOGGER.warn("[幻灵] endPhantom 找不到实体 id={}，留待区块加载时拦截",
                     d.phantomEntityId());
         }
+        // 幻影骑士的兄弟骑士随本体一起清（否则队伍会留在世界里）
+        discardKnightSquad(p, d.phantomEntityId());
 
         PacketDistributor.sendToPlayer(p, new PhantomStopPacket(d.playerId()));
 

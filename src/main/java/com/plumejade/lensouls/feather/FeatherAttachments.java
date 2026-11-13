@@ -39,8 +39,24 @@ public class FeatherAttachments {
             TYPES.register("curse_state",
                     () -> AttachmentType.serializable(CurseStateData::new).copyOnDeath().build());
 
+    /**
+     * 玩家「本世界起点天」（绝对天）—— 折翼沉渊 e3 安魂曲 / e10 失忆的「自己的已过天数」都从它推。
+     * <p>
+     * <b>必须 {@code copyOnDeath}</b>：玩家实测「戴羽毛过 3 天，一死诅咒天数归零」——复活只重建实体，
+     * 只写在 {@code persistentData} 里的量不保证跟过来；而附件这份是框架整体复制的
+     * （羽毛槽内容与反转掩码同样靠它活过死亡）。详见 {@link WorldDayData}。
+     */
+    public static final Supplier<AttachmentType<WorldDayData>> WORLD_DAY =
+            TYPES.register("world_day",
+                    () -> AttachmentType.serializable(WorldDayData::new).copyOnDeath().build());
+
     public static void register(IEventBus modEventBus) {
         TYPES.register(modEventBus);
+    }
+
+    /** 取玩家的「本世界起点天」数据（缺失时返回默认实例，永远不会 null） */
+    public static WorldDayData worldDay(Player player) {
+        return player.getData(WORLD_DAY);
     }
 
     /**

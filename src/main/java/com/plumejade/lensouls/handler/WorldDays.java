@@ -1,10 +1,13 @@
 package com.plumejade.lensouls.handler;
 
-import net.minecraft.nbt.CompoundTag;
+import com.plumejade.lensouls.feather.FeatherAttachments;
+import com.plumejade.lensouls.feather.WorldDayData;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 世界天数：口径对齐 Xaero 的世界地图 / 小地图「天」（{@code gui.xaero_day}）。
@@ -23,7 +26,7 @@ import net.minecraft.world.level.Level;
  * <b>本模组为什么要再叠一层「每个人自己的天」</b>：折翼沉渊的 e3 安魂曲按「已过天数」扣血
  * （每天 −1 上限）且反转窗口是「天数 &lt; 5」。如果直接拿绝对天数，一个刚进服务器的新人
  * 会因为世界已经过了几十天而立刻被扣成 1 血、并且永远错过反转窗口 ——
- * 所以这里记「该玩家在本世界的起点天」（首次被观测时写进玩家持久数据），
+ * 所以这里记「该玩家在本世界的起点天」（首次被观测时写进<b>玩家附件</b>），
  * 之后一律用 {@link #elapsedDays}（0 起）：
  * <ul>
  *   <li>开局就在线的玩家：起点天 = 1 ⇒ 自己的天数与地图上看到的天数完全一致；</li>
@@ -35,8 +38,18 @@ import net.minecraft.world.level.Level;
  * <p>
  * 唯一的入口语义：{@link #absoluteDay} 只回答「现在是世界第几天」（与地图一致），
  * {@link #elapsedDays} 只回答「你在这个世界过了几天」（本模组所有效果都用它）。
+ *
+ * <h2>数据存在哪（2026-11-07 修）</h2>
+ * 起点天存在玩家附件 {@link WorldDayData}（注册带 {@code copyOnDeath}），<b>不再</b>写
+ * {@code player.getPersistentData()}。原因：玩家实测「过了 3 天、地图仍是第 3 天，一死诅咒天数归零」——
+ * 复活是重建玩家实体，只有框架明确搬的东西才会跟过来（附件有 {@code copyOnDeath}，
+ * 自定义 persistentData 没有保证）。老存档的 {@code lensouls:world_day_start} 会在
+ * {@link #ensureOrigin} 里**一次性迁移**进附件后删键。
+ * 复盘日志前缀 {@code [WorldDays]}：记录起点 / 迁移 / 时间回拨三件事各打一行。
  */
 public final class WorldDays {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger("lensouls.worlddays");
 
     /** 一天 24000 tick（原版常量，Xaero 同款） */
     public static final long TICKS_PER_DAY = 24000L;
@@ -47,8 +60,8 @@ public final class WorldDays {
      */
     public static final long DAY_BOUNDARY_OFFSET = 6000L;
 
-    /** 玩家持久数据里「本世界起点天」的键（绝对天，1 起） */
-    private static final String KEY_START_DAY = "lensouls:world_day_start";
+    /** **旧版**玩家持久数据里「本世界起点天」的键（仅为一次性迁移保留，迁移后即删） */
+    private static final String LEGACY_KEY_START_DAY = "lensouls:world_day_start";
 
     /**
      * 折翼沉渊 e3 安魂曲的反转窗口（天）：**自己的**已过天数 ≥ 该值即过期。
@@ -86,22 +99,33 @@ public final class WorldDays {
      * 记下该玩家的「起点天」：**首次被观测到的当天**（= 他加入这个世界的第 1 天）。
      * <p>
      * 由 {@code FeatherAbyssHandler} 在登录当刻与每 20 tick 兜底各调一次；已经有值就什么都不做
-     * （换维度、重进、死亡重生都保持同一个起点）。
+     * （换维度、重进、死亡重生都保持同一个起点 —— 附件带 {@code copyOnDeath}）。
+     * <p>
+     * 老存档迁移：附件还没值但 {@code persistentData} 里有旧键
+     * {@code lensouls:world_day_start} 时，先把旧值搬过来，再删旧键（只做一次）。
      */
     public static void ensureOrigin(ServerPlayer player) {
         if (player == null) return;
-        CompoundTag tag = player.getPersistentData();
-        if (tag.contains(KEY_START_DAY)) return;
-        tag.putLong(KEY_START_DAY, absoluteDay(player.getServer()));
+        WorldDayData data = FeatherAttachments.worldDay(player);
+        if (data.hasOrigin()) return;
+        long abs = absoluteDay(player.getServer());
+        long legacy = player.getPersistentData().getLong(LEGACY_KEY_START_DAY);
+        long start = legacy > 0L ? legacy : abs;
+        data.setOrigin(start);
+        if (legacy > 0L) {
+            player.getPersistentData().remove(LEGACY_KEY_START_DAY);
+        }
+        LOGGER.info("[WorldDays] 记录起点天 start={} abs={} 来源={}",
+                start, abs, legacy > 0L ? "旧 persistentData 迁移" : "首次观测");
     }
 
     /**
      * 该玩家自己的「已过天数」（0 起）：{@code 绝对天 − 起点天}。
      * <p>
-     * 起点天由 {@link #ensureOrigin} 在玩家首次出现时写入（跨死亡 / 重进 / 换维度保留）；
-     * 万一还没写过，这里先补写再返回 0。
+     * 起点天由 {@link #ensureOrigin} 在玩家首次出现时写进附件 {@link WorldDayData}
+     * （跨死亡 / 重进 / 换维度保留）；万一还没写过，这里先补写再返回 0。
      * 时间被回拨（回档、{@code /time set}）导致绝对天小于起点时，把起点拉回当天 ——
-     * 天数取 0 而不是负数，旧效果不会被反算。
+     * 天数取 0 而不是负数，旧效果不会被反算（会打一行 {@code [WorldDays]} 日志）。
      */
     public static int elapsedDays(ServerPlayer player) {
         if (player == null) return 0;
@@ -109,10 +133,11 @@ public final class WorldDays {
         if (server == null) return 0;
         ensureOrigin(player);
         long abs = absoluteDay(server);
-        CompoundTag tag = player.getPersistentData();
-        long start = tag.getLong(KEY_START_DAY);
+        WorldDayData data = FeatherAttachments.worldDay(player);
+        long start = data.origin();
         if (abs < start) {
-            tag.putLong(KEY_START_DAY, abs);
+            data.setOrigin(abs);
+            LOGGER.info("[WorldDays] 绝对天倒退，起点天 {} → {}（天数归 0 而不取负）", start, abs);
             start = abs;
         }
         long elapsed = abs - start;
@@ -127,6 +152,9 @@ public final class WorldDays {
     /** 调试 / 迁移用：清掉某个玩家的起点天（下次调用重新以当天为起点） */
     public static void resetOrigin(ServerPlayer player) {
         if (player == null) return;
-        player.getPersistentData().remove(KEY_START_DAY);
+        FeatherAttachments.worldDay(player).setOrigin(0L);
+        // 旧键也清掉，否则下次 ensureOrigin 会把旧值当「待迁移」又搬回来
+        player.getPersistentData().remove(LEGACY_KEY_START_DAY);
+        LOGGER.info("[WorldDays] 起点天已清空（下次以当天为起点）");
     }
 }

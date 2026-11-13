@@ -69,13 +69,12 @@ public class TwistSyncPacket implements CustomPacketPayload {
     public static void send(ServerPlayer player, int value) {
         boolean twitcher = com.plumejade.lensouls.handler.FeatherTwitcherHandler.hasTwitcher(player);
         boolean abyss = com.plumejade.lensouls.handler.FeatherAbyssHandler.hasAbyss(player);
-        // ② 与 ④ 各自独立存值，而左侧条只有一根 ⇒ 显示**两者中较大者**（④ 的值 ÷2 归一到 0–100）。
-        // 否则同时佩戴时，④ 的"每合成 1 个物品 +1"永远看不见（实测：②+④ 一起戴，
-        // 疯狂合成一堆物品，条仍停在 ② 的旧值）。
+        // ② 与 ④ 共用同一份 0–100 存储（2026-11-13 起单刻度，不再有 ÷2 换算）⇒ 直接取较大者即可。
+        // 保留「取大」是为了兼容调用点各自算值的旧习惯（例如刚装入 ④ 时它自己的值是 0）。
         int tw = twitcher
                 ? com.plumejade.lensouls.handler.FeatherTwitcherHandler.getTwist(player) : -1;
         int ab = abyss
-                ? Math.round(com.plumejade.lensouls.handler.FeatherAbyssHandler.getTwist(player) / 2.0f) : -1;
+                ? com.plumejade.lensouls.handler.FeatherAbyssHandler.getTwist(player) : -1;
         int real = (tw < 0 && ab < 0) ? value : Math.max(0, Math.max(tw, ab));
         PacketDistributor.sendToPlayer(player, new TwistSyncPacket(real, twitcher || abyss));
     }

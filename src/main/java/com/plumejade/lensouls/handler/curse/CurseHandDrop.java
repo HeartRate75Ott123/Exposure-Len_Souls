@@ -71,6 +71,18 @@ public final class CurseHandDrop {
             ItemStack held = inv.getItem(slot);
             if (held.isEmpty()) return false;
 
+            // 正在「使用」或「取景/自拍」时绝不抽手：
+            // 相机把「活跃」写在物品组件上（Exposure.DataComponents.CAMERA_ACTIVE），客户端据此保持在取景状态；
+            // 手上那件被抽走后客户端会停在取景/自拍的中间态 —— 实测症状：卡第三人称、无法使用物品、
+            // 也退不出视角（2026-11-13 玩家报告：手持相机自拍时拍照伤害触发释刃丢手）。
+            // 本模组对所有「手里正在用」的东西都按同一口径处理（拉弓/举盾/进食同理，抽走同样会卡状态）。
+            if (player.isUsingItem()
+                    || (held.getItem() instanceof io.github.mortuusars.exposure.world.item.camera.CameraItem camera
+                        && camera.isActive(held))) {
+                LenSouls.LOGGER.info("[Curse] {} 跳过丢手：主手物品正在使用/相机正在取景（抽走会卡客户端状态）", reason);
+                return false;
+            }
+
             // 1) 先清空槽位 —— 只有清空成功才允许生成掉落物，顺序反了就是「凭空多一份」
             ItemStack copy = held.copy();
             inv.setItem(slot, ItemStack.EMPTY);

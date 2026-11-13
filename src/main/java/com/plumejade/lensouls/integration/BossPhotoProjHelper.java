@@ -256,7 +256,7 @@ public class BossPhotoProjHelper {
                 case "cataclysm:ender_guardian" -> spawnVoidRune(player);
                 case "cataclysm:ignis" -> spawnIgnisFireballs(player);
                 case "cataclysm:netherite_monstrosity" -> spawnFallingBlocks(player);
-                case "cataclysm:the_harbinger" -> spawnDeathLaser(player);
+                case "cataclysm:the_harbinger" -> spawnDeathLaser(player, hit);
                 case "cataclysm:the_leviathan" -> spawnAbyssBlast(player);
                 case "cataclysm:ancient_remnant" -> spawnDesertStele(player);
                 case "cataclysm:maledictus" -> spawnPhantomArrows(player);
@@ -404,8 +404,11 @@ public class BossPhotoProjHelper {
                 // 本体 launch(entity, 2.0D, 0.6D)：水平朝外推 + 上抛
                 double dx = e.getX() - cx;
                 double dz = e.getZ() - cz;
-                double d2 = Math.max(dx * dx + dz * dz, 0.001D);
-                e.push(dx / d2 * 2.0D, 0.6D, dz / d2 * 2.0D);
+                // 除数必须是「长度」而不是「长度的平方」：这一格原本把 dx/d2 当单位方向用，
+                // 平方距离最小只夹到 0.001 ⇒ 贴脸的敌人会被推 1000 格/tick（非 NaN，但同样是把
+                // 实体位移写飞）。这里按原版 Entity#push 的写法先开方再夹下限。
+                double len = Math.sqrt(Math.max(dx * dx + dz * dz, 1.0E-4D));
+                e.push(dx / len * 2.0D, 0.6D, dz / len * 2.0D);
                 e.hurtMarked = true;
             }
         }
@@ -456,44 +459,153 @@ public class BossPhotoProjHelper {
      *   <li>判定盒 {@code inflate(1,1,1)} —— 射线很「粗」，不容易从怪身边擦过去；</li>
      *   <li>安全：<b>不</b>调 {@code setFire(true)}（本体只在 powered 时开，开了会在命中地面处
      *       <b>生火</b>，属于地形副作用，照片版一律不发火）；</li>
-     *   <li><b>朝向同步</b>：本体 {@code tick()} 每 tick 用 {@code caster.yHeadRot/getXRot()} 刷
-     *       {@code renderYaw/renderPitch} 给<b>客户端渲染</b>，而<b>服务端判定</b>用的是构造时定死的
-     *       {@code getYaw()/getPitch()}（玩家 caster 不会走 {@code updateWithHarbinger()}）。
-     *       于是「挥砍后转头」会出现光柱视觉跟着摆、伤害留在原线的错位。这里在
-     *       {@link #syncDeathLaserAim} 里每 tick 用同一个公式把服务端 yaw/pitch 也同步过去
-     *       —— 效果就是一条<b>跟着你视线扫射</b>的死亡激光，与客户端所见一致。</li>
+     *   <li><b>朝向：锁定目标 + 角度限速平滑跟踪</b>。{@link #syncDeathLaserAim} 每 tick 把
+     *       {@code setYaw/setPitch}（服务端判定角）朝目标包围盒中心转最多 8°，目标死了换最近敌人，
+     *       绝不回退到准星；客户端由 {@code CataclysmDeathLaserRenderAimMixin} <b>替换角度来源</b>
+     *       （把 {@code caster.yHeadRot/getXRot} 的读取换成等价于锁定角的头部值），
+     *       让渲染、末端、命中点、原生闪电全部按同一角度算 —— 渲染器本身一行没改。</li>
      * </ul>
-     * 射线方向由我们传入（服务端用 {@code getYaw()/getPitch()}）；客户端按施法者头部朝向渲染，
-     * 玩家挥砍瞬间两者一致，随后由 {@link #syncDeathLaserAim} 持续对齐。
      */
-    private static void spawnDeathLaser(ServerPlayer player) {
+    private static void spawnDeathLaser(ServerPlayer player, LivingEntity hit) {
         Level level = player.level();
-        float yaw = (float) ((player.getYRot() + 90.0) * Math.PI / 180.0);
-        float pitch = (float) (-player.getXRot() * Math.PI / 180.0);
         float dmg = playerFinalDamage(player);
         Vec3 origin = beamOrigin(player);
+        LivingEntity target = pickDeathLaserTarget(player, hit, origin);
+
+        // 初始朝向：有目标就指向目标中心，否则沿用「看向哪就打哪」
+        Vec3 dir = target != null ? unitDirTo(origin, target.getBoundingBox().getCenter()) : null;
+        if (dir == null) {
+            Vec3 look = player.getViewVector(1.0F);
+            dir = look.lengthSqr() > 1.0E-8D ? look.normalize() : new Vec3(0.0, 0.0, 1.0);
+        }
+        float[] yawPitch = dirYawPitch(dir);
+
         var beam = new com.github.L_Ender.cataclysm.entity.projectile.Death_Laser_Beam_Entity(
                 com.github.L_Ender.cataclysm.init.ModEntities.DEATH_LASER_BEAM.get(),
                 level, player,
                 origin.x, origin.y, origin.z,
-                yaw, pitch,
+                yawPitch[0], yawPitch[1],
                 DEATH_LASER_TICKS,          // duration：结算 tick 数（另有 20 tick 蓄力）
                 dmg,                        // damage：玩家面板
                 DEATH_LASER_HP_PERCENT);    // Hpdamage：最大生命百分比
         markPercentAndSpawn(beam);
-        PLAYER_DEATH_LASERS.add(new DeathLaserLink(player.getUUID(), new java.lang.ref.WeakReference<>(beam)));
+        PLAYER_DEATH_LASERS.add(new DeathLaserLink(player.getUUID(), beam, origin,
+                target == null ? null : target.getUUID(), dir));
     }
 
-    /** 玩家发射的死亡激光：记录 (施法者, 光束) 以便每 tick 同步判定朝向 */
-    private record DeathLaserLink(java.util.UUID caster,
-                                  java.lang.ref.WeakReference<com.github.L_Ender.cataclysm.entity.projectile.Death_Laser_Beam_Entity> beam) {}
+    /** 死亡激光锁敌半径：本体射线 30 格，留 2 格余量 */
+    private static final double DEATH_LASER_LOCK_RADIUS = 28.0D;
+    /**
+     * 每 tick 的最大转向角度（弧度）：1.5°/tick ≈ 30°/秒。
+     * <p>
+     * 必须限速——直接 {@code setYaw(目标角度)} 是瞬移，实测反馈「一下闪过去」。
+     * 限速后光柱是一条扫过去的弧线，转的途中扫到的东西也会照常结算（伤害方向就是这个角度）。
+     */
+    private static final double DEATH_LASER_TURN_STEP = Math.toRadians(1.5D);
+
+    /** 激光锁定对象：`target` 死后会换下一个，`aim` 是当前的<b>单位朝向</b>（平滑跟踪用） */
+    private static final class DeathLaserLink {
+        final java.util.UUID caster;
+        final java.lang.ref.WeakReference<com.github.L_Ender.cataclysm.entity.projectile.Death_Laser_Beam_Entity> beam;
+        final Vec3 origin;
+        java.util.UUID target;
+        Vec3 aim;
+
+        DeathLaserLink(java.util.UUID caster,
+                       com.github.L_Ender.cataclysm.entity.projectile.Death_Laser_Beam_Entity beam,
+                       Vec3 origin, java.util.UUID target, Vec3 aim) {
+            this.caster = caster;
+            this.beam = new java.lang.ref.WeakReference<>(beam);
+            this.origin = origin;
+            this.target = target;
+            this.aim = aim;
+        }
+    }
 
     private static final java.util.List<DeathLaserLink> PLAYER_DEATH_LASERS =
             new java.util.concurrent.CopyOnWriteArrayList<>();
 
+    /** 发光瞬间选目标：刚打中的那个优先（真实被攻击目标），否则半径内最近的敌人 */
+    private static LivingEntity pickDeathLaserTarget(ServerPlayer player, LivingEntity hit, Vec3 origin) {
+        if (hit != null && hit.isAlive() && hit != player
+                && com.plumejade.lensouls.util.AllyFilter.isEnemyOf(player, hit)
+                && hit.position().distanceToSqr(origin) <= DEATH_LASER_LOCK_RADIUS * DEATH_LASER_LOCK_RADIUS) {
+            return hit;
+        }
+        return nearestLaserTarget(player, origin);
+    }
+
+    /** 半径内最近的敌人（按到光柱起点的距离） */
+    private static LivingEntity nearestLaserTarget(ServerPlayer caster, Vec3 origin) {
+        LivingEntity best = null;
+        double bestDist = DEATH_LASER_LOCK_RADIUS * DEATH_LASER_LOCK_RADIUS;
+        for (LivingEntity e : caster.level().getEntitiesOfClass(LivingEntity.class,
+                new net.minecraft.world.phys.AABB(origin, origin).inflate(DEATH_LASER_LOCK_RADIUS),
+                en -> en.isAlive() && com.plumejade.lensouls.util.AllyFilter.isEnemyOf(caster, en))) {
+            double d = e.position().distanceToSqr(origin);
+            if (d < bestDist) {
+                bestDist = d;
+                best = e;
+            }
+        }
+        return best;
+    }
+
+    /** 「起点 → 目标点」的单位方向；重合/非有限返回 null */
+    private static Vec3 unitDirTo(Vec3 from, Vec3 to) {
+        Vec3 d = to.subtract(from);
+        double len = d.length();
+        if (!(len > 1.0E-6D) || !Double.isFinite(len)) return null;
+        return d.scale(1.0D / len);
+    }
+
     /**
-     * 把服务端判定朝向同步到施法者头部（公式与本体 {@code tick()} 里给渲染用的那一份完全一致：
-     * {@code yaw = (yHeadRot + 90) * π/180}、{@code pitch = -xRot * π/180}）。
+     * 把<b>单位方向</b>换算成该弹幕构造参数用的 yaw/pitch（弧度）。
+     * <p>
+     * 与本体给渲染用的那套公式完全等价（{@code yaw = (yRot + 90) * π/180}、
+     * {@code pitch = -xRot * π/180}）：先把方向换成 MC 的 yRot/xRot，再做同样的换算，
+     * 化简后就是 {@code atan2(-dx, dz) + π/2} 与 {@code asin(dy)}。
+     */
+    private static float[] dirYawPitch(Vec3 dir) {
+        double cy = Math.max(-1.0D, Math.min(1.0D, dir.y));
+        double yaw = Math.atan2(-dir.x, dir.z) + Math.PI / 2.0;
+        double pitch = Math.asin(cy);
+        return new float[] {(float) yaw, (float) pitch};
+    }
+
+    /**
+     * 把 {@code cur} 朝 {@code want} 转最多 {@code maxStep} 弧度（Rodrigues 旋转），返回新的单位方向。
+     * 反向平行（叉积退化）时保持不动——绝不返回 NaN。
+     */
+    private static Vec3 turnToward(Vec3 cur, Vec3 want, double maxStep) {
+        double dot = Math.max(-1.0D, Math.min(1.0D, cur.dot(want)));
+        double angle = Math.acos(dot);
+        if (!(angle > 1.0E-4D)) return want;                 // 已经对上
+        if (angle <= maxStep) return want;                   // 一步之内，直接到位
+        Vec3 axis = cur.cross(want);
+        if (axis.lengthSqr() < 1.0E-9D) return cur;          // 正相反/平行退化
+        axis = axis.normalize();
+        double c = Math.cos(maxStep);
+        double s = Math.sin(maxStep);
+        Vec3 next = cur.scale(c)
+                .add(axis.cross(cur).scale(s))
+                .add(axis.scale(axis.dot(cur) * (1.0D - c)));
+        if (!Double.isFinite(next.x) || next.lengthSqr() < 1.0E-8D) return cur;
+        return next.normalize();
+    }
+
+    /**
+     * 死亡激光每 tick 的朝向：<b>锁定 → 目标死了换下一个 → 一律平滑扫过去</b>。
+     * <p>
+     * 三条实测教训都体现在这里：
+     * <ul>
+     *   <li><b>不能「目标没了退回施法者视线」</b>：面板高时目标常在第一个结算 tick 就被秒，
+     *       回退会让光柱在它身上闪一下后整根甩回玩家视角（实测「被瞬间拽回来」）；</li>
+     *   <li><b>不能直接赋角</b>：换目标时直接 {@code setYaw(新角度)} 是瞬移（实测「一下闪过去」）；</li>
+     *   <li><b>光束类不能靠复制实体加量</b>：套装「弹幕额外触发」原本会再生成 N 条同款光柱，
+     *       每条各自锁敌 ⇒ 场上出现多条走向不同的射线（实测）。现在先驱者只发一条，
+     *       额外触发在 {@code triggerInner} 里折算成伤害倍率。</li>
+     * </ul>
      * 光束消失/施法者下线即从表里摘掉。
      * <p>
      * <b>崩溃教训（1.5.3 修复）</b>：{@code PLAYER_DEATH_LASERS} 是 {@link java.util.concurrent.CopyOnWriteArrayList}，
@@ -506,16 +618,43 @@ public class BossPhotoProjHelper {
         if (PLAYER_DEATH_LASERS.isEmpty()) return;
         var playerList = server.getPlayerList();
         for (DeathLaserLink link : PLAYER_DEATH_LASERS) {
-            var beam = link.beam().get();
+            var beam = link.beam.get();
             if (beam == null || beam.isRemoved()) {
                 PLAYER_DEATH_LASERS.remove(link);
                 continue;
             }
-            ServerPlayer caster = playerList == null ? null : playerList.getPlayer(link.caster());
+            ServerPlayer caster = playerList == null ? null : playerList.getPlayer(link.caster);
             if (caster == null || !caster.isAlive()) continue;
-            beam.setYaw((float) ((caster.yHeadRot + 90.0) * Math.PI / 180.0));
-            beam.setPitch((float) (-caster.getXRot() * Math.PI / 180.0));
+
+            LivingEntity target = resolveDeathLaserTarget(link, caster, beam);
+            if (target == null) {
+                target = nearestLaserTarget(caster, link.origin);   // 目标死了/没了：换下一个
+                link.target = target == null ? null : target.getUUID();
+            }
+            if (target != null) {
+                Vec3 want = unitDirTo(link.origin, target.getBoundingBox().getCenter());
+                if (want != null) {
+                    link.aim = turnToward(link.aim, want, DEATH_LASER_TURN_STEP);
+                }
+            }
+            // 没有目标时保持当前 aim 不动（光柱不甩、不回头）
+            float[] yawPitch = dirYawPitch(link.aim);
+            beam.setYaw(yawPitch[0]);
+            beam.setPitch(yawPitch[1]);
         }
+    }
+
+    /** 锁定目标还活着就返回它；死了/换维度/变友方一律返回 null（调用方据此换目标） */
+    private static LivingEntity resolveDeathLaserTarget(DeathLaserLink link, ServerPlayer caster,
+                                                        net.minecraft.world.entity.Entity beam) {
+        if (link.target == null) return null;
+        if (!(beam.level() instanceof ServerLevel level)) return null;
+        if (level.getEntity(link.target) instanceof LivingEntity le && le.isAlive()
+                && com.plumejade.lensouls.util.AllyFilter.isEnemyOf(caster, le)) {
+            return le;
+        }
+        link.target = null;
+        return null;
     }
 
     /** 利维坦：深渊裂缝激光（8+5%生命，2s 后从裂缝射出） */
@@ -814,7 +953,8 @@ public class BossPhotoProjHelper {
         LivingEntity target = findNearestNonPlayer(player, 16.0);
         Vec3 from = new Vec3(player.getX(), player.getEyeY(), player.getZ());
         Vec3 dir = target != null
-                ? new Vec3(target.getX(), target.getEyeY(), target.getZ()).subtract(from).normalize()
+                ? safeDir(new Vec3(target.getX(), target.getEyeY(), target.getZ()), from,
+                        player.getViewVector(1.0F), "骷髅三连箭")
                 : player.getViewVector(1.0F);
         for (int i = 0; i < 3; i++) {
             Arrow arrow = new Arrow(EntityType.ARROW, level);
@@ -1257,7 +1397,8 @@ public class BossPhotoProjHelper {
         LivingEntity target = hit != null ? hit : findNearestNonPlayer(player, 24.0);
         Vec3 eye = player.getEyePosition();
         Vec3 dir = target != null
-                ? new Vec3(target.getX(), target.getY() + target.getEyeHeight(), target.getZ()).subtract(eye).normalize()
+                ? safeDir(new Vec3(target.getX(), target.getY() + target.getEyeHeight(), target.getZ()), eye,
+                        player.getViewVector(1.0F), "回声之星")
                 : player.getViewVector(1.0F);
         try {
             Class<?> cls = Class.forName("com.ratrod.archaion.entities.projectile.EchoStarProjectile");
@@ -1340,23 +1481,153 @@ public class BossPhotoProjHelper {
         }
     }
 
-    /** 审判：法阵射线（在被打中的敌人身上浮现青色法阵，蓄力后朝敌我连线方向射出 20 格贯穿射线） */
+    /** 法阵出现位置：玩家面朝方向前方几格 */
+    private static final double GEBURAH_CAST_DIST = 2.5D;
+    /** 法阵射线长度：fdbosses `cast()` 里写死 20 格（`position().add(dir.scale(20.0))`） */
+    private static final double GEBURAH_RAY_LEN = 20.0D;
+    /** 锁敌半径：法阵在前方 2.5 格，留 1 格余量保证目标落在 20 格射线内 */
+    private static final double GEBURAH_LOCK_RADIUS = GEBURAH_RAY_LEN - 3.5D;
+
+    /**
+     * 审判：法阵射线（青色法阵出现在<b>玩家面前几格</b>，锁定目标后朝其射出 20 格贯穿射线）。
+     * <p>
+     * 旧版两个问题（实机体验）：①法阵直接生在被命中的敌人身上，等于「在敌人肚子里放个阵」；
+     * ②方向是「玩家眼睛 → 敌人」外推，敌人近的时候射线从它身上往外走了 20 格，
+     * 命中全靠运气。现在：落点在玩家面朝方向前 2.5 格（那里是实心方块则退到 1.5 格，不生在墙里），
+     * 方向锁到目标<b>包围盒中心</b>；<b>锁不到生物就不发</b>（旧版会拿视线方向乱放）。
+     * <p>
+     * 方向仍必须走 {@link #safeDir}：目标正好压在法阵位置上时 `aim - origin` 长度≈0，
+     * normalize 出 NaN 会让 fdbosses 把被命中实体写成 NaN 坐标（暮色幻影骑士 ⇒ `nextInt(0)` 崩服）。
+     */
     private static void spawnGeburahRay(ServerPlayer player, LivingEntity hit) {
         if (!modLoaded("fdbosses")) return;
         Level level = player.level();
-        LivingEntity target = hit != null ? hit : findNearestNonPlayer(player, 24.0);
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getViewVector(1.0F);
+        // 落点：面朝方向前方几格；前方是实心方块时退到 1.5 格，避免法阵生在墙里
+        Vec3 origin = eye.add(look.scale(GEBURAH_CAST_DIST));
+        BlockPos originPos = BlockPos.containing(origin.x, origin.y, origin.z);
+        if (level.getBlockState(originPos).isSolid()) {
+            origin = eye.add(look.scale(1.5D));
+        }
+        // 锁目标：刚打中的那个优先（真实被攻击目标），否则半径内最近的敌人
+        LivingEntity target = isRayTarget(player, hit, origin) ? hit : findNearestNonPlayer(player, GEBURAH_LOCK_RADIUS);
         if (target == null) return;
         try {
-            Vec3 origin = new Vec3(target.getX(), target.getY() + target.getBbHeight() * 0.6, target.getZ());
-            Vec3 dir = origin.subtract(player.getEyePosition()).normalize();
+            Vec3 dir = safeDir(target.getBoundingBox().getCenter(), origin, look, "审判法阵");
             Class<?> cls = Class.forName("com.finderfeed.fdbosses.content.entities.geburah.casts.GeburahRayCastingCircle");
             Method summon = cls.getMethod("summon", Level.class, Vec3.class, Vec3.class);
             Object circle = summon.invoke(null, level, origin, dir);
             // 该法阵由 fdbosses 自行加入世界，我们只补标记：命中时不得再回头掷弹幕触发
             markOnly(circle);
+            // 伤害必须接管：法阵 cast() 里结算是它自己配置的 judgementBirdDamage
+            // （`BossUtil.transformDamage(level, BOSS_CONFIG.geburahConfig.judgementBirdDamage)`，
+            //  javap 核对），跟玩家主手面板毫无关系 —— 实测就是「弹幕打出模组原伤害」。
+            // 这里记下这条射线的几何，命中时把伤害改写成玩家面板（见 onIncomingDamage）。
+            if (level instanceof ServerLevel sl && sl.getServer() != null) {
+                GEBURAH_RAYS.add(new GeburahRay(sl, origin, dir,
+                        sl.getServer().getTickCount() + GEBURAH_RAY_TTL, playerFinalDamage(player)));
+            }
         } catch (Exception ex) {
             com.plumejade.lensouls.LenSouls.LOGGER.warn("[PhotoBoss] 法阵射线弹幕失败", ex);
         }
+    }
+
+    /** 候选目标是否适合当射线目标：活着、是玩家的敌人、且落在射线长度内（以法阵位置为起点量） */
+    private static boolean isRayTarget(ServerPlayer player, LivingEntity candidate, Vec3 origin) {
+        if (candidate == null || candidate == player || !candidate.isAlive()) return false;
+        if (!com.plumejade.lensouls.util.AllyFilter.isEnemyOf(player, candidate)) return false;
+        double reach = GEBURAH_RAY_LEN - 1.0D;
+        return candidate.position().distanceToSqr(origin) <= reach * reach;
+    }
+
+    /**
+     * 我们召唤的审判法阵射线（记录几何与应结算的面板伤害）。
+     * <p>
+     * 只留 {@link #GEBURAH_RAY_TTL} tick：fdbosses 的法阵在 {@code castDuration=0} 时第一 tick 就
+     * 结算完，窗口只用于「命中事件发生在召唤之后不久」这一判定，同时把<b>真·格布拉 BOSS 自己放的
+     * 同名法阵</b>排除在外（它的射线不会正好落在我们记录的起点±20 格这条管子里）。
+     */
+    private record GeburahRay(ServerLevel level, Vec3 origin, Vec3 dir, long expireTick, float dmg) {}
+
+    private static final java.util.List<GeburahRay> GEBURAH_RAYS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** 审判射线的伤害类型 id（`data/fdbosses/damage_type/geburah_laser_strike.json`） */
+    private static final String GEBURAH_LASER_ID = "fdbosses:geburah_laser_strike";
+
+    /**
+     * 法阵从召唤到真正结算的窗口（tick）。
+     * <p>
+     * <b>别再按「castDuration=0 就是立刻发射」来估</b>（第一版按 4 tick 设，结果一次都没命中）：
+     * {@code GeburahCastingCircle.tick()} 是
+     * <pre>
+     *   int half = getDuration() / 2;
+     *   if (tickCount == half &amp;&amp; !wasCast) { cast(); wasCast = true; }
+     * </pre>
+     * 而 {@code setCastDuration(int)} 的字节码是 <b>{@code DURATION = 20 + 传入值}</b> ——
+     * {@code summon()} 传 0 ⇒ duration=20 ⇒ <b>第 10 tick 才发射</b>（本体那 0.5 秒蓄力）。
+     * 这里给 16 tick：覆盖 10 tick 蓄力 + 6 tick 余量（服务器卡顿、实体延后 tick）。
+     */
+    private static final int GEBURAH_RAY_TTL = 16;
+
+    /**
+     * 把我们召的审判法阵的伤害换成玩家面板。
+     * <p>
+     * 归属仍是 fdbosses 那条伤害源（它的 {@code bypasses_armor}/{@code bypasses_enchantments}
+     * 标签里都没有 {@code geburah_laser_strike}），所以在 Incoming 阶段改 {@code amount}
+     * 与直接 {@code hurt(playerAttack, 面板)} 的护甲/附魔口径一致。
+     * <p>
+     * 开销：没有待结算的法阵时第一行就返回；有也只是常数次的点积/距离判断。
+     */
+    @SubscribeEvent
+    public static void onIncomingDamage(
+            net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent event) {
+        if (GEBURAH_RAYS.isEmpty()) return;
+        net.minecraft.world.damagesource.DamageSource src = event.getSource();
+        var key = src.typeHolder().unwrapKey();
+        boolean isLaser = key.isPresent()
+                ? GEBURAH_LASER_ID.equals(key.get().location().toString())
+                : src.getMsgId().contains("geburah_laser_strike");
+        if (!isLaser) return;
+
+        LivingEntity victim = event.getEntity();
+        if (!(victim.level() instanceof ServerLevel level) || level.getServer() == null) return;
+        long now = level.getServer().getTickCount();
+        Vec3 p = victim.position();
+        for (GeburahRay ray : GEBURAH_RAYS) {
+            if (ray.level() != level || now > ray.expireTick()) continue;
+            Vec3 rel = p.subtract(ray.origin());
+            double t = rel.dot(ray.dir());
+            if (t < -2.0D || t > 22.0D) continue;
+            // 3 格内算「落在同一条射线上」：法阵的判定盒自己就带 inflate，这里只做归属区分
+            if (rel.subtract(ray.dir().scale(t)).lengthSqr() > 9.0D) continue;
+            float original = event.getOriginalAmount();
+            event.setAmount(ray.dmg());
+            com.plumejade.lensouls.LenSouls.LOGGER.info(
+                    "[PhotoBoss] 审判射线 伤害改写：{} → {}（fdbosses 原值 {}）",
+                    victim.getType(), ray.dmg(), original);
+            return;
+        }
+    }
+
+    /**
+     * 归一化方向，带退化保护（{@code to−from} 长度≈0 或含 NaN/Inf 时退到 {@code fallback}）。
+     * <p>
+     * <b>为什么必须有</b>：`Vec3.normalize()` 在零长度上除 0 会给出 NaN；把 NaN 方向交给第三方弹幕，
+     * 它们拿去推撞/位移实体就会写出 <b>NaN 坐标</b> 的实体 —— 之后该实体所有基于包围盒的逻辑
+     * （查附近同类、算距离、随机的上界取整…）都会退化，严重时直接崩服
+     * （实测：严厉/geburah 照片的射线 × 暮色幻影骑士 ⇒ `nextInt(0)` 崩）。
+     */
+    private static Vec3 safeDir(Vec3 to, Vec3 from, Vec3 fallback, String tag) {
+        Vec3 d = to.subtract(from);
+        boolean bad = !Double.isFinite(d.x) || !Double.isFinite(d.y) || !Double.isFinite(d.z)
+                || d.lengthSqr() < 1.0E-6;
+        if (bad) {
+            com.plumejade.lensouls.LenSouls.LOGGER.info("[PhotoBoss] {} 方向退化(长度={})，改用视线方向", tag, d.length());
+            d = fallback;
+            if (d == null || d.lengthSqr() < 1.0E-6) d = new Vec3(0, 0, 1);
+        }
+        return d.normalize();
     }
 
     /** 仁慈：动能力场（在被打中的敌人位置竖起能量场，1.5s 内对其持续造成每 5tick 一次的电击伤害后消散） */
@@ -1397,6 +1668,8 @@ public class BossPhotoProjHelper {
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         long now = event.getServer().getTickCount();
+        // 审判法阵的命中窗口只有几 tick，过期即清（没召过法阵时这张表恒为空，不产生遍历）
+        if (!GEBURAH_RAYS.isEmpty()) GEBURAH_RAYS.removeIf(ray -> now > ray.expireTick());
         // 玩家死亡激光：判定朝向持续跟随施法者视线（否则光柱视觉在摆、伤害留在原线）
         syncDeathLaserAim(event.getServer());
         // 超时清理不自删的临时实体（动能力场墙）

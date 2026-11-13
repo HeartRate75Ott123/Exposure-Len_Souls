@@ -51,6 +51,13 @@ public class TrophyModifierHandler {
         return new TrophyMod(type, value);
     }
 
+    /** 是否为暮色森林的战利品头饰（8 只 BOSS 头颅，均已登记进 `data/curios/tags/item/head.json`） */
+    public static boolean isTwilightTrophy(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
+        String regName = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+        return regName.contains("twilightforest") && regName.contains("trophy");
+    }
+
     /** 每 20 tick 检查：首次装备时生成修饰符（一次性逻辑，低频轮询足够） */
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
@@ -61,9 +68,7 @@ public class TrophyModifierHandler {
                 var stackHandler = stacksHandler.getStacks();
                 for (int i = 0; i < stackHandler.getSlots(); i++) {
                     ItemStack stack = stackHandler.getStackInSlot(i);
-                    if (stack.isEmpty()) continue;
-                    String regName = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-                    if (!regName.contains("twilightforest") || !regName.contains("trophy")) continue;
+                    if (!isTwilightTrophy(stack)) continue;
                     if (getModifier(stack) != null) continue;
                     TrophyMod mod = rollModifier();
                     CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
@@ -124,6 +129,14 @@ public class TrophyModifierHandler {
     @SubscribeEvent
     public static void onTooltip(net.neoforged.neoforge.event.entity.player.ItemTooltipEvent event) {
         ItemStack stack = event.getItemStack();
+        // 统一的说明行：所有暮色战利品头饰**无论有没有 roll 出增益**都显示，
+        // 让玩家在没戴过（物品上还没写 lensouls:trophy_mod）时也知道它有什么用。
+        if (!isTwilightTrophy(stack)) return;
+        var tooltip = event.getToolTip();
+        tooltip.add(net.minecraft.network.chat.Component.translatable("trophy.lensouls.desc"));
+        tooltip.add(net.minecraft.network.chat.Component.translatable("trophy.lensouls.pool"));
+        tooltip.add(net.minecraft.network.chat.Component.translatable("trophy.lensouls.pool_list"));
+
         TrophyMod m = getModifier(stack);
         if (m == null) return;
         String line = switch (m.type) {
@@ -132,6 +145,6 @@ public class TrophyModifierHandler {
             case "invincible_shorten" -> "§6白霸体时长 ×" + String.format("%.0f%%", m.value * 100);
             default -> "";
         };
-        if (!line.isEmpty()) event.getToolTip().add(net.minecraft.network.chat.Component.literal(line));
+        if (!line.isEmpty()) tooltip.add(net.minecraft.network.chat.Component.literal(line));
     }
 }

@@ -50,14 +50,12 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerXpEvent;
-import net.neoforged.neoforge.event.level.BlockDropsEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 
@@ -456,7 +454,7 @@ public final class ZeroforgeCurse {
     // ==================== e3 誓约·锈契 ====================
 
     /**
-     * e3 锈契：攻击 15% 概率丢失 + 掉落物数量 -1。
+     * e3 锈契：攻击 15% 概率丢失（掉落物数量 -1 已于 1.8.123 移除）。
      * <p>
      * 丢失与计数器都放在 {@code LOWEST} 优先级：{@link com.plumejade.lensouls.damage.HitChanceHandler}
      * 是 {@code LOWEST}，同优先级下「后注册者后跑」，这里必然在它之后，
@@ -523,46 +521,6 @@ public final class ZeroforgeCurse {
             CurseManager.tick(player, D, 2, 1L, MISS_GOAL);
         } catch (Throwable t) {
             LenSouls.LOGGER.error("[Curse] ⑦ e3 锈契（远程）结算异常", t);
-        }
-    }
-
-    /** e3 锈契：掉落物数量 -1（生物掉落与方块掉落都减；反转后不再减） */
-    @SubscribeEvent
-    public static void onDrops(LivingDropsEvent event) {
-        try {
-            if (event.getEntity().level().isClientSide) return;
-            LivingEntity killer = event.getEntity().getKillCredit();
-            if (!(killer instanceof ServerPlayer player)) return;
-            reduceDrops(event.getDrops(), player);
-        } catch (Throwable t) {
-            LenSouls.LOGGER.error("[Curse] ⑦ e3 锈契掉落结算异常", t);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onBlockDrops(BlockDropsEvent event) {
-        try {
-            if (!(event.getBreaker() instanceof ServerPlayer player)) return;
-            reduceDrops(event.getDrops(), player);
-        } catch (Throwable t) {
-            LenSouls.LOGGER.error("[Curse] ⑦ e3 锈契方块掉落结算异常", t);
-        }
-    }
-
-    private static void reduceDrops(java.util.Collection<ItemEntity> drops, ServerPlayer player) {
-        if (drops == null || drops.isEmpty()) return;
-        if (!CurseManager.on(player, D, 2)) return;
-        List<ItemEntity> snapshot = new ArrayList<>(drops);
-        for (ItemEntity entity : snapshot) {
-            ItemStack stack = entity.getItem();
-            if (stack.isEmpty()) continue;
-            if (stack.getCount() > 1) {
-                stack.shrink(1);
-                entity.setItem(stack);
-            } else {
-                drops.remove(entity);
-            }
-            return; // 每次事件只减 1 个
         }
     }
 

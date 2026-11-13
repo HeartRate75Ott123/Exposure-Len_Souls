@@ -153,8 +153,8 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherTwitcherHandler.java:244 on",
-            "handler/FeatherTwitcherHandler.java:246 rev"
+            "handler/FeatherTwitcherHandler.java:245 on",
+            "handler/FeatherTwitcherHandler.java:247 rev"
           ]
         },
         {
@@ -177,10 +177,10 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherTwitcherHandler.java:204 rev",
-            "handler/FeatherTwitcherHandler.java:213 rev",
-            "handler/FeatherTwitcherHandler.java:252 on",
-            "handler/FeatherTwitcherHandler.java:293 on"
+            "handler/FeatherTwitcherHandler.java:205 rev",
+            "handler/FeatherTwitcherHandler.java:214 rev",
+            "handler/FeatherTwitcherHandler.java:253 on",
+            "handler/FeatherTwitcherHandler.java:299 on"
           ]
         },
         {
@@ -203,12 +203,12 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/FeatherTwitcherHandler.java:277 on",
-            "handler/FeatherTwitcherHandler.java:277 rev",
-            "handler/FeatherTwitcherHandler.java:378 on",
-            "handler/FeatherTwitcherHandler.java:378 rev",
-            "handler/FeatherTwitcherHandler.java:392 rev",
-            "handler/FeatherTwitcherHandler.java:406 on"
+            "handler/FeatherTwitcherHandler.java:278 on",
+            "handler/FeatherTwitcherHandler.java:278 rev",
+            "handler/FeatherTwitcherHandler.java:384 on",
+            "handler/FeatherTwitcherHandler.java:384 rev",
+            "handler/FeatherTwitcherHandler.java:398 rev",
+            "handler/FeatherTwitcherHandler.java:412 on"
           ]
         }
       ],
@@ -217,7 +217,7 @@
       "noReverse": null,
       "extraLang": {},
       "loopRefs": [
-        "handler/FeatherTwitcherHandler.java:535 tick(i)"
+        "handler/FeatherTwitcherHandler.java:548 tick(i)"
       ]
     },
     {
@@ -1474,10 +1474,10 @@
             "unitText": "%s / %s"
           },
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:367 on",
-            "handler/curse/ZeroforgeCurse.java:372 on",
-            "handler/curse/ZeroforgeCurse.java:374 tick",
-            "handler/curse/ZeroforgeCurse.java:380 on"
+            "handler/curse/ZeroforgeCurse.java:365 on",
+            "handler/curse/ZeroforgeCurse.java:370 on",
+            "handler/curse/ZeroforgeCurse.java:372 tick",
+            "handler/curse/ZeroforgeCurse.java:378 on"
           ]
         },
         {
@@ -1500,25 +1500,25 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:421 on",
-            "handler/curse/ZeroforgeCurse.java:426 rev",
-            "handler/curse/ZeroforgeCurse.java:1599 on",
-            "handler/curse/ZeroforgeCurse.java:1601 tick"
+            "handler/curse/ZeroforgeCurse.java:419 on",
+            "handler/curse/ZeroforgeCurse.java:424 rev",
+            "handler/curse/ZeroforgeCurse.java:1557 on",
+            "handler/curse/ZeroforgeCurse.java:1559 tick"
           ]
         },
         {
           "n": 3,
           "maskBit": 52,
           "name": "誓约·锈契",
-          "curse": "§c攻击 15% 概率丢失 + 掉落物数量 -1",
+          "curse": "§c攻击 15% 概率丢失",
           "cond": "累计 100 次攻击丢失",
-          "after": "§a攻击不再丢失、掉落数量不再减少",
+          "after": "§a攻击不再丢失",
           "merged": null,
           "en": {
             "name": "Oath·Rusted Pact",
-            "curse": "§c15% chance to miss attacks; dropped item count -1",
+            "curse": "§c15% chance to miss attacks",
             "cond": "Miss 100 attacks in total",
-            "after": "§aAttacks no longer miss; drop count no longer reduced"
+            "after": "§aAttacks no longer miss"
           },
           "target": {
             "goal": 100,
@@ -1526,11 +1526,10 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:482 on",
-            "handler/curse/ZeroforgeCurse.java:492 tick",
-            "handler/curse/ZeroforgeCurse.java:513 on",
-            "handler/curse/ZeroforgeCurse.java:523 tick",
-            "handler/curse/ZeroforgeCurse.java:554 on"
+            "handler/curse/ZeroforgeCurse.java:480 on",
+            "handler/curse/ZeroforgeCurse.java:490 tick",
+            "handler/curse/ZeroforgeCurse.java:511 on",
+            "handler/curse/ZeroforgeCurse.java:521 tick"
           ]
         },
         {
@@ -1553,11 +1552,11 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:586 on",
-            "handler/curse/ZeroforgeCurse.java:594 rev",
-            "handler/curse/ZeroforgeCurse.java:623 on",
-            "handler/curse/ZeroforgeCurse.java:1609 tick",
-            "handler/curse/ZeroforgeCurse.java:1631 rev"
+            "handler/curse/ZeroforgeCurse.java:544 on",
+            "handler/curse/ZeroforgeCurse.java:552 rev",
+            "handler/curse/ZeroforgeCurse.java:581 on",
+            "handler/curse/ZeroforgeCurse.java:1567 tick",
+            "handler/curse/ZeroforgeCurse.java:1589 rev"
           ]
         },
         {
@@ -1580,12 +1579,12 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:689 on",
+            "handler/curse/ZeroforgeCurse.java:647 on",
+            "handler/curse/ZeroforgeCurse.java:655 on",
+            "handler/curse/ZeroforgeCurse.java:671 on",
             "handler/curse/ZeroforgeCurse.java:697 on",
-            "handler/curse/ZeroforgeCurse.java:713 on",
-            "handler/curse/ZeroforgeCurse.java:739 on",
-            "handler/curse/ZeroforgeCurse.java:754 rev",
-            "handler/curse/ZeroforgeCurse.java:1612 tick"
+            "handler/curse/ZeroforgeCurse.java:712 rev",
+            "handler/curse/ZeroforgeCurse.java:1570 tick"
           ]
         },
         {
@@ -1608,12 +1607,12 @@
             "unitText": "%s 次 / %s 次"
           },
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:598 rev",
-            "handler/curse/ZeroforgeCurse.java:833 on",
-            "handler/curse/ZeroforgeCurse.java:835 on",
-            "handler/curse/ZeroforgeCurse.java:940 rev",
-            "handler/curse/ZeroforgeCurse.java:958 on",
-            "handler/curse/ZeroforgeCurse.java:963 tick"
+            "handler/curse/ZeroforgeCurse.java:556 rev",
+            "handler/curse/ZeroforgeCurse.java:791 on",
+            "handler/curse/ZeroforgeCurse.java:793 on",
+            "handler/curse/ZeroforgeCurse.java:898 rev",
+            "handler/curse/ZeroforgeCurse.java:916 on",
+            "handler/curse/ZeroforgeCurse.java:921 tick"
           ]
         },
         {
@@ -1636,10 +1635,10 @@
             "unitText": "%s 只 / %s 只"
           },
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:1003 on",
-            "handler/curse/ZeroforgeCurse.java:1044 rev",
-            "handler/curse/ZeroforgeCurse.java:1616 on",
-            "handler/curse/ZeroforgeCurse.java:1617 tick"
+            "handler/curse/ZeroforgeCurse.java:961 on",
+            "handler/curse/ZeroforgeCurse.java:1002 rev",
+            "handler/curse/ZeroforgeCurse.java:1574 on",
+            "handler/curse/ZeroforgeCurse.java:1575 tick"
           ]
         },
         {
@@ -1663,9 +1662,9 @@
           },
           "isBlessing": true,
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:604 rev",
-            "handler/curse/ZeroforgeCurse.java:1140 on",
-            "handler/curse/ZeroforgeCurse.java:1145 tick"
+            "handler/curse/ZeroforgeCurse.java:562 rev",
+            "handler/curse/ZeroforgeCurse.java:1098 on",
+            "handler/curse/ZeroforgeCurse.java:1103 tick"
           ]
         },
         {
@@ -1689,10 +1688,10 @@
           },
           "isBlessing": true,
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:1152 on",
-            "handler/curse/ZeroforgeCurse.java:1154 tick",
-            "handler/curse/ZeroforgeCurse.java:1163 rev",
-            "handler/curse/ZeroforgeCurse.java:1164 on"
+            "handler/curse/ZeroforgeCurse.java:1110 on",
+            "handler/curse/ZeroforgeCurse.java:1112 tick",
+            "handler/curse/ZeroforgeCurse.java:1121 rev",
+            "handler/curse/ZeroforgeCurse.java:1122 on"
           ]
         },
         {
@@ -1716,12 +1715,12 @@
           },
           "isBlessing": true,
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:607 rev",
-            "handler/curse/ZeroforgeCurse.java:1184 on",
-            "handler/curse/ZeroforgeCurse.java:1188 setProgress",
-            "handler/curse/ZeroforgeCurse.java:1191 reach",
-            "handler/curse/ZeroforgeCurse.java:1196 on",
-            "handler/curse/ZeroforgeCurse.java:1196 rev"
+            "handler/curse/ZeroforgeCurse.java:565 rev",
+            "handler/curse/ZeroforgeCurse.java:1142 on",
+            "handler/curse/ZeroforgeCurse.java:1146 setProgress",
+            "handler/curse/ZeroforgeCurse.java:1149 reach",
+            "handler/curse/ZeroforgeCurse.java:1154 on",
+            "handler/curse/ZeroforgeCurse.java:1154 rev"
           ]
         },
         {
@@ -1745,10 +1744,10 @@
           },
           "isBlessing": true,
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:613 rev",
-            "handler/curse/ZeroforgeCurse.java:1302 on",
-            "handler/curse/ZeroforgeCurse.java:1305 setProgress",
-            "handler/curse/ZeroforgeCurse.java:1308 reach"
+            "handler/curse/ZeroforgeCurse.java:571 rev",
+            "handler/curse/ZeroforgeCurse.java:1260 on",
+            "handler/curse/ZeroforgeCurse.java:1263 setProgress",
+            "handler/curse/ZeroforgeCurse.java:1266 reach"
           ]
         },
         {
@@ -1772,11 +1771,11 @@
           },
           "isBlessing": true,
           "refs": [
+            "handler/curse/ZeroforgeCurse.java:1298 on",
+            "handler/curse/ZeroforgeCurse.java:1300 rev",
             "handler/curse/ZeroforgeCurse.java:1340 on",
-            "handler/curse/ZeroforgeCurse.java:1342 rev",
-            "handler/curse/ZeroforgeCurse.java:1382 on",
-            "handler/curse/ZeroforgeCurse.java:1386 setProgress",
-            "handler/curse/ZeroforgeCurse.java:1389 reach"
+            "handler/curse/ZeroforgeCurse.java:1344 setProgress",
+            "handler/curse/ZeroforgeCurse.java:1347 reach"
           ]
         },
         {
@@ -1800,10 +1799,10 @@
           },
           "isBlessing": true,
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:1425 on",
-            "handler/curse/ZeroforgeCurse.java:1426 tick",
-            "handler/curse/ZeroforgeCurse.java:1428 rev",
-            "handler/curse/ZeroforgeCurse.java:1429 on"
+            "handler/curse/ZeroforgeCurse.java:1383 on",
+            "handler/curse/ZeroforgeCurse.java:1384 tick",
+            "handler/curse/ZeroforgeCurse.java:1386 rev",
+            "handler/curse/ZeroforgeCurse.java:1387 on"
           ]
         },
         {
@@ -1827,11 +1826,11 @@
           },
           "isBlessing": true,
           "refs": [
-            "handler/curse/ZeroforgeCurse.java:1443 on",
-            "handler/curse/ZeroforgeCurse.java:1444 rev",
-            "handler/curse/ZeroforgeCurse.java:1463 on",
-            "handler/curse/ZeroforgeCurse.java:1467 setProgress",
-            "handler/curse/ZeroforgeCurse.java:1470 reach"
+            "handler/curse/ZeroforgeCurse.java:1401 on",
+            "handler/curse/ZeroforgeCurse.java:1402 rev",
+            "handler/curse/ZeroforgeCurse.java:1421 on",
+            "handler/curse/ZeroforgeCurse.java:1425 setProgress",
+            "handler/curse/ZeroforgeCurse.java:1428 reach"
           ]
         }
       ],

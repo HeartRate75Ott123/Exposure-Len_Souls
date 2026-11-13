@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.network;
 
 import com.plumejade.lensouls.ability.network.AbilityOpenGuiPacket;
+import com.plumejade.lensouls.ability.network.AbilityOrderSetPacket;
 import com.plumejade.lensouls.ability.network.AbilitySelectPacket;
 import com.plumejade.lensouls.ability.network.AbilitySyncPacket;
 import com.plumejade.lensouls.ability.network.CameraAbilitySyncPacket;
@@ -128,6 +129,13 @@ public class PacketHandler {
                 AbilitySelectPacket.TYPE,
                 AbilitySelectPacket.STREAM_CODEC,
                 AbilitySelectPacket::handle
+        );
+
+        // ---- 能力展示顺序上报（菜单拖拽排序）C2S ----
+        registrar.playToServer(
+                AbilityOrderSetPacket.TYPE,
+                AbilityOrderSetPacket.STREAM_CODEC,
+                AbilityOrderSetPacket::handle
         );
 
         registrar.playToServer(

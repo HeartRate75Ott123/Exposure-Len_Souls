@@ -52,6 +52,7 @@ public class AbilityWheelHud {
 
     private static final String KEY_HINT = "gui.lensouls.ability.hint";
     private static final String KEY_HINT_OPEN = "gui.lensouls.ability.hint_open";
+    private static final String KEY_HINT_WHEEL = "gui.lensouls.ability.hint_wheel";
 
     /** 滚轮在单能力下最近一次成功切换的时间戳（Util.getMillis()；0 = 尚未切换过） */
     private static long lastToggleAtMs = 0L;
@@ -202,12 +203,16 @@ public class AbilityWheelHud {
         int up = Math.min(WINDOW_MAX, (size - 1) / 2);
         int down = Math.min(WINDOW_MAX, size - 1 - up);
 
-        // 提示文字（列表上方，&a 绿色）：第一行=左键打开界面，第二行=潜行滚轮切换
-        int hintTop = centerY - up * ROW_HEIGHT - ROW_HEIGHT / 2 - 27;
-        g.drawCenteredString(mc.font, Component.translatable(KEY_HINT_OPEN),
+        // 提示文字（列表上方，&a 绿色）：轮盘 / 左键打开界面 / 潜行滚轮切换
+        int hintTop = centerY - up * ROW_HEIGHT - ROW_HEIGHT / 2 - 38;
+        g.drawCenteredString(mc.font,
+                Component.translatable(KEY_HINT_WHEEL,
+                        com.plumejade.lensouls.key.KeyBindings.abilityWheelKeyName()),
                 x + ROW_WIDTH / 2, hintTop, 0xFF55FF55);
-        g.drawCenteredString(mc.font, Component.translatable(KEY_HINT),
+        g.drawCenteredString(mc.font, Component.translatable(KEY_HINT_OPEN),
                 x + ROW_WIDTH / 2, hintTop + 11, 0xFF55FF55);
+        g.drawCenteredString(mc.font, Component.translatable(KEY_HINT),
+                x + ROW_WIDTH / 2, hintTop + 22, 0xFF55FF55);
 
         // 帧级补间：只把 tick 步进（prev→curr）平滑成连续动画，不插向 target，
         // partialTick 单调递增，永不回跳（修复回跳导致的抽搐与残影）
@@ -293,17 +298,14 @@ public class AbilityWheelHud {
 
     // ========== 数据 ==========
 
-    /** 已解锁能力列表（新解锁最前，与容器 GUI 排序一致） */
+    /**
+     * 已解锁能力列表：取<b>存档级展示顺序</b>里已解锁的那一段。
+     * <p>
+     * 菜单拖拽排序后、轮盘扇区、这份滚动列表三处必须是同一份顺序——
+     * 所以这里不再自己算「解锁倒序」，一律走 {@link ClientAbilityCache#getUnlockedInDisplayOrder()}；
+     * 还没收到同步时该方法内部会回退到旧口径，列表不会空。
+     */
     private static List<AbilityType> getUnlockedList() {
-        List<AbilityType> result = new ArrayList<>();
-        List<AbilityType> order = ClientAbilityCache.getUnlockOrder();
-        for (int i = order.size() - 1; i >= 0; i--) {
-            AbilityType type = order.get(i);
-            if (ClientAbilityCache.isUnlocked(type) && !result.contains(type)) result.add(type);
-        }
-        for (AbilityType type : AbilityType.values()) {
-            if (ClientAbilityCache.isUnlocked(type) && !result.contains(type)) result.add(type);
-        }
-        return result;
+        return ClientAbilityCache.getUnlockedInDisplayOrder();
     }
 }

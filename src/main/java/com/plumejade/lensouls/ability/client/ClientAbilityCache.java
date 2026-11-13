@@ -19,11 +19,13 @@ public class ClientAbilityCache {
     private static long unlockedMask = 0L;
     /** 解锁顺序（旧→新，最近解锁在尾部），GUI 排序用 */
     private static java.util.List<AbilityType> unlockOrder = new java.util.ArrayList<>();
+    /** 存档级展示顺序（全 8 项，玩家拖拽后的顺序）；空 = 尚未同步，回退默认排序 */
+    private static java.util.List<AbilityType> displayOrder = new java.util.ArrayList<>();
     private static boolean spatialWarpActive = false;
     private static Vec3 warpCenter = Vec3.ZERO;
     private static String warpDimension = "";
 
-    public static void set(long unlockedMask, int[] unlockOrder, boolean swActive,
+    public static void set(long unlockedMask, int[] unlockOrder, int[] displayOrder, boolean swActive,
                             double warpX, double warpY, double warpZ, String warpDimension) {
         AbilityType[] values = AbilityType.values();
         spatialWarpActive = swActive;
@@ -32,6 +34,14 @@ public class ClientAbilityCache {
         for (int ordinal : unlockOrder) {
             if (ordinal >= 0 && ordinal < values.length) {
                 ClientAbilityCache.unlockOrder.add(values[ordinal]);
+            }
+        }
+        ClientAbilityCache.displayOrder = new java.util.ArrayList<>();
+        if (displayOrder != null) {
+            for (int ordinal : displayOrder) {
+                if (ordinal >= 0 && ordinal < values.length) {
+                    ClientAbilityCache.displayOrder.add(values[ordinal]);
+                }
             }
         }
         warpCenter = new Vec3(warpX, warpY, warpZ);
@@ -60,6 +70,7 @@ public class ClientAbilityCache {
         currentEnabled = null;
         unlockedMask = 0L;
         unlockOrder = new java.util.ArrayList<>();
+        displayOrder = new java.util.ArrayList<>();
         spatialWarpActive = false;
         warpCenter = Vec3.ZERO;
         warpDimension = "";
@@ -89,6 +100,58 @@ public class ClientAbilityCache {
     /** 解锁顺序（旧→新，最近解锁在尾部），GUI「新解锁排最前」用 */
     public static java.util.List<AbilityType> getUnlockOrder() {
         return unlockOrder;
+    }
+
+    /**
+     * 存档级展示顺序（全 8 项）：菜单 / 轮盘 / 右侧滚动列表三处<b>同源</b>，不漂移。
+     * <p>
+     * 还没收到同步（登录瞬间、或服务端没发过）时按旧口径现算一份默认顺序，
+     * 保证任何时刻都不会出现空列表。
+     */
+    public static java.util.List<AbilityType> getDisplayOrder() {
+        if (displayOrder.isEmpty()) return defaultDisplayOrder();
+        return displayOrder;
+    }
+
+    /**
+     * 客户端乐观写入展示顺序（拖拽落位后立刻生效）。
+     * <p>
+     * 服务端随后会把权威顺序同步回来，这里只是保证「松手 → 立刻关菜单 → 重开」
+     * 这条路径上不会因为同步还没到而显示旧顺序；缺项按枚举序补全，与服务端口径一致。
+     */
+    public static void setDisplayOrder(java.util.List<AbilityType> order) {
+        java.util.List<AbilityType> copy = new java.util.ArrayList<>();
+        if (order != null) {
+            for (AbilityType type : order) {
+                if (type != null && !copy.contains(type)) copy.add(type);
+            }
+        }
+        for (AbilityType type : AbilityType.values()) {
+            if (!copy.contains(type)) copy.add(type);
+        }
+        displayOrder = copy;
+    }
+
+    /** 展示顺序里<b>已解锁</b>的那一段（轮盘扇区、右侧滚动列表用） */
+    public static java.util.List<AbilityType> getUnlockedInDisplayOrder() {
+        java.util.List<AbilityType> result = new java.util.ArrayList<>();
+        for (AbilityType type : getDisplayOrder()) {
+            if (isUnlocked(type) && !result.contains(type)) result.add(type);
+        }
+        return result;
+    }
+
+    /** 默认展示顺序：已解锁按解锁顺序倒序（新解锁最前），未解锁按枚举序在后 */
+    private static java.util.List<AbilityType> defaultDisplayOrder() {
+        java.util.List<AbilityType> order = new java.util.ArrayList<>();
+        for (int i = unlockOrder.size() - 1; i >= 0; i--) {
+            AbilityType type = unlockOrder.get(i);
+            if (isUnlocked(type) && !order.contains(type)) order.add(type);
+        }
+        for (AbilityType type : AbilityType.values()) {
+            if (!order.contains(type)) order.add(type);
+        }
+        return order;
     }
 
     /**

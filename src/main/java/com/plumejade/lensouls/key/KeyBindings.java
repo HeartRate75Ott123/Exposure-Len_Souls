@@ -2,6 +2,9 @@ package com.plumejade.lensouls.key;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.ability.client.ClientAbilityCache;
+import com.plumejade.lensouls.ability.gui.AbilityRadialScreen;
+import com.plumejade.lensouls.ability.handler.CameraInputHandler;
 import com.plumejade.lensouls.client.ClientBarrageState;
 import com.plumejade.lensouls.client.ClientTamedPhotoSubject;
 import com.plumejade.lensouls.component.ModDataComponents;
@@ -48,6 +51,8 @@ public class KeyBindings {
     public static final String KEY_BARRAGE = "key.lensouls.barrage";
     /** 拍摄主体开关：驯服过的生物是否纳入相机拍摄主体选取 */
     public static final String KEY_TAMED_SUBJECT = "key.lensouls.tamed_subject";
+    /** 能力轮盘：长按呼出、松手确认（把指向的能力写进手持相机） */
+    public static final String KEY_ABILITY_WHEEL = "key.lensouls.ability_wheel";
 
     /** 触发模式常量落在公共类上（物品组件与 tooltip 共用），此处仅作别名 */
     public static final int MODE_FAST = ModDataComponents.CONVERTER_MODE_FAST;
@@ -81,8 +86,22 @@ public class KeyBindings {
                     KEY_TAMED_SUBJECT, KeyConflictContext.IN_GAME,
                     InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_BRACKET, KEY_CATEGORY));
 
+    /**
+     * 能力轮盘键（默认 Tab）。长按呼出、松手确认。
+     * <p>
+     * 物理键状态用 {@code InputConstants.isKeyDown} 读，而不是 {@code consumeClick()}：
+     * 轮盘本身是个 Screen，屏幕打开后原版 KeyMapping 的按下/抬起计数不再更新，
+     * 只靠 KeyMapping 会拿不到「松手」这一刻（这是长按型界面的通用坑）。
+     */
+    private static final Lazy<net.minecraft.client.KeyMapping> ABILITY_WHEEL_KEY =
+            Lazy.of(() -> new net.minecraft.client.KeyMapping(
+                    KEY_ABILITY_WHEEL, KeyConflictContext.IN_GAME,
+                    InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_TAB, KEY_CATEGORY));
+
     private static boolean converterKeyHeld = false;
     private static long pressStartNanos = 0;
+    /** 轮盘键上一 tick 是否按着（边沿检测用） */
+    private static boolean wheelKeyHeld = false;
 
     // ========== 触发模式 ==========
 
@@ -121,6 +140,54 @@ public class KeyBindings {
         event.register(PHOTO_GUI_KEY.get());
         event.register(BARRAGE_KEY.get());
         event.register(TAMED_SUBJECT_KEY.get());
+        event.register(ABILITY_WHEEL_KEY.get());
+    }
+
+    // ========== 能力轮盘（长按呼出 / 松手确认） ==========
+
+    @SubscribeEvent
+    public static void onAbilityWheelTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            wheelKeyHeld = false;
+            return;
+        }
+        boolean down = isKeyHeld(mc, ABILITY_WHEEL_KEY.get());
+
+        if (down && !wheelKeyHeld) {
+            wheelKeyHeld = true;
+            if (canOpenWheel(mc)) {
+                mc.setScreen(new AbilityRadialScreen());
+                // Tab 同时是原版「玩家列表」键：屏幕一开 KeyMapping 就不再更新，
+                // 这里主动复位，免得玩家列表一直挂着压在轮盘底下
+                mc.options.keyPlayerList.setDown(false);
+            }
+        } else if (!down && wheelKeyHeld) {
+            wheelKeyHeld = false;
+            if (mc.screen instanceof AbilityRadialScreen screen) {
+                screen.onWheelKeyReleased();
+            }
+        }
+    }
+
+    /** 只有「手持相机 + 至少解锁一个能力 + 当前没有别的界面」才接管这次按键 */
+    private static boolean canOpenWheel(Minecraft mc) {
+        if (mc.screen != null) return false;
+        if (mc.player == null) return false;
+        if (CameraInputHandler.getWieldedCamera(mc.player).isEmpty()) return false;
+        return !ClientAbilityCache.getUnlockedInDisplayOrder().isEmpty();
+    }
+
+    /** 轮盘键的当前键名（HUD 提示用；玩家在操作设置里改键后提示会跟着变） */
+    public static Component abilityWheelKeyName() {
+        return ABILITY_WHEEL_KEY.get().getTranslatedKeyMessage();
+    }
+
+    /** 物理键是否按着（屏幕打开时 KeyMapping 状态不更新，必须直接问窗口） */
+    private static boolean isKeyHeld(Minecraft mc, net.minecraft.client.KeyMapping mapping) {
+        var key = mapping.getKey();
+        if (key.getType() != InputConstants.Type.KEYSYM) return mapping.isDown();
+        return InputConstants.isKeyDown(mc.getWindow().getWindow(), key.getValue());
     }
 
     @SubscribeEvent

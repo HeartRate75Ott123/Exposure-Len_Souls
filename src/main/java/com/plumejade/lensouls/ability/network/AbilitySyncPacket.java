@@ -26,15 +26,18 @@ public class AbilitySyncPacket implements CustomPacketPayload {
     private final long unlockedMask;
     /** 解锁顺序（旧→新，最近解锁在尾部），GUI 排序用 */
     private final int[] unlockOrder;
+    /** 存档级展示顺序（全量 ordinal），菜单 / 轮盘 / 滚动列表三处同源 */
+    private final int[] displayOrder;
     private final boolean spatialWarpActive;
     private final double warpX, warpY, warpZ;
     private final String warpDimension;
 
-    public AbilitySyncPacket(long unlockedMask, int[] unlockOrder,
+    public AbilitySyncPacket(long unlockedMask, int[] unlockOrder, int[] displayOrder,
                              boolean spatialWarpActive,
                              double warpX, double warpY, double warpZ, String warpDimension) {
         this.unlockedMask = unlockedMask;
         this.unlockOrder = unlockOrder;
+        this.displayOrder = displayOrder;
         this.spatialWarpActive = spatialWarpActive;
         this.warpX = warpX;
         this.warpY = warpY;
@@ -48,6 +51,11 @@ public class AbilitySyncPacket implements CustomPacketPayload {
         this.unlockOrder = new int[orderLen];
         for (int i = 0; i < orderLen; i++) {
             this.unlockOrder[i] = buf.readVarInt();
+        }
+        int displayLen = buf.readVarInt();
+        this.displayOrder = new int[displayLen];
+        for (int i = 0; i < displayLen; i++) {
+            this.displayOrder[i] = buf.readVarInt();
         }
         this.spatialWarpActive = buf.readBoolean();
         if (this.spatialWarpActive) {
@@ -67,6 +75,10 @@ public class AbilitySyncPacket implements CustomPacketPayload {
         for (int ordinal : unlockOrder) {
             buf.writeVarInt(ordinal);
         }
+        buf.writeVarInt(displayOrder.length);
+        for (int ordinal : displayOrder) {
+            buf.writeVarInt(ordinal);
+        }
         buf.writeBoolean(spatialWarpActive);
         if (spatialWarpActive) {
             buf.writeDouble(warpX);
@@ -84,7 +96,7 @@ public class AbilitySyncPacket implements CustomPacketPayload {
 
     public static void handle(AbilitySyncPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
-            ClientAbilityCache.set(packet.unlockedMask, packet.unlockOrder,
+            ClientAbilityCache.set(packet.unlockedMask, packet.unlockOrder, packet.displayOrder,
                     packet.spatialWarpActive, packet.warpX, packet.warpY, packet.warpZ, packet.warpDimension);
         });
     }

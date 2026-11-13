@@ -191,8 +191,14 @@ public class AbilityManager {
             wx = c.x; wy = c.y; wz = c.z;
             wDim = data.getWarpDimension();
         }
+        // 存档级展示顺序（全量）：菜单拖拽过就用自己的，没拖过就按解锁口径现算
+        java.util.List<AbilityType> display = AbilityOrderData.get(player.getServer()).resolve(player);
+        int[] displayOrder = new int[display.size()];
+        for (int i = 0; i < display.size(); i++) {
+            displayOrder[i] = display.get(i).ordinal();
+        }
         PacketDistributor.sendToPlayer(player,
-                new AbilitySyncPacket(unlockedMask, unlockOrder, swActive, wx, wy, wz, wDim));
+                new AbilitySyncPacket(unlockedMask, unlockOrder, displayOrder, swActive, wx, wy, wz, wDim));
     }
 
     // ========== 持久化 ==========

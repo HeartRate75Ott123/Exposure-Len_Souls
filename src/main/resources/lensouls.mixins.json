@@ -42,6 +42,8 @@
     "client.ItemRendererOutlineMixin",
     "client.ItemRendererAccessor",
     "client.ItemInHandLayerMixin",
+    "client.VirtualHandCameraMixin",
+    "client.VirtualHandPlayerMixin",
     "client.PlayerClientMixin",
     "client.MultiPlayerGameModeMixin",
     "client.GameRendererFrameEndMixin",

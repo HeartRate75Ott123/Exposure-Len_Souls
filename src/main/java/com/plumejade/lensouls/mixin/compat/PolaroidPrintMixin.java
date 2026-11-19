@@ -2,6 +2,7 @@ package com.plumejade.lensouls.mixin.compat;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.PhotoInjector;
+import io.github.mortuusars.exposure.Exposure;
 import io.github.mortuusars.exposure.world.camera.frame.Frame;
 import io.github.mortuusars.exposure.world.entity.CameraHolder;
 import net.minecraft.core.component.DataComponents;
@@ -36,6 +37,9 @@ import java.util.Set;
 public class PolaroidPrintMixin {
 
     @Unique
+    private static final ThreadLocal<Boolean> suppressClientInsert = ThreadLocal.withInitial(() -> false);
+
+    @Unique
     private static final ThreadLocal<ItemStack> capturedPhoto = new ThreadLocal<>();
 
     @Unique
@@ -44,18 +48,28 @@ public class PolaroidPrintMixin {
     @Unique
     private static final Set<String> SPECIAL_GROUPS = Set.of("weakness_lens", "spatial_warp", "temporal_recall", "ability_steal");
 
+    // ── 记录本次出片跑在哪一侧 ──
+    @Inject(method = "printPhotograph", at = @At("HEAD"), require = 0)
+    private static void lensouls$markSide(
+            CameraHolder holder, ItemStack cameraStack, Frame frame, CallbackInfo ci) {
+        // 非 cancellable，ci 不参与；descriptor 必须与 RETURN 那条保持一致，否则整条 mixin 会被判非法。
+        suppressClientInsert.set(holder.asHolderEntity().level().isClientSide);
+    }
+
     // ── 空空插槽路径 ──
-    @ModifyArg(method = "printPhotograph", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Inventory;setItem(ILnet/minecraft/world/item/ItemStack;)V"), index = 1, require = 0)
-    private static ItemStack lensouls$captureSetItem(ItemStack stack) {
+    @Redirect(method = "printPhotograph", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Inventory;setItem(ILnet/minecraft/world/item/ItemStack;)V"), require = 0)
+    private static void lensouls$captureSetItem(net.minecraft.world.entity.player.Inventory inventory, int slot, ItemStack stack) {
+        if (suppressClientInsert.get()) return;
         LenSouls.LOGGER.debug("[Polaroid] capture: setItem");
         if (stack.getItem() instanceof io.github.mortuusars.exposure.world.item.PhotographItem) capturedPhoto.set(stack);
-        return stack;
+        inventory.setItem(slot, stack);
     }
 
     // ── 堆叠路径：记下照片 + 目标堆，并照常调用 ──
     @Redirect(method = "printPhotograph", at = @At(value = "INVOKE", target = "Lio/github/mortuusars/exposure/world/item/StackedPhotographsItem;addPhotographOnTop(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemStack;)V"), require = 0)
     private static void lensouls$captureStackTarget(io.github.mortuusars.exposure.world.item.StackedPhotographsItem item,
                                                     ItemStack target, ItemStack photo) {
+        if (suppressClientInsert.get()) return;
         if (photo.getItem() instanceof io.github.mortuusars.exposure.world.item.PhotographItem) {
             capturedPhoto.set(photo);
             capturedStack.set(target);
@@ -64,11 +78,12 @@ public class PolaroidPrintMixin {
     }
 
     // ── 背包满时直接丢地上路径 ──
-    @ModifyArg(method = "printPhotograph", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;drop(Lnet/minecraft/world/item/ItemStack;ZZ)Lnet/minecraft/world/entity/item/ItemEntity;"), index = 0, require = 0)
-    private static ItemStack lensouls$captureDrop(ItemStack stack) {
+    @Redirect(method = "printPhotograph", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Player;drop(Lnet/minecraft/world/item/ItemStack;ZZ)Lnet/minecraft/world/entity/item/ItemEntity;"), require = 0)
+    private static net.minecraft.world.entity.item.ItemEntity lensouls$captureDrop(net.minecraft.world.entity.player.Player player, ItemStack stack, boolean dropAround, boolean traceItem) {
+        if (suppressClientInsert.get()) return null;
         LenSouls.LOGGER.debug("[Polaroid] capture: drop");
         if (stack.getItem() instanceof io.github.mortuusars.exposure.world.item.PhotographItem) capturedPhoto.set(stack);
-        return stack;
+        return player.drop(stack, dropAround, traceItem);
     }
 
     @Inject(method = "printPhotograph", at = @At("RETURN"), require = 0)
@@ -78,6 +93,7 @@ public class PolaroidPrintMixin {
         capturedPhoto.remove();
         ItemStack target = capturedStack.get();
         capturedStack.remove();
+        suppressClientInsert.remove();
 
         if (!(holder.asHolderEntity() instanceof ServerPlayer player)) return;
 
@@ -85,35 +101,182 @@ public class PolaroidPrintMixin {
         PhotoInjector.inject(photo, frame, player, true, "polaroid");
 
         lensouls$divertToOwnStack(photo, target, player);
+        lensouls$splitMixedStacks(player);
+        lensouls$normalizeSinglePhotoStacks(player);
+        // 客户端已在插入点被挡掉（suppressClientInsert），不会再出现「本地多一张」，
+        // 所以不需要整包重发；服务端 setItem/add 的改动会按原版通道同步。
     }
 
-    /** 特殊能力照片若被塞进了不匹配的堆，摘出来另起一堆。 */
+    /**
+     * 特殊能力照片若被塞进了「另一种能力」或「普通照片」的堆，摘出来单独归位。
+     * <p>
+     * <b>坑 1（2026-11-20 用户实测「能力窃取和空间扭曲还是混在一起」）</b>：
+     * 原实现拿 {@code getPhotographs(target).getItemUnsafe(0)} 当「这堆的分组」去比，
+     * 而 index 0 就是刚插进去的这张（{@code addPhotographOnTop} = {@code add(0, photo)}），
+     * 永远和自己相等、永远提前 return。⇒ 必须跟 <b>index 1..n</b> 的其余照片比。
+     * <p>
+     * <b>坑 2（同日「堆成了一个空照片堆，右键拖出来只剩空壳」）</b>：
+     * 原修法把摘出来的那张塞进 {@code new ItemStack(stacked_photographs)} 造了<b>只装 1 张的堆</b>，
+     * 而原版 {@code overrideOtherStackedOnMe} 拿照片时是「先 remove 再判 size()==1」——
+     * 1 张的堆被判成 0 张，槽里就留下一个<b>没有照片的堆物品</b>（空壳）。
+     * 原版世界里永远不存在 1 张的堆（降到 1 张就换回单张照片实体），所以这里必须遵守同一不变量：
+     * <b>绝不造 1 张的堆</b>——先找身上同组且有位的堆塞进去，找不到就让它以单张照片存在。
+     */
     @Unique
     private static void lensouls$divertToOwnStack(ItemStack photo, ItemStack target, ServerPlayer player) {
         if (photo == null || photo.isEmpty() || target == null || target.isEmpty()) return;
 
         String ability = lensouls$ability(photo);
-        if (ability == null || !SPECIAL_GROUPS.contains(ability)) return;
+        String photoGroup = lensouls$group(photo);
 
         if (!(target.getItem() instanceof io.github.mortuusars.exposure.world.item.StackedPhotographsItem item)) return;
 
-        // 目标堆里第一张照片的能力 = 这一堆的分组
         var photographs = item.getPhotographs(target);
-        if (photographs.size() <= 0) return;
-        String stackAbility = lensouls$ability(photographs.getItemUnsafe(0));
-        if (ability.equals(stackAbility)) return; // 同能力的堆，允许（继续往里放）
+        if (photographs.isEmpty()) return;
 
-        // 刚插进来的一定是 index 0；直接改组件（removePhotograph 返回的是 ItemAndStack 包装）
-        ItemStack removed = photographs.getItemUnsafe(0);
-        if (removed.isEmpty()) return;
-        item.setPhotographs(target, photographs.remove(0));
+        // 只认「刚插进 index 0、且就是我们这张」的堆：拿帧号核对，避免 ThreadLocal 带旧值时
+        // 把别人的堆写坏（帧号是这张照片的身份，副本也带得走，比对象同一性可靠）。
+        var topFrame = photographs.getItemUnsafe(0).get(Exposure.DataComponents.PHOTOGRAPH_FRAME);
+        var photoFrame = photo.get(Exposure.DataComponents.PHOTOGRAPH_FRAME);
+        if (topFrame == null || photoFrame == null || !topFrame.equals(photoFrame)) return;
 
-        ItemStack fresh = new ItemStack(item);
-        item.addPhotographOnTop(fresh, removed);
-        if (!player.getInventory().add(fresh)) {
-            player.drop(fresh, false);
+        // ① 进堆时这张可能还没有能力数据（注入在 addPhotographOnTop 之后），把注入后的栈写回 index 0
+        var withInjected = photographs.remove(0).add(0, photo);
+
+        // ② 与堆里其余照片比分组：有一张不同组就算混装。
+        //   组键：特殊能力 = 能力名；普通照片 = ""。**两个方向都要拆**——
+        //   特殊照片落进普通/别的能力的堆（旧口径），以及
+        //   普通照片落进特殊能力的堆（2026-11-20 用户实测「拍两次，堆里凭空多了一张普通照片」）。
+        boolean mixed = false;
+        for (int i = 1; i < withInjected.size(); i++) {
+            if (!photoGroup.equals(lensouls$group(withInjected.getItemUnsafe(i)))) {
+                mixed = true;
+                break;
+            }
         }
-        LenSouls.LOGGER.debug("[Polaroid] 特殊照片另起一堆: ability={}", ability);
+        item.setPhotographs(target, withInjected);
+        if (!mixed) return;
+
+        // ③ 从这堆摘掉这一张（摘完至少还剩 1 张，不会留下空壳）
+        item.setPhotographs(target, withInjected.remove(0));
+
+        // ④ 归位：优先塞进身上同组且有位的堆；没有就以单张照片存在（绝不造 1 张的堆）。
+        //    注意只能用**栈对象同一性**跳过刚被摘的那个槽 —— 之前写成 other == item（物品单例比较）
+        //    永远为真，等于把这段合并整个跳过，所有照片都退化成了单张。
+        var inventory = player.getInventory();
+        for (int i = 0; i < inventory.items.size(); i++) {
+            ItemStack slotStack = inventory.items.get(i);
+            if (slotStack.isEmpty() || slotStack == target) continue;
+            if (!(slotStack.getItem() instanceof io.github.mortuusars.exposure.world.item.StackedPhotographsItem other)) continue;
+            var inner = other.getPhotographs(slotStack);
+            if (inner.isEmpty()) continue;
+            if (!photoGroup.equals(lensouls$group(inner.getItemUnsafe(0)))) continue;
+            if (!other.canAddPhotograph(slotStack)) continue;
+            other.addPhotographOnTop(slotStack, photo);
+            LenSouls.LOGGER.debug("[Polaroid] 照片并入同组堆: group={} size={}", photoGroup, other.getPhotographs(slotStack).size());
+            return;
+        }
+
+        if (!inventory.add(photo)) {
+            player.drop(photo, false);
+        }
+        LenSouls.LOGGER.debug("[Polaroid] 照片另成单张: group={} ability={}", photoGroup, ability);
+    }
+
+    /**
+     * 追溯整理：把**已经混装**的堆按组拆开。
+     * <p>
+     * 1.8.182 之前形成的堆里可能同时躺着普通照片和不同能力的照片（分流只处理「新进堆的那张」，
+     * 旧内容不管）；用户「把堆掀开」时看到的就是这些。这里在每次出片后顺手扫一遍背包：
+     * 第一组留在原格（只剩 1 张就还原成单张照片，绝不造 1 张的堆），其余组逐张归位。
+     */
+    @Unique
+    private static void lensouls$splitMixedStacks(ServerPlayer player) {
+        var inventory = player.getInventory();
+        for (int i = 0; i < inventory.items.size(); i++) {
+            ItemStack stack = inventory.items.get(i);
+            if (stack.isEmpty() || !(stack.getItem() instanceof io.github.mortuusars.exposure.world.item.StackedPhotographsItem item)) continue;
+            var photographs = item.getPhotographs(stack);
+            if (photographs.size() < 2) continue;
+
+            java.util.LinkedHashMap<String, java.util.ArrayList<ItemStack>> byGroup = new java.util.LinkedHashMap<>();
+            for (int k = 0; k < photographs.size(); k++) {
+                ItemStack inner = photographs.getItemUnsafe(k);
+                byGroup.computeIfAbsent(lensouls$group(inner), key -> new java.util.ArrayList<>()).add(inner);
+            }
+            if (byGroup.size() < 2) continue;
+
+            var iterator = byGroup.entrySet().iterator();
+            var first = iterator.next();
+            if (first.getValue().size() == 1) {
+                inventory.setItem(i, first.getValue().get(0));
+            } else {
+                item.setPhotographs(stack, new io.github.mortuusars.exposure.world.item.component.StackedPhotographs(first.getValue()));
+            }
+            while (iterator.hasNext()) {
+                for (ItemStack orphan : iterator.next().getValue()) {
+                    lensouls$placePhoto(orphan, player, stack);
+                }
+            }
+            LenSouls.LOGGER.debug("[Polaroid] 混装堆已拆开 slot={} groups={}", i, byGroup.keySet());
+        }
+    }
+
+    /** 把一张照片归位：优先并进身上同组且有位的堆，否则作为单张照片放进背包（不行就丢地上）。 */
+    @Unique
+    private static void lensouls$placePhoto(ItemStack photo, ServerPlayer player, ItemStack skip) {
+        String group = lensouls$group(photo);
+        var inventory = player.getInventory();
+        for (int i = 0; i < inventory.items.size(); i++) {
+            ItemStack slotStack = inventory.items.get(i);
+            if (slotStack.isEmpty() || slotStack == skip) continue;
+            if (!(slotStack.getItem() instanceof io.github.mortuusars.exposure.world.item.StackedPhotographsItem other)) continue;
+            var inner = other.getPhotographs(slotStack);
+            if (inner.isEmpty()) continue;
+            if (!group.equals(lensouls$group(inner.getItemUnsafe(0)))) continue;
+            if (!other.canAddPhotograph(slotStack)) continue;
+            other.addPhotographOnTop(slotStack, photo);
+            return;
+        }
+        if (!inventory.add(photo)) {
+            player.drop(photo, false);
+        }
+    }
+
+    /**
+     * 原版不变量：**不存在只装 1 张照片的堆**（降到 1 张就会换回单张 photograph 物品）。
+     * <p>
+     * {@code InstantCameraItem.printPhotograph} 有一条"背包里有单张照片 → 新建一个堆把两张都塞进去"的
+     * 路径，我们分流时会把刚拍的那张从新建的堆里摘走，于是一个只装 1 张的堆被 {@code setItem} 放进背包，
+     * 玩家拖它出来时原版先 remove 再判 {@code size()==1}，判成 0 张 ⇒ 槽里留下**空壳**。
+     * 所以每次出片分流后，把背包里所有"只剩 1 张的堆"还原成那张照片本身。
+     */
+    @Unique
+    private static void lensouls$normalizeSinglePhotoStacks(ServerPlayer player) {
+        var inv = player.getInventory();
+        for (int i = 0; i < inv.items.size(); i++) {
+            ItemStack stack = inv.items.get(i);
+            if (stack.isEmpty()) continue;
+            if (!(stack.getItem() instanceof io.github.mortuusars.exposure.world.item.StackedPhotographsItem item)) continue;
+            var photographs = item.getPhotographs(stack);
+            if (photographs.size() != 1) continue;
+            inv.setItem(i, photographs.getItemUnsafe(0).copy());
+            LenSouls.LOGGER.debug("[Polaroid] 单张堆还原成照片 slot={}", i);
+        }
+        if (!inv.offhand.isEmpty()) {
+            ItemStack off = inv.offhand.get(0);
+            if (!off.isEmpty() && off.getItem() instanceof io.github.mortuusars.exposure.world.item.StackedPhotographsItem item) {
+                var photographs = item.getPhotographs(off);
+                if (photographs.size() == 1) inv.offhand.set(0, photographs.getItemUnsafe(0).copy());
+            }
+        }
+    }
+
+    /** 分组键：特殊能力名；普通照片返回空串。 */
+    @Unique
+    private static String lensouls$group(ItemStack stack) {
+        String ability = lensouls$ability(stack);
+        return ability != null && SPECIAL_GROUPS.contains(ability) ? ability : "";
     }
 
     @Unique

@@ -46,7 +46,19 @@ public class SoulSeverHandler {
         if (!isViewfinderOpen(stack)) return;
 
         event.setCanceled(true);
+        runSever(player, stack);
+    }
 
+    /** 饰品栏相机快门入口（原理同 {@link VitalStrikeHandler#tryCurioShot}）。 */
+    public static boolean tryCurioShot(ServerPlayer player, ItemStack stack) {
+        if (!isCamera(stack)) return false;
+        if (CameraAbilityStore.getSelected(player) != AbilityType.SOUL_SEVER) return false;
+        if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), stack) <= 0) return false;
+        runSever(player, stack);
+        return true;
+    }
+
+    private static void runSever(ServerPlayer player, ItemStack stack) {
         LivingEntity target = findTarget(player);
         if (target == null || target.isDeadOrDying()) {
             failSound(player, player.getX(), player.getY(), player.getZ());

@@ -128,6 +128,14 @@ public class CameraInputHandler {
         if (isCamera(main)) return main;
         ItemStack off = player.getOffhandItem();
         if (isCamera(off)) return off;
+        // 饰品栏相机正在取景时，视同「手上这台」——能力 HUD/轮盘/服务端校验全都靠这个方法定位相机，
+        // 不补这条就会表现为「从饰品栏打开取景后当前能力丢失」。
+        if (player instanceof io.github.mortuusars.exposure.world.entity.CameraOperator operator) {
+            if (operator.getActiveExposureCamera() instanceof com.plumejade.lensouls.ability.camera.CameraInCurio curio) {
+                ItemStack curioStack = curio.getItemStack();
+                if (isCamera(curioStack)) return curioStack;
+            }
+        }
         return ItemStack.EMPTY;
     }
 

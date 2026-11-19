@@ -34,6 +34,8 @@ public final class CameraEquipHandler {
 
     /** 每个玩家上一次同步出去的相机栈快照（只在「饰品栏相机处于取景态」时才用）。 */
     private static final Map<UUID, ItemStack> LAST_SYNCED = new HashMap<>();
+    /** 上一次广播出去的「虚拟手持」显示态（true = 现在客户端看到这人拿着相机）。 */
+    private static final Map<UUID, Boolean> LAST_HAND = new HashMap<>();
 
     private CameraEquipHandler() {
     }
@@ -82,6 +84,7 @@ public final class CameraEquipHandler {
             active.deactivate();
             operator.removeActiveExposureCamera();
             if (activeSlot != null) syncSlot(player, activeSlot, activeIndex);
+            broadcastHand(player, ItemStack.EMPTY);
             if (sameTarget) return;
         }
 
@@ -94,6 +97,7 @@ public final class CameraEquipHandler {
         // 直接改 slot 里的 ItemStack 不会触发 Curios 的变更同步，客户端那份就看不到
         // CAMERA_ACTIVE / 胶卷数变化 —— 写回一次，强制同步。
         syncSlot(player, slotId, index);
+        broadcastHand(player, stack.copy());
         LenSouls.LOGGER.debug("[Camera] 饰品栏相机开取景 slot={} index={}", slotId, index);
     }
 
@@ -123,6 +127,9 @@ public final class CameraEquipHandler {
             Camera active = ((CameraOperator) player).getActiveExposureCamera();
             if (!(active instanceof CameraInCurio curio)) {
                 LAST_SYNCED.remove(player.getUUID());
+                if (Boolean.TRUE.equals(LAST_HAND.get(player.getUUID()))) {
+                    broadcastHand(player, ItemStack.EMPTY);
+                }
                 continue;
             }
             ItemStack current = curio.getItemStack();
@@ -131,7 +138,24 @@ public final class CameraEquipHandler {
             if (previous != null && ItemStack.matches(previous, current)) continue;
             CuriosApi.getCuriosInventory(player).ifPresent(handler ->
                     handler.setEquippedCurio(curio.slotId(), curio.index(), current.copy()));
+            // 相机设置（自拍模式/变焦/胶卷数）就地改在这根栈上，而客户端渲染虚拟手持用的是
+            // 广播时那份快照 —— 不重播的话自拍模式切了模型还停在普通相机。
+            if (Boolean.TRUE.equals(LAST_HAND.get(player.getUUID()))) {
+                broadcastHand(player, current.copy());
+            }
         }
+    }
+
+    /**
+     * 广播「该玩家此刻看起来手里拿着这台相机」给所有能看到他的人（含自己）。
+     * <p>
+     * 纯显示态：服务端物品栏不动，客户端只在渲染读手持物时替换 —— 所以联机时别人也能看见，
+     * 也不存在凭空多出手持物导致的复制/同步问题。
+     */
+    private static void broadcastHand(ServerPlayer player, ItemStack stack) {
+        LAST_HAND.put(player.getUUID(), !stack.isEmpty());
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+                player, new com.plumejade.lensouls.ability.network.VirtualHandPacket(player.getId(), stack));
     }
 
     /** 把槽里那份 ItemStack 原样写回，触发 Curios 的变更同步（服务端→客户端）。 */

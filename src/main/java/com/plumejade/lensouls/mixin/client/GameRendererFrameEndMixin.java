@@ -48,6 +48,8 @@ public class GameRendererFrameEndMixin {
         com.plumejade.lensouls.client.hud.VitalDenyOverlay.render();
         // 同一件事的默认形态（没装机械眼时）：屏幕上方正中一枚原版虚弱小图标，0.3s
         com.plumejade.lensouls.client.hud.HyperArmorDenyIcon.render();
+        // 取景器里的能力轮盘：必须在所有 GUI 之后画，取景器打开时才看得见
+        com.plumejade.lensouls.ability.gui.AbilityWheelOverlay.render();
     }
 
     /**

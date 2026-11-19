@@ -12,7 +12,7 @@
     "LightroomInjectMixin",
     "PolaroidPrintMixin",
     "CameraCurioMixin",
-    "CameraAttachmentPositionsMixin",
+    "ExposureViewfinderRecoilMixin",
     "PhotographCurioMixin",
     "CataclysmDamageBucketMixin",
     "LegendaryMonstersCapMixin",

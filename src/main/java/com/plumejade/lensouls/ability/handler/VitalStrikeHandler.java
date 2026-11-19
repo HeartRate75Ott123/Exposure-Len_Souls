@@ -59,7 +59,24 @@ public class VitalStrikeHandler {
 
         // ── 取消事件 + 不消耗相纸 + 直接削韧 ──
         event.setCanceled(true);
+        runStrike(player, stack);
+    }
 
+    /**
+     * 饰品栏相机快门的入口。Exposure 手持右键那条链路对饰品相机不存在，
+     * 若不在这里补一刀，取景框里能力特效照常、按下快门却什么都不发生。
+     *
+     * @return true = 这一下已被能力接管，调用方不要再 {@code release()}（不消耗相纸）
+     */
+    public static boolean tryCurioShot(ServerPlayer player, ItemStack stack) {
+        if (!isCamera(stack)) return false;
+        if (CameraAbilityStore.getSelected(player) != AbilityType.VITAL_STRIKE) return false;
+        if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), stack) <= 0) return false;
+        runStrike(player, stack);
+        return true;
+    }
+
+    private static void runStrike(ServerPlayer player, ItemStack stack) {
         // ── 寻找瞄准的 BOSS ──
         List<LivingEntity> bosses = findAllBossesInSight(player);
         if (bosses.isEmpty()) return;

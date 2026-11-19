@@ -216,19 +216,46 @@ public class KeyBindings {
         }
         boolean down = isKeyHeld(mc, ABILITY_WHEEL_KEY.get());
 
+        // 取景器没了 / 中途开了别的界面 ⇒ 覆盖层轮盘跟着收，避免"看不见的轮盘还在吃鼠标"
+        if (com.plumejade.lensouls.ability.gui.AbilityWheelOverlay.isOpen()
+                && (!viewfinderActive() || mc.screen != null)) {
+            com.plumejade.lensouls.ability.gui.AbilityWheelOverlay.close();
+        }
+
         if (down && !wheelKeyHeld) {
             wheelKeyHeld = true;
             if (canOpenWheel(mc)) {
-                mc.setScreen(new AbilityRadialScreen());
-                // Tab 同时是原版「玩家列表」键：屏幕一开 KeyMapping 就不再更新，
-                // 这里主动复位，免得玩家列表一直挂着压在轮盘底下
-                mc.options.keyPlayerList.setDown(false);
+                if (viewfinderActive()) {
+                    // 取景器里 Gui.render 被 cancel，屏幕类画不出来 ⇒ 走覆盖层形态
+                    com.plumejade.lensouls.ability.gui.AbilityWheelOverlay.open();
+                } else {
+                    mc.setScreen(new AbilityRadialScreen());
+                    // Tab 同时是原版「玩家列表」键：屏幕一开 KeyMapping 就不再更新，
+                    // 这里主动复位，免得玩家列表一直挂着压在轮盘底下
+                    mc.options.keyPlayerList.setDown(false);
+                }
             }
         } else if (!down && wheelKeyHeld) {
             wheelKeyHeld = false;
-            if (mc.screen instanceof AbilityRadialScreen screen) {
+            if (com.plumejade.lensouls.ability.gui.AbilityWheelOverlay.isOpen()) {
+                com.plumejade.lensouls.ability.gui.AbilityWheelOverlay.release();
+            } else if (mc.screen instanceof AbilityRadialScreen screen) {
                 screen.onWheelKeyReleased();
             }
+        }
+    }
+
+    /** 是否正开着 Exposure 取景器（覆盖层形态的轮盘只在此时启用） */
+    private static boolean viewfinderActive() {
+        var viewfinder = io.github.mortuusars.exposure.client.camera.CameraClient.viewfinder();
+        return viewfinder != null && viewfinder.isLookingThrough();
+    }
+
+    /** 覆盖层轮盘开着时把鼠标点击吃掉，免得松手那一下顺手打出攻击/放方块。 */
+    @SubscribeEvent
+    public static void onMouseButton(InputEvent.MouseButton.Pre event) {
+        if (com.plumejade.lensouls.ability.gui.AbilityWheelOverlay.isOpen()) {
+            event.setCanceled(true);
         }
     }
 

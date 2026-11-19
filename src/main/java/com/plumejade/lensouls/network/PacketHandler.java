@@ -83,6 +83,13 @@ public class PacketHandler {
                 com.plumejade.lensouls.ability.network.CameraDrawPacket::handle
         );
 
+        // ---- 虚拟手持（显示态，S2C） ----
+        registrar.playToClient(
+                com.plumejade.lensouls.ability.network.VirtualHandPacket.TYPE,
+                com.plumejade.lensouls.ability.network.VirtualHandPacket.STREAM_CODEC,
+                com.plumejade.lensouls.ability.network.VirtualHandPacket::handle
+        );
+
         // ---- 饰品栏相机：按下快门 ----
         registrar.playToServer(
                 com.plumejade.lensouls.ability.network.CameraShootPacket.TYPE,

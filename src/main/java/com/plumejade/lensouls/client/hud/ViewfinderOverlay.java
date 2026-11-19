@@ -181,6 +181,13 @@ public final class ViewfinderOverlay {
      * 主手优先、副手兜底；两个相机同时在手上只要有一个在冷却就算。
      */
     private static boolean cameraOnCooldown(LocalPlayer player) {
+        // 饰品栏相机：快捷取景时两只手其实是空的，只看手持永远判不到冷却，
+        // 于是「冷却中按快门」既没反馈也看不出正在冷却。先问当前活跃相机那根栈。
+        if (((io.github.mortuusars.exposure.world.entity.CameraOperator) player)
+                .getActiveExposureCamera() instanceof io.github.mortuusars.exposure.world.camera.Camera active
+                && isCoolingCamera(player, active.getItemStack())) {
+            return true;
+        }
         ItemStack main = player.getMainHandItem();
         if (isCoolingCamera(player, main)) return true;
         return isCoolingCamera(player, player.getOffhandItem());

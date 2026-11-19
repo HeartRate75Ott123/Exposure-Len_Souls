@@ -386,6 +386,9 @@ public class LenSoulsClient {
         // 要害打击：红色魂尘
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.SOUL_WISP_RED.get(),
                 com.plumejade.lensouls.client.particle.SoulWispParticle.RedProvider::new);
+        // 时间定格拒绝：蓝色魂火（仿夺魂索命失败版）
+        event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.SOUL_WISP_BLUE.get(),
+                com.plumejade.lensouls.client.particle.SoulWispParticle.BlueProvider::new);
 
         // 韧性粒子
         event.registerSpriteSet(com.plumejade.lensouls.particle.ModParticleTypes.TOUGHNESS_HIT.get(),

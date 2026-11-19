@@ -25,6 +25,25 @@ public class PhotoBadgeIcon {
 
     private static final Map<ResourceLocation, ItemStack> CACHE = new HashMap<>();
 
+    /** 需要角标的能力照片：贴图直接用对应能力球物品（{@code textures/item/skill_ball/<id>.png}） */
+    private static final java.util.Set<String> ABILITY_BADGES =
+            java.util.Set.of("weakness_lens", "spatial_warp", "temporal_recall");
+
+    /**
+     * 空间扭曲 / 时空回溯照片的角标：返回对应能力球物品（渲染出来就是那张能力球贴图）。
+     * 其它能力、空 id、物品不存在都返回 null（不画角标）。
+     */
+    @Nullable
+    public static ItemStack getAbilityBadge(@Nullable String abilityId) {
+        if (abilityId == null || !ABILITY_BADGES.contains(abilityId)) return null;
+        com.plumejade.lensouls.ability.AbilityType type =
+                com.plumejade.lensouls.ability.AbilityType.byId(abilityId);
+        if (type == null) return null;
+        Item item = BuiltInRegistries.ITEM.get(type.getIconItemId());
+        if (item == Items.AIR) return null;
+        return new ItemStack(item);
+    }
+
     @Nullable
     public static ItemStack getEggStack(@Nullable ResourceLocation entityId) {
         if (entityId == null) return null;

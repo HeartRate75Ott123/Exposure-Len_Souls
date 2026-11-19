@@ -95,12 +95,12 @@ public class ToughnessDamageHandler {
             if (!(event.getEntity() instanceof LivingEntity target)) return;
             if (event.getNewDamage() <= 0f) return;
             // 只统计玩家造成的伤害（getEntity 为最终来源，投射物归属射手）
-            if (!(event.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer)) return;
+            if (!(event.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer player)) return;
 
-            BossToughnessManager.getInstance().addStunDamage(target, event.getNewDamage());
+            BossToughnessManager.getInstance().addStunDamage(target, event.getNewDamage(), player);
             // 时间定格定身：同口径统计伤害，达标提前解冻该实体（共用 toughStunBreakDamagePercent 阈值）
             com.plumejade.lensouls.ability.util.TimeFreezeManager.getInstance()
-                    .addFreezeDamage(target, event.getNewDamage());
+                    .addFreezeDamage(target, event.getNewDamage(), player);
         } catch (Exception e) {
             long now = event.getEntity().level().getGameTime();
             if (now - lastErrorTick > 100L) {

@@ -25,6 +25,11 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class AbilityBehavior {
 
+    /** 空间扭曲照片：拍摄坐标（CompoundTag: x / y / z） */
+    public static final String TAG_WARP_POS = "lensouls:spatial_warp_pos";
+    /** 空间扭曲照片：拍摄维度（ResourceLocation 字符串；1.8.146 之前的照片没有这个键） */
+    public static final String TAG_WARP_DIM = "lensouls:spatial_warp_dim";
+
     private AbilityBehavior() {
     }
 
@@ -86,14 +91,17 @@ public final class AbilityBehavior {
         if (ability == null || frame == null || tag == null) return;
         switch (ability) {
             case SPATIAL_WARP -> {
-                // 记录拍照位置，作为空间扭曲球心
+                // 记录拍照位置（球心）与所在维度。维度必须一起存：激活时以照片维度为准，
+                // 跨维度直接拒绝，而不是把 A 维的数字硬套到 B 维（会凭空出现一个错位的球）。
                 Vec3 pos = frame.extraData().get(Frame.POSITION).orElse(null);
                 if (pos != null) {
                     CompoundTag posTag = new CompoundTag();
                     posTag.putDouble("x", pos.x);
                     posTag.putDouble("y", pos.y);
                     posTag.putDouble("z", pos.z);
-                    tag.put("lensouls:spatial_warp_pos", posTag);
+                    tag.put(TAG_WARP_POS, posTag);
+                    frame.extraData().get(Frame.DIMENSION)
+                            .ifPresent(dim -> tag.putString(TAG_WARP_DIM, dim.toString()));
                 }
             }
             case TEMPORAL_RECALL -> {

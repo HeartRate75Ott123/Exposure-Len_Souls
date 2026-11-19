@@ -19,7 +19,11 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 照片角标：在 GUI 渲染照片物品时，于左上角叠加来源生物的刷怪蛋图标（保留原版着色）。
+ * 照片角标：在 GUI 渲染照片物品时，于左上角叠加一个小图标。
+ * <ul>
+ *   <li>能力窃取照片（{@code lensouls:stolen_entity}）→ 来源生物的刷怪蛋图标（保留原版着色）；</li>
+ *   <li>空间扭曲 / 时空回溯照片 → 对应能力球物品（即 {@code skill_ball/<id>.png} 那张贴图）。</li>
+ * </ul>
  * <p>
  * 1.21.1 无 RegisterItemModelsEvent / ItemModel（那是 1.21.4+ 的 API），故采用 Quark 同款方案：
  * 在 ItemRenderer.render 的 TAIL 注入，仅 GUI 上下文、且物品含 lensouls:stolen_entity 时绘制叠加层。
@@ -29,6 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ItemRendererMixin {
 
     private static final String STOLEN_KEY = "lensouls:stolen_entity";
+    private static final String ABILITY_KEY = "lensouls:ability_type";
     // 角标缩放与位置：GUI 上下文自带正向朝向与全亮光照；BADGE_X/Y 为栏位内微调旋钮
     private static final float BADGE_SCALE = 0.6f;
     private static final double BADGE_X = -0.25;
@@ -43,11 +48,15 @@ public abstract class ItemRendererMixin {
         CustomData cd = itemStackIn.get(DataComponents.CUSTOM_DATA);
         if (cd == null) return;
         CompoundTag tag = cd.copyTag();
-        if (!tag.contains(STOLEN_KEY)) return;
-
-        ResourceLocation id = ResourceLocation.tryParse(tag.getString(STOLEN_KEY));
-        ItemStack egg = PhotoBadgeIcon.getEggStack(id);
-        if (egg == null || egg.isEmpty()) return;
+        ItemStack badge;
+        if (tag.contains(STOLEN_KEY)) {
+            ResourceLocation id = ResourceLocation.tryParse(tag.getString(STOLEN_KEY));
+            badge = PhotoBadgeIcon.getEggStack(id);
+        } else {
+            // 空间扭曲 / 时空回溯：角标用对应能力球贴图
+            badge = PhotoBadgeIcon.getAbilityBadge(tag.getString(ABILITY_KEY));
+        }
+        if (badge == null || badge.isEmpty()) return;
         if (rendering) return;
 
         Minecraft mc = Minecraft.getInstance();
@@ -55,7 +64,7 @@ public abstract class ItemRendererMixin {
         rendering = true;
         try {
             ItemRenderer ir = mc.getItemRenderer();
-            BakedModel eggModel = ir.getModel(egg, mc.level, null, 0);
+            BakedModel badgeModel = ir.getModel(badge, mc.level, null, 0);
             poseStackIn.pushPose();
             poseStackIn.translate(BADGE_X, BADGE_Y, 0.1);
             poseStackIn.scale(BADGE_SCALE, BADGE_SCALE, BADGE_SCALE);
@@ -63,8 +72,8 @@ public abstract class ItemRendererMixin {
             // 关闭深度测试，使角标始终绘制在照片之上（z 在前、不被照片深度遮挡）
             RenderSystem.disableDepthTest();
             try {
-                ir.render(egg, ItemDisplayContext.GUI, leftHand, poseStackIn, bufferIn,
-                        0xF000F0, combinedOverlayIn, eggModel);
+                ir.render(badge, ItemDisplayContext.GUI, leftHand, poseStackIn, bufferIn,
+                        0xF000F0, combinedOverlayIn, badgeModel);
             } finally {
                 RenderSystem.enableDepthTest();
             }

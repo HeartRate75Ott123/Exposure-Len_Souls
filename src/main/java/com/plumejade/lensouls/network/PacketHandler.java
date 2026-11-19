@@ -68,6 +68,28 @@ public class PacketHandler {
                 DimensionalGunTogglePacket::handle
         );
 
+        // ---- 饰品栏相机：活跃相机指向饰品槽（凭空开取景框） ----
+        registrar.playToClient(
+                com.plumejade.lensouls.ability.camera.CameraCurioSyncPacket.TYPE,
+                com.plumejade.lensouls.ability.camera.CameraCurioSyncPacket.STREAM_CODEC,
+                (packet, ctx) -> ctx.enqueueWork(() -> packet.handle(
+                        net.minecraft.network.protocol.PacketFlow.CLIENTBOUND, ctx.player()))
+        );
+
+        // ---- 饰品栏相机：取出（Z 键 / 相机轮盘） ----
+        registrar.playToServer(
+                com.plumejade.lensouls.ability.network.CameraDrawPacket.TYPE,
+                com.plumejade.lensouls.ability.network.CameraDrawPacket.STREAM_CODEC,
+                com.plumejade.lensouls.ability.network.CameraDrawPacket::handle
+        );
+
+        // ---- 饰品栏相机：按下快门 ----
+        registrar.playToServer(
+                com.plumejade.lensouls.ability.network.CameraShootPacket.TYPE,
+                com.plumejade.lensouls.ability.network.CameraShootPacket.STREAM_CODEC,
+                com.plumejade.lensouls.ability.network.CameraShootPacket::handle
+        );
+
         // ---- 照片挥击信号 C2S（空手/空挥触发 Boss 弹幕） ----
         registrar.playToServer(
                 PhotoSwingPacket.TYPE,

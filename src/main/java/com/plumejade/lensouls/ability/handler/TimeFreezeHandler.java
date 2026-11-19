@@ -48,24 +48,12 @@ public class TimeFreezeHandler {
                                           java.util.List<net.minecraft.world.entity.LivingEntity> entitiesInFrame) {
         TimeFreezeManager manager = TimeFreezeManager.getInstance();
         if (manager.isFrozen()) {
-            showFloatingText(player, Component.translatable("message.lensouls.freeze_already_active"));
+            // 走最上层提示弹窗（FeatherToast）：新提示进来时旧提示走快速淡出，和其它提示同一条管线
+            com.plumejade.lensouls.network.HudHintPacket.send(player,
+                    Component.translatable("message.lensouls.freeze_already_active")
+                            .withStyle(net.minecraft.ChatFormatting.RED));
             return;
         }
         manager.freeze(player.server, player, entitiesInFrame);
-    }
-
-    private static void showFloatingText(ServerPlayer player, Component text) {
-        var level = player.serverLevel();
-        var look = player.getLookAngle();
-        var pos = player.getEyePosition().add(look.scale(3.0));
-        var cloud = new net.minecraft.world.entity.AreaEffectCloud(level, pos.x, pos.y, pos.z);
-        cloud.setCustomName(text.copy().withStyle(s -> s.withBold(true).withColor(net.minecraft.ChatFormatting.RED)));
-        cloud.setCustomNameVisible(true);
-        cloud.setRadius(0f);
-        cloud.setDuration(60);
-        cloud.setWaitTime(0);
-        cloud.setNoGravity(true);
-        cloud.setInvulnerable(true);
-        level.addFreshEntity(cloud);
     }
 }

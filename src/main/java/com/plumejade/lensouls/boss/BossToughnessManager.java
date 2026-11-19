@@ -223,6 +223,16 @@ public class BossToughnessManager {
      * 由 {@link LivingDamageEvent.Post} 在实际伤害生效后调用。
      */
     public void addStunDamage(LivingEntity entity, float amount) {
+        addStunDamage(entity, amount, null);
+    }
+
+    /**
+     * 定身期间玩家累计伤害达标则提前解除定身，并给该玩家弹一条提示。
+     * <p>
+     * 弹窗只在<b>真拦到</b>的时候发：这一下如果已经把目标打死（死亡，或血量已掉到 1 以下的
+     * 濒死口径 —— 有些 BOSS 会压到 0.1 并取消死亡），提前退出就没有意义，不发。
+     */
+    public void addStunDamage(LivingEntity entity, float amount, @javax.annotation.Nullable ServerPlayer source) {
         if (amount <= 0) return;
         BossToughnessData data = dataMap.get(entity.getUUID());
         if (data == null || !data.isBroken()) return;
@@ -232,9 +242,16 @@ public class BossToughnessManager {
 
         float total = data.addStunDamage(amount);
         float threshold = (float) (entity.getMaxHealth() * percent);
-        if (total >= threshold) {
-            onStunEnd(entity);
+        if (total < threshold) return;
+
+        boolean survived = entity.isAlive() && entity.getHealth() >= 1.0f;
+        if (survived && source != null) {
+            com.plumejade.lensouls.network.HudHintPacket.send(source,
+                    net.minecraft.network.chat.Component
+                            .translatable("message.lensouls.toughness.stun_broken_early")
+                            .withStyle(net.minecraft.ChatFormatting.YELLOW));
         }
+        onStunEnd(entity);
     }
 
     // ========== 减伤计算 ==========

@@ -58,6 +58,7 @@ public class TimeFreezeManager {
         this.remainingTicks = 100;
         frozenEntities.clear();
         accumulatedDamage.clear();
+        boolean anyRejected = false;
         // 目标选取口径统一在 PhotoTargets.freezable（不要玩家 / 不要拍摄者本人 /
         // 不要玩家驯服的宠物 / 不要本模组自己的召唤物——幻灵与幻影幻翼）
         for (LivingEntity e : com.plumejade.lensouls.util.PhotoTargets.freezable(source, entitiesInFrame)) {
@@ -70,14 +71,22 @@ public class TimeFreezeManager {
             if (data != null) {
                 if (data.isBroken()) {
                     PacketDistributor.sendToAllPlayers(new FreezeRejectParticlePacket(e.getId()));
+                    anyRejected = true;
                     continue;
                 }
                 if (random.nextFloat() >= 0.3f) {
                     PacketDistributor.sendToAllPlayers(new FreezeRejectParticlePacket(e.getId()));
+                    anyRejected = true;
                     continue;
                 }
             }
             frozenEntities.add(e.getId());
+        }
+        // 画面内只要有韧性目标判定失败（破刹中 或 30% 掷骰失败），就给触发者弹一次提示
+        if (anyRejected) {
+            com.plumejade.lensouls.network.HudHintPacket.send(source,
+                    net.minecraft.network.chat.Component.translatable("message.lensouls.time_stop.rejected")
+                            .withStyle(net.minecraft.ChatFormatting.RED));
         }
         LenSouls.LOGGER.debug("[TimeFreeze] 时间定格开始，定身 {} 个实体", frozenEntities.size());
         broadcast(true);
@@ -104,6 +113,17 @@ public class TimeFreezeManager {
      * 对面还剩韧性就照常免伤），所以这里累计的是减伤后实际打出来的伤害。
      */
     public void addFreezeDamage(LivingEntity entity, float amount) {
+        addFreezeDamage(entity, amount, null);
+    }
+
+    /**
+     * 同上；{@code source} 是造成这一下伤害的玩家 —— 真挣脱时给他弹一条提示。
+     * <p>
+     * 只在<b>真挣脱</b>时弹：这一下如果已经把目标打死（或打到 1 血以下的濒死口径），
+     * 就没有"挣脱"可言，不弹。
+     */
+    public void addFreezeDamage(LivingEntity entity, float amount,
+                                @javax.annotation.Nullable net.minecraft.server.level.ServerPlayer source) {
         if (server == null || amount <= 0f) return;
         int id = entity.getId();
         if (!frozenEntities.contains(id)) return;
@@ -111,9 +131,16 @@ public class TimeFreezeManager {
         if (percent <= 0) return;
         float total = accumulatedDamage.addTo(id, amount) + amount;
         float threshold = (float) (entity.getMaxHealth() * percent);
-        if (total >= threshold) {
-            unfreezeEntity(id);
+        if (total < threshold) return;
+
+        boolean survived = entity.isAlive() && entity.getHealth() >= 1.0f;
+        if (survived && source != null) {
+            com.plumejade.lensouls.network.HudHintPacket.send(source,
+                    net.minecraft.network.chat.Component
+                            .translatable("message.lensouls.time_stop.target_escaped")
+                            .withStyle(net.minecraft.ChatFormatting.YELLOW));
         }
+        unfreezeEntity(id);
     }
 
     /** 提前解冻单个实体（其余照旧），并广播剩余定身集给客户端。 */

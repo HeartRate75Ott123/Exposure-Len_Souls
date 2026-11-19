@@ -1,8 +1,11 @@
 {
+  "replace": false,
   "values": [
     "lensouls:mage_brooch",
     "lensouls:soul_whistle",
     "lensouls:heart_of_stone",
-    "lensouls:phantom_core"
+    "lensouls:phantom_core",
+    "exposure:camera",
+    "exposure_polaroid:instant_camera"
   ]
 }

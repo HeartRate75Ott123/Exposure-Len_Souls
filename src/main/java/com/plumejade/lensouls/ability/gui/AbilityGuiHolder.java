@@ -1016,10 +1016,15 @@ public class AbilityGuiHolder {
     }
 
     private static List<AbilityType> resolveOrder(Player player) {
+        List<AbilityType> order;
         if (player instanceof ServerPlayer sp) {
-            return AbilityOrderData.get(sp.getServer()).resolve(sp);
+            order = AbilityOrderData.get(sp.getServer()).resolve(sp);
+        } else {
+            order = ClientAbilityCache.getDisplayOrder();
         }
-        return ClientAbilityCache.getDisplayOrder();
+        // 胶卷相机与拍立得各用一套列表：按手持相机类型筛掉对方专属的能力
+        return com.plumejade.lensouls.ability.CameraAbilityRules.filterFor(order,
+                CameraInputHandler.getWieldedCamera(player));
     }
 
     private static boolean isEnabled(Player player, AbilityType type) {

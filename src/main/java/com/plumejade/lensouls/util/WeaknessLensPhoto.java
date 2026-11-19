@@ -54,7 +54,7 @@ public final class WeaknessLensPhoto {
     }
 
     /** 弱点透镜照片可生效次数（点数为 0 即销毁） */
-    public static final int MAX_DURABILITY = 100;
+    public static final int MAX_DURABILITY = 500;
 
     /** 照片带给武器的活性等级：视为该元素的 2 级武器活性 */
     public static final int ACTIVITY_LEVEL = 2;

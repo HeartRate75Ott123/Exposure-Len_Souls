@@ -28,16 +28,12 @@ public class AcquisitionHandler {
     public static void onLivingDrops(LivingDropsEvent event) {
         if (event.getEntity().level().isClientSide) return;
 
-        // ---- 胶卷/拍立得相片掉落 13% ----
-        if (event.getEntity().getRandom().nextFloat() < 0.13f) {
-            boolean isColor = event.getEntity().getRandom().nextBoolean();
-            boolean isInstant = event.getEntity().getRandom().nextBoolean();
-            String filmId;
-            if (isInstant) {
-                filmId = isColor ? "exposure_polaroid:instant_color_slide" : "exposure_polaroid:instant_black_and_white_slide";
-            } else {
-                filmId = isColor ? "exposure:color_film" : "exposure:black_and_white_film";
-            }
+        // ---- 相纸/胶片掉落 13%（只出这两种；玩家不掉） ----
+        if (!(event.getEntity() instanceof net.minecraft.world.entity.player.Player)
+                && event.getEntity().getRandom().nextFloat() < 0.13f) {
+            String filmId = event.getEntity().getRandom().nextBoolean()
+                    ? "exposure_polaroid:instant_color_slide"
+                    : "exposure_expanded:hicap_black_and_white_film";
             var filmItem = BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse(filmId));
             if (filmItem != null) {
                 event.getDrops().add(createItemEntity(event, new ItemStack(filmItem)));

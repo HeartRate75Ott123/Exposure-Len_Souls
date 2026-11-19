@@ -40,6 +40,10 @@ public class ModParticleTypes {
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SOUL_WISP_WHITE =
             PARTICLE_TYPES.register("soul_wisp_white", () -> new SimpleParticleType(false));
 
+    /** 蓝色魂火（时间定格拒绝：仿夺魂索命失败版的蓝色配色） */
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SOUL_WISP_BLUE =
+            PARTICLE_TYPES.register("soul_wisp_blue", () -> new SimpleParticleType(false));
+
     /** 红色魂尘（要害打击命中时从受击者身上爆出） */
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SOUL_WISP_RED =
             PARTICLE_TYPES.register("soul_wisp_red", () -> new SimpleParticleType(false));

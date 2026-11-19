@@ -461,7 +461,12 @@ public class PhotoSetEffects {
                 default -> null;
             };
             if (sup == null) continue;
-            target.addEffect(new MobEffectInstance(sup, 100, Math.max(0, e.getValue() - 1), false, true, true));
+            // 非玩家被抑制时播「对焦收束」法印（1.8.74 随 FilterAppliedFxHandler 一起被删的那套）；
+            // 玩家被抑制不播 —— 用户 2026-11-20 裁定。
+            boolean applied = target.addEffect(new MobEffectInstance(sup, 100, Math.max(0, e.getValue() - 1), false, true, true));
+            if (applied && !(target instanceof net.minecraft.world.entity.player.Player)) {
+                com.plumejade.lensouls.handler.FilterAppliedFx.broadcast(target, sup.value().getColor());
+            }
         }
     }
 
@@ -493,7 +498,11 @@ public class PhotoSetEffects {
                 };
                 if (sup == null) continue;
                 int dur = Integer.parseInt(p[3]);
-                target.addEffect(new MobEffectInstance(sup, dur, 0, false, true, true));
+                // 同上：非玩家播法印，玩家不播。
+                boolean applied = target.addEffect(new MobEffectInstance(sup, dur, 0, false, true, true));
+                if (applied && !(target instanceof net.minecraft.world.entity.player.Player)) {
+                    com.plumejade.lensouls.handler.FilterAppliedFx.broadcast(target, sup.value().getColor());
+                }
             }
         }
     }

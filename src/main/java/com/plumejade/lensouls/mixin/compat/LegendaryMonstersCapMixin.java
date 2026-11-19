@@ -18,9 +18,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * <p>
  * 当武器活性等级 5 + 目标有对应弱点，或目标处于我方定身时，绕过此上限。
  * <p>
- * <b>版本差异（实测 2.2.2）：</b>2.1.20 的上限调用是 {@code Math.min(DD)D}（double），
- * 而 2.2.2 改成了 {@code Math.min(FF)F}（float）。靶点必须两个都挂、各自 {@code require = 0}，
- * 否则在对应版本上 {@code @ModifyArg} 会静默失配（表现就是「绕上限完全没生效、伤害照旧被压」）。
+ * <b>版本差异（javap 逐版核对）：</b>2.1.20 的上限调用是 {@code Math.min(DD)D}（double），
+ * 2.2.2 改成了 {@code Math.min(FF)F}（float），<b>2.2.4 又改回了 {@code Math.min(DD)D}</b>
+ * （{@code Math.min(FF)F} 在 2.2.4 只剩于 {@code addDamage}/{@code readAdditionalSaveData}，
+ * {@code hurt} 里已经没有）。所以两个靶点都要挂、各自 {@code require = 0}：哪个版本用哪个就命中哪个，
+ * 另一个安静跳过（2.2.4 上跳过的是 float 那个）。少挂一个的后果是 {@code @ModifyArg} 静默失配
+ * （表现就是「绕上限完全没生效、伤害照旧被压」）。
  * 传奇怪物没有伤害桶，不需要 bucket reset。
  */
 @Mixin(value = net.miauczel.legendary_monsters.entity.AnimatedMonster.OriginClasses.IAnimatedBoss.class, remap = false)
@@ -50,8 +53,8 @@ public abstract class LegendaryMonstersCapMixin {
     }
 
     /**
-     * 传奇怪物 2.2.2 起的 float 版靶点（{@code Math.min(FF)F}）。
-     * 2.1.20 没有这条调用，{@code require = 0} 保证旧版安静跳过。
+     * float 版靶点（{@code Math.min(FF)F}）：2.2.2 有、2.1.20 和 2.2.4 都没有。
+     * {@code require = 0} 保证在没这条调用的版本上安静跳过（2.2.4 就是这种情况）。
      */
     @ModifyArg(
             method = "hurt",

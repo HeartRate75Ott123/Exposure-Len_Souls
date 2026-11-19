@@ -75,7 +75,7 @@ public class AbilityWheelHud {
     public static void onMouseScrolled(InputEvent.MouseScrollingEvent event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null) return;
-        if (!mc.options.keyShift.isDown()) return;
+        if (!com.plumejade.lensouls.key.KeyBindings.isAbilityScrollModDown()) return;
         if (CameraInputHandler.getWieldedCamera(mc.player).isEmpty()) return;
 
         double delta = event.getScrollDeltaY();
@@ -211,7 +211,8 @@ public class AbilityWheelHud {
                 x + ROW_WIDTH / 2, hintTop, 0xFF55FF55);
         g.drawCenteredString(mc.font, Component.translatable(KEY_HINT_OPEN),
                 x + ROW_WIDTH / 2, hintTop + 11, 0xFF55FF55);
-        g.drawCenteredString(mc.font, Component.translatable(KEY_HINT),
+        g.drawCenteredString(mc.font, Component.translatable(KEY_HINT,
+                        com.plumejade.lensouls.key.KeyBindings.abilityScrollModKeyName()),
                 x + ROW_WIDTH / 2, hintTop + 22, 0xFF55FF55);
 
         // 帧级补间：只把 tick 步进（prev→curr）平滑成连续动画，不插向 target，
@@ -306,6 +307,8 @@ public class AbilityWheelHud {
      * 还没收到同步时该方法内部会回退到旧口径，列表不会空。
      */
     private static List<AbilityType> getUnlockedList() {
-        return ClientAbilityCache.getUnlockedInDisplayOrder();
+        // 快捷列表与轮盘/菜单同一口径：只列当前手持相机能用的能力（胶卷、拍立得各一套）
+        return com.plumejade.lensouls.ability.CameraAbilityRules
+                .filterHeld(ClientAbilityCache.getUnlockedInDisplayOrder());
     }
 }

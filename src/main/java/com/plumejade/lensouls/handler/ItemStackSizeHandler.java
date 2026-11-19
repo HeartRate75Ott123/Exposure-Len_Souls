@@ -97,6 +97,22 @@ public final class ItemStackSizeHandler {
                 }
             });
         }
+        // 胶卷容量（2026-11-19 用户定案）：所有胶卷 32，exposure_expanded 那两件 hicap 64。
+        // 走默认组件 FILM_FRAME_COUNT——FilmItem.getMaxFrameCount 优先读它，取景框帧数/物品条/tooltip 全部同源。
+        int films = 0;
+        for (Item filmItem : BuiltInRegistries.ITEM.stream()
+                .filter(i -> i instanceof io.github.mortuusars.exposure.world.item.FilmItem).toList()) {
+            ResourceLocation filmId = BuiltInRegistries.ITEM.getKey(filmItem);
+            boolean hicap = filmId != null
+                    && (filmId.equals(ResourceLocation.parse("exposure_expanded:hicap_color_film"))
+                    || filmId.equals(ResourceLocation.parse("exposure_expanded:hicap_black_and_white_film")));
+            int frames = hicap ? 64 : 32;
+            event.modify(filmItem, builder ->
+                    builder.set(io.github.mortuusars.exposure.Exposure.DataComponents.FILM_FRAME_COUNT, frames));
+            films++;
+        }
+        LenSouls.LOGGER.info("[ItemStack] 已把 {} 种胶卷的容量改为 32（hicap 两件 64）", films);
+
         LenSouls.LOGGER.info("[ItemStack] 已把 {} 个物品的最大堆叠上限改为 64（其中 {} 个同时摘除耐久）",
                 OVERRIDES.size(), Math.min(STRIP_DURABILITY.size(), OVERRIDES.size()));
     }

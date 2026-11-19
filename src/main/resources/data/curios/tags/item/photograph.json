@@ -1,7 +1,8 @@
 {
+  "replace": false,
   "values": [
     "exposure:photograph",
-    {"id": "exposure_polaroid:instant_photograph", "required": false},
+    "[object Object]",
     "lensouls:entity_photograph",
     "lensouls:photo_album"
   ]

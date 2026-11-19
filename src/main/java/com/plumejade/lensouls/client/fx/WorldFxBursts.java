@@ -87,6 +87,34 @@ public final class WorldFxBursts {
         return Math.max(0.55F, Math.min(3.40F, span / 1.90F));
     }
 
+    /**
+     * 时间定格拒绝：**复用夺魂索命判定失败那套渲染管线**（WorldFx 着色器的魂丝 + 连续环），
+     * 只把配色换成时停的冷蓝，另加一圈蓝色魂火爆散。
+     * <p>
+     * 这就是用户点名的「夺魂索命那个大特效（含着色器）」——不是纯粒子，粒子只是配菜。
+     */
+    public static void freezeReject(ClientLevel level, Vec3 feet, float height) {
+        float h = (float) Math.max(0.9, height);
+        // 70/170/255 = 时停取景框同色系（冷蓝）
+        BURSTS.add(new SoulSeverBurst(feet, h, 70, 170, 255, false));
+
+        int wisps = 24;
+        for (int i = 0; i < wisps; i++) {
+            double ox = (level.random.nextDouble() - 0.5) * 0.9;
+            double oz = (level.random.nextDouble() - 0.5) * 0.9;
+            double oy = 0.1 + level.random.nextDouble() * h;
+            level.addParticle(ModParticleTypes.SOUL_WISP_BLUE.get(),
+                    feet.x + ox, feet.y + oy, feet.z + oz,
+                    0.0, 0.02 + level.random.nextDouble() * 0.03, 0.0);
+        }
+        for (int i = 0; i < 8; i++) {
+            double ang = Math.PI * 2 * i / 8.0;
+            level.addParticle(ModParticleTypes.SOUL_WISP_BLUE.get(),
+                    feet.x, feet.y + h * 0.58, feet.z,
+                    Math.cos(ang) * 0.09, 0.05, Math.sin(ang) * 0.09);
+        }
+    }
+
     /** 夺魂索命：目标身上「魂飞魄散」。 */
     public static void soulSever(ClientLevel level, Vec3 feet, float height, boolean success) {
         BURSTS.add(new SoulSeverBurst(feet, height, success));
@@ -144,13 +172,26 @@ public final class WorldFxBursts {
 
         private final Vec3 feet;
         private final float height;
+        /** 密度/亮度口径：true = 夺魂索命成功、false = 失败（时停拒绝也走这一档） */
         private final boolean success;
+        private final int r, g, b;
         private float t;
 
         SoulSeverBurst(Vec3 feet, float height, boolean success) {
+            this(feet, height,
+                    success ? 70 : 150,
+                    success ? 255 : 90,
+                    success ? 170 : 255,
+                    success);
+        }
+
+        SoulSeverBurst(Vec3 feet, float height, int r, int g, int b, boolean success) {
             this.feet = feet;
             this.height = Math.max(0.9F, height);
             this.success = success;
+            this.r = r;
+            this.g = g;
+            this.b = b;
         }
 
         @Override
@@ -166,10 +207,7 @@ public final class WorldFxBursts {
                     (float) (feet.x - camera.x),
                     (float) (feet.y - camera.y),
                     (float) (feet.z - camera.z));
-            // 成功 = 绿色；失败 = 紫色
-            int r = success ? 70 : 150;
-            int g = success ? 255 : 90;
-            int b = success ? 170 : 255;
+            // 配色由构造器给定：夺魂索命成功=绿 / 失败=紫 / 时停拒绝=冷蓝
 
             // ── 1. 魂丝：沿路径生长（前 22%），末端散开变细（后 45%） ──
             float grow = Math.min(1.0F, t / 0.30F);

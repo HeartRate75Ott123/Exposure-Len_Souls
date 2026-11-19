@@ -59,6 +59,13 @@ public class AbilitySelectPacket implements CustomPacketPayload {
             if (packet.ordinal < 0 || packet.ordinal >= values.length) return;
             AbilityType type = values[packet.ordinal];
             if (!AbilityManager.getInstance().isUnlocked(sp, type)) return;
+            // 相机类型归属：拍立得专属（空间扭曲/能力窃取/时空回溯）与胶卷专属（见微知著）互不通用
+            if (!com.plumejade.lensouls.ability.CameraAbilityRules.allows(cam, type)) {
+                com.plumejade.lensouls.network.HudHintPacket.send(sp,
+                        net.minecraft.network.chat.Component.translatable("ability.lensouls.wrong_camera_type")
+                                .withStyle(net.minecraft.ChatFormatting.RED));
+                return;
+            }
             CameraAbilityStore.setSelected(cam, type, sp);
             CameraAbilitySyncPacket.send(sp, packet.ordinal);
         });

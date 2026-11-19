@@ -1,6 +1,7 @@
 package com.plumejade.lensouls.ability.handler;
 
 import com.plumejade.lensouls.LenSouls;
+import com.plumejade.lensouls.ability.AbilityBehavior;
 import com.plumejade.lensouls.ability.gui.AbilityGuiHolder;
 import com.plumejade.lensouls.ability.network.AbilityOpenGuiPacket;
 import com.plumejade.lensouls.ability.network.SpatialWarpActivatePacket;
@@ -40,16 +41,19 @@ public class CameraInputHandler {
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null) return;
-        if (mc.hitResult == null || mc.hitResult.getType() != HitResult.Type.MISS) return;
 
         ItemStack stack = mc.player.getMainHandItem();
-        String itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
 
-        // ── 主手持有空间扭曲照片 → 激活空间扭曲 ──
+        // ── 主手持有空间扭曲照片 → 开/关空间扭曲 ──
+        // 口径（用户定）：手持 + 左键就认，不再要求「左键点到空气」——
+        // 对着方块/生物左键同样生效；这里不取消原版左键，破坏/攻击照常进行。
         if (hasSpatialWarpData(stack)) {
             PacketDistributor.sendToServer(new SpatialWarpActivatePacket());
             return;
         }
+
+        // 下面两条仍然只认「左键点空」，避免与破坏方块/攻击抢输入
+        if (mc.hitResult == null || mc.hitResult.getType() != HitResult.Type.MISS) return;
 
         // ── 主手持有回溯快照照片 → 主动触发回溯 ──
         if (TemporalSnapshot.hasSnapshot(stack)) {
@@ -131,6 +135,6 @@ public class CameraInputHandler {
         var data = stack.get(DataComponents.CUSTOM_DATA);
         if (data == null) return false;
         var tag = data.copyTag();
-        return tag.contains("lensouls:spatial_warp_pos");
+        return tag.contains(AbilityBehavior.TAG_WARP_POS);
     }
 }

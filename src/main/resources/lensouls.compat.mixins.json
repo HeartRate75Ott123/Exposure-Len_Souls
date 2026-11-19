@@ -11,6 +11,8 @@
     "StackedPhotoStackingMixin",
     "LightroomInjectMixin",
     "PolaroidPrintMixin",
+    "CameraCurioMixin",
+    "CameraAttachmentPositionsMixin",
     "PhotographCurioMixin",
     "CataclysmDamageBucketMixin",
     "LegendaryMonstersCapMixin",

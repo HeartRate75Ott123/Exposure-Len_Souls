@@ -132,6 +132,30 @@ public class SoulWispParticle extends TextureSheetParticle {
     }
 
     /**
+     * 蓝色魂火（时间定格拒绝）。
+     * <p>
+     * 与紫/红同一套运动（上浮 + 螺旋 + 末段淡出），只换配色：冷蓝偏青（时停取景框同色系），
+     * 复用 {@code lensouls:soul_wisp} 贴图 + 逐粒子染色，不新增贴图资源。
+     */
+    public static class BlueProvider implements ParticleProvider<SimpleParticleType> {
+        private final SpriteSet sprites;
+
+        public BlueProvider(SpriteSet sprites) {
+            this.sprites = sprites;
+        }
+
+        @Override
+        public Particle createParticle(SimpleParticleType type, ClientLevel level,
+                                       double x, double y, double z,
+                                       double xSpeed, double ySpeed, double zSpeed) {
+            SoulWispParticle particle = new SoulWispParticle(level, x, y, z, xSpeed, ySpeed, zSpeed, sprites);
+            float hot = level.random.nextFloat();
+            particle.setColor(0.30f + hot * 0.20f, 0.66f + hot * 0.22f, 1.00f);
+            return particle;
+        }
+    }
+
+    /**
      * 红色魂尘（要害打击命中，从受击者身上爆出）。
      * <p>
      * 与银白同一套运动，只换配色：血红偏橙（{@code #FF3B30} 一族），亮部略带白热感。

@@ -78,7 +78,9 @@ public class AbilityRadialScreen extends Screen {
     /** 外沿描边宽度（像素）：命中填充推进到这条描边的内沿就停，不再压到描边上 */
     private static final double BORDER_W = 1.5;
 
-    private final List<AbilityType> items = new ArrayList<>(ClientAbilityCache.getUnlockedInDisplayOrder());
+    private final List<AbilityType> items = new ArrayList<>(
+            com.plumejade.lensouls.ability.CameraAbilityRules.filterHeld(
+                    ClientAbilityCache.getUnlockedInDisplayOrder()));
     private final long openedAtMs = Util.getMillis();
     private final SliceAnim anim = new SliceAnim();
 

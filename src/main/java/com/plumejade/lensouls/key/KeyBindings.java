@@ -53,6 +53,14 @@ public class KeyBindings {
     public static final String KEY_TAMED_SUBJECT = "key.lensouls.tamed_subject";
     /** 能力轮盘：长按呼出、松手确认（把指向的能力写进手持相机） */
     public static final String KEY_ABILITY_WHEEL = "key.lensouls.ability_wheel";
+    /** 取出饰品栏里的相机（默认 Z）：身上只有一台直接开取景框，多台呼出相机轮盘 */
+    public static final String KEY_CAMERA_DRAW = "key.lensouls.camera_draw";
+
+    /** 滚轮切换能力时要按住的键（可改键；默认左 Shift，与原「潜行 + 滚轮」一致） */
+    public static final String KEY_ABILITY_SCROLL_MOD = "key.lensouls.ability_scroll_mod";
+
+    /** 诅咒页面：直接打开羽毛装配界面（默认句号键） */
+    public static final String KEY_CURSE_PAGE = "key.lensouls.curse_page";
 
     /** 触发模式常量落在公共类上（物品组件与 tooltip 共用），此处仅作别名 */
     public static final int MODE_FAST = ModDataComponents.CONVERTER_MODE_FAST;
@@ -65,6 +73,11 @@ public class KeyBindings {
             Lazy.of(() -> new net.minecraft.client.KeyMapping(
                     KEY_CONVERTER, KeyConflictContext.IN_GAME,
                     InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, KEY_CATEGORY));
+
+    private static final Lazy<net.minecraft.client.KeyMapping> CURSE_PAGE_KEY =
+            Lazy.of(() -> new net.minecraft.client.KeyMapping(
+                    KEY_CURSE_PAGE, KeyConflictContext.IN_GAME,
+                    InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_PERIOD, KEY_CATEGORY));
 
     private static final Lazy<net.minecraft.client.KeyMapping> PHOTO_GUI_KEY =
             Lazy.of(() -> new net.minecraft.client.KeyMapping(
@@ -93,6 +106,21 @@ public class KeyBindings {
      * 轮盘本身是个 Screen，屏幕打开后原版 KeyMapping 的按下/抬起计数不再更新，
      * 只靠 KeyMapping 会拿不到「松手」这一刻（这是长按型界面的通用坑）。
      */
+    /** 相机取出键（默认 Z） */
+    private static final Lazy<net.minecraft.client.KeyMapping> CAMERA_DRAW_KEY =
+            Lazy.of(() -> new net.minecraft.client.KeyMapping(
+                    KEY_CAMERA_DRAW, KeyConflictContext.IN_GAME,
+                    InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Z, KEY_CATEGORY));
+
+    /**
+     * 滚轮修饰键。默认左 Shift：改动前「潜行 + 滚轮」的手感原样保留，
+     * 想换键的玩家在操作设置里改这一条即可（HUD 提示会跟着变）。
+     */
+    private static final Lazy<net.minecraft.client.KeyMapping> ABILITY_SCROLL_MOD_KEY =
+            Lazy.of(() -> new net.minecraft.client.KeyMapping(
+                    KEY_ABILITY_SCROLL_MOD, KeyConflictContext.IN_GAME,
+                    InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_SHIFT, KEY_CATEGORY));
+
     private static final Lazy<net.minecraft.client.KeyMapping> ABILITY_WHEEL_KEY =
             Lazy.of(() -> new net.minecraft.client.KeyMapping(
                     KEY_ABILITY_WHEEL, KeyConflictContext.IN_GAME,
@@ -141,6 +169,40 @@ public class KeyBindings {
         event.register(BARRAGE_KEY.get());
         event.register(TAMED_SUBJECT_KEY.get());
         event.register(ABILITY_WHEEL_KEY.get());
+        event.register(ABILITY_SCROLL_MOD_KEY.get());
+        event.register(CAMERA_DRAW_KEY.get());
+        event.register(CURSE_PAGE_KEY.get());
+    }
+
+    // ========== 饰品栏相机（点按 Z 取出） ==========
+
+    @SubscribeEvent
+    public static void onCameraDrawTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.screen != null) return;
+        if (!CAMERA_DRAW_KEY.get().consumeClick()) return;
+        // 手里已经有相机：手持优先，交给原版右键开关取景框
+        if (!CameraInputHandler.getWieldedCamera(mc.player).isEmpty()) return;
+
+        // 已经在用饰品栏相机：再按一次 = 关掉取景框
+        if (((io.github.mortuusars.exposure.world.entity.CameraOperator) mc.player)
+                .getActiveExposureCamera() instanceof com.plumejade.lensouls.ability.camera.CameraInCurio active) {
+            PacketDistributor.sendToServer(new com.plumejade.lensouls.ability.network.CameraDrawPacket(
+                    active.slotId(), active.index()));
+            return;
+        }
+
+        var cameras = com.plumejade.lensouls.ability.CameraEquipHandler.collect(mc.player);
+        if (cameras.isEmpty()) {
+            mc.player.displayClientMessage(com.plumejade.lensouls.ability.CameraEquipHandler.noneMessage(), true);
+            return;
+        }
+        if (cameras.size() == 1) {
+            PacketDistributor.sendToServer(new com.plumejade.lensouls.ability.network.CameraDrawPacket(
+                    cameras.get(0).slotId(), cameras.get(0).index()));
+        } else {
+            mc.setScreen(new com.plumejade.lensouls.ability.gui.CameraRadialScreen(cameras));
+        }
     }
 
     // ========== 能力轮盘（长按呼出 / 松手确认） ==========
@@ -183,11 +245,35 @@ public class KeyBindings {
         return ABILITY_WHEEL_KEY.get().getTranslatedKeyMessage();
     }
 
+    /** 滚轮修饰键的当前键名（HUD 提示用；改键后提示跟着变） */
+    public static Component abilityScrollModKeyName() {
+        return ABILITY_SCROLL_MOD_KEY.get().getTranslatedKeyMessage();
+    }
+
+    /** 滚轮修饰键是否按着（屏幕外读物理键，与轮盘键同一口径） */
+    public static boolean isAbilityScrollModDown() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return false;
+        return isKeyHeld(mc, ABILITY_SCROLL_MOD_KEY.get());
+    }
+
     /** 物理键是否按着（屏幕打开时 KeyMapping 状态不更新，必须直接问窗口） */
     private static boolean isKeyHeld(Minecraft mc, net.minecraft.client.KeyMapping mapping) {
         var key = mapping.getKey();
         if (key.getType() != InputConstants.Type.KEYSYM) return mapping.isDown();
         return InputConstants.isKeyDown(mc.getWindow().getWindow(), key.getValue());
+    }
+
+    /** 饰品栏相机取景时，右键 = 按快门（原版只处理手持相机与相机架）。 */
+    @SubscribeEvent
+    public static void onInteraction(InputEvent.InteractionKeyMappingTriggered event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.screen != null) return;
+        if (!event.isUseItem()) return;
+        if (!(((io.github.mortuusars.exposure.world.entity.CameraOperator) mc.player)
+                .getActiveExposureCamera() instanceof com.plumejade.lensouls.ability.camera.CameraInCurio)) return;
+        event.setCanceled(true);
+        PacketDistributor.sendToServer(com.plumejade.lensouls.ability.network.CameraShootPacket.INSTANCE);
     }
 
     @SubscribeEvent
@@ -197,6 +283,12 @@ public class KeyBindings {
 
         if (PHOTO_GUI_KEY.get().consumeClick()) {
             PacketDistributor.sendToServer(new PhotoOpenPacket());
+        }
+
+        // 诅咒页面（默认句号键）：与点「羽毛装配」分页同一套——服务端开屏，客户端复原光标
+        if (CURSE_PAGE_KEY.get().consumeClick()) {
+            com.plumejade.lensouls.client.feather.CursorKeeper.remember();
+            PacketDistributor.sendToServer(new com.plumejade.lensouls.network.FeatherOpenPacket());
         }
 
         // 弹幕开关（B 键）：本地乐观翻转保证提示即时，再上报服务端翻转权威状态

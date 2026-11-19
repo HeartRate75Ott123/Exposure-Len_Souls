@@ -197,9 +197,16 @@ public class ClientPacketHandlers {
         Vec3 toPlayer = player.position().add(0, player.getEyeHeight() * 0.5, 0)
                 .subtract(center).normalize();
 
-        // 平面四边形方式向玩家方向锥形散射（120 度锥角，5 条加速）
+        // 平面四边形方式向玩家方向锥形散射（120 度锥角，8 条加速；原来 5 条，实机不够显眼）
         spawnConeParticles(level, center, toPlayer, 120.0,
-                5, ModParticleTypes.FREEZE_REJECT.get(), 0.15, 0.45);
+                8, ModParticleTypes.FREEZE_REJECT.get(), 0.15, 0.45);
+
+        // 主菜：夺魂索命判定失败那套**着色器**特效（魂丝 + 连续环）的冷蓝版 + 蓝魂火爆散。
+        // 只在被拒实体身上播一次；体型由 Burst 内部按高度/包围盒换算。
+        if (level instanceof net.minecraft.client.multiplayer.ClientLevel cl) {
+            com.plumejade.lensouls.client.fx.WorldFxBursts.freezeReject(
+                    cl, le.position(), le.getBbHeight());
+        }
     }
 
     /**

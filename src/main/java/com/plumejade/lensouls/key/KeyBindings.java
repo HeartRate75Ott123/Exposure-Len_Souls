@@ -182,7 +182,7 @@ public class KeyBindings {
         if (mc.player == null || mc.screen != null) return;
         if (!CAMERA_DRAW_KEY.get().consumeClick()) return;
         // 手里已经有相机：手持优先，交给原版右键开关取景框
-        if (!CameraInputHandler.getWieldedCamera(mc.player).isEmpty()) return;
+        if (!com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(mc.player).isEmpty()) return;
 
         // 已经在用饰品栏相机：再按一次 = 关掉取景框
         if (((io.github.mortuusars.exposure.world.entity.CameraOperator) mc.player)
@@ -263,7 +263,7 @@ public class KeyBindings {
     private static boolean canOpenWheel(Minecraft mc) {
         if (mc.screen != null) return false;
         if (mc.player == null) return false;
-        if (CameraInputHandler.getWieldedCamera(mc.player).isEmpty()) return false;
+        if (com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(mc.player).isEmpty()) return false;
         return !ClientAbilityCache.getUnlockedInDisplayOrder().isEmpty();
     }
 

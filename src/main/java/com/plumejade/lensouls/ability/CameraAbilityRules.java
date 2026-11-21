@@ -68,12 +68,4 @@ public final class CameraAbilityRules {
         }
         return out.isEmpty() ? list : out;
     }
-
-    /** 客户端用：按当前手持/副手的相机类型过滤能力列表。 */
-    public static List<AbilityType> filterHeld(List<AbilityType> list) {
-        net.minecraft.client.player.LocalPlayer player = net.minecraft.client.Minecraft.getInstance().player;
-        if (player == null) return list;
-        ItemStack camera = com.plumejade.lensouls.ability.handler.CameraInputHandler.getWieldedCamera(player);
-        return filterFor(list, camera);
-    }
 }

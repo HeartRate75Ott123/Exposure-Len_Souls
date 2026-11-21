@@ -2,6 +2,7 @@ package com.plumejade.lensouls.ability.handler;
 
 import com.plumejade.lensouls.LenSouls;
 import com.plumejade.lensouls.ability.AbilityBehavior;
+import com.plumejade.lensouls.ability.CameraStacks;
 import com.plumejade.lensouls.ability.gui.AbilityGuiHolder;
 import com.plumejade.lensouls.ability.network.AbilityOpenGuiPacket;
 import com.plumejade.lensouls.ability.network.SpatialWarpActivatePacket;
@@ -15,9 +16,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.Input;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
@@ -30,6 +28,9 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * 客户端：检测手持相机左键空气，根据当前能力发送对应的 C2S 包。
+ * <p>
+ * ⚠ 本类属于**仅客户端**（引用 LocalPlayer/Minecraft/KeyMapping）。服务端要查相机一律用
+ * {@link CameraStacks}——服务端路径引用本类里的方法会在专用服务器上抛 dist 异常。
  */
 @EventBusSubscriber(modid = LenSouls.MODID, value = Dist.CLIENT)
 public class CameraInputHandler {
@@ -62,15 +63,10 @@ public class CameraInputHandler {
         }
 
         // ── 手持相机 → 打开能力选择 GUI ──
-        if (isCamera(stack)) {
+        if (CameraStacks.isCamera(stack)) {
             PacketDistributor.sendToServer(new AbilityOpenGuiPacket());
         }
     }
-
-    // ========== 相机检测（按 ID 比对，无编译依赖） ==========
-
-    private static final ResourceLocation CAMERA_ID = ResourceLocation.parse("exposure:camera");
-    private static final ResourceLocation POLAROID_ID = ResourceLocation.parse("exposure_polaroid:instant_camera");
 
     /**
      * 能力选择 GUI 打开时仍可移动（WASD/跳跃/潜行/冲刺）。
@@ -116,27 +112,12 @@ public class CameraInputHandler {
         return InputConstants.isKeyDown(mc.getWindow().getWindow(), key.getValue());
     }
 
-    /** 相机检测（按 ID 比对，无编译依赖）；HUD 滚动列表等客户端组件复用 */
-    public static boolean isCamera(ItemStack stack) {
-        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        return CAMERA_ID.equals(id) || POLAROID_ID.equals(id);
-    }
-
-    /** 返回玩家当前手持相机（主手优先，其次副手）；无则空栈。HUD/滚动/服务端激活统一复用。 */
-    public static ItemStack getWieldedCamera(Player player) {
-        ItemStack main = player.getMainHandItem();
-        if (isCamera(main)) return main;
-        ItemStack off = player.getOffhandItem();
-        if (isCamera(off)) return off;
-        // 饰品栏相机正在取景时，视同「手上这台」——能力 HUD/轮盘/服务端校验全都靠这个方法定位相机，
-        // 不补这条就会表现为「从饰品栏打开取景后当前能力丢失」。
-        if (player instanceof io.github.mortuusars.exposure.world.entity.CameraOperator operator) {
-            if (operator.getActiveExposureCamera() instanceof com.plumejade.lensouls.ability.camera.CameraInCurio curio) {
-                ItemStack curioStack = curio.getItemStack();
-                if (isCamera(curioStack)) return curioStack;
-            }
-        }
-        return ItemStack.EMPTY;
+    /** 客户端用：按当前手持/副手的相机类型过滤能力列表（轮盘/快捷列表/菜单共用）。 */
+    public static java.util.List<com.plumejade.lensouls.ability.AbilityType> filterHeld(
+            java.util.List<com.plumejade.lensouls.ability.AbilityType> list) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return list;
+        return com.plumejade.lensouls.ability.CameraAbilityRules.filterFor(list, CameraStacks.getWieldedCamera(mc.player));
     }
 
     private static boolean hasSpatialWarpData(ItemStack stack) {

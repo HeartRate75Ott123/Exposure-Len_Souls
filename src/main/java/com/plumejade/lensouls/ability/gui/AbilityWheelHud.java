@@ -76,7 +76,7 @@ public class AbilityWheelHud {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null) return;
         if (!com.plumejade.lensouls.key.KeyBindings.isAbilityScrollModDown()) return;
-        if (CameraInputHandler.getWieldedCamera(mc.player).isEmpty()) return;
+        if (com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(mc.player).isEmpty()) return;
 
         double delta = event.getScrollDeltaY();
         if (delta == 0) return;
@@ -91,7 +91,7 @@ public class AbilityWheelHud {
             if (now - lastToggleAtMs < TOGGLE_COOLDOWN_MS) return;
             // 与多能力分支同口径：该语境下滚轮已被模组接管，不放给原版热栏
             event.setCanceled(true);
-            ItemStack cam = CameraInputHandler.getWieldedCamera(mc.player);
+            ItemStack cam = com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(mc.player);
             if (cam.isEmpty()) return;
             AbilityType type = list.get(0);
             AbilityType current = CameraAbilityStore.getSelectedType(cam);
@@ -136,7 +136,7 @@ public class AbilityWheelHud {
         if (mc.player == null) return;
 
         // 换机播种：手持相机变更时本地读取其选中项，即时更新镜像（不依赖滞后 NBT 同步）
-        ItemStack held = CameraInputHandler.getWieldedCamera(mc.player);
+        ItemStack held = com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(mc.player);
         if (!held.isEmpty()) {
             CameraId cid = held.get(Exposure.DataComponents.CAMERA_ID);
             java.util.UUID id = cid != null ? cid.uuid() : null;
@@ -188,7 +188,7 @@ public class AbilityWheelHud {
     public static void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.options.hideGui) return;
-        if (CameraInputHandler.getWieldedCamera(mc.player).isEmpty()) return;
+        if (com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(mc.player).isEmpty()) return;
 
         List<AbilityType> list = getUnlockedList();
         if (list.isEmpty()) return;
@@ -308,7 +308,7 @@ public class AbilityWheelHud {
      */
     private static List<AbilityType> getUnlockedList() {
         // 快捷列表与轮盘/菜单同一口径：只列当前手持相机能用的能力（胶卷、拍立得各一套）
-        return com.plumejade.lensouls.ability.CameraAbilityRules
+        return com.plumejade.lensouls.ability.handler.CameraInputHandler
                 .filterHeld(ClientAbilityCache.getUnlockedInDisplayOrder());
     }
 }

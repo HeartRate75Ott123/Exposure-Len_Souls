@@ -39,11 +39,11 @@ public class TimeFreezeHandler {
                 net.minecraft.core.registries.Registries.ENCHANTMENT,
                 net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(LenSouls.MODID, "soul_photography")));
         if (soulPhoto.isEmpty()) return false;
-        // 以「当前使用的相机」为准：CameraInputHandler.getWieldedCamera 也会落回正在取景的
+        // 以「当前使用的相机」为准：CameraStacks.getWieldedCamera 也会落回正在取景的
         // 饰品槽相机。只查主/副手的话，快捷取景框一开两手都是空的 ⇒ 时间定格永远不触发。
         return com.plumejade.lensouls.enchantment.ModEnchantments
                 .getSoulPhotographyLevel(player.registryAccess(),
-                        CameraInputHandler.getWieldedCamera(player)) > 0;
+                        com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(player)) > 0;
     }
 
     private static void triggerTimeFreeze(ServerPlayer player,

@@ -79,7 +79,7 @@ public class AbilityRadialScreen extends Screen {
     private static final double BORDER_W = 1.5;
 
     private final List<AbilityType> items = new ArrayList<>(
-            com.plumejade.lensouls.ability.CameraAbilityRules.filterHeld(
+            com.plumejade.lensouls.ability.handler.CameraInputHandler.filterHeld(
                     ClientAbilityCache.getUnlockedInDisplayOrder()));
     private final long openedAtMs = Util.getMillis();
     private final SliceAnim anim = new SliceAnim();

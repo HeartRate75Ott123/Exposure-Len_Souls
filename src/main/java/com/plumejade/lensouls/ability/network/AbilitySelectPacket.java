@@ -47,7 +47,7 @@ public class AbilitySelectPacket implements CustomPacketPayload {
     public static void handle(AbilitySelectPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer sp)) return;
-            ItemStack cam = CameraInputHandler.getWieldedCamera(sp);
+            ItemStack cam = com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(sp);
             if (cam.isEmpty()) return;
             // -1 = 取消选中
             if (packet.ordinal == -1) {

@@ -1024,15 +1024,15 @@ public class AbilityGuiHolder {
         }
         // 胶卷相机与拍立得各用一套列表：按手持相机类型筛掉对方专属的能力
         return com.plumejade.lensouls.ability.CameraAbilityRules.filterFor(order,
-                CameraInputHandler.getWieldedCamera(player));
+                com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(player));
     }
 
     private static boolean isEnabled(Player player, AbilityType type) {
         if (player instanceof ServerPlayer sp) {
-            AbilityType sel = CameraAbilityStore.getSelectedType(CameraInputHandler.getWieldedCamera(sp));
+            AbilityType sel = CameraAbilityStore.getSelectedType(com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(sp));
             return sel == type && AbilityManager.getInstance().isUnlocked(sp, type);
         }
-        AbilityType sel = CameraAbilityStore.getSelectedType(CameraInputHandler.getWieldedCamera(player));
+        AbilityType sel = CameraAbilityStore.getSelectedType(com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(player));
         return sel == type && ClientAbilityCache.isUnlocked(type);
     }
 }

@@ -119,7 +119,7 @@ public final class WeaknessLensPhoto {
      */
     public static boolean isInstallTarget(Player player, ItemStack stack) {
         if (player == null || stack == null || stack.isEmpty()) return false;
-        if (CameraInputHandler.isCamera(stack)) return false;
+        if (com.plumejade.lensouls.ability.CameraStacks.isCamera(stack)) return false;
         return ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), stack) > 0;
     }
 

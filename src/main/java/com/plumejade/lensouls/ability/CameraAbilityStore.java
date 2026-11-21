@@ -39,7 +39,7 @@ public final class CameraAbilityStore {
      * 客户端与服务端通用——用于 HUD/菜单/换机播种显示当前相机记录的选中项。
      */
     public static AbilityType getSelectedType(ItemStack cam) {
-        if (!CameraInputHandler.isCamera(cam)) return null;
+        if (!com.plumejade.lensouls.ability.CameraStacks.isCamera(cam)) return null;
         CustomData data = cam.get(DataComponents.CUSTOM_DATA);
         if (data == null) return null;
         CompoundTag tag = data.copyTag();
@@ -51,7 +51,7 @@ public final class CameraAbilityStore {
 
     /** 读取玩家手持相机（主手优先，其次副手）的选中能力（校验解锁，未解锁/非相机返回 null）。服务端激活消费用。 */
     public static AbilityType getSelected(Player player) {
-        return getSelected(CameraInputHandler.getWieldedCamera(player), player);
+        return getSelected(com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(player), player);
     }
 
     public static AbilityType getSelected(ItemStack cam, Player player) {
@@ -65,7 +65,7 @@ public final class CameraAbilityStore {
 
     /** 设置相机选中能力（仅当玩家已解锁）。 */
     public static void setSelected(ItemStack cam, AbilityType type, Player player) {
-        if (!CameraInputHandler.isCamera(cam)) return;
+        if (!com.plumejade.lensouls.ability.CameraStacks.isCamera(cam)) return;
         if (player != null && !AbilityManager.getInstance().isUnlocked(player, type)) return;
         CompoundTag tag = cam.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         tag.putInt(KEY, type.ordinal());
@@ -75,7 +75,7 @@ public final class CameraAbilityStore {
 
     /** 清除相机选中（取消选中）。 */
     public static void clearSelected(ItemStack cam) {
-        if (!CameraInputHandler.isCamera(cam)) return;
+        if (!com.plumejade.lensouls.ability.CameraStacks.isCamera(cam)) return;
         CompoundTag tag = cam.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         tag.remove(KEY);
         cam.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
@@ -89,7 +89,7 @@ public final class CameraAbilityStore {
      * @return 是否做了修正
      */
     public static boolean validate(ItemStack cam, Player player) {
-        if (!CameraInputHandler.isCamera(cam)) return false;
+        if (!com.plumejade.lensouls.ability.CameraStacks.isCamera(cam)) return false;
         AbilityType type = getSelectedType(cam);
         if (type == null) return false;
         if (!AbilityManager.getInstance().isUnlocked(player, type)) {
@@ -130,7 +130,7 @@ public final class CameraAbilityStore {
 
         boolean changed = false;
         for (ItemStack stack : all) {
-            if (!CameraInputHandler.isCamera(stack)) continue;
+            if (!com.plumejade.lensouls.ability.CameraStacks.isCamera(stack)) continue;
             if (!stack.has(Exposure.DataComponents.CAMERA_ID)) {
                 stack.set(Exposure.DataComponents.CAMERA_ID, CameraId.create());
                 changed = true;

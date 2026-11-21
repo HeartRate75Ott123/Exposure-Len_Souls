@@ -141,7 +141,7 @@ public class PhotoInjectionHandler {
                 return;
             }
 
-            ItemStack hand = CameraInputHandler.getWieldedCamera(player);
+            ItemStack hand = com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(player);
             if (ModEnchantments.getSoulPhotographyLevel(player.registryAccess(), hand) <= 0) {
                 PhotoLog.info("cache-no-enchant", () -> "未缓存：手持相机没有摄魂术（exposureId=" + exposureId
                         + ", ability=" + ability.getId() + ", 拍摄者此刻手上"

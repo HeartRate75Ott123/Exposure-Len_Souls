@@ -55,7 +55,7 @@ public final class CameraEquipHandler {
             int slots = Math.min(stacks.getSlots(), e.getValue().getSlots());
             for (int i = 0; i < slots; i++) {
                 ItemStack stack = stacks.getStackInSlot(i);
-                if (stack.isEmpty() || !CameraInputHandler.isCamera(stack)) continue;
+                if (stack.isEmpty() || !com.plumejade.lensouls.ability.CameraStacks.isCamera(stack)) continue;
                 out.add(new Entry(e.getKey(), i, stack));
             }
         }

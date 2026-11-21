@@ -70,7 +70,7 @@ public class GytrinketCameraChargeMixin {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc == null ? null : mc.player;
         if (player == null) return false;
-        return com.plumejade.lensouls.ability.handler.CameraInputHandler.isCamera(player.getMainHandItem())
-                || com.plumejade.lensouls.ability.handler.CameraInputHandler.isCamera(player.getOffhandItem());
+        return com.plumejade.lensouls.ability.CameraStacks.isCamera(player.getMainHandItem())
+                || com.plumejade.lensouls.ability.CameraStacks.isCamera(player.getOffhandItem());
     }
 }

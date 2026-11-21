@@ -112,7 +112,7 @@ public class FilterPhotoHandler {
 
             boolean selfie = frame.extraData().get(Frame.SELFIE).orElse(false);
 
-            ItemStack hand = CameraInputHandler.getWieldedCamera(player);
+            ItemStack hand = com.plumejade.lensouls.ability.CameraStacks.getWieldedCamera(player);
             if (hand.isEmpty() || !(hand.getItem() instanceof CameraItem camera)) return;
 
             Optional<ResourceLocation> filterOpt = camera.getFilter(player.registryAccess(), hand)
